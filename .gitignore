@@ -1,32 +1,35 @@
-# Prerequisites
-*.d
+# data in Exec of CNS
+EB_CNS/Exec/Combustor/*.ex*
+EB_CNS/Exec/Combustor/plt*
+EB_CNS/Exec/Combustor/tmp_build_dir
+EB_CNS/Exec/Pulse/*.ex*
+EB_CNS/Exec/Pulse/plt*
+EB_CNS/Exec/Pulse/tmp_build_dir
+EB_CNS/Exec/ShockRef/*.ex*
+EB_CNS/Exec/ShockRef/plt*
+EB_CNS/Exec/ShockRef/tmp_build_dir
+EB_CNS/Exec/Sod/*.ex*
+EB_CNS/Exec/Sod/plt*
+EB_CNS/Exec/Sod/tmp_build_dir
 
-# Compiled Object files
-*.slo
-*.lo
-*.o
-*.obj
+# data in Exec of CNS  hybrid
+EB_CNS/Exec/Combustor/*.EX*
+EB_CNS/Exec/Combustor/plt*
+EB_CNS/Exec/Combustor/tmp_build_dir
+EB_CNS/Exec/Pulse/*.EX*
+EB_CNS/Exec/Pulse/plt*
+EB_CNS/Exec/Pulse/tmp_build_dir
+EB_CNS/Exec/ShockRef/*.EX*
+EB_CNS/Exec/ShockRef/plt*
+EB_CNS/Exec/ShockRef/tmp_build_dir
+EB_CNS/Exec/Sod/*.EX*
+EB_CNS/Exec/Sod/plt*
+EB_CNS/Exec/Sod/tmp_build_dir
 
-# Precompiled Headers
-*.gch
-*.pch
 
-# Compiled Dynamic libraries
-*.so
-*.dylib
-*.dll
 
-# Fortran module files
-*.mod
-*.smod
-
-# Compiled Static libraries
-*.lai
-*.la
-*.a
-*.lib
-
-# Executables
-*.exe
-*.out
-*.app
+#vscode data
+.vscode/configurationCache.log
+.vscode/dryrun.log
+.vscode/settings.json
+.vscode/targets.log
