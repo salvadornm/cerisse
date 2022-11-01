@@ -1,5 +1,5 @@
-#ifndef CNS_INDEX_H_
-#define CNS_INDEX_H_
+#ifndef CNS_INDEX_MACROS_H
+#define CNS_INDEX_MACROS_H
 
 #if (AMREX_SPACEDIM == 2)
 
@@ -9,7 +9,8 @@
 #define UEDEN 3
 #define UEINT 4
 #define UTEMP 5
-#define NUM_STATE 6
+//#define UFS   6
+#define NUM_STATE 6 //+ NUM_SPECIES
 
 #define NCONS 6
 #define NEQNS 4
@@ -32,7 +33,8 @@
 #define UEDEN 4
 #define UEINT 5
 #define UTEMP 6
-#define NUM_STATE 7
+//#define UFS   7
+#define NUM_STATE 7 //+ NUM_SPECIES
 
 #define NCONS 7
 #define NEQNS 5

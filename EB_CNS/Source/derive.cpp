@@ -1,6 +1,6 @@
-#include "CNS_derive.H"
+#include "derive.H"
 #include "CNS.H"
-#include "CNS_parm.H"
+#include "parm.H"
 
 using namespace amrex;
 

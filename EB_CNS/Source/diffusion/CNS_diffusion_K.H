@@ -1,8 +1,8 @@
 #ifndef CNS_DIFFUSION_K_H_
 #define CNS_DIFFUSION_K_H_
 
-#include "CNS_index_macros.H"
-#include "CNS_parm.H"
+#include "index_macros.H"
+#include "parm.H"
 #include <AMReX_FArrayBox.H>
 #include <AMReX_CONSTANTS.H>
 #include <cmath>

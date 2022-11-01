@@ -1,9 +1,9 @@
 #ifndef CNS_HYDRO_EB_K_H_
 #define CNS_HYDRO_EB_K_H_
 
-#include "CNS_index_macros.H"
+#include "index_macros.H"
 #include "CNS.H"
-#include "CNS_parm.H"
+#include "parm.H"
 #include "CNS_hydro_K.H"
 #include <AMReX_FArrayBox.H>
 #include <cmath>

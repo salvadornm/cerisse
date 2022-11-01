@@ -1,9 +1,9 @@
 
 #include <CNS.H>
 #include <CNS_K.H>
-#include <CNS_tagging.H>
-#include <CNS_parm.H>
-#include <cns_prob.H>
+#include <tagging.H>
+#include <parm.H>
+#include <prob.H>
 
 #include <AMReX_EBMultiFabUtil.H>
 #include <AMReX_ParmParse.H>
@@ -14,38 +14,37 @@
 
 using namespace amrex;
 
-BCRec     CNS::phys_bc;
+BCRec    CNS::phys_bc;
 
-int       CNS::verbose = 0;
-IntVect   CNS::hydro_tile_size {AMREX_D_DECL(1024,16,16)};
-Real      CNS::cfl       = 0.3;
-int       CNS::do_reflux = 1;
-int       CNS::refine_cutcells          = 1;
-int       CNS::refine_max_dengrad_lev   = -1;
-Real      CNS::refine_dengrad           = 1.0e10;
+int      CNS::verbose = 2;
+IntVect  CNS::hydro_tile_size {AMREX_D_DECL(1024,16,16)};
+Real     CNS::cfl       = 0.3;
+int      CNS::do_reflux = 1;
+int      CNS::refine_cutcells          = 1;
+int      CNS::refine_max_dengrad_lev   = -1;
+Real     CNS::refine_dengrad           = 1.0e10;
 Vector<RealBox> CNS::refine_boxes;
-RealBox*  CNS::dp_refine_boxes;
+RealBox* CNS::dp_refine_boxes;
 
-bool      CNS::do_visc        = true;  // diffusion is on by default
-bool      CNS::use_const_visc = false; // diffusion does not use constant viscosity by default
+bool     CNS::do_visc        = true;  // diffusion is on by default
+bool     CNS::do_react       = false; // reaction is off by default
+bool     CNS::use_const_visc = false; // diffusion does not use constant viscosity by default
 
-int       CNS::plm_iorder     = 2;     // [1,2] 1: slopes are zero'd,  2: second order slopes
-Real      CNS::plm_theta      = 2.0;   // [1,2] 1: minmod; 2: van Leer's MC
-Real      CNS::gravity        = 0.0;
+int      CNS::plm_iorder     = 2;     // [1,2] 1: slopes are zero'd,  2: second order slopes
+Real     CNS::plm_theta      = 2.0;   // [1,2] 1: minmod; 2: van Leer's MC
+// Real     CNS::gravity        = 0.0;
 
-int       CNS::eb_weights_type = 0;   // [0,1,2,3] 0: weights are all 1
-int       CNS::do_reredistribution = 1;
+int      CNS::eb_weights_type = 0;   // [0,1,2,3] 0: weights are all 1
+int      CNS::do_reredistribution = 1;
 
-CNS::CNS ()
-{}
+CNS::CNS() {}
 
-CNS::CNS (Amr&            papa,
-          int             lev,
-          const Geometry& level_geom,
-          const BoxArray& bl,
-          const DistributionMapping& dm,
-          Real            time)
-    : AmrLevel(papa,lev,level_geom,bl,dm,time)
+CNS::CNS(Amr&            papa,
+         int             lev,
+         const Geometry& level_geom,
+         const BoxArray& bl,
+         const DistributionMapping& dm,
+         Real            time) : AmrLevel(papa,lev,level_geom,bl,dm,time)
 {
     if (do_reflux && level > 0) {
         flux_reg.define(bl, papa.boxArray(level-1),
@@ -55,14 +54,26 @@ CNS::CNS (Amr&            papa,
     }
 
     buildMetrics();
+
+    // Initialize reaction
+    get_new_data(Reactions_Type).setVal(0.0);
+    if (do_react) {
+        // init_reactor();
+    }    
 }
 
-CNS::~CNS ()
-{}
+CNS::~CNS() 
+{
+    if (do_react) {
+        // reactor->close();
+    }
+}
 
 void
-CNS::init (AmrLevel& old)
+CNS::init(AmrLevel& old)
 {
+    BL_PROFILE("CNS::init(old)");
+
     auto& oldlev = dynamic_cast<CNS&>(old);
 
     Real dt_new    = parent->dtLevel(level);
@@ -72,15 +83,27 @@ CNS::init (AmrLevel& old)
     setTimeLevel(cur_time,dt_old,dt_new);
 
     MultiFab& S_new = get_new_data(State_Type);
-    FillPatch(old,S_new,0,cur_time,State_Type,0,NUM_STATE);
+    FillPatch(old, S_new, 0, cur_time, State_Type, 0, NUM_STATE);
+
+    amrex::MultiFab& React_new = get_new_data(Reactions_Type);
+    if (do_react) {
+        FillPatch(
+        old, React_new, 0, cur_time, Reactions_Type, 0, React_new.nComp());
+    } else {
+        React_new.setVal(0);
+    }
 
     MultiFab& C_new = get_new_data(Cost_Type);
-    FillPatch(old,C_new,0,cur_time,Cost_Type,0,1);
+    FillPatch(old, C_new, 0, cur_time, Cost_Type, 0, 1);
 }
 
 void
-CNS::init ()
+CNS::init()
 {
+    // This version inits the data on a new level that did not
+    // exist before regridding.
+    BL_PROFILE("CNS::init()");
+
     Real dt        = parent->dtLevel(level);
     Real cur_time  = getLevel(level-1).state[State_Type].curTime();
     Real prev_time = getLevel(level-1).state[State_Type].prevTime();
@@ -95,21 +118,28 @@ CNS::init ()
 }
 
 void
-CNS::initData ()
+CNS::initData()
 {
     BL_PROFILE("CNS::initData()");
 
     const auto geomdata = geom.data();
     MultiFab& S_new = get_new_data(State_Type);
+    S_new.setVal(0.0);
 
     Parm const* lparm = d_parm;
     ProbParm const* lprobparm = d_prob_parm;
 
-    auto const& sma = S_new.arrays();
+    if (verbose != 0) {
+        Print() << "Initializing the data at level " << level << std::endl;
+    }
+
+    auto const& sarrs = S_new.arrays();
     amrex::ParallelFor(S_new,
     [=] AMREX_GPU_DEVICE (int box_no, int i, int j, int k) noexcept
     {
-        cns_initdata(i, j, k, sma[box_no], geomdata, *lparm, *lprobparm);
+        cns_initdata(i, j, k, sarrs[box_no], geomdata, *lparm, *lprobparm);
+        // Verify that the sum of (rho Y)_i = rho at every cell
+        // cns_check_initial_species(i, j, k, sarrs[box_no]);
     });
 
     // Compute the initial temperature (will override what was set in initdata)
@@ -120,32 +150,25 @@ CNS::initData ()
 }
 
 void
-CNS::computeInitialDt (int                    finest_level,
-                       int                    /*sub_cycle*/,
-                       Vector<int>&           n_cycle,
-                       const Vector<IntVect>& /*ref_ratio*/,
-                       Vector<Real>&          dt_level,
-                       Real                   stop_time)
+CNS::computeInitialDt(int                    finest_level,
+                      int                    /*sub_cycle*/,
+                      Vector<int>&           n_cycle,
+                      const Vector<IntVect>& /*ref_ratio*/,
+                      Vector<Real>&          dt_level,
+                      Real                   stop_time)
 {
-  //
   // Grids have been constructed, compute dt for all levels.
-  //
-  if (level > 0) {
-    return;
-  }
+  if (level > 0) return;
 
   Real dt_0 = std::numeric_limits<Real>::max();
   int n_factor = 1;
-  for (int i = 0; i <= finest_level; i++)
-  {
+  for (int i = 0; i <= finest_level; i++) {
     dt_level[i] = getLevel(i).initialTimeStep();
-    n_factor   *= n_cycle[i];
-    dt_0 = std::min(dt_0,n_factor*dt_level[i]);
+    n_factor *= n_cycle[i];
+    dt_0 = std::min<amrex::Real>(dt_0, n_factor*dt_level[i]);
   }
 
-  //
   // Limit dt's by the value of stop_time.
-  //
   const Real eps = 0.001*dt_0;
   Real cur_time  = state[State_Type].curTime();
   if (stop_time >= 0.0) {
@@ -154,72 +177,63 @@ CNS::computeInitialDt (int                    finest_level,
   }
 
   n_factor = 1;
-  for (int i = 0; i <= finest_level; i++)
-  {
+  for (int i = 0; i <= finest_level; i++) {
     n_factor *= n_cycle[i];
     dt_level[i] = dt_0/n_factor;
   }
 }
 
 void
-CNS::computeNewDt (int                    finest_level,
-                   int                    /*sub_cycle*/,
-                   Vector<int>&           n_cycle,
-                   const Vector<IntVect>& /*ref_ratio*/,
-                   Vector<Real>&          dt_min,
-                   Vector<Real>&          dt_level,
-                   Real                   stop_time,
-                   int                    post_regrid_flag)
+CNS::computeNewDt(int                    finest_level,
+                  int                    /*sub_cycle*/,
+                  Vector<int>&           n_cycle,
+                  const Vector<IntVect>& /*ref_ratio*/,
+                  Vector<Real>&          dt_min,
+                  Vector<Real>&          dt_level,
+                  Real                   stop_time,
+                  int                    post_regrid_flag)
 {
-    //
     // We are at the end of a coarse grid timecycle.
     // Compute the timesteps for the next iteration.
-    //
-    if (level > 0) {
-        return;
-    }
+    if (level > 0) return;
 
-    for (int i = 0; i <= finest_level; i++)
-    {
+    for (int i = 0; i <= finest_level; i++) {
         dt_min[i] = getLevel(i).estTimeStep();
     }
 
-    if (post_regrid_flag == 1)
-    {
-        //
+    if (post_regrid_flag == 1) {
         // Limit dt's by pre-regrid dt
-        //
-        for (int i = 0; i <= finest_level; i++)
-        {
+        for (int i = 0; i <= finest_level; i++) {
             dt_min[i] = std::min(dt_min[i],dt_level[i]);
         }
-    }
-    else
-    {
-        //
+    } else {
         // Limit dt's by change_max * old dt
-        //
         static Real change_max = 1.1;
-        for (int i = 0; i <= finest_level; i++)
-        {
-            dt_min[i] = std::min(dt_min[i],change_max*dt_level[i]);
+        for (int i = 0; i <= finest_level; i++) {
+            if ((verbose != 0) && ParallelDescriptor::IOProcessor()) {
+                if (dt_min[i] > change_max * dt_level[i]) {
+                    Print() << "PeleC::compute_new_dt : limiting dt at level "
+                            << i << '\n';
+                    Print() << " ... new dt computed: " << dt_min[i] << '\n';
+                    Print() << " ... but limiting to: "
+                            << change_max * dt_level[i] << " = " << change_max
+                            << " * " << dt_level[i] << '\n';
+                }
+            }
+
+            dt_min[i] = std::min(dt_min[i], change_max * dt_level[i]);
         }
     }
 
-    //
     // Find the minimum over all levels
-    //
     Real dt_0 = std::numeric_limits<Real>::max();
     int n_factor = 1;
-    for (int i = 0; i <= finest_level; i++)
-    {
+    for (int i = 0; i <= finest_level; i++) {
         n_factor *= n_cycle[i];
-        dt_0 = std::min(dt_0,n_factor*dt_min[i]);
+        dt_0 = std::min(dt_0, n_factor*dt_min[i]);
     }
 
-    //
     // Limit dt's by the value of stop_time.
-    //
     const Real eps = 0.001*dt_0;
     Real cur_time  = state[State_Type].curTime();
     if (stop_time >= 0.0) {
@@ -229,21 +243,22 @@ CNS::computeNewDt (int                    finest_level,
     }
 
     n_factor = 1;
-    for (int i = 0; i <= finest_level; i++)
-    {
+    for (int i = 0; i <= finest_level; i++) {
         n_factor *= n_cycle[i];
         dt_level[i] = dt_0/n_factor;
     }
 }
 
 void
-CNS::post_regrid (int /*lbase*/, int /*new_finest*/)
+CNS::post_regrid(int /*lbase*/, int /*new_finest*/)
 {
 }
 
 void
-CNS::post_timestep (int /*iteration*/)
+CNS::post_timestep(int /*iteration*/)
 {
+    BL_PROFILE("CNS::post_timestep()");
+
     if (do_reflux && level < parent->finestLevel()) {
         CNS& fine_level = getLevel(level+1);
         MultiFab& S_crse = get_new_data(State_Type);
@@ -257,7 +272,7 @@ CNS::post_timestep (int /*iteration*/)
 }
 
 void
-CNS::postCoarseTimeStep (Real /*time*/)
+CNS::postCoarseTimeStep(Real /*time*/)
 {
     // This only computes sum on level 0
     if (verbose >= 2) {
@@ -266,7 +281,7 @@ CNS::postCoarseTimeStep (Real /*time*/)
 }
 
 void
-CNS::printTotal () const
+CNS::printTotal() const
 {
     const MultiFab& S_new = get_new_data(State_Type);
     MultiFab mf(grids, dmap, 1, 0);
@@ -293,11 +308,15 @@ CNS::printTotal () const
 }
 
 void
-CNS::post_init (Real)
+CNS::post_init(Real /*stop_time*/)
 {
     if (level > 0) return;
     for (int k = parent->finestLevel()-1; k >= 0; --k) {
         getLevel(k).avgDown();
+    }
+
+    if (do_react) {
+        // react_state(parent->cumTime(), parent->dtLevel(level), true);
     }
 
     if (verbose >= 2) {
@@ -306,18 +325,18 @@ CNS::post_init (Real)
 }
 
 void
-CNS::post_restart ()
+CNS::post_restart()
 {
 }
 
 void
-CNS::errorEst (TagBoxArray& tags, int, int, Real /*time*/, int, int)
+CNS::errorEst(TagBoxArray& tags, int, int, Real /*time*/, int, int)
 {
     BL_PROFILE("CNS::errorEst()");
 
     if (refine_cutcells) {
         const MultiFab& S_new = get_new_data(State_Type);
-        amrex::TagCutCells(tags, S_new);
+        TagCutCells(tags, S_new);
     }
 
     if (!refine_boxes.empty())
@@ -329,8 +348,7 @@ CNS::errorEst (TagBoxArray& tags, int, int, Real /*time*/, int, int)
 
         auto const& tagma = tags.arrays();
         ParallelFor(tags,
-        [=] AMREX_GPU_DEVICE (int box_no, int i, int j, int k) noexcept
-        {
+        [=] AMREX_GPU_DEVICE (int box_no, int i, int j, int k) noexcept {
             RealVect pos {AMREX_D_DECL((i+0.5)*dx[0]+problo[0],
                                        (j+0.5)*dx[1]+problo[1],
                                        (k+0.5)*dx[2]+problo[2])};
@@ -343,8 +361,7 @@ CNS::errorEst (TagBoxArray& tags, int, int, Real /*time*/, int, int)
         Gpu::streamSynchronize();
     }
 
-    if (level < refine_max_dengrad_lev)
-    {
+    if (level < refine_max_dengrad_lev) {
         const MultiFab& S_new = get_new_data(State_Type);
         const Real cur_time = state[State_Type].curTime();
         MultiFab rho(S_new.boxArray(), S_new.DistributionMap(), 1, 1);
@@ -359,22 +376,21 @@ CNS::errorEst (TagBoxArray& tags, int, int, Real /*time*/, int, int)
         ParallelFor(rho,
         [=] AMREX_GPU_DEVICE (int box_no, int i, int j, int k) noexcept
         {
-            cns_tag_denerror(i, j, k, tagma[box_no], rhoma[box_no], dengrad_threshold, tagval);
+            cns_tag_graderror(i, j, k, tagma[box_no], rhoma[box_no], dengrad_threshold, tagval);
         });
         Gpu::streamSynchronize();
     }
 }
 
 void
-CNS::read_params ()
+CNS::read_params()
 {
     ParmParse pp("cns");
 
     pp.query("v", verbose);
 
     Vector<int> tilesize(AMREX_SPACEDIM);
-    if (pp.queryarr("hydro_tile_size", tilesize, 0, AMREX_SPACEDIM))
-    {
+    if (pp.queryarr("hydro_tile_size", tilesize, 0, AMREX_SPACEDIM)) {
         for (int i=0; i<AMREX_SPACEDIM; i++) hydro_tile_size[i] = tilesize[i];
     }
 
@@ -392,11 +408,9 @@ CNS::read_params ()
 
     pp.query("do_visc", do_visc);
 
-    if (do_visc)
-    {
+    if (do_visc) {
         pp.query("use_const_visc",use_const_visc);
-        if (use_const_visc)
-        {
+        if (use_const_visc) {
             pp.get("const_visc_mu",h_parm->const_visc_mu);
             pp.get("const_visc_ki",h_parm->const_visc_ki);
             pp.get("const_lambda" ,h_parm->const_lambda);
@@ -430,7 +444,7 @@ CNS::read_params ()
 #endif
     }
 
-    pp.query("gravity", gravity);
+    // pp.query("gravity", gravity);
 
     pp.query("eos_gamma", h_parm->eos_gamma);
     pp.query("eos_mu"   , h_parm->eos_mu);
@@ -448,7 +462,7 @@ CNS::read_params ()
     //   3 -- use_volfrac_as_eb_weights
     pp.query("eb_weights_type", eb_weights_type);
     if (eb_weights_type < 0 || eb_weights_type > 3) {
-        amrex::Abort("CNS: eb_weights_type must be 0,1,2 or 3");
+        amrex::Abort("CNS: eb_weights_type must be 0, 1, 2 or 3");
     }
 
     pp.query("do_reredistribution", do_reredistribution);
@@ -460,7 +474,7 @@ CNS::read_params ()
 }
 
 void
-CNS::avgDown ()
+CNS::avgDown()
 {
     BL_PROFILE("CNS::avgDown()");
 
@@ -481,19 +495,19 @@ CNS::avgDown ()
 }
 
 void
-CNS::buildMetrics ()
+CNS::buildMetrics()
 {
     BL_PROFILE("CNS::buildMetrics()");
 
     // make sure dx == dy == dz
-    const Real* dx = geom.CellSize();
-#if (AMREX_SPACEDIM == 2)
-    if (std::abs(dx[0]-dx[1]) > 1.e-12*dx[0])
-        amrex::Abort("CNS: must have dx == dy\n");
-#else
-    if (std::abs(dx[0]-dx[1]) > 1.e-12*dx[0] || std::abs(dx[0]-dx[2]) > 1.e-12*dx[0])
-        amrex::Abort("CNS: must have dx == dy == dz\n");
-#endif
+//     const Real* dx = geom.CellSize();
+// #if (AMREX_SPACEDIM == 2)
+//     if (std::abs(dx[0]-dx[1]) > 1.e-12*dx[0])
+//         amrex::Abort("CNS: must have dx == dy\n");
+// #else
+//     if (std::abs(dx[0]-dx[1]) > 1.e-12*dx[0] || std::abs(dx[0]-dx[2]) > 1.e-12*dx[0])
+//         amrex::Abort("CNS: must have dx == dy == dz\n");
+// #endif
 
     const auto& ebfactory = dynamic_cast<EBFArrayBoxFactory const&>(Factory());
 
@@ -514,7 +528,7 @@ CNS::buildMetrics ()
 }
 
 Real
-CNS::estTimeStep ()
+CNS::estTimeStep()
 {
     BL_PROFILE("CNS::estTimeStep()");
 
@@ -559,13 +573,13 @@ CNS::estTimeStep ()
 }
 
 Real
-CNS::initialTimeStep ()
+CNS::initialTimeStep()
 {
     return estTimeStep();
 }
 
 void
-CNS::computeTemp (MultiFab& State, int ng)
+CNS::computeTemp(MultiFab& State, int ng)
 {
     BL_PROFILE("CNS::computeTemp()");
 

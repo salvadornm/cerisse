@@ -1,5 +1,5 @@
-#ifndef CNS_PROB_PARM_H_
-#define CNS_PROB_PARM_H_
+#ifndef CNS_PROB_PARM_H
+#define CNS_PROB_PARM_H
 
 #include <AMReX_REAL.H>
 

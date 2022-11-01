@@ -89,9 +89,9 @@ int main (int argc, char* argv[])
     ParallelDescriptor::ReduceRealMax({timer_tot, timer_init, timer_advance},
                                       ParallelDescriptor::IOProcessorNumber());
 
-    amrex::Print() << "Run Time total        = " << timer_tot     << "\n"
-                   << "Run Time init         = " << timer_init    << "\n"
-                   << "Run Time advance      = " << timer_advance << "\n";
+    amrex::Print() << "Run Time total   = " << timer_tot     << "\n"
+                   << "Run Time init    = " << timer_init    << "\n"
+                   << "Run Time advance = " << timer_advance << "\n";
 
     BL_PROFILE_VAR_STOP(pmain);
 

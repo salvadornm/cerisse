@@ -1,4 +1,4 @@
-#include <CNS_parm.H>
+#include <parm.H>
 #include <CNS_hydro_K.H>
 #include <CNS_hydro_eb_K.H>
 

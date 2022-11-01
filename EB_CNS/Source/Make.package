@@ -2,23 +2,24 @@
 CEXE_sources += main.cpp
 
 CEXE_headers += CNS.H
-CEXE_headers += CNS_derive.H
-CEXE_headers += CNS_tagging.H
+CEXE_headers += derive.H
+CEXE_headers += tagging.H
 CEXE_headers += CNS_K.H
+CEXE_headers += index_marcos.H
 
-CEXE_sources += CNS_advance.cpp
-CEXE_sources += CNS_advance_box.cpp
-CEXE_sources += CNS_advance_box_eb.cpp
-CEXE_sources += CNS_bcfill.cpp
-CEXE_sources += CNS_derive.cpp
+CEXE_sources += advance.cpp
+CEXE_sources += advance_box.cpp
+CEXE_sources += advance_box_eb.cpp
+CEXE_sources += bcfill.cpp
+CEXE_sources += derive.cpp
 CEXE_sources += CNS_flux_redistribute.cpp
 CEXE_sources += CNS.cpp
 CEXE_sources += CNSBld.cpp
-CEXE_sources += CNS_io.cpp
-CEXE_sources += CNS_setup.cpp
+CEXE_sources += io.cpp
+CEXE_sources += setup.cpp
 
-CEXE_sources += CNS_init_eb2.cpp
+CEXE_sources += init_eb2.cpp
 
-CEXE_headers += CNS_parm.H
-CEXE_sources += CNS_parm.cpp
+CEXE_headers += parm.H
+CEXE_sources += parm.cpp
 

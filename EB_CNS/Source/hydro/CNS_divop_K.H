@@ -1,6 +1,6 @@
 #include <AMReX_Config.H>
 #include <AMReX_REAL.H>
-#include <CNS_parm.H>
+#include <parm.H>
 #include <CNS_diffusion_eb_K.H>
 
 AMREX_GPU_DEVICE AMREX_FORCE_INLINE

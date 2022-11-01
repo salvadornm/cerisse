@@ -1,5 +1,5 @@
 
-#include <CNS_parm.H>
+#include <parm.H>
 
 void Parm::Initialize ()
 {

@@ -1,13 +1,13 @@
 #ifndef CNS_K_H_
 #define CNS_K_H_
 
-#include "CNS_index_macros.H"
+#include "index_macros.H"
 #include <AMReX_FArrayBox.H>
 #include <limits>
 #include <cmath>
 
-#include "cns_prob.H"
-#include "CNS_parm.H"
+#include "prob.H"
+#include "parm.H"
 #include "CNS_K.H"
 
 AMREX_GPU_DEVICE AMREX_FORCE_INLINE

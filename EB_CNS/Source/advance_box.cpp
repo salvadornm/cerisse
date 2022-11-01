@@ -152,22 +152,22 @@ CNS::compute_dSdt_box (const Box& bx,
         cns_flux_to_dudt(i, j, k, n, dsdtfab, AMREX_D_DECL(fxfab,fyfab,fzfab), dxinv);
     });
 
-    if (gravity != Real(0.0)) {
-        const Real g = gravity;
-        const int irho = URHO;
-#if (AMREX_SPACEDIM == 2)
-        const int imz = UMY;
-#elif (AMREX_SPACEDIM == 3)
-        const int imz = UMZ;
-#endif
-        const int irhoE = UEDEN;
-        amrex::ParallelFor(bx,
-        [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept
-        {
-            dsdtfab(i,j,k,imz  ) += g * sfab(i,j,k,irho);
-            dsdtfab(i,j,k,irhoE) += g * sfab(i,j,k,imz);
-        });
-    }
+//     if (gravity != Real(0.0)) {
+//         const Real g = gravity;
+//         const int irho = URHO;
+// #if (AMREX_SPACEDIM == 2)
+//         const int imz = UMY;
+// #elif (AMREX_SPACEDIM == 3)
+//         const int imz = UMZ;
+// #endif
+//         const int irhoE = UEDEN;
+//         amrex::ParallelFor(bx,
+//         [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept
+//         {
+//             dsdtfab(i,j,k,imz  ) += g * sfab(i,j,k,irho);
+//             dsdtfab(i,j,k,irhoE) += g * sfab(i,j,k,imz);
+//         });
+//     }
 
     Gpu::streamSynchronize();
 }

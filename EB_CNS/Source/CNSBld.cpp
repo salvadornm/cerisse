@@ -4,9 +4,7 @@
 
 using namespace amrex;
 
-class CNSBld
-    :
-    public LevelBld
+class CNSBld : public LevelBld
 {
     virtual void variableSetUp () override;
     virtual void variableCleanUp () override;

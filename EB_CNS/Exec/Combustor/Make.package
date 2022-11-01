@@ -1,2 +1,2 @@
-CEXE_headers += cns_prob.H cns_prob_parm.H
-CEXE_sources += cns_prob.cpp cns_prob_parm.cpp
+CEXE_headers += prob.H prob_parm.H
+CEXE_sources += prob.cpp prob_parm.cpp

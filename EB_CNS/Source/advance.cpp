@@ -7,7 +7,7 @@
 using namespace amrex;
 
 Real
-CNS::advance (Real time, Real dt, int /*iteration*/, int /*ncycle*/)
+CNS::advance(Real time, Real dt, int /*iteration*/, int /*ncycle*/)
 {
     BL_PROFILE("CNS::advance()");
 
@@ -68,8 +68,8 @@ CNS::advance (Real time, Real dt, int /*iteration*/, int /*ncycle*/)
 }
 
 void
-CNS::compute_dSdt (const MultiFab& S, MultiFab& dSdt, Real dt,
-                   EBFluxRegister* fr_as_crse, EBFluxRegister* fr_as_fine)
+CNS::compute_dSdt(const MultiFab& S, MultiFab& dSdt, Real dt,
+                  EBFluxRegister* fr_as_crse, EBFluxRegister* fr_as_fine)
 {
     BL_PROFILE("CNS::compute_dSdt()");
 
