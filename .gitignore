@@ -2,23 +2,15 @@
 EB_CNS/Exec/*/*.ex*
 EB_CNS/Exec/*/plt*
 EB_CNS/Exec/*/chk*
+EB_CNS/Exec/*/Backtrace*
 EB_CNS/Exec/*/tmp_build_dir
 
-# data in Exec of CNS  hybrid
-EB_CNS/Exec/Combustor/*.EX*
-EB_CNS/Exec/Combustor/plt*
-EB_CNS/Exec/Combustor/tmp_build_dir
-EB_CNS/Exec/Pulse/*.EX*
-EB_CNS/Exec/Pulse/plt*
-EB_CNS/Exec/Pulse/tmp_build_dir
-EB_CNS/Exec/ShockRef/*.EX*
-EB_CNS/Exec/ShockRef/plt*
-EB_CNS/Exec/ShockRef/tmp_build_dir
-EB_CNS/Exec/Sod/*.EX*
-EB_CNS/Exec/Sod/plt*
-EB_CNS/Exec/Sod/tmp_build_dir
-
-
+# data in Exec of CNS hybrid
+EB_CNS/Exec/*/*.EX*
+EB_CNS/Exec/*/plt*
+EB_CNS/Exec/*/chk*
+EB_CNS/Exec/*/Backtrace*
+EB_CNS/Exec/*/tmp_build_dir
 
 #vscode data
 .vscode/configurationCache.log
