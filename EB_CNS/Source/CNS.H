@@ -116,9 +116,9 @@ public:
     // Cleanup data descriptors at end of run.
     static void variableCleanUp();
 
-    static int numGrow() { return NUM_GROW; }         // REMOVE THIS USELESS FUNC
+    // static int numGrow() { return NUM_GROW; }         // REMOVE THIS USELESS FUNC
 
-    static int numState() { return NUM_STATE; }
+    // static int numState() { return NUM_STATE; }
 
     amrex::Real estTimeStep();
 
@@ -202,7 +202,7 @@ protected:
 
     amrex::EBFluxRegister flux_reg;
 
-    static constexpr int NUM_GROW = 5;
+    // static constexpr int NUM_GROW = 5;
 
     enum StateDataType { State_Type = 0, Reactions_Type, Cost_Type };
     static int num_state_data_types;

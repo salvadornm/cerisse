@@ -63,4 +63,6 @@
 #define CRHOD  3  // species diffusivity
 #define NCOEF  3 + NUM_SPECIES
 
+#define NUM_GROW 5
+
 #endif

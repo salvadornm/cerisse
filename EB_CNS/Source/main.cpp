@@ -5,7 +5,7 @@
 #include <AMReX_Amr.H>
 #include <AMReX_EB2.H>
 
-#include <CNS.H>
+#include "CNS.H"
 
 using namespace amrex;
 
@@ -51,7 +51,7 @@ int main (int argc, char* argv[])
 
         Amr amr(getLevelBld());
         AmrLevel::SetEBSupportLevel(EBSupport::full);
-        AmrLevel::SetEBMaxGrowCells(CNS::numGrow(),4,2);
+        AmrLevel::SetEBMaxGrowCells(NUM_GROW, 4, 2);
 
         initialize_EB2(amr.Geom(amr.maxLevel()), amr.maxLevel(), amr.maxLevel());
 
@@ -61,14 +61,10 @@ int main (int argc, char* argv[])
 
         timer_advance = amrex::second();
 
-        while ( amr.okToContinue() &&
-                 (amr.levelSteps(0) < max_step || max_step < 0) &&
-               (amr.cumTime() < stop_time || stop_time < 0.0) )
-
+        while (amr.okToContinue() && (amr.levelSteps(0) < max_step || max_step < 0) &&
+              (amr.cumTime() < stop_time || stop_time < 0.0))
         {
-            //
-            // Do a coarse timestep.  Recursively calls timeStep()
-            //
+            // Do a coarse timestep. Recursively calls timeStep()
             amr.coarseTimeStep(stop_time);
         }
 
