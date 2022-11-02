@@ -1,14 +1,18 @@
 #ifndef CNS_H
 #define CNS_H
 
-#include <index_macros.H>
-#include <parm.H>
-#include <prob_parm.H>
+#include "index_macros.H"
+#include "PelePhysics.H"
+#include "ReactorBase.H"
+#include "parm.H"
+#include "prob_parm.H"
+
 #include <AMReX_AmrLevel.H>
 #include <AMReX_EBCellFlag.H>
 #include <AMReX_EBFluxRegister.H>
 
 using namespace amrex;
+
 class CNS : public amrex::AmrLevel
 {
 public:
@@ -112,9 +116,62 @@ public:
     // Cleanup data descriptors at end of run.
     static void variableCleanUp();
 
-    static int numGrow() { return NUM_GROW; }
+    static int numGrow() { return NUM_GROW; }         // REMOVE THIS USELESS FUNC
 
     static int numState() { return NUM_STATE; }
+
+    amrex::Real estTimeStep();
+
+    void computeTemp(amrex::MultiFab& State, int ng);
+
+    void compute_dSdt_box(const amrex::Box& bx,
+                          amrex::Array4<amrex::Real const>& Sfab,
+                          amrex::Array4<amrex::Real      >& dSdtfab,
+                          const std::array<FArrayBox*, AMREX_SPACEDIM>& flux);
+
+    void compute_dSdt_box_eb(const amrex::Box& bx,
+                             amrex::Array4<amrex::Real       const> const& Sfab,
+                             amrex::Array4<amrex::Real            > const& dSdtfab,
+                             std::array<FArrayBox*, AMREX_SPACEDIM> const& flux,
+                             amrex::Array4<amrex::EBCellFlag const> const& flag,
+                             amrex::Array4<amrex::Real       const> const& vfrac,
+                             AMREX_D_DECL(
+                                amrex::Array4<amrex::Real    const> const& apx,
+                                amrex::Array4<amrex::Real    const> const& apy,
+                                amrex::Array4<amrex::Real    const> const& apz),
+                             AMREX_D_DECL(
+                                amrex::Array4<amrex::Real    const> const& fcx,
+                                amrex::Array4<amrex::Real    const> const& fcy,
+                                amrex::Array4<amrex::Real    const> const& fcz),
+                                amrex::Array4<amrex::Real    const> const& bcent,
+                             int as_crse,
+                             amrex::Array4<amrex::Real            > const& drho_as_crse,
+                             amrex::Array4<int               const> const& rrflag_as_crse,
+                             int as_fine,
+                             amrex::Array4<amrex::Real            > const& dm_as_fine,
+                             amrex::Array4<int               const> const& lev_mask,
+                             amrex::Real dt);
+
+    void cns_flux_redistribute(const amrex::Box& bx,
+                               amrex::Array4<amrex::Real            > const& dqdt,
+                               amrex::Array4<amrex::Real            > const& divc,
+                               amrex::Array4<amrex::Real            > const& optmp,
+                               amrex::Array4<amrex::Real            > const& del_m,
+                               amrex::Array4<amrex::Real       const> const& redistwgt,
+                               amrex::Array4<amrex::Real       const> const& vfrac,
+                               amrex::Array4<amrex::EBCellFlag const> const& flag,
+                               int as_crse,
+                               amrex::Array4<amrex::Real            > const& drho_as_crse,
+                               amrex::Array4<int               const> const& rrflag_as_crse,
+                               int as_fine,
+                               amrex::Array4<amrex::Real            > const& dm_as_fine,
+                               amrex::Array4<int               const> const& lev_mask,
+                               amrex::Real dt);
+
+    static Parm* h_parm;
+    static Parm* d_parm;
+    static ProbParm* h_prob_parm;
+    static ProbParm* d_prob_parm;
 
 protected:
 
@@ -152,9 +209,18 @@ protected:
 
     static amrex::BCRec phys_bc;
 
-    // std::unique_ptr<pele::physics::reactions::ReactorBase> reactor;
-    // void init_reactor();
-    // void close_reactor();
+    // PelePhysics related
+    static pele::physics::transport::TransportParams<
+        pele::physics::PhysicsType::transport_type> trans_parms;
+
+    static amrex::Vector<std::string> spec_names;
+
+    static std::string chem_integrator;
+
+    std::unique_ptr<pele::physics::reactions::ReactorBase> reactor;
+
+    void react_state(amrex::Real time, amrex::Real dt, bool react_init = false,
+                     amrex::MultiFab* aux_src = nullptr);
 
     // Parameters
     static int verbose;
@@ -184,67 +250,28 @@ protected:
     // static amrex::Real gravity;
 
     static bool signalStopJob;
-
-public:
-
-    amrex::Real estTimeStep();
-
-    void computeTemp(amrex::MultiFab& State, int ng);
-
-    void compute_dSdt_box(const amrex::Box& bx,
-                          amrex::Array4<amrex::Real const>& Sfab,
-                          amrex::Array4<amrex::Real      >& dSdtfab,
-                          const std::array<FArrayBox*, AMREX_SPACEDIM>& flux);
-
-    void compute_dSdt_box_eb(const amrex::Box& bx,
-                             amrex::Array4<amrex::Real       const> const& Sfab,
-                             amrex::Array4<amrex::Real            > const& dSdtfab,
-                             std::array<FArrayBox*, AMREX_SPACEDIM> const& flux,
-                             amrex::Array4<amrex::EBCellFlag const> const& flag,
-                             amrex::Array4<amrex::Real       const> const& vfrac,
-                             AMREX_D_DECL(
-                              amrex::Array4<amrex::Real       const> const& apx,
-                              amrex::Array4<amrex::Real       const> const& apy,
-                              amrex::Array4<amrex::Real       const> const& apz),
-                             AMREX_D_DECL(
-                              amrex::Array4<amrex::Real       const> const& fcx,
-                              amrex::Array4<amrex::Real       const> const& fcy,
-                              amrex::Array4<amrex::Real       const> const& fcz),
-                              amrex::Array4<amrex::Real       const> const& bcent,
-                             int as_crse,
-                             amrex::Array4<amrex::Real            > const& drho_as_crse,
-                             amrex::Array4<int               const> const& rrflag_as_crse,
-                             int as_fine,
-                             amrex::Array4<amrex::Real            > const& dm_as_fine,
-                             amrex::Array4<int               const> const& lev_mask,
-                             amrex::Real dt);
-
-    void cns_flux_redistribute(const amrex::Box& bx,
-                               amrex::Array4<amrex::Real            > const& dqdt,
-                               amrex::Array4<amrex::Real            > const& divc,
-                               amrex::Array4<amrex::Real            > const& optmp,
-                               amrex::Array4<amrex::Real            > const& del_m,
-                               amrex::Array4<amrex::Real       const> const& redistwgt,
-                               amrex::Array4<amrex::Real       const> const& vfrac,
-                               amrex::Array4<amrex::EBCellFlag const> const& flag,
-                               int as_crse,
-                               amrex::Array4<amrex::Real            > const& drho_as_crse,
-                               amrex::Array4<int               const> const& rrflag_as_crse,
-                               int as_fine,
-                               amrex::Array4<amrex::Real            > const& dm_as_fine,
-                               amrex::Array4<int               const> const& lev_mask,
-                               amrex::Real dt);
-
-    static Parm* h_parm;
-    static Parm* d_parm;
-    static ProbParm* h_prob_parm;
-    static ProbParm* d_prob_parm;
 };
 
-void cns_bcfill (amrex::Box const& bx, amrex::FArrayBox& data,
-                 const int dcomp, const int numcomp,
-                 amrex::Geometry const& geom, const amrex::Real time,
-                 const amrex::Vector<amrex::BCRec>& bcr, const int bcomp,
-                 const int scomp);
+void cns_bcfill(
+    amrex::Box const& bx, 
+    amrex::FArrayBox& data,
+    const int dcomp, 
+    const int numcomp,
+    amrex::Geometry const& geom, 
+    const amrex::Real time,
+    const amrex::Vector<amrex::BCRec>& bcr, 
+    const int bcomp,
+    const int scomp);
+
+void cns_react_bcfill(
+    amrex::Box const& bx, 
+    amrex::FArrayBox& data,
+    const int dcomp, 
+    const int numcomp,
+    amrex::Geometry const& geom, 
+    const amrex::Real time,
+    const amrex::Vector<amrex::BCRec>& bcr, 
+    const int bcomp,
+    const int scomp);
 
 #endif

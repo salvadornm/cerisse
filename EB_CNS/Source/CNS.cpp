@@ -14,6 +14,7 @@
 
 using namespace amrex;
 
+// Default values
 BCRec    CNS::phys_bc;
 
 int      CNS::verbose = 2;
@@ -27,8 +28,13 @@ Vector<RealBox> CNS::refine_boxes;
 RealBox* CNS::dp_refine_boxes;
 
 bool     CNS::do_visc        = true;  // diffusion is on by default
-bool     CNS::do_react       = false; // reaction is off by default
 bool     CNS::use_const_visc = false; // diffusion does not use constant viscosity by default
+
+bool     CNS::do_react       = false; // reaction is off by default
+std::string CNS::chem_integrator = "Reactor_Null";
+pele::physics::transport::TransportParams<
+  pele::physics::PhysicsType::transport_type> CNS::trans_parms;
+amrex::Vector<std::string> CNS::spec_names;
 
 int      CNS::plm_iorder     = 2;     // [1,2] 1: slopes are zero'd,  2: second order slopes
 Real     CNS::plm_theta      = 2.0;   // [1,2] 1: minmod; 2: van Leer's MC
@@ -58,14 +64,20 @@ CNS::CNS(Amr&            papa,
     // Initialize reaction
     get_new_data(Reactions_Type).setVal(0.0);
     if (do_react) {
-        // init_reactor();
-    }    
+        if (chem_integrator == "ReactorNull") {
+            Print() << "WARNING: turning on reactions while using ReactorNull. "
+                       "Make sure this is intended." << std::endl;
+        }
+
+        reactor = pele::physics::reactions::ReactorBase::create(chem_integrator);
+        reactor->init(1, 1);
+    }
 }
 
 CNS::~CNS() 
 {
     if (do_react) {
-        // reactor->close();
+        reactor->close();
     }
 }
 
@@ -135,18 +147,25 @@ CNS::initData()
 
     auto const& sarrs = S_new.arrays();
     amrex::ParallelFor(S_new,
-    [=] AMREX_GPU_DEVICE (int box_no, int i, int j, int k) noexcept
-    {
+    [=] AMREX_GPU_DEVICE (int box_no, int i, int j, int k) noexcept {
         cns_initdata(i, j, k, sarrs[box_no], geomdata, *lparm, *lprobparm);
         // Verify that the sum of (rho Y)_i = rho at every cell
         // cns_check_initial_species(i, j, k, sarrs[box_no]);
     });
+    amrex::Gpu::synchronize();
 
     // Compute the initial temperature (will override what was set in initdata)
     computeTemp(S_new,0);
 
-    MultiFab& C_new = get_new_data(Cost_Type);
-    C_new.setVal(1.0);
+    // set_body_state(S_new);
+    // amrex::Real cur_time = state[State_Type].curTime();
+    // const amrex::StateDescriptor* desc = state[State_Type].descriptor();
+    // const auto& bcs = desc->getBCs();
+    // InitialRedistribution(cur_time, bcs, S_new);
+
+    // get_new_data(Reactions_Type).setVal(0.0);
+
+    get_new_data(Cost_Type).setVal(1.0);
 }
 
 void
@@ -444,6 +463,9 @@ CNS::read_params()
 #endif
     }
 
+    pp.query("do_react", do_react);
+    pp.query("chem_integrator", chem_integrator);
+
     // pp.query("gravity", gravity);
 
     pp.query("eos_gamma", h_parm->eos_gamma);
@@ -491,7 +513,7 @@ CNS::avgDown()
                            0, S_fine.nComp(), fine_ratio);
 
     const int nghost = 0;
-    computeTemp (S_crse, nghost);
+    computeTemp(S_crse, nghost);
 }
 
 void
@@ -557,10 +579,10 @@ CNS::estTimeStep()
         if (flag.getType(bx) != FabType::covered)
         {
           reduce_op.eval(bx, reduce_data, [=]
-             AMREX_GPU_DEVICE (int i, int j, int k) -> ReduceTuple
-             {
-                 return cns_estdt(i,j,k,s_arr,dx,*lparm);
-             });
+            AMREX_GPU_DEVICE (int i, int j, int k) -> ReduceTuple
+            {
+                return cns_estdt(i,j,k,s_arr,dx,*lparm);
+            });
         }
     } // mfi
 

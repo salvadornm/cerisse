@@ -1,6 +1,6 @@
-#include "prob_parm.H"
 #include "CNS.H"
 #include "index_macros.H"
+#include "prob_parm.H"
 
 #include <AMReX_Arena.H>
 

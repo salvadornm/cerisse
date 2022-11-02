@@ -5,7 +5,7 @@
 using namespace amrex;
 
 void
-CNS::restart (Amr& papa, std::istream& is, bool bReadSpecial)
+CNS::restart(Amr& papa, std::istream& is, bool bReadSpecial)
 {
     AmrLevel::restart(papa,is,bReadSpecial);
 
@@ -20,13 +20,13 @@ CNS::restart (Amr& papa, std::istream& is, bool bReadSpecial)
 }
 
 void
-CNS::checkPoint (const std::string& dir, std::ostream& os, VisMF::How how, bool dump_old)
+CNS::checkPoint(const std::string& dir, std::ostream& os, VisMF::How how, bool dump_old)
 {
     AmrLevel::checkPoint(dir, os, how, dump_old);
 }
 
 void
-CNS::writePlotFile (const std::string& dir, std::ostream& os, VisMF::How how)
+CNS::writePlotFile(const std::string& dir, std::ostream& os, VisMF::How how)
 {
     BL_PROFILE("CNS::writePlotFile()");
 #ifdef AMREX_TESTING

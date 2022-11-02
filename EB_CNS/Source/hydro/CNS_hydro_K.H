@@ -3,43 +3,60 @@
 
 #include "index_macros.H"
 #include "parm.H"
+#include "PelePhysics.H"
+
 #include <AMReX_FArrayBox.H>
 #include <cmath>
 
 AMREX_GPU_DEVICE AMREX_FORCE_INLINE
 void
-cns_ctoprim (int i, int j, int k,
-             amrex::Array4<amrex::Real const> const& u,
-             amrex::Array4<amrex::Real> const& q,
-             Parm const& parm) noexcept
+cns_ctoprim(int i, int j, int k,
+            amrex::Array4<amrex::Real const> const& u,
+            amrex::Array4<amrex::Real> const& q,
+            Parm const& parm) noexcept
 {
     using amrex::Real;
 
-    Real rho = amrex::max(u(i,j,k,URHO),parm.smallr);
+    Real rho = amrex::max(u(i,j,k,URHO), parm.smallr);
     Real rhoinv = Real(1.0)/rho;
-    AMREX_D_TERM(Real ux = u(i,j,k,UMX)*rhoinv;,
-                 Real uy = u(i,j,k,UMY)*rhoinv;,
+    AMREX_D_TERM(Real ux = u(i,j,k,UMX)*rhoinv; ,
+                 Real uy = u(i,j,k,UMY)*rhoinv; ,
                  Real uz = u(i,j,k,UMZ)*rhoinv;);
 #if (AMREX_SPACEDIM == 2)
     Real kineng = Real(0.5)*rho*(ux*ux+uy*uy);
 #else
     Real kineng = Real(0.5)*rho*(ux*ux+uy*uy+uz*uz);
 #endif
-    Real ei = u(i,j,k,UEDEN) - kineng;
-    if (ei <= Real(0.0)) ei = u(i,j,k,UEINT);
-    Real p = amrex::max((parm.eos_gamma-Real(1.0))*ei,parm.smallp);
+    Real ei = (u(i,j,k,UEDEN) - kineng) * rhoinv;
+    Real massfrac[NUM_SPECIES];
+    for (int n = 0; n < NUM_SPECIES; n++) {
+        q(i, j, k, QFS + n) = u(i, j, k, UFS + n) * rhoinv;
+        massfrac[n] = q(i, j, k, QFS + n);
+    }
 
+    // if (ei <= Real(0.0)) ei = u(i,j,k,UEINT);
+    // Real p = amrex::max((parm.eos_gamma-Real(1.0))*ei,parm.smallp);
     // q(i,j,k,QEINT) is e, not (rho e)
-    ei *= rhoinv;
+
+    auto eos = pele::physics::PhysicsType::eos();
+    Real T, p, cs;
+    // eos.Y2WBAR(massfrac, wbar);
+    eos.REY2T(rho, ei, massfrac, T);
+    eos.RTY2P(rho, T, massfrac, p);
+    eos.RTY2Cs(rho, T, massfrac, cs);
+    // eos.RTY2G(rho, T, massfrac, gam1);
+    // eos.RTY2dpde_dpdre(rho, T, massfrac, dpde, dpdr_e);
 
     q(i,j,k,QRHO) = rho;
-    AMREX_D_TERM(q(i,j,k,QU) = ux;,
-                 q(i,j,k,QV) = uy;,
+    AMREX_D_TERM(q(i,j,k,QU) = ux; ,
+                 q(i,j,k,QV) = uy; ,
                  q(i,j,k,QW) = uz;);
     q(i,j,k,QEINT) = ei;
     q(i,j,k,QPRES) = p;
-    q(i,j,k,QCS) = std::sqrt(parm.eos_gamma*p*rhoinv);
-    q(i,j,k,QTEMP) = ei/parm.cv;
+    q(i,j,k,QCS) = cs;
+    q(i,j,k,QTEMP) = T;
+    // q(i,j,k,QCS) = std::sqrt(parm.eos_gamma*p*rhoinv);
+    // q(i,j,k,QTEMP) = ei/parm.cv;
 }
 
 AMREX_GPU_DEVICE AMREX_FORCE_INLINE

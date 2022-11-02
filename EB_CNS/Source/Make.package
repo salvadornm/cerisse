@@ -10,16 +10,16 @@ CEXE_headers += index_marcos.H
 CEXE_sources += advance.cpp
 CEXE_sources += advance_box.cpp
 CEXE_sources += advance_box_eb.cpp
-CEXE_sources += bcfill.cpp
+#CEXE_sources += bcfill.cpp
 CEXE_sources += derive.cpp
-CEXE_sources += CNS_flux_redistribute.cpp
 CEXE_sources += CNS.cpp
 CEXE_sources += CNSBld.cpp
 CEXE_sources += io.cpp
 CEXE_sources += setup.cpp
-
 CEXE_sources += init_eb2.cpp
+CEXE_sources += react.cpp
 
 CEXE_headers += parm.H
 CEXE_sources += parm.cpp
 
+CEXE_sources += CNS_flux_redistribute.cpp

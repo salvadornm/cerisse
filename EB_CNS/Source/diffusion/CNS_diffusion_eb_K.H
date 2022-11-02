@@ -2,48 +2,12 @@
 #define CNS_DIFFUSION_EB_K_H_
 
 #include "index_macros.H"
-#include "parm.H"
+// #include "parm.H"
+#include "diffcoef.H"
+
 #include <AMReX_FArrayBox.H>
 #include <AMReX_CONSTANTS.H>
 #include <cmath>
-
-AMREX_GPU_DEVICE AMREX_FORCE_INLINE
-void
-cns_diffcoef_eb (int i, int j, int k,
-                 amrex::Array4<amrex::Real const> const& q,
-                 amrex::Array4<amrex::EBCellFlag const> const& flag,
-                 amrex::Array4<amrex::Real> const& coefs,
-                 Parm const& parm) noexcept
-{
-    using amrex::Real;
-
-    if (q(i,j,k,QTEMP) < 0.)
-    {
-//        std::cout << "Computing diff coeffs at " << IntVect(i,j,k) <<
-//             " with  temp = " << q(i,j,k,UTEMP)  << std::endl;
-        amrex::Abort("Negative temperature sent to cns_diffcoef_eb");
-    }
-
-    bool cov = flag(i,j,k).isCovered();
-    coefs(i,j,k,CETA) = cov ? -1.e10 : parm.C_S * std::sqrt(q(i,j,k,QTEMP)) * q(i,j,k,QTEMP) / (q(i,j,k,QTEMP)+parm.T_S);
-    coefs(i,j,k,CXI)  = cov ? -1.e10 : Real(0.0);
-    coefs(i,j,k,CLAM) = cov ? -1.e10 : coefs(i,j,k,CETA)*parm.cp/parm.Pr;
-}
-
-AMREX_GPU_DEVICE AMREX_FORCE_INLINE
-void
-cns_constcoef_eb (int i, int j, int k,
-                 amrex::Array4<amrex::EBCellFlag const> const& flag,
-                 amrex::Array4<amrex::Real> const& coefs,
-                 Parm const& parm) noexcept
-{
-    using amrex::Real;
-
-     bool cov = flag(i,j,k).isCovered();
-     coefs(i,j,k,CETA) = cov ? -1.e01 : parm.const_visc_mu;
-     coefs(i,j,k,CXI)  = cov ? -1.e01 : parm.const_visc_ki;
-     coefs(i,j,k,CLAM) = cov ? -1.e01 : parm.const_lambda;
-}
 
 AMREX_GPU_DEVICE AMREX_FORCE_INLINE
 void
@@ -57,22 +21,22 @@ cns_diff_eb_x (int i, int j, int k,
 {
     using amrex::Real;
 
-    Real  dTdx = (q(i,j,k,QTEMP)-q(i-1,j,k,QTEMP))*dxinv[0];
+    Real dTdx = (q(i,j,k,QTEMP)-q(i-1,j,k,QTEMP))*dxinv[0];
     AMREX_D_TERM(Real  dudx = (q(i,j,k,QU)-q(i-1,j,k,QU))*dxinv[0];,
                  Real  dvdx = (q(i,j,k,QV)-q(i-1,j,k,QV))*dxinv[0];,
                  Real  dwdx = (q(i,j,k,QW)-q(i-1,j,k,QW))*dxinv[0];);
 
-    int  jhip = j + (flag(i  ,j,k).isConnected(0, 1,0) ? 1 : 0 );
-    int  jhim = j - (flag(i  ,j,k).isConnected(0,-1,0) ? 1 : 0 );
-    int  jlop = j + (flag(i-1,j,k).isConnected(0, 1,0) ? 1 : 0 );
-    int  jlom = j - (flag(i-1,j,k).isConnected(0,-1,0) ? 1 : 0 );
+    int jhip = j + (flag(i  ,j,k).isConnected(0, 1,0) ? 1 : 0 );
+    int jhim = j - (flag(i  ,j,k).isConnected(0,-1,0) ? 1 : 0 );
+    int jlop = j + (flag(i-1,j,k).isConnected(0, 1,0) ? 1 : 0 );
+    int jlom = j - (flag(i-1,j,k).isConnected(0,-1,0) ? 1 : 0 );
 
-    Real  whi = weights[jhip-jhim];
-    Real  wlo = weights[jlop-jlom];
-    Real  dudy = (0.5*dxinv[1]) * ((q(i  ,jhip,k,QU)-q(i  ,jhim,k,QU))*whi
-                                  +(q(i-1,jlop,k,QU)-q(i-1,jlom,k,QU))*wlo);
-    Real  dvdy = (0.5*dxinv[1]) * ((q(i  ,jhip,k,QV)-q(i  ,jhim,k,QV))*whi
-                                  +(q(i-1,jlop,k,QV)-q(i-1,jlom,k,QV))*wlo);
+    Real whi = weights[jhip-jhim];
+    Real wlo = weights[jlop-jlom];
+    Real dudy = (0.5*dxinv[1]) * ((q(i  ,jhip,k,QU)-q(i  ,jhim,k,QU))*whi
+                                 +(q(i-1,jlop,k,QU)-q(i-1,jlom,k,QU))*wlo);
+    Real dvdy = (0.5*dxinv[1]) * ((q(i  ,jhip,k,QV)-q(i  ,jhim,k,QV))*whi
+                                 +(q(i-1,jlop,k,QV)-q(i-1,jlom,k,QV))*wlo);
 
 #if (AMREX_SPACEDIM == 3)
     int  khip = k + (flag(i  ,j,k).isConnected(0,0, 1) ? 1 : 0 );
@@ -90,7 +54,7 @@ cns_diff_eb_x (int i, int j, int k,
 
 #if (AMREX_SPACEDIM == 2)
     Real  divu = dudx + dvdy;
-    Real  etaf = 0.5*(coeffs(i,j,k,CETA)+coeffs(i-1,j,k,CETA));
+    Real  etaf = 0.5*(coeffs(i,j,k,CMU)+coeffs(i-1,j,k,CMU));
     Real  xif  = 0.5*(coeffs(i,j,k,CXI)+coeffs(i-1,j,k,CXI));
     Real  tauxx = etaf*(2.0*dudx-(2.0/3.0)*divu) + xif*divu;
     Real  tauxy = etaf*(dudy+dvdx);
@@ -102,7 +66,7 @@ cns_diff_eb_x (int i, int j, int k,
                               (coeffs(i,j,k,CLAM) +coeffs(i-1,j,k,CLAM))*dTdx );
 #else
     Real  divu = dudx + dvdy + dwdz;
-    Real  etaf = 0.5*(coeffs(i,j,k,CETA)+coeffs(i-1,j,k,CETA));
+    Real  etaf = 0.5*(coeffs(i,j,k,CMU)+coeffs(i-1,j,k,CMU));
     Real  xif  = 0.5*(coeffs(i,j,k,CXI)+coeffs(i-1,j,k,CXI));
     Real  tauxx = etaf*(2.0*dudx-(2.0/3.0)*divu) + xif*divu;
     Real  tauxy = etaf*(dudy+dvdx);
@@ -163,7 +127,7 @@ cns_diff_eb_y (int i, int j, int k, amrex::Array4<amrex::Real const> const& q,
 
 #if (AMREX_SPACEDIM == 2)
     Real  divu = dudx + dvdy;
-    Real  etaf = 0.5*(coeffs(i,j,k,CETA)+coeffs(i,j-1,k,CETA));
+    Real  etaf = 0.5*(coeffs(i,j,k,CMU)+coeffs(i,j-1,k,CMU));
     Real  xif  = 0.5*(coeffs(i,j,k,CXI)+coeffs(i,j-1,k,CXI));
     Real  tauyy = etaf*(2.0*dvdy-(2.0/3.0)*divu) + xif*divu;
     Real  tauxy = etaf*(dudy+dvdx);
@@ -175,7 +139,7 @@ cns_diff_eb_y (int i, int j, int k, amrex::Array4<amrex::Real const> const& q,
                              +(coeffs(i,j,k,CLAM) +coeffs(i,j-1,k,CLAM))*dTdy );
 #else
     Real  divu = dudx + dvdy + dwdz;
-    Real  etaf = 0.5*(coeffs(i,j,k,CETA)+coeffs(i,j-1,k,CETA));
+    Real  etaf = 0.5*(coeffs(i,j,k,CMU)+coeffs(i,j-1,k,CMU));
     Real  xif  = 0.5*(coeffs(i,j,k,CXI)+coeffs(i,j-1,k,CXI));
     Real  tauyy = etaf*(2.0*dvdy-(2.0/3.0)*divu) + xif*divu;
     Real  tauxy = etaf*(dudy+dvdx);
@@ -236,7 +200,7 @@ cns_diff_eb_z (int i, int j, int k,
                                    +(q(i,jlop,k-1,QW)-q(i,jlom,k-1,QW))*wlo);
 
     Real  divu = dudx + dvdy + dwdz;
-    Real  etaf = 0.5*(coeffs(i,j,k,CETA)+coeffs(i,j,k-1,CETA));
+    Real  etaf = 0.5*(coeffs(i,j,k,CMU)+coeffs(i,j,k-1,CMU));
     Real  xif  = 0.5*(coeffs(i,j,k,CXI)+coeffs(i,j,k-1,CXI));
     Real  tauxz = etaf*(dudz+dwdx);
     Real  tauyz = etaf*(dvdz+dwdy);
@@ -448,10 +412,10 @@ compute_diff_wallflux ( int i, int j, int k,
 
     Real divu = dudx+dvdy;
 
-    Real tautmp = (coefs(i,j,k,CXI)-(2.0/3.0)*coefs(i,j,k,CETA))*divu;
-    Real tauxx = coefs(i,j,k,CETA)*2.*dudx + tautmp;
-    Real tauyy = coefs(i,j,k,CETA)*2.*dvdy + tautmp;
-    Real tauxy = coefs(i,j,k,CETA)*(dudy+dvdx);
+    Real tautmp = (coefs(i,j,k,CXI)-(2.0/3.0)*coefs(i,j,k,CMU))*divu;
+    Real tauxx = coefs(i,j,k,CMU)*2.*dudx + tautmp;
+    Real tauyy = coefs(i,j,k,CMU)*2.*dvdy + tautmp;
+    Real tauxy = coefs(i,j,k,CMU)*(dudy+dvdx);
 
     // assumes  dx == dy == dz
     viscw[1] = (dapx*tauxx + dapy*tauxy);
@@ -792,14 +756,14 @@ compute_diff_wallflux ( int i, int j, int k,
 
     Real divu = dudx+dvdy+dwdz;
 
-    Real tautmp = (coefs(i,j,k,CXI)-(2.0/3.0)*coefs(i,j,k,CETA))*divu;
-    Real tauxx = coefs(i,j,k,CETA)*2.*dudx + tautmp;
-    Real tauyy = coefs(i,j,k,CETA)*2.*dvdy + tautmp;
-    Real tauxy = coefs(i,j,k,CETA)*(dudy+dvdx);
+    Real tautmp = (coefs(i,j,k,CXI)-(2.0/3.0)*coefs(i,j,k,CMU))*divu;
+    Real tauxx = coefs(i,j,k,CMU)*2.*dudx + tautmp;
+    Real tauyy = coefs(i,j,k,CMU)*2.*dvdy + tautmp;
+    Real tauxy = coefs(i,j,k,CMU)*(dudy+dvdx);
 
-    Real tauzz = coefs(i,j,k,CETA)*2.*dwdz + tautmp;
-    Real tauxz = coefs(i,j,k,CETA)*(dudz+dwdx);
-    Real tauyz = coefs(i,j,k,CETA)*(dwdy+dvdz);
+    Real tauzz = coefs(i,j,k,CMU)*2.*dwdz + tautmp;
+    Real tauxz = coefs(i,j,k,CMU)*(dudz+dwdx);
+    Real tauyz = coefs(i,j,k,CMU)*(dwdy+dvdz);
 
     // assumes  dx == dy == dz
     viscw[1] = (dapx*tauxx + dapy*tauxy + dapz*tauxz);

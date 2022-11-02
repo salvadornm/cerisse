@@ -26,7 +26,7 @@ THREAD_SANITIZER = FALSE
 # PelePhysics
 Eos_Model := Fuego
 Transport_Model := Simple
-Chemistry_Model := LiDryer
+Chemistry_Model := air
 
 # GNU Make
 include ./Make.package

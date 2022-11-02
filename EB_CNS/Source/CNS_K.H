@@ -1,20 +1,21 @@
 #ifndef CNS_K_H_
 #define CNS_K_H_
 
-#include "index_macros.H"
 #include <AMReX_FArrayBox.H>
 #include <limits>
 #include <cmath>
 
-#include "prob.H"
-#include "parm.H"
-#include "CNS_K.H"
+// #include "CNS.H"
+#include "index_macros.H"
+#include "PelePhysics.H"
+// #include "prob.H"
+// #include "parm.H"
 
 AMREX_GPU_DEVICE AMREX_FORCE_INLINE
 amrex::Real
-cns_estdt (int i, int j, int k, amrex::Array4<Real const> const& state,
-           amrex::GpuArray<amrex::Real,AMREX_SPACEDIM> const& dx,
-           Parm const& parm) noexcept
+cns_estdt(int i, int j, int k, amrex::Array4<Real const> const& state,
+          amrex::GpuArray<amrex::Real,AMREX_SPACEDIM> const& dx,
+          Parm const& parm) noexcept
 {
     using amrex::Real;
 
@@ -49,21 +50,36 @@ cns_estdt (int i, int j, int k, amrex::Array4<Real const> const& state,
 
 AMREX_GPU_DEVICE AMREX_FORCE_INLINE
 void
-cns_compute_temperature (int i, int j, int k, amrex::Array4<amrex::Real> const& u,
-                         Parm const& parm) noexcept
+cns_compute_temperature(int i, int j, int k, amrex::Array4<amrex::Real> const& S,
+                        Parm const& parm) noexcept
 {
-    using amrex::Real;
-
-    Real rhoinv = Real(1.0)/u(i,j,k,URHO);
-    Real mx = u(i,j,k,UMX);
-    Real my = u(i,j,k,UMY);
+    // Compute temperature and enforce consistent eint
+    
+    amrex::Real rhoinv = amrex::Real(1.0)/S(i,j,k,URHO);
+    amrex::Real mx = S(i,j,k,UMX);
+    amrex::Real my = S(i,j,k,UMY);
 #if (AMREX_SPACEDIM == 2)
-    u(i,j,k,UEINT) = u(i,j,k,UEDEN) - Real(0.5) * rhoinv * (mx*mx+my*my);
+    S(i,j,k,UEINT) = S(i,j,k,UEDEN) - amrex::Real(0.5) * rhoinv * (mx*mx + my*my);
 #else
-    Real mz = u(i,j,k,UMZ);
-    u(i,j,k,UEINT) = u(i,j,k,UEDEN) - Real(0.5) * rhoinv * (mx*mx+my*my+mz*mz);
+    amrex::Real mz = S(i,j,k,UMZ);
+    S(i,j,k,UEINT) = S(i,j,k,UEDEN) - amrex::Real(0.5) * rhoinv * (mx*mx + my*my + mz*mz);
 #endif
-    u(i,j,k,UTEMP) = rhoinv * u(i,j,k,UEINT) * (Real(1.0)/parm.cv);
+    amrex::Real massfrac[NUM_SPECIES];
+    for (int n = 0; n < NUM_SPECIES; ++n) {
+        massfrac[n] = S(i, j, k, UFS + n) * rhoinv;
+    }
+
+    auto eos = pele::physics::PhysicsType::eos();
+    amrex::Real T;
+    eos.EY2T(rhoinv * S(i,j,k,UEINT), massfrac, T);
+
+    // Print() << massfrac[0] << " " << massfrac[1] << ", ";
+
+    S(i,j,k,UTEMP) = T;
+    // amrex::Real cv;
+    // eos.TY2Cv(S(i,j,k,UTEMP), massfrac, cv);
+    // S(i,j,k,UTEMP) = rhoinv * S(i,j,k,UEINT) * amrex::Real(1.0) / cv;
+    // S(i,j,k,UTEMP) = 1500.0; //rhoinv * S(i,j,k,UEINT) * amrex::Real(1.0) / parm.cv;
 }
 
 #endif

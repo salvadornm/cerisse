@@ -1,3 +1,5 @@
+#include "CNS.H"
+#include "prob.H"
 
 #include <AMReX_FArrayBox.H>
 #include <AMReX_Geometry.H>
@@ -8,14 +10,35 @@ using namespace amrex;
 struct CnsFillExtDir
 {
     AMREX_GPU_DEVICE
-    void operator() (const IntVect& /*iv*/, Array4<Real> const& /*dest*/,
-                     const int /*dcomp*/, const int /*numcomp*/,
-                     GeometryData const& /*geom*/, const Real /*time*/,
-                     const BCRec* /*bcr*/, const int /*bcomp*/,
-                     const int /*orig_comp*/) const
-        {
-            // do something for external Dirichlet (BCType::ext_dir)
-        }
+    void operator()(const IntVect& /*iv*/, 
+                    Array4<Real> const& /*dest*/,
+                    const int /*dcomp*/, 
+                    const int /*numcomp*/,
+                    GeometryData const& /*geom*/, 
+                    const Real /*time*/,
+                    const BCRec* /*bcr*/, 
+                    const int /*bcomp*/,
+                    const int /*orig_comp*/) const
+    {
+        // do something for external Dirichlet (BCType::ext_dir)
+    }
+};
+
+struct CnsReactFillExtDir
+{
+    AMREX_GPU_DEVICE
+    void operator()(const amrex::IntVect& /*iv*/,
+                    amrex::Array4<amrex::Real> const& /*dest*/,
+                    const int /*dcomp*/,
+                    const int /*numcomp*/,
+                    amrex::GeometryData const& /*geom*/,
+                    const amrex::Real /*time*/,
+                    const amrex::BCRec* /*bcr*/,
+                    const int /*bcomp*/,
+                    const int /*orig_comp*/) const
+    {
+        // do something for external Dirichlet (BCType::ext_dir)
+    }
 };
 
 // bx                  : Cells outside physical domain and inside bx are filled.
@@ -23,12 +46,22 @@ struct CnsFillExtDir
 // bcr, bcomp          : bcr[bcomp] specifies BC for component dcomp and so on.
 // scomp               : component index for dcomp as in the descriptor set up in CNS::variableSetUp.
 
-void cns_bcfill (Box const& bx, FArrayBox& data,
-                 const int dcomp, const int numcomp,
-                 Geometry const& geom, const Real time,
-                 const Vector<BCRec>& bcr, const int bcomp,
-                 const int scomp)
+void cns_bcfill(Box const& bx, FArrayBox& data,
+                const int dcomp, const int numcomp,
+                Geometry const& geom, const Real time,
+                const Vector<BCRec>& bcr, const int bcomp,
+                const int scomp)
 {
-    GpuBndryFuncFab<CnsFillExtDir> gpu_bndry_func(CnsFillExtDir{});
-    gpu_bndry_func(bx,data,dcomp,numcomp,geom,time,bcr,bcomp,scomp);
+    GpuBndryFuncFab<CnsFillExtDir> gpu_hyp_bndry_func(CnsFillExtDir{});
+    gpu_hyp_bndry_func(bx, data, dcomp, numcomp, geom, time, bcr, bcomp, scomp);
+}
+
+void cns_react_bcfill(Box const& bx, FArrayBox& data,
+                      const int dcomp, const int numcomp,
+                      Geometry const& geom, const Real time,
+                      const Vector<BCRec>& bcr, const int bcomp,
+                      const int scomp)
+{
+    GpuBndryFuncFab<CnsReactFillExtDir> gpu_react_bndry_func(CnsReactFillExtDir{});
+    gpu_react_bndry_func(bx, data, dcomp, numcomp, geom, time, bcr, bcomp, scomp);
 }

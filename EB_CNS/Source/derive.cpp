@@ -4,9 +4,9 @@
 
 using namespace amrex;
 
-void cns_derpres (const Box& bx, FArrayBox& pfab, int dcomp, int /*ncomp*/,
-                  const FArrayBox& rhoefab, const Geometry& /*geomdata*/,
-                  Real /*time*/, const int* /*bcrec*/, int /*level*/)
+void cns_derpres(const Box& bx, FArrayBox& pfab, int dcomp, int /*ncomp*/,
+                 const FArrayBox& rhoefab, const Geometry& /*geomdata*/,
+                 Real /*time*/, const int* /*bcrec*/, int /*level*/)
 {
     auto const rhoe = rhoefab.array();
     auto       p    = pfab.array();
@@ -14,13 +14,13 @@ void cns_derpres (const Box& bx, FArrayBox& pfab, int dcomp, int /*ncomp*/,
     amrex::ParallelFor(bx,
     [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept
     {
-        p(i,j,k,dcomp) = (parm->eos_gamma-1.)*rhoe(i,j,k);
+        p(i,j,k,dcomp) = (parm->eos_gamma-1.)*rhoe(i,j,k); // change to pelephysics
     });
 }
 
-void cns_dervel (const Box& bx, FArrayBox& velfab, int dcomp, int /*ncomp*/,
-                  const FArrayBox& datfab, const Geometry& /*geomdata*/,
-                  Real /*time*/, const int* /*bcrec*/, int /*level*/)
+void cns_dervel(const Box& bx, FArrayBox& velfab, int dcomp, int /*ncomp*/,
+                const FArrayBox& datfab, const Geometry& /*geomdata*/,
+                Real /*time*/, const int* /*bcrec*/, int /*level*/)
 {
     auto const dat = datfab.array();
     auto       vel = velfab.array();

@@ -2,42 +2,12 @@
 #define CNS_DIFFUSION_K_H_
 
 #include "index_macros.H"
-#include "parm.H"
+// #include "parm.H"
+#include "diffcoef.H"
+
 #include <AMReX_FArrayBox.H>
 #include <AMReX_CONSTANTS.H>
 #include <cmath>
-
-AMREX_GPU_DEVICE AMREX_FORCE_INLINE
-void
-cns_diffcoef (int i, int j, int k,
-              amrex::Array4<amrex::Real const> const& q,
-              amrex::Array4<amrex::Real> const& coefs,
-              Parm const& parm) noexcept
-{
-    using amrex::Real;
-
-    if (q(i,j,k,QTEMP) < 0.)
-    {
-//        std::cout << "Computing diff coeffs at " << IntVect(i,j,k) <<
-//             " with  temp = " << q(i,j,k,UTEMP)  << std::endl;
-        amrex::Abort("Negative temperature sent to cns_diffcoef_eb");
-    }
-
-    coefs(i,j,k,CETA) = parm.C_S * std::sqrt(q(i,j,k,QTEMP)) * q(i,j,k,QTEMP) / (q(i,j,k,QTEMP)+parm.T_S);
-    coefs(i,j,k,CXI)  = Real(0.0);
-    coefs(i,j,k,CLAM) = coefs(i,j,k,CETA)*parm.cp/parm.Pr;
-}
-
-AMREX_GPU_DEVICE AMREX_FORCE_INLINE
-void
-cns_constcoef (int i, int j, int k,
-              amrex::Array4<amrex::Real> const& coefs,
-              Parm const& parm) noexcept
-{
-    coefs(i,j,k,CETA) = parm.const_visc_mu;
-    coefs(i,j,k,CXI)  = parm.const_visc_ki;
-    coefs(i,j,k,CLAM) = parm.const_lambda;
-}
 
 AMREX_GPU_DEVICE AMREX_FORCE_INLINE
 void
@@ -63,7 +33,7 @@ cns_diff_x (int i, int j, int k,
     Real  divu = dudx + dvdy + dwdz;
 #endif
 
-    Real  etaf = 0.5*(coeffs(i,j,k,CETA)+coeffs(i-1,j,k,CETA));
+    Real  etaf = 0.5*(coeffs(i,j,k,CMU)+coeffs(i-1,j,k,CMU));
     Real  xif  = 0.5*(coeffs(i,j,k,CXI)+coeffs(i-1,j,k,CXI));
 
     AMREX_D_TERM(Real  tauxx = etaf*(2.0*dudx-(2.0/3.0)*divu) + xif*divu;,
@@ -106,7 +76,7 @@ cns_diff_y (int i, int j, int k, amrex::Array4<amrex::Real const> const& q,
     Real  divu = dudx + dvdy + dwdz;
 #endif
 
-    Real  etaf = 0.5*(coeffs(i,j,k,CETA)+coeffs(i,j-1,k,CETA));
+    Real  etaf = 0.5*(coeffs(i,j,k,CMU)+coeffs(i,j-1,k,CMU));
     Real  xif  = 0.5*(coeffs(i,j,k,CXI)+coeffs(i,j-1,k,CXI));
     AMREX_D_TERM(Real  tauyy = etaf*(2.0*dvdy-(2.0/3.0)*divu) + xif*divu;,
                  Real  tauxy = etaf*(dudy+dvdx);,
@@ -144,7 +114,7 @@ cns_diff_z (int i, int j, int k,
     Real  dvdy = (q(i,j+1,k,QV)+q(i,j+1,k-1,QV)-q(i,j-1,k,QV)-q(i,j-1,k-1,QV))*(0.25*dxinv[1]);
     Real  dwdy = (q(i,j+1,k,QW)+q(i,j+1,k-1,QW)-q(i,j-1,k,QW)-q(i,j-1,k-1,QW))*(0.25*dxinv[1]);
     Real  divu = dudx + dvdy + dwdz;
-    Real  etaf = 0.5*(coeffs(i,j,k,CETA)+coeffs(i,j,k-1,CETA));
+    Real  etaf = 0.5*(coeffs(i,j,k,CMU)+coeffs(i,j,k-1,CMU));
     Real  xif  = 0.5*(coeffs(i,j,k,CXI)+coeffs(i,j,k-1,CXI));
     Real  tauxz = etaf*(dudz+dwdx);
     Real  tauyz = etaf*(dvdz+dwdy);

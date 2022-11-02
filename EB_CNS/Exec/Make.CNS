@@ -1,12 +1,12 @@
-AMREX_HOME := ../../../../amrex/
-TOP :=  ../../
+AMREX_HOME := ../../../../PeleC/Submodules/AMReX
+PELE_PHYSICS_HOME := ../../../../PeleC/Submodules/PelePhysics
+TOP :=  ../..
 
-EBASE := CNS
+EBASE := Cerisse
 
 USE_EB := TRUE
-
+USE_SUNDIALS := TRUE
 LAZY := TRUE
-
 BL_NO_FORT = TRUE
 
 include $(AMREX_HOME)/Tools/GNUMake/Make.defs
@@ -23,11 +23,61 @@ include $(TOP)/Source/diffusion/Make.package
 INCLUDE_LOCATIONS += $(TOP)/Source/diffusion
 VPATH_LOCATIONS   += $(TOP)/Source/diffusion
 
+# ================== AMREX ==================
 include $(AMREX_HOME)/Src/Base/Make.package
 include $(AMREX_HOME)/Src/Boundary/Make.package
 include $(AMREX_HOME)/Src/AmrCore/Make.package
 include $(AMREX_HOME)/Src/Amr/Make.package
 include $(AMREX_HOME)/Src/EB/Make.package
 
-include $(AMREX_HOME)/Tools/GNUMake/Make.rules
+# =============== PELE_PHYSICS ===============
+include $(PELE_PHYSICS_HOME)/Source/Make.package
+include $(PELE_PHYSICS_HOME)/ThirdParty/Make.ThirdParty
+INCLUDE_LOCATIONS += $(PELE_PHYSICS_HOME)/Source
+INCLUDE_LOCATIONS += $(PELE_PHYSICS_HOME)/ThirdParty
+VPATH_LOCATIONS   += $(PELE_PHYSICS_HOME)/Source
+VPATH_LOCATIONS   += $(PELE_PHYSICS_HOME)/ThirdParty
 
+# EOS
+include $(PELE_PHYSICS_HOME)/Eos/Make.package
+INCLUDE_LOCATIONS += $(PELE_PHYSICS_HOME)/Eos
+VPATH_LOCATIONS   += $(PELE_PHYSICS_HOME)/Eos
+
+ifeq ($(Eos_Model),$(filter $(Eos_Model),GammaLaw))
+   DEFINES += -DUSE_GAMMALAW_EOS
+endif
+ifeq ($(Eos_Model),$(filter $(Eos_Model),Fuego))
+   DEFINES += -DUSE_FUEGO_EOS
+endif
+ifeq ($(Eos_Model),$(filter $(Eos_Model),Soave-Redlich-Kwong))
+   DEFINES += -DUSE_SRK_EOS
+endif
+
+# Transport
+include $(PELE_PHYSICS_HOME)/Transport/Make.package
+INCLUDE_LOCATIONS += $(PELE_PHYSICS_HOME)/Transport
+VPATH_LOCATIONS   += $(PELE_PHYSICS_HOME)/Transport
+
+ifeq ($(Transport_Model),$(filter $(Transport_Model),Constant))
+   DEFINES += -DUSE_CONSTANT_TRANSPORT
+endif
+ifeq ($(Transport_Model),$(filter $(Transport_Model),Simple))
+   DEFINES += -DUSE_SIMPLE_TRANSPORT
+endif
+ifeq ($(Transport_Model),$(filter $(Transport_Model),Sutherland))
+   DEFINES += -DUSE_SUTHERLAND_TRANSPORT
+endif
+
+# Reactions
+include $(PELE_PHYSICS_HOME)/Reactions/Make.package
+INCLUDE_LOCATIONS += $(PELE_PHYSICS_HOME)/Reactions
+VPATH_LOCATIONS   += $(PELE_PHYSICS_HOME)/Reactions
+
+ifdef Chemistry_Model
+  CHEM_HOME = $(PELE_PHYSICS_HOME)/Support/Mechanism/Models/$(Chemistry_Model)
+endif
+include $(CHEM_HOME)/Make.package
+INCLUDE_LOCATIONS += $(CHEM_HOME)
+VPATH_LOCATIONS   += $(CHEM_HOME)
+
+include $(AMREX_HOME)/Tools/GNUMake/Make.rules

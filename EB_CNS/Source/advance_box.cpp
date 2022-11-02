@@ -51,11 +51,27 @@ CNS::compute_dSdt_box (const Box& bx,
               cns_constcoef(i, j, k, coefs, *lparm);
           });
        } else {
-          amrex::ParallelFor(bxg2,
-          [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept
-          {
-              cns_diffcoef(i, j, k, q, coefs, *lparm);
-          });
+        //   amrex::ParallelFor(bxg2,
+        //   [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept
+        //   {
+        //       cns_diffcoef(i, j, k, q, coefs, *lparm);
+        //   });
+            auto const& qar_yin   = qtmp.array(QFS);
+            auto const& qar_Tin   = qtmp.array(QTEMP);
+            auto const& qar_rhoin = qtmp.array(QRHO);
+            auto const& rhoD   = diff_coeff.array(CRHOD);
+            auto const& mu     = diff_coeff.array(CMU);
+            auto const& xi     = diff_coeff.array(CXI);
+            auto const& lambda = diff_coeff.array(CLAM);
+            
+            BL_PROFILE("PelePhysics::get_transport_coeffs()");
+            // Get Transport coefs on GPU.
+            auto const* ltransparm = trans_parms.device_trans_parm();
+            amrex::launch(bxg2, [=] AMREX_GPU_DEVICE(amrex::Box const& tbx) {
+                auto trans = pele::physics::PhysicsType::transport();
+                trans.get_transport_coeffs(
+                    tbx, qar_yin, qar_Tin, qar_rhoin, rhoD, mu, xi, lambda, ltransparm);
+            });
        }
     }
 

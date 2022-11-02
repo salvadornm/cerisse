@@ -1,25 +1,30 @@
 
-max_step = 250
-stop_time =  0.2
+max_step = 400
+stop_time = 0.2
 
 geometry.is_periodic = 0 0 0
 geometry.coord_sys   = 0  # 0 => cart, 1 => RZ  2=>spherical
-geometry.prob_lo     =  0      0      0
-geometry.prob_hi     =  5.0   5.0    5.0
-amr.n_cell           =  64    64     64
+geometry.prob_lo     = 0      0      0
+geometry.prob_hi     = 5.0   5.0    5.0
+amr.n_cell           = 64    64     64
 
-# >>>>>>>>>>>>>  BC FLAGS <<<<<<<<<<<<<<<<
-# 0 = Interior           3 = Symmetry
-# 1 = Inflow             4 = SlipWall
-# 2 = Outflow            5 = NoSlipWall
-# >>>>>>>>>>>>>  BC FLAGS <<<<<<<<<<<<<<<<
+# >>>>>>>>>>>>> BC FLAGS <<<<<<<<<<<<<<<<
+# 0 = Interior            3 = Symmetry
+# 1 = Inflow              4 = SlipWall
+# 2 = Outflow (FOExtrap)  5 = NoSlipWall
+# >>>>>>>>>>>>> BC FLAGS <<<<<<<<<<<<<<<<
 cns.lo_bc       =  5 5 1 
 cns.hi_bc       =  5 5 2 
 
-cns.cfl = 0.3     # cfl number for hyperbolic system
+cns.do_visc  = 1
+cns.use_const_visc = 0
+cns.do_react = 0
+cns.chem_integrator = Reactor_Null
 
-cns.v = 1
-amr.v = 1
+cns.cfl = 1.0     # cfl number for hyperbolic system
+
+cns.v = 2
+amr.v = 2
 
 # LOAD BALANCE
 amr.loadbalance_with_workestimates = 1
@@ -29,21 +34,20 @@ amr.loadbalance_level0_int = 1000
 amr.max_level       = 0       # maximum level number allowed
 amr.ref_ratio       = 2 2 2 2 # refinement ratio
 amr.regrid_int      = 2 2 2 2 # how often to regrid
-amr.blocking_factor = 16
+amr.blocking_factor = 8
 amr.max_grid_size   = 64
 amr.n_error_buf     = 2 2 2 2 # number of buffer cells in error est
 
 # CHECKPOINT FILES
-amr.checkpoint_files_output = 0
+amr.checkpoint_files_output = 1
 amr.check_file      = chk        # root name of checkpoint file
-amr.check_int       = 10         # number of timesteps between checkpoints
+amr.check_int       = 100        # number of timesteps between checkpoints
 
 # PLOTFILES
 amr.plot_files_output = 1
 amr.plot_file         = plt      # root name of plotfile
-amr.plot_int          = 50       # number of timesteps between plotfiles
+amr.plot_int          = 10       # number of timesteps between plotfiles
 amr.derive_plot_vars  = pressure x_velocity y_velocity z_velocity
-
 
 #this is for the JBB combustor
 eb2.geom_type = "combustor" 
@@ -63,3 +67,5 @@ combustor.ramp_plane3_point = 0.5 0.
 #pipe construct
 combustor.pipe_lo = 0.3 -5.0
 combustor.pipe_hi = 0.5 2.5
+
+amr.restart = chk00300

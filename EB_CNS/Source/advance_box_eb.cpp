@@ -1,9 +1,8 @@
-
-#include <CNS.H>
-#include <CNS_hydro_K.H>
-#include <CNS_hydro_eb_K.H>
-#include <CNS_divop_K.H>
-#include <CNS_diffusion_eb_K.H>
+#include "CNS.H"
+#include "CNS_hydro_K.H"
+#include "CNS_hydro_eb_K.H"
+#include "CNS_divop_K.H"
+#include "CNS_diffusion_eb_K.H"
 
 #include <AMReX_EBFArrayBox.H>
 #include <AMReX_MultiCutFab.H>
@@ -17,28 +16,28 @@
 using namespace amrex;
 
 void
-CNS::compute_dSdt_box_eb (const Box& bx,
-                          Array4<Real const> const& sfab,
-                          Array4<Real      > const& dsdtfab,
-                          std::array<FArrayBox*, AMREX_SPACEDIM> const& flux,
-                          Array4<EBCellFlag const> const& flag,
-                          Array4<Real       const> const& vfrac,
-                          AMREX_D_DECL(
-                          Array4<Real       const> const& apx,
-                          Array4<Real       const> const& apy,
-                          Array4<Real       const> const& apz),
-                          AMREX_D_DECL(
-                          Array4<Real       const> const& fcx,
-                          Array4<Real       const> const& fcy,
-                          Array4<Real       const> const& fcz),
-                          Array4<Real       const> const& bcent,
-                          int as_crse,
-                          Array4<Real            > const& drho_as_crse,
-                          Array4<int        const> const& rrflag_as_crse,
-                          int as_fine,
-                          Array4<Real            > const& dm_as_fine,
-                          Array4<int        const> const& lev_mask,
-                          Real dt)
+CNS::compute_dSdt_box_eb(const Box& bx,
+                         Array4<Real const> const&       sfab,
+                         Array4<Real      > const&       dsdtfab,
+                         std::array<FArrayBox*, AMREX_SPACEDIM> const& flux,
+                         Array4<EBCellFlag const> const& flag,
+                         Array4<Real       const> const& vfrac,
+                         AMREX_D_DECL(
+                            Array4<Real    const> const& apx,
+                            Array4<Real    const> const& apy,
+                            Array4<Real    const> const& apz),
+                         AMREX_D_DECL(
+                            Array4<Real    const> const& fcx,
+                            Array4<Real    const> const& fcy,
+                            Array4<Real    const> const& fcz),
+                         Array4<Real       const> const& bcent,
+                         int                             as_crse,
+                         Array4<Real            > const& drho_as_crse,
+                         Array4<int        const> const& rrflag_as_crse,
+                         int                             as_fine,
+                         Array4<Real            > const& dm_as_fine,
+                         Array4<int        const> const& lev_mask,
+                         Real                            dt)
 {
     BL_PROFILE("CNS::compute_dSdt_box_eb()");
 
@@ -52,10 +51,10 @@ CNS::compute_dSdt_box_eb (const Box& bx,
 
     // Quantities for redistribution
     FArrayBox divc,optmp,redistwgt,delta_m;
-    divc.resize(bxg2,NEQNS);
-    optmp.resize(bxg2,NEQNS);
-    delta_m.resize(bxg1,NEQNS);
-    redistwgt.resize(bxg2,1);
+    divc.resize(bxg2, NVAR);
+    optmp.resize(bxg2, NVAR);
+    delta_m.resize(bxg1, NVAR);
+    redistwgt.resize(bxg2, 1);
 
     // Set to zero just in case
     divc.setVal<RunOn::Device>(0.0);
@@ -69,12 +68,10 @@ CNS::compute_dSdt_box_eb (const Box& bx,
 
     // Slopes
     FArrayBox slopetmp;
-    slopetmp.resize(bxg4,NEQNS);
+    slopetmp.resize(bxg4, NVAR);
 
     FArrayBox diff_coeff;
-
-    if (do_visc == 1)
-    {
+    if (do_visc == 1) {
        diff_coeff.resize(bxg4, NCOEF);
     }
 
@@ -98,37 +95,48 @@ CNS::compute_dSdt_box_eb (const Box& bx,
     weights[2] = 0.5;
 
     // Initialize dm_as_fine to 0
-    if (as_fine)
-    {
+    if (as_fine) {
         amrex::ParallelFor(bxg1, NCONS,
-        [=] AMREX_GPU_DEVICE (int i, int j, int k, int n) noexcept
-        {
+        [=] AMREX_GPU_DEVICE (int i, int j, int k, int n) noexcept {
            dm_as_fine(i,j,k,n) = 0.;
         });
     }
 
     amrex::ParallelFor(bxg5,
-    [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept
-    {
+    [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept {
         cns_ctoprim(i, j, k, sfab, q, *lparm);
     });
 
-    if (do_visc == 1)
-    {
-       auto const& coefs = diff_coeff.array();
-       if(use_const_visc == 1 ) {
-          amrex::ParallelFor(bxg4,
-          [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept
-          {
-              cns_constcoef_eb(i, j, k, flag, coefs, *lparm);
-          });
-       } else {
-          amrex::ParallelFor(bxg4,
-          [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept
-          {
-              cns_diffcoef_eb(i, j, k, q, flag, coefs, *lparm);
-          });
-       }
+    if (do_visc == 1) {        
+        if(use_const_visc == 1) {
+            auto const& coefs = diff_coeff.array();
+            amrex::ParallelFor(bxg4,
+            [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept {
+                cns_constcoef_eb(i, j, k, flag, coefs, *lparm);
+            });
+        } else {
+        //   amrex::ParallelFor(bxg4,
+        //   [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept
+        //   {
+        //       cns_diffcoef_eb(i, j, k, q, flag, coefs, *lparm);
+        //   });
+            auto const& qar_yin   = qtmp.array(QFS);
+            auto const& qar_Tin   = qtmp.array(QTEMP);
+            auto const& qar_rhoin = qtmp.array(QRHO);
+            auto const& rhoD   = diff_coeff.array(CRHOD);
+            auto const& mu     = diff_coeff.array(CMU);
+            auto const& xi     = diff_coeff.array(CXI);
+            auto const& lambda = diff_coeff.array(CLAM);
+            
+            BL_PROFILE("PelePhysics::get_transport_coeffs()");
+            // Get Transport coefs on GPU.
+            auto const* ltransparm = trans_parms.device_trans_parm();
+            amrex::launch(bxg4, [=] AMREX_GPU_DEVICE(amrex::Box const& tbx) {
+                auto trans = pele::physics::PhysicsType::transport();
+                trans.get_transport_coeffs(
+                    tbx, qar_yin, qar_Tin, qar_rhoin, rhoD, mu, xi, lambda, ltransparm);
+            });
+        }
     }
 
     auto const& slope = slopetmp.array();
