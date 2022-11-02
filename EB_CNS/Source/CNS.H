@@ -100,6 +100,8 @@ public:
 
     virtual void post_restart() override;
 
+    virtual int okToContinue() override;
+
     // Error estimation for regridding.
     virtual void errorEst(amrex::TagBoxArray& tb,
                           int                 clearval,
@@ -226,6 +228,7 @@ protected:
     static int verbose;
     static amrex::IntVect hydro_tile_size;
     static amrex::Real cfl;
+    static amrex::Real dt_cutoff;
 
     static bool do_visc;
     static bool do_react;

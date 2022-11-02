@@ -20,10 +20,11 @@ BCRec    CNS::phys_bc;
 int      CNS::verbose = 2;
 IntVect  CNS::hydro_tile_size {AMREX_D_DECL(1024,16,16)};
 Real     CNS::cfl       = 0.3;
+Real     CNS::dt_cutoff = 5.e-20;
 int      CNS::do_reflux = 1;
-int      CNS::refine_cutcells          = 1;
-int      CNS::refine_max_dengrad_lev   = -1;
-Real     CNS::refine_dengrad           = 1.0e10;
+int      CNS::refine_cutcells        = 1;
+int      CNS::refine_max_dengrad_lev = -1;
+Real     CNS::refine_dengrad         = 1.e10;
 Vector<RealBox> CNS::refine_boxes;
 RealBox* CNS::dp_refine_boxes;
 
@@ -42,6 +43,8 @@ Real     CNS::plm_theta      = 2.0;   // [1,2] 1: minmod; 2: van Leer's MC
 
 int      CNS::eb_weights_type = 0;   // [0,1,2,3] 0: weights are all 1
 int      CNS::do_reredistribution = 1;
+
+bool     CNS::signalStopJob = false;
 
 CNS::CNS() {}
 
@@ -302,6 +305,8 @@ CNS::postCoarseTimeStep(Real /*time*/)
 void
 CNS::printTotal() const
 {
+    // Print total and check for nan
+
     const MultiFab& S_new = get_new_data(State_Type);
     MultiFab mf(grids, dmap, 1, 0);
     std::array<Real,5> tot;
@@ -324,6 +329,10 @@ CNS::printTotal() const
 #ifdef BL_LAZY
         });
 #endif
+
+    // Nan detector
+    if (std::isnan(tot[4])) signalStopJob = true;
+    amrex::ParallelDescriptor::ReduceBoolOr(signalStopJob);
 }
 
 void
@@ -346,6 +355,29 @@ CNS::post_init(Real /*stop_time*/)
 void
 CNS::post_restart()
 {
+}
+
+int
+CNS::okToContinue() 
+{
+    if (level > 0) {
+        return 1;
+    }
+
+    int test = 1;
+    if (signalStopJob) {
+        test = 0;
+
+        amrex::Print() << "Signalling a stop of the run due to signalStopJob = true."
+                       << std::endl;
+    } else if (parent->dtLevel(0) < dt_cutoff) {
+        test = 0;
+
+        amrex::Print() << "Signalling a stop of the run because dt < dt_cutoff."
+                       << std::endl;
+    }
+
+    return test;
 }
 
 void
@@ -414,6 +446,7 @@ CNS::read_params()
     }
 
     pp.query("cfl", cfl);
+    pp.query("dt_cutoff", dt_cutoff);
 
     Vector<int> lo_bc(AMREX_SPACEDIM), hi_bc(AMREX_SPACEDIM);
     pp.getarr("lo_bc", lo_bc, 0, AMREX_SPACEDIM);

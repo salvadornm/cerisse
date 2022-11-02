@@ -61,8 +61,9 @@ int main (int argc, char* argv[])
 
         timer_advance = amrex::second();
 
-        while (amr.okToContinue() && (amr.levelSteps(0) < max_step || max_step < 0) &&
-              (amr.cumTime() < stop_time || stop_time < 0.0))
+        while ((amr.okToContinue()) && 
+               (amr.levelSteps(0) < max_step || max_step < 0) &&
+               (amr.cumTime() < stop_time || stop_time < 0.0))
         {
             // Do a coarse timestep. Recursively calls timeStep()
             amr.coarseTimeStep(stop_time);
