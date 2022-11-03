@@ -3,7 +3,6 @@
 
 #include "index_macros.H"
 // #include "parm.H"
-#include "diffcoef.H"
 
 #include <AMReX_FArrayBox.H>
 #include <AMReX_CONSTANTS.H>
@@ -439,7 +438,7 @@ compute_diff_wallflux ( int i, int j, int k,
 
     using amrex::Real;
 
-    for (int n = 0; n<NEQNS; n++) viscw[n]=0.;
+    for (int n = 0; n < NEQNS; n++) viscw[n]=0.;
 
     AMREX_D_TERM(Real dapx = axp - axm;,
                  Real dapy = ayp - aym;,

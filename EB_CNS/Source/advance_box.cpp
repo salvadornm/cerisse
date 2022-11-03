@@ -1,7 +1,7 @@
-
 #include <CNS.H>
 #include <CNS_hydro_K.H>
 #include <CNS_diffusion_K.H>
+#include "diffcoef.H"
 
 #include <AMReX_EBFArrayBox.H>
 #include <AMReX_MultiCutFab.H>

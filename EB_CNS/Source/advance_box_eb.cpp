@@ -3,6 +3,7 @@
 #include "CNS_hydro_eb_K.H"
 #include "CNS_divop_K.H"
 #include "CNS_diffusion_eb_K.H"
+#include "diffcoef.H"
 
 #include <AMReX_EBFArrayBox.H>
 #include <AMReX_MultiCutFab.H>

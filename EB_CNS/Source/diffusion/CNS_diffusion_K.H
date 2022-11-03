@@ -3,7 +3,6 @@
 
 #include "index_macros.H"
 // #include "parm.H"
-#include "diffcoef.H"
 
 #include <AMReX_FArrayBox.H>
 #include <AMReX_CONSTANTS.H>
