@@ -50,7 +50,8 @@ cns_estdt(int i, int j, int k, amrex::Array4<Real const> const& state,
 
 AMREX_GPU_DEVICE AMREX_FORCE_INLINE
 void
-cns_compute_temperature(int i, int j, int k, amrex::Array4<amrex::Real> const& S,
+cns_compute_temperature(int i, int j, int k, 
+                        amrex::Array4<amrex::Real> const& S,
                         Parm const& parm) noexcept
 {
     // Compute temperature and enforce consistent eint
@@ -70,16 +71,12 @@ cns_compute_temperature(int i, int j, int k, amrex::Array4<amrex::Real> const& S
     }
 
     auto eos = pele::physics::PhysicsType::eos();
-    amrex::Real T;
-    eos.EY2T(rhoinv * S(i,j,k,UEINT), massfrac, T);
+    eos.EY2T(rhoinv * S(i,j,k,UEINT), massfrac, S(i,j,k,UTEMP));
 
-    // Print() << massfrac[0] << " " << massfrac[1] << ", ";
-
-    S(i,j,k,UTEMP) = T;
     // amrex::Real cv;
     // eos.TY2Cv(S(i,j,k,UTEMP), massfrac, cv);
     // S(i,j,k,UTEMP) = rhoinv * S(i,j,k,UEINT) * amrex::Real(1.0) / cv;
-    // S(i,j,k,UTEMP) = 1500.0; //rhoinv * S(i,j,k,UEINT) * amrex::Real(1.0) / parm.cv;
+    // S(i,j,k,UTEMP) = rhoinv * S(i,j,k,UEINT) * amrex::Real(1.0) / parm.cv;
 }
 
 #endif

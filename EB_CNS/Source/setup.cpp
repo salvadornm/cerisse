@@ -10,9 +10,6 @@ Parm* CNS::d_parm = nullptr;
 ProbParm* CNS::h_prob_parm = nullptr;
 ProbParm* CNS::d_prob_parm = nullptr;
 
-static Box the_same_box (const Box& b) { return b; }
-//static Box grow_box_by_one (const Box& b) { return amrex::grow(b,1); }
-
 using BndryFunc = StateDescriptor::BndryFunc;
 
 // Components are:
@@ -188,27 +185,46 @@ CNS::variableSetUp()
 
     // DEFINE DERIVED QUANTITIES
     // Pressure
-    derive_lst.add("pressure",IndexType::TheCellType(),1,
-                   cns_derpres,the_same_box);
-    derive_lst.addComponent("pressure",desc_lst,State_Type,UEINT,1);
+    derive_lst.add("pressure", IndexType::TheCellType(), 1,
+                   cns_derpres, amrex::DeriveRec::TheSameBox);
+    derive_lst.addComponent("pressure", desc_lst, State_Type, URHO, NVAR);
 
     // Velocities
-    derive_lst.add("x_velocity",IndexType::TheCellType(),1,
-                   cns_dervel,the_same_box);
-    derive_lst.addComponent("x_velocity",desc_lst,State_Type,URHO,1);
-    derive_lst.addComponent("x_velocity",desc_lst,State_Type,UMX,1);
+    derive_lst.add("x_velocity", IndexType::TheCellType(), 1,
+                   cns_dervel, amrex::DeriveRec::TheSameBox);
+    derive_lst.addComponent("x_velocity", desc_lst, State_Type, URHO, 1);
+    derive_lst.addComponent("x_velocity", desc_lst, State_Type, UMX, 1);
 
-    derive_lst.add("y_velocity",IndexType::TheCellType(),1,
-                   cns_dervel,the_same_box);
-    derive_lst.addComponent("y_velocity",desc_lst,State_Type,URHO,1);
-    derive_lst.addComponent("y_velocity",desc_lst,State_Type,UMY,1);
+    derive_lst.add("y_velocity", IndexType::TheCellType(), 1,
+                   cns_dervel, amrex::DeriveRec::TheSameBox);
+    derive_lst.addComponent("y_velocity", desc_lst, State_Type, URHO, 1);
+    derive_lst.addComponent("y_velocity", desc_lst, State_Type, UMY, 1);
 
 #if (AMREX_SPACEDIM == 3)
-    derive_lst.add("z_velocity",IndexType::TheCellType(),1,
-                   cns_dervel,the_same_box);
-    derive_lst.addComponent("z_velocity",desc_lst,State_Type,URHO,1);
-    derive_lst.addComponent("z_velocity",desc_lst,State_Type,UMZ,1);
+    derive_lst.add("z_velocity", IndexType::TheCellType(), 1,
+                   cns_dervel, amrex::DeriveRec::TheSameBox);
+    derive_lst.addComponent("z_velocity", desc_lst, State_Type, URHO, 1);
+    derive_lst.addComponent("z_velocity", desc_lst, State_Type, UMZ, 1);
 #endif
+
+    // Vorticity
+    derive_lst.add("magvort", amrex::IndexType::TheCellType(), 1, 
+                   cns_dermagvort, amrex::DeriveRec::GrowBoxByOne);
+    derive_lst.addComponent("magvort", desc_lst, State_Type, URHO, AMREX_SPACEDIM + 1);
+
+    // Numerical schlieren
+    derive_lst.add("divu", amrex::IndexType::TheCellType(), 1, 
+                   cns_derdivu, amrex::DeriveRec::GrowBoxByOne);
+    derive_lst.addComponent("divu", desc_lst, State_Type, URHO, AMREX_SPACEDIM + 1);
+
+    derive_lst.add("divrho", amrex::IndexType::TheCellType(), 1, 
+                   cns_derdivrho, amrex::DeriveRec::GrowBoxByOne);
+    derive_lst.addComponent("divrho", desc_lst, State_Type, URHO, 1);
+
+    // Mach number
+    derive_lst.add("MachNumber", amrex::IndexType::TheCellType(), 1, 
+                   cns_dermachnumber, amrex::DeriveRec::TheSameBox);
+    derive_lst.addComponent("MachNumber", desc_lst, State_Type, URHO, NVAR);
 }
 
 void

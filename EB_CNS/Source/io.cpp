@@ -29,9 +29,5 @@ void
 CNS::writePlotFile(const std::string& dir, std::ostream& os, VisMF::How how)
 {
     BL_PROFILE("CNS::writePlotFile()");
-#ifdef AMREX_TESTING
-    MultiFab& C_new = get_new_data(Cost_Type);
-    C_new.setVal(0.0);
-#endif
     AmrLevel::writePlotFile(dir, os, how);
 }
