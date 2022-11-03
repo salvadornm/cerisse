@@ -13,7 +13,7 @@
 #define NVAR  6 + NUM_SPECIES
 #define NUM_STATE NVAR // * NUM_FIELDS
 
-#define NCONS 6
+#define NCONS 6 + NUM_SPECIES
 #define NEQNS 4
 
 #define QRHO   0
@@ -40,7 +40,7 @@
 #define NVAR  7 + NUM_SPECIES
 #define NUM_STATE NVAR // * NUM_FIELDS
 
-#define NCONS 7
+#define NCONS 7 + NUM_SPECIES // TODO: NEED TO REARRANGE VALUES
 #define NEQNS 5
 
 #define QRHO   0
