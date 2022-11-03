@@ -54,7 +54,7 @@ cns_compute_temperature(int i, int j, int k,
                         amrex::Array4<amrex::Real> const& S,
                         Parm const& parm) noexcept
 {
-    // Compute temperature and enforce consistent eint
+    // Reset Eint and compute T
     
     amrex::Real rhoinv = amrex::Real(1.0)/S(i,j,k,URHO);
     amrex::Real mx = S(i,j,k,UMX);
@@ -65,6 +65,7 @@ cns_compute_temperature(int i, int j, int k,
     amrex::Real mz = S(i,j,k,UMZ);
     S(i,j,k,UEINT) = S(i,j,k,UEDEN) - amrex::Real(0.5) * rhoinv * (mx*mx + my*my + mz*mz);
 #endif
+
     amrex::Real massfrac[NUM_SPECIES];
     for (int n = 0; n < NUM_SPECIES; ++n) {
         massfrac[n] = S(i, j, k, UFS + n) * rhoinv;
@@ -77,6 +78,8 @@ cns_compute_temperature(int i, int j, int k,
     // eos.TY2Cv(S(i,j,k,UTEMP), massfrac, cv);
     // S(i,j,k,UTEMP) = rhoinv * S(i,j,k,UEINT) * amrex::Real(1.0) / cv;
     // S(i,j,k,UTEMP) = rhoinv * S(i,j,k,UEINT) * amrex::Real(1.0) / parm.cv;
+
+    // S(i,j,k,UTEMP) = 1500.; //for debug
 }
 
 #endif

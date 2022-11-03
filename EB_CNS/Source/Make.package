@@ -21,5 +21,3 @@ CEXE_sources += react.cpp
 
 CEXE_headers += parm.H
 CEXE_sources += parm.cpp
-
-CEXE_sources += CNS_flux_redistribute.cpp

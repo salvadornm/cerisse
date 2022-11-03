@@ -16,22 +16,22 @@ struct CnsFillExtDir
                      GeometryData const& geom, const Real /*time*/,
                      const BCRec* bcr, const int bcomp,
                      const int /*orig_comp*/) const
+    {
+        const Box& domain_box = geom.Domain();
+
+        const BCRec& bc = bcr[bcomp+0];
+
+        AMREX_D_TERM(int i = iv[0];,
+                     int j = iv[1];,
+                     int k = iv[2];);
+
+        // The combustor problem is hard-wired for inflow at low-z right now
+        if (bc.lo(2) == BCType::ext_dir and k < domain_box.smallEnd(2))
         {
-            const Box& domain_box = geom.Domain();
-
-            const BCRec& bc = bcr[bcomp+0];
-
-            AMREX_D_TERM(int i = iv[0];,
-                         int j = iv[1];,
-                         int k = iv[2];);
-
-            // The combustor problem is hard-wired for inflow at low-z right now
-            if (bc.lo(2) == BCType::ext_dir and k < domain_box.smallEnd(2))
-            {
-                for (int nc = 0; nc < numcomp; ++nc)
-                   dest(i,j,k,dcomp+nc) = inflow_state[dcomp+nc];
-            }
+            for (int nc = 0; nc < numcomp; ++nc)
+                dest(i,j,k,dcomp+nc) = inflow_state[dcomp+nc];
         }
+    }
 };
 
 struct CnsReactFillExtDir

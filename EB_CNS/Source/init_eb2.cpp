@@ -10,8 +10,8 @@
 using namespace amrex;
 
 void
-initialize_EB2 (const Geometry& geom, const int /*required_coarsening_level*/,
-                const int max_coarsening_level)
+initialize_EB2(const Geometry& geom, const int /*required_coarsening_level*/,
+               const int max_coarsening_level)
 {
     BL_PROFILE("initializeEB2");
 
@@ -64,11 +64,12 @@ initialize_EB2 (const Geometry& geom, const int /*required_coarsening_level*/,
         auto pr = EB2::translate(EB2::lathe(polys), {lenx*0.5, leny*0.5, 0.});
 
         auto gshop = EB2::makeShop(pr);
-        EB2::Build(gshop, geom, max_coarsening_level, max_coarsening_level, 4);
+        EB2::Build(gshop, geom, max_coarsening_level, max_coarsening_level, 4, true);
     }
     else
 #endif
     {
-        EB2::Build(geom, max_coarsening_level, max_coarsening_level, 4);
+        // (geom, required_coarsening_level, max_coarsening_level, ngrow, build_coarse_level_by_coarsening)
+        EB2::Build(geom, max_coarsening_level, max_coarsening_level, 4, true);
     }
 }

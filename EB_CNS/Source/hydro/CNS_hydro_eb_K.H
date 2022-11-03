@@ -34,12 +34,12 @@ cns_slope_eb_x (int i, int j, int k,
 {
     using amrex::Real;
 
-    Real dlft0 = Real(0.0);
-    Real dlft1 = Real(0.0);
-    Real dlft2 = Real(0.0);
-    Real dlft3 = Real(0.0);
+    Real dlft0 = Real(0.0); // RHO?
+    Real dlft1 = Real(0.0); // UX
+    Real dlft2 = Real(0.0); // UY
+    Real dlft3 = Real(0.0); // E?
 #if (AMREX_SPACEDIM == 3)
-    Real dlft4 = Real(0.0);
+    Real dlft4 = Real(0.0); // UZ
 #endif
 
     Real drgt0 = Real(0.0);

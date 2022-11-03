@@ -158,7 +158,7 @@ CNS::initData()
     amrex::Gpu::synchronize();
 
     // Compute the initial temperature (will override what was set in initdata)
-    computeTemp(S_new,0);
+    computeTemp(S_new, 0);
 
     // set_body_state(S_new);
     // amrex::Real cur_time = state[State_Type].curTime();
@@ -644,22 +644,32 @@ CNS::computeTemp(MultiFab& State, int ng)
     Parm const* lparm = d_parm;
 
     // This will reset Eint and compute Temperature
-#ifdef AMREX_USE_OMP
-#pragma omp parallel if (Gpu::notInLaunchRegion())
-#endif
-    for (MFIter mfi(State,true); mfi.isValid(); ++mfi)
-    {
-        const Box& bx = mfi.growntilebox(ng);
+// #ifdef AMREX_USE_OMP
+// #pragma omp parallel if (Gpu::notInLaunchRegion())
+// #endif
+//     for (MFIter mfi(State,true); mfi.isValid(); ++mfi)
+//     {
+//         const Box& bx = mfi.growntilebox(ng);
 
-        const auto& flag = flags[mfi];
-        auto s_arr = State.array(mfi);
+//         const auto& flag = flags[mfi];
+//         auto s_arr = State.array(mfi);
 
-        if (flag.getType(bx) != FabType::covered) {
-            amrex::ParallelFor(bx,
-            [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept
-            {
-                cns_compute_temperature(i, j, k, s_arr, *lparm);
-            });
-        }
-    }
+//         if (flag.getType(bx) != FabType::covered) {
+//             amrex::ParallelFor(bx,
+//             [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept
+//             {
+//                 cns_compute_temperature(i, j, k, s_arr, *lparm);
+//             });
+//         }
+//     }
+    auto const& sarrs = State.arrays();
+    auto const& flagarrs = flags.const_arrays();
+    const amrex::IntVect ngs(ng);
+    amrex::ParallelFor(
+        State, ngs, [=] AMREX_GPU_DEVICE(int nbx, int i, int j, int k) noexcept {
+            if (!flagarrs[nbx](i, j, k).isCovered()) {
+                cns_compute_temperature(i, j, k, sarrs[nbx], *lparm);
+            }
+        });
+    amrex::Gpu::synchronize();
 }

@@ -41,7 +41,7 @@ cns_ctoprim(int i, int j, int k,
     auto eos = pele::physics::PhysicsType::eos();
     Real T, p, cs;
     // eos.Y2WBAR(massfrac, wbar);
-    eos.REY2T(rho, ei, massfrac, T);
+    eos.EY2T(ei, massfrac, T); 
     eos.RTY2P(rho, T, massfrac, p);
     eos.RTY2Cs(rho, T, massfrac, cs);
     // eos.RTY2G(rho, T, massfrac, gam1);
