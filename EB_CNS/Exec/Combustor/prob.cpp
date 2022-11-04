@@ -27,7 +27,7 @@ void amrex_probinit(const int* /*init*/,
     std::memcpy(CNS::d_prob_parm, CNS::h_prob_parm, sizeof(ProbParm));
 #endif
 
-    Gpu::HostVector<Real> inflow_state(NUM_STATE);
+    Gpu::HostVector<Real> inflow_state(NVAR);
 
     auto eos = pele::physics::PhysicsType::eos();
     Real rho, eint, cs;
@@ -49,7 +49,7 @@ void amrex_probinit(const int* /*init*/,
     }
 
     Gpu::copyAsync(Gpu::hostToDevice, inflow_state.data(),
-                   inflow_state.data() + NUM_STATE,
+                   inflow_state.data() + NVAR,
                    CNS::h_prob_parm->inflow_state);
     Gpu::streamSynchronize();
 }

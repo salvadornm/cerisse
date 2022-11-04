@@ -59,7 +59,7 @@ CNS::CNS(Amr&            papa,
         flux_reg.define(bl, papa.boxArray(level-1),
                         dm, papa.DistributionMap(level-1),
                         level_geom, papa.Geom(level-1),
-                        papa.refRatio(level-1), level, NUM_STATE);
+                        papa.refRatio(level-1), level, LEN_STATE);
     }
 
     buildMetrics();
@@ -98,7 +98,7 @@ CNS::init(AmrLevel& old)
     setTimeLevel(cur_time,dt_old,dt_new);
 
     MultiFab& S_new = get_new_data(State_Type);
-    FillPatch(old, S_new, 0, cur_time, State_Type, 0, NUM_STATE);
+    FillPatch(old, S_new, 0, cur_time, State_Type, 0, LEN_STATE);
 
     amrex::MultiFab& React_new = get_new_data(Reactions_Type);
     if (do_react) {
@@ -126,7 +126,7 @@ CNS::init()
     setTimeLevel(cur_time,dt_old,dt);
 
     MultiFab& S_new = get_new_data(State_Type);
-    FillCoarsePatch(S_new, 0, cur_time, State_Type, 0, NUM_STATE);
+    FillCoarsePatch(S_new, 0, cur_time, State_Type, 0, LEN_STATE);
 
     MultiFab& C_new = get_new_data(Cost_Type);
     FillCoarsePatch(C_new, 0, cur_time, Cost_Type, 0, 1);
@@ -286,6 +286,11 @@ CNS::post_timestep(int /*iteration*/)
         MultiFab& S_crse = get_new_data(State_Type);
         MultiFab& S_fine = fine_level.get_new_data(State_Type);
         fine_level.flux_reg.Reflux(S_crse, *volfrac, S_fine, *fine_level.volfrac);
+
+        if (verbose && amrex::ParallelDescriptor::IOProcessor()) {
+            amrex::Print() << "Reflux() at level " << level
+                           << " : time = " << state[State_Type].curTime() << std::endl;
+        }
     }
 
     if (level < parent->finestLevel()) {
@@ -309,8 +314,8 @@ CNS::printTotal() const
 
     const MultiFab& S_new = get_new_data(State_Type);
     MultiFab mf(grids, dmap, 1, 0);
-    std::array<Real,5> tot;
-    for (int comp = 0; comp < 5; ++comp) {
+    std::array<Real,6> tot;
+    for (int comp = 0; comp < 6; ++comp) {
         MultiFab::Copy(mf, S_new, comp, 0, 1, 0);
         MultiFab::Multiply(mf, *volfrac, 0, 0, 1, 0);
         tot[comp] = mf.sum(0,true) * geom.ProbSize();
@@ -319,13 +324,12 @@ CNS::printTotal() const
     Lazy::QueueReduction( [=] () mutable {
 #endif
             ParallelDescriptor::ReduceRealSum(tot.data(), 5, ParallelDescriptor::IOProcessorNumber());
-            amrex::Print().SetPrecision(17) << "\n[CNS] Total mass       is " << tot[0] << "\n"
-                                            <<   "      Total x-momentum is " << tot[1] << "\n"
-                                            <<   "      Total y-momentum is " << tot[2] << "\n"
-#if (AMREX_SPACEDIM == 3)
-                                            <<   "      Total z-momentum is " << tot[3] << "\n"
-#endif
-                                            <<   "      Total energy     is " << tot[4] << "\n";
+            amrex::Print().SetPrecision(17) << "\n[CNS] Total mass       = " << tot[0] << "\n"
+                                            <<   "      Total x-momentum = " << tot[1] << "\n"
+                                            <<   "      Total y-momentum = " << tot[2] << "\n"
+                                            <<   "      Total z-momentum = " << tot[3] << "\n"
+                                            <<   "      Total energy     = " << tot[4] << "\n"
+                                            <<   "      Total int energy = " << tot[5] << "\n";
 #ifdef BL_LAZY
         });
 #endif
@@ -344,7 +348,9 @@ CNS::post_init(Real /*stop_time*/)
     }
 
     if (do_react) {
-        // react_state(parent->cumTime(), parent->dtLevel(level), true);
+        const MultiFab& S_new = get_new_data(State_Type);
+              MultiFab& I_R   = get_new_data(Reactions_Type);
+        reaction_source(I_R, S_new, parent->cumTime(), parent->dtLevel(level), true);
     }
 
     if (verbose >= 2) {
@@ -416,7 +422,7 @@ CNS::errorEst(TagBoxArray& tags, int, int, Real /*time*/, int, int)
         const MultiFab& S_new = get_new_data(State_Type);
         const Real cur_time = state[State_Type].curTime();
         MultiFab rho(S_new.boxArray(), S_new.DistributionMap(), 1, 1);
-        FillPatch(*this, rho, rho.nGrow(), cur_time, State_Type, URHO, 1, 0);
+        FillPatch(*this, rho, rho.nGrow(), cur_time, State_Type, UMF + URHO, 1, 0);
 
         const char   tagval = TagBox::SET;
 //        const char clearval = TagBox::CLEAR;
@@ -536,17 +542,23 @@ CNS::avgDown()
     if (level == parent->finestLevel()) return;
 
     auto& fine_lev = getLevel(level+1);
-
-    MultiFab& S_crse =          get_new_data(State_Type);
-    MultiFab& S_fine = fine_lev.get_new_data(State_Type);
+          MultiFab& S_crse =          get_new_data(State_Type);
+    const MultiFab& S_fine = fine_lev.get_new_data(State_Type);
 
     MultiFab volume(S_fine.boxArray(), S_fine.DistributionMap(), 1, 0);
-    volume.setVal(1.0);
+    geom.GetVolume(volume);
+
     amrex::EB_average_down(S_fine, S_crse, volume, fine_lev.volFrac(),
                            0, S_fine.nComp(), fine_ratio);
-
     const int nghost = 0;
     computeTemp(S_crse, nghost);
+
+    if (do_react) {
+              MultiFab& R_crse =          get_new_data(Reactions_Type);
+        const MultiFab& R_fine = fine_lev.get_new_data(Reactions_Type);
+        amrex::EB_average_down(R_fine, R_crse, volume, fine_lev.volFrac(),
+                               0, S_fine.nComp(), fine_ratio);
+    }
 }
 
 void

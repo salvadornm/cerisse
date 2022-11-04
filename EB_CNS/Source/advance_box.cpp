@@ -9,10 +9,14 @@
 using namespace amrex;
 
 void
-CNS::compute_dSdt_box (const Box& bx,
-                       Array4<Real const>& sfab,
-                       Array4<Real      >& dsdtfab,
-                       const std::array<FArrayBox*, AMREX_SPACEDIM>& flux)
+CNS::compute_dSdt_box(const Box& bx,
+                      Array4<Real const>& sfab,
+                      Array4<Real      >& dsdtfab,
+                      /*const std::array<FArrayBox*, AMREX_SPACEDIM>& flux*/
+                      AMREX_D_DECL(
+                        Array4<Real    >& fxfab,
+                        Array4<Real    >& fyfab,
+                        Array4<Real    >& fzfab))
 {
     BL_PROFILE("CNS::compute_dSdt__box()");
 
@@ -22,9 +26,9 @@ CNS::compute_dSdt_box (const Box& bx,
 
     Parm const* lparm = d_parm;
 
-    AMREX_D_TERM(auto const& fxfab = flux[0]->array();,
-                 auto const& fyfab = flux[1]->array();,
-                 auto const& fzfab = flux[2]->array(););
+    // AMREX_D_TERM(auto const& fxfab = flux[0]->array();,
+    //              auto const& fyfab = flux[1]->array();,
+    //              auto const& fzfab = flux[2]->array(););
 
     const Box& bxg2 = amrex::grow(bx,2);
     qtmp.resize(bxg2, NPRIM);
@@ -76,7 +80,7 @@ CNS::compute_dSdt_box (const Box& bx,
     }
 
     const Box& bxg1 = amrex::grow(bx,1);
-    slopetmp.resize(bxg1,NEQNS);
+    slopetmp.resize(bxg1,UEINT);
     auto const& slope = slopetmp.array();
 
     auto l_plm_iorder = plm_iorder;
@@ -95,7 +99,7 @@ CNS::compute_dSdt_box (const Box& bx,
     [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept
     {
         cns_riemann_x(i, j, k, fxfab, slope, q, *lparm);
-        for (int n = NEQNS; n < NCONS; ++n) fxfab(i,j,k,n) = Real(0.0);
+        for (int n = UEINT; n < NVAR; ++n) fxfab(i,j,k,n) = Real(0.0);
     });
 
     if (do_visc == 1)
@@ -121,7 +125,7 @@ CNS::compute_dSdt_box (const Box& bx,
     [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept
     {
         cns_riemann_y(i, j, k, fyfab, slope, q, *lparm);
-        for (int n = NEQNS; n < NCONS; ++n) fyfab(i,j,k,n) = Real(0.0);
+        for (int n = UEINT; n < NVAR; ++n) fyfab(i,j,k,n) = Real(0.0);
     });
 
     if(do_visc == 1)
@@ -148,7 +152,7 @@ CNS::compute_dSdt_box (const Box& bx,
     [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept
     {
         cns_riemann_z(i, j, k, fzfab, slope, q, *lparm);
-        for (int n = NEQNS; n < NCONS; ++n) fzfab(i,j,k,n) = Real(0.0);
+        for (int n = UEINT; n < NVAR; ++n) fzfab(i,j,k,n) = Real(0.0);
     });
 
     if(do_visc == 1)
@@ -162,7 +166,7 @@ CNS::compute_dSdt_box (const Box& bx,
     }
 #endif
 
-    amrex::ParallelFor(bx, NCONS,
+    amrex::ParallelFor(bx, NVAR,
     [=] AMREX_GPU_DEVICE (int i, int j, int k, int n) noexcept
     {
         cns_flux_to_dudt(i, j, k, n, dsdtfab, AMREX_D_DECL(fxfab,fyfab,fzfab), dxinv);

@@ -236,19 +236,19 @@ compute_interp2d(amrex::Real cym,amrex::Real cy0,amrex::Real cyp,
 #if (AMREX_SPACEDIM == 2)
 AMREX_GPU_DEVICE AMREX_FORCE_INLINE
 void
-compute_diff_wallflux ( int i, int j, int k,
-                        amrex::Array4<amrex::Real const> const& q,
-                        amrex::Array4<amrex::Real const> const& coefs,
-                        amrex::Array4<amrex::Real const> const& bcent,
-                        const amrex::Real axm, const amrex::Real axp,
-                        const amrex::Real aym, const amrex::Real ayp,
-                        amrex::GpuArray<amrex::Real,NEQNS>& viscw) noexcept
+compute_diff_wallflux(int i, int j, int k,
+                      amrex::Array4<amrex::Real const> const& q,
+                      amrex::Array4<amrex::Real const> const& coefs,
+                      amrex::Array4<amrex::Real const> const& bcent,
+                      const amrex::Real axm, const amrex::Real axp,
+                      const amrex::Real aym, const amrex::Real ayp,
+                      amrex::GpuArray<amrex::Real,NVAR>& viscw) noexcept
 {
     //  This implementation assumes adiabatic walls
 
     using amrex::Real;
 
-    for (int n = 0; n<NEQNS; n++) viscw[n]=0.;
+    for (int n = 0; n<NVAR; n++) viscw[n]=0.;
 
     Real dapx = axp - axm;
     Real dapy = ayp - aym;
@@ -425,20 +425,20 @@ compute_diff_wallflux ( int i, int j, int k,
 
 AMREX_GPU_DEVICE AMREX_FORCE_INLINE
 void
-compute_diff_wallflux ( int i, int j, int k,
-                        amrex::Array4<amrex::Real const> const& q,
-                        amrex::Array4<amrex::Real const> const& coefs,
-                        amrex::Array4<amrex::Real const> const& bcent,
-                        const amrex::Real axm, const amrex::Real axp,
-                        const amrex::Real aym, const amrex::Real ayp,
-                        const amrex::Real azm, const amrex::Real azp,
-                        amrex::GpuArray<amrex::Real,NEQNS>& viscw) noexcept
+compute_diff_wallflux(int i, int j, int k,
+                      amrex::Array4<amrex::Real const> const& q,
+                      amrex::Array4<amrex::Real const> const& coefs,
+                      amrex::Array4<amrex::Real const> const& bcent,
+                      const amrex::Real axm, const amrex::Real axp,
+                      const amrex::Real aym, const amrex::Real ayp,
+                      const amrex::Real azm, const amrex::Real azp,
+                      amrex::GpuArray<amrex::Real,NVAR>& viscw) noexcept
 {
     //  This implementation assumes adiabatic walls
 
     using amrex::Real;
 
-    for (int n = 0; n < NEQNS; n++) viscw[n]=0.;
+    for (int n = 0; n < NVAR; n++) viscw[n]=0.;
 
     AMREX_D_TERM(Real dapx = axp - axm;,
                  Real dapy = ayp - aym;,

@@ -20,7 +20,11 @@ void
 CNS::compute_dSdt_box_eb(const Box& bx,
                          Array4<Real const> const&       sfab,
                          Array4<Real      > const&       dsdtfab,
-                         std::array<FArrayBox*, AMREX_SPACEDIM> const& flux,
+                         /*std::array<FArrayBox*, AMREX_SPACEDIM> const& flux,*/
+                         AMREX_D_DECL(
+                            Array4<Real   > const&       fx_out_arr,
+                            Array4<Real   > const&       fy_out_arr,
+                            Array4<Real   > const&       fz_out_arr),
                          Array4<EBCellFlag const> const& flag,
                          Array4<Real       const> const& vfrac,
                          AMREX_D_DECL(
@@ -78,7 +82,7 @@ CNS::compute_dSdt_box_eb(const Box& bx,
 
     FArrayBox flux_tmp[AMREX_SPACEDIM];
     for (int idim=0; idim < AMREX_SPACEDIM; ++idim) {
-        flux_tmp[idim].resize(amrex::surroundingNodes(bxg3,idim),NCONS);
+        flux_tmp[idim].resize(amrex::surroundingNodes(bxg3,idim),NVAR);
         flux_tmp[idim].setVal<RunOn::Device>(0.);
     }
 
@@ -97,7 +101,7 @@ CNS::compute_dSdt_box_eb(const Box& bx,
 
     // Initialize dm_as_fine to 0
     if (as_fine) {
-        amrex::ParallelFor(bxg1, NCONS,
+        amrex::ParallelFor(bxg1, NVAR,
         [=] AMREX_GPU_DEVICE (int i, int j, int k, int n) noexcept {
            dm_as_fine(i,j,k,n) = 0.;
         });
@@ -159,7 +163,7 @@ CNS::compute_dSdt_box_eb(const Box& bx,
     [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept
     {
         cns_riemann_x(i, j, k, fxfab, slope, q, *lparm);
-        for (int n = NEQNS; n < NCONS; ++n) fxfab(i,j,k,n) = Real(0.0);
+        for (int n = UEINT; n < NVAR; ++n) fxfab(i,j,k,n) = Real(0.0);
     });
 
 
@@ -188,7 +192,7 @@ CNS::compute_dSdt_box_eb(const Box& bx,
     [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept
     {
         cns_riemann_y(i, j, k, fyfab, slope, q, *lparm);
-        for (int n = NEQNS; n < NCONS; ++n) fyfab(i,j,k,n) = Real(0.0);
+        for (int n = UEINT; n < NVAR; ++n) fyfab(i,j,k,n) = Real(0.0);
     });
 
     if(do_visc == 1)
@@ -216,7 +220,7 @@ CNS::compute_dSdt_box_eb(const Box& bx,
     [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept
     {
         cns_riemann_z(i, j, k, fzfab, slope, q, *lparm);
-        for (int n = NEQNS; n < NCONS; ++n) fzfab(i,j,k,n) = Real(0.0);
+        for (int n = UEINT; n < NVAR; ++n) fzfab(i,j,k,n) = Real(0.0);
     });
 
     if(do_visc == 1)
@@ -237,9 +241,9 @@ CNS::compute_dSdt_box_eb(const Box& bx,
 
     // These are the fluxes on face centroids -- they are defined in eb_compute_div
     //    and are the fluxes that go into the flux registers
-    AMREX_D_TERM(auto const& fx_out_arr = flux[0]->array();,
-                 auto const& fy_out_arr = flux[1]->array();,
-                 auto const& fz_out_arr = flux[2]->array(););
+    // AMREX_D_TERM(auto const& fx_out_arr = flux[0]->array();,
+    //              auto const& fy_out_arr = flux[1]->array();,
+    //              auto const& fz_out_arr = flux[2]->array(););
 
     auto const& blo = bx.smallEnd();
     auto const& bhi = bx.bigEnd();
@@ -254,7 +258,7 @@ CNS::compute_dSdt_box_eb(const Box& bx,
     auto const& coefs = diff_coeff.array();
     auto const& redistwgt_arr = redistwgt.array();
 
-    amrex::ParallelFor(bxg2, NEQNS,
+    amrex::ParallelFor(bxg2, UEINT,
     [=] AMREX_GPU_DEVICE (int i, int j, int k, int n) noexcept
     {
        // This does the divergence but not the redistribution -- we will do that later

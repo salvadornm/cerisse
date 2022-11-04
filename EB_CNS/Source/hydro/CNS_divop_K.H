@@ -4,27 +4,27 @@
 #include <CNS_diffusion_eb_K.H>
 
 AMREX_GPU_DEVICE AMREX_FORCE_INLINE
-void eb_compute_div (int i, int j, int k, int n, IntVect const& blo, IntVect const& bhi,
-                     Array4<Real> const& q, Array4<Real> const& divu,
-                     AMREX_D_DECL(Array4<Real const> const& u,
-                                  Array4<Real const> const& v,
-                                  Array4<Real const> const& w),
-                     AMREX_D_DECL(Array4<Real> const& fx,
-                                  Array4<Real> const& fy,
-                                  Array4<Real> const& fz),
-                     Array4<EBCellFlag const> const& flag,
-                     Array4<Real const> const& vfrc,
-                     Array4<Real const> const& bcent,
-                     Array4<Real const> const& coefs,
-                     Array4<Real      > const& redistwgt,
-                     AMREX_D_DECL(Array4<Real const> const& apx,
-                                  Array4<Real const> const& apy,
-                                  Array4<Real const> const& apz),
-                     AMREX_D_DECL(Array4<Real const> const& fcx,
-                                  Array4<Real const> const& fcy,
-                                  Array4<Real const> const& fcz),
-                     GpuArray<Real,AMREX_SPACEDIM> const& dxinv, Parm const& parm,
-                     int eb_weights_type, bool do_visc)
+void eb_compute_div(int i, int j, int k, int n, IntVect const& blo, IntVect const& bhi,
+                    Array4<Real> const& q, Array4<Real> const& divu,
+                    AMREX_D_DECL(Array4<Real const> const& u,
+                                 Array4<Real const> const& v,
+                                 Array4<Real const> const& w),
+                    AMREX_D_DECL(Array4<Real> const& fx,
+                                 Array4<Real> const& fy,
+                                 Array4<Real> const& fz),
+                    Array4<EBCellFlag const> const& flag,
+                    Array4<Real const> const& vfrc,
+                    Array4<Real const> const& bcent,
+                    Array4<Real const> const& coefs,
+                    Array4<Real      > const& redistwgt,
+                    AMREX_D_DECL(Array4<Real const> const& apx,
+                                 Array4<Real const> const& apy,
+                                 Array4<Real const> const& apz),
+                    AMREX_D_DECL(Array4<Real const> const& fcx,
+                                 Array4<Real const> const& fcy,
+                                 Array4<Real const> const& fcz),
+                    GpuArray<Real,AMREX_SPACEDIM> const& dxinv, Parm const& parm,
+                    int eb_weights_type, bool do_visc)
 {
     AMREX_D_TERM(bool x_high = (i == bhi[0]);,
                  bool y_high = (j == bhi[1]);,
@@ -110,7 +110,7 @@ void eb_compute_div (int i, int j, int k, int n, IntVect const& blo, IntVect con
             ( dxinv[0] * (apx(i+1,j,k)*fxp-apx(i,j,k)*fxm)
             + dxinv[1] * (apy(i,j+1,k)*fyp-apy(i,j,k)*fym) );
 
-        GpuArray<Real,NEQNS> flux_hyp_wall;
+        GpuArray<Real,NVAR> flux_hyp_wall;
         compute_hyp_wallflux(q(i,j,k,QRHO),AMREX_D_DECL(q(i,j,k,QU),q(i,j,k,QV),q(i,j,k,QW)),
                              q(i,j,k,QPRES),apx(i,j,k),apx(i+1,j,k),apy(i,j,k),apy(i,j+1,k),
                              flux_hyp_wall,parm);
@@ -120,7 +120,7 @@ void eb_compute_div (int i, int j, int k, int n, IntVect const& blo, IntVect con
 
         if (do_visc)
         {
-            GpuArray<Real,NEQNS> flux_diff_wall;
+            GpuArray<Real,NVAR> flux_diff_wall;
             compute_diff_wallflux(i,j,k,q,coefs,bcent,
                                   apx(i,j,k),apx(i+1,j,k), apy(i,j,k),apy(i,j+1,k),
                                   flux_diff_wall);
@@ -269,7 +269,7 @@ void eb_compute_div (int i, int j, int k, int n, IntVect const& blo, IntVect con
             + dxinv[1] * (apy(i,j+1,k)*fyp-apy(i,j,k)*fym)
             + dxinv[2] * (apz(i,j,k+1)*fzp-apz(i,j,k)*fzm) );
 
-        GpuArray<Real,NEQNS> flux_hyp_wall;
+        GpuArray<Real,NVAR> flux_hyp_wall;
         compute_hyp_wallflux(q(i,j,k,QRHO),AMREX_D_DECL(q(i,j,k,QU),q(i,j,k,QV),q(i,j,k,QW)),
                              q(i,j,k,QPRES),apx(i,j,k),apx(i+1,j,k),apy(i,j,k),apy(i,j+1,k),
                              apz(i,j,k),apz(i,j,k+1),flux_hyp_wall,parm);
@@ -279,7 +279,7 @@ void eb_compute_div (int i, int j, int k, int n, IntVect const& blo, IntVect con
 
         if (do_visc)
         {
-            GpuArray<Real,NEQNS> flux_diff_wall;
+            GpuArray<Real,NVAR> flux_diff_wall;
             compute_diff_wallflux(i,j,k,q,coefs,bcent,
                                   apx(i,j,k),apx(i+1,j,k), apy(i,j,k),apy(i,j+1,k),
                                   apz(i,j,k),apz(i,j,k+1),flux_diff_wall);

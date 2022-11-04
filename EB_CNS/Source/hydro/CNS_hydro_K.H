@@ -403,7 +403,7 @@ compute_hyp_wallflux (const amrex::Real rho,
 #if (AMREX_SPACEDIM == 3)
                       const amrex::Real azm, const amrex::Real azp,
 #endif
-                      amrex::GpuArray<amrex::Real,NEQNS>& fluxw, Parm const& parm) noexcept
+                      amrex::GpuArray<amrex::Real,NVAR>& fluxw, Parm const& parm) noexcept
 {
     using amrex::Real;
 

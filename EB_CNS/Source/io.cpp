@@ -13,7 +13,7 @@ CNS::restart(Amr& papa, std::istream& is, bool bReadSpecial)
         flux_reg.define(grids, papa.boxArray(level-1),
                         dmap, papa.DistributionMap(level-1),
                         geom, papa.Geom(level-1),
-                        papa.refRatio(level-1), level, NUM_STATE);
+                        papa.refRatio(level-1), level, LEN_STATE);
     }
 
     buildMetrics();

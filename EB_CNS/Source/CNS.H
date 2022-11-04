@@ -1,15 +1,16 @@
 #ifndef CNS_H
 #define CNS_H
 
+#include <AMReX_AmrLevel.H>
+#include <AMReX_EBCellFlag.H>
+#include <AMReX_EBFluxRegister.H>
+
 #include "index_macros.H"
 #include "PelePhysics.H"
 #include "ReactorBase.H"
 #include "parm.H"
 #include "prob_parm.H"
 
-#include <AMReX_AmrLevel.H>
-#include <AMReX_EBCellFlag.H>
-#include <AMReX_EBFluxRegister.H>
 
 using namespace amrex;
 
@@ -118,10 +119,6 @@ public:
     // Cleanup data descriptors at end of run.
     static void variableCleanUp();
 
-    // static int numGrow() { return NUM_GROW; }         // REMOVE THIS USELESS FUNC
-
-    // static int numState() { return NUM_STATE; }
-
     amrex::Real estTimeStep();
 
     void computeTemp(amrex::MultiFab& State, int ng);
@@ -129,12 +126,20 @@ public:
     void compute_dSdt_box(const amrex::Box& bx,
                           amrex::Array4<amrex::Real const>& Sfab,
                           amrex::Array4<amrex::Real      >& dSdtfab,
-                          const std::array<FArrayBox*, AMREX_SPACEDIM>& flux);
+                          /*const std::array<FArrayBox*, AMREX_SPACEDIM>& flux*/
+                          AMREX_D_DECL(
+                            amrex::Array4<amrex::Real    >& fxfab,
+                            amrex::Array4<amrex::Real    >& fyfab,
+                            amrex::Array4<amrex::Real    >& fzfab));
 
     void compute_dSdt_box_eb(const amrex::Box& bx,
                              amrex::Array4<amrex::Real       const> const& Sfab,
                              amrex::Array4<amrex::Real            > const& dSdtfab,
-                             std::array<FArrayBox*, AMREX_SPACEDIM> const& flux,
+                             /*std::array<FArrayBox*, AMREX_SPACEDIM> const& flux,*/
+                             AMREX_D_DECL(
+                                amrex::Array4<amrex::Real         > const& fx_out_arr,
+                                amrex::Array4<amrex::Real         > const& fy_out_arr,
+                                amrex::Array4<amrex::Real         > const& fz_out_arr),
                              amrex::Array4<amrex::EBCellFlag const> const& flag,
                              amrex::Array4<amrex::Real       const> const& vfrac,
                              AMREX_D_DECL(
@@ -221,8 +226,9 @@ protected:
 
     std::unique_ptr<pele::physics::reactions::ReactorBase> reactor;
 
-    void react_state(amrex::Real time, amrex::Real dt, bool react_init = false,
-                     amrex::MultiFab* aux_src = nullptr);
+    void reaction_source(amrex::MultiFab& I_R, const amrex::MultiFab& S_new,
+                         amrex::Real time, amrex::Real dt, bool react_init = false,
+                         amrex::MultiFab* aux_src = nullptr);
 
     // Parameters
     static int verbose;

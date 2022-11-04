@@ -1,30 +1,32 @@
 #include <AMReX_FArrayBox.H>
 
-#include "index_macros.H"
-#include "PelePhysics.H"
+// #include "index_macros.H"
 #include "CNS.H"
+#include "PelePhysics.H"
 
 void
-CNS::react_state(amrex::Real /*time*/,
-                 amrex::Real dt,
-                 bool react_init,
-                 amrex::MultiFab* aux_src)
+CNS::reaction_source(amrex::MultiFab& react_src,
+                     const amrex::MultiFab& S_new,
+                     amrex::Real /*time*/,
+                     amrex::Real dt,
+                     bool react_init,
+                     amrex::MultiFab* aux_src)
 {
-  // Update I_R, and recompute S_new
-  BL_PROFILE("CNS::react_state()");
+  // Update I_R, do not recompute S_new
+  BL_PROFILE("CNS::reaction_source()");
 
   const amrex::Real strt_time = amrex::ParallelDescriptor::second();
 
-//   AMREX_ASSERT(do_react == 1);
+  AMREX_ASSERT(do_react == 1);
 
-//   if ((verbose != 0) && amrex::ParallelDescriptor::IOProcessor()) {
-//     if (react_init) {
-//       amrex::Print() << "... Initializing reactions, using interval dt = " << dt
-//                      << std::endl;
-//     } else {
-//       amrex::Print() << "... Computing reactions for dt = " << dt << std::endl;
-//     }
-//   }
+  if ((verbose != 0) && amrex::ParallelDescriptor::IOProcessor()) {
+    if (react_init) {
+      amrex::Print() << "... Initializing reactions, using interval dt = " << dt
+                     << std::endl;
+    } else {
+      amrex::Print() << "... Computing reactions for dt = " << dt << std::endl;
+    }
+  }
 
 //   amrex::MultiFab& S_new = get_new_data(State_Type);
 //   const int ng = S_new.nGrow();

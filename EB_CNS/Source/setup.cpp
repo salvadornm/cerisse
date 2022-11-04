@@ -109,26 +109,15 @@ CNS::variableSetUp()
     bool state_data_extrap = false;
     bool store_in_checkpoint = true;
     desc_lst.addDescriptor(State_Type, IndexType::TheCellType(),
-                           StateDescriptor::Point, NUM_GROW, NUM_STATE,
+                           StateDescriptor::Point, NUM_GROW, LEN_STATE,
                            &eb_mf_cell_cons_interp, state_data_extrap, store_in_checkpoint);
 
-    amrex::Vector<amrex::BCRec> bcs(NUM_STATE);
-    amrex::Vector<std::string>  name(NUM_STATE);
+    amrex::Vector<amrex::BCRec> bcs(LEN_STATE);
+    amrex::Vector<std::string>  name(LEN_STATE);
     amrex::BCRec bc;
-    int cnt = 0;
-           set_scalar_bc(bc,phys_bc); bcs[cnt] = bc; name[cnt] = "density";
-    cnt++; set_x_vel_bc(bc,phys_bc);  bcs[cnt] = bc; name[cnt] = "xmom";
-    cnt++; set_y_vel_bc(bc,phys_bc);  bcs[cnt] = bc; name[cnt] = "ymom";
-#if (AMREX_SPACEDIM == 3)
-    cnt++; set_z_vel_bc(bc,phys_bc);  bcs[cnt] = bc; name[cnt] = "zmom";
-#endif
-    cnt++; set_scalar_bc(bc,phys_bc); bcs[cnt] = bc; name[cnt] = "rho_E";
-    cnt++; set_scalar_bc(bc,phys_bc); bcs[cnt] = bc; name[cnt] = "rho_e";
-    cnt++; set_scalar_bc(bc,phys_bc); bcs[cnt] = bc; name[cnt] = "Temp";
-    
-    pele::physics::eos::speciesNames<
-        pele::physics::PhysicsType::eos_type>(spec_names);
 
+    pele::physics::eos::speciesNames<
+        pele::physics::PhysicsType::eos_type>(spec_names);        
     if (amrex::ParallelDescriptor::IOProcessor()) {
         Print() << NUM_SPECIES << " Species: ";
         for (int i = 0; i < NUM_SPECIES; i++) {
@@ -136,43 +125,87 @@ CNS::variableSetUp()
         }
         Print() << std::endl;
     }
+
+    int cnt = 0;
+    // For each field
+#if (NUM_FIELD > 1)
+    for (int nf = 0; nf < NUM_FIELD; ++nf) {
+        set_scalar_bc(bc,phys_bc); bcs[cnt] = bc; name[cnt] = "density_Field" + nf; cnt++;
+        set_x_vel_bc(bc,phys_bc);  bcs[cnt] = bc; name[cnt] = "xmom_Field" + nf;    cnt++;
+        set_y_vel_bc(bc,phys_bc);  bcs[cnt] = bc; name[cnt] = "ymom_Field" + nf;    cnt++;
+        set_z_vel_bc(bc,phys_bc);  bcs[cnt] = bc; name[cnt] = "zmom_Field" + nf;    cnt++;
+        set_scalar_bc(bc,phys_bc); bcs[cnt] = bc; name[cnt] = "rho_E_Field" + nf;   cnt++;
+        set_scalar_bc(bc,phys_bc); bcs[cnt] = bc; name[cnt] = "rho_e_Field" + nf;   cnt++;
+        set_scalar_bc(bc,phys_bc); bcs[cnt] = bc; name[cnt] = "Temp_Field" + nf;    cnt++;
+        for (int i = 0; i < NUM_SPECIES; ++i) {
+            set_scalar_bc(bc, phys_bc); bcs[cnt] = bc; name[cnt] = "rho_" + spec_names[i] + "_Field" + nf;
+            cnt++;
+        }
+    }
+#endif
+
+    // Mean of all fields
+    set_scalar_bc(bc,phys_bc); bcs[cnt] = bc; name[cnt] = "density"; cnt++;
+    set_x_vel_bc(bc,phys_bc);  bcs[cnt] = bc; name[cnt] = "xmom";    cnt++;
+    set_y_vel_bc(bc,phys_bc);  bcs[cnt] = bc; name[cnt] = "ymom";    cnt++;
+    set_z_vel_bc(bc,phys_bc);  bcs[cnt] = bc; name[cnt] = "zmom";    cnt++;
+    set_scalar_bc(bc,phys_bc); bcs[cnt] = bc; name[cnt] = "rho_E";   cnt++;
+    set_scalar_bc(bc,phys_bc); bcs[cnt] = bc; name[cnt] = "rho_e";   cnt++;
+    set_scalar_bc(bc,phys_bc); bcs[cnt] = bc; name[cnt] = "Temp";    cnt++;
     for (int i = 0; i < NUM_SPECIES; ++i) {
-        cnt++; 
-        set_scalar_bc(bc, phys_bc); 
-        bcs[cnt] = bc; 
-        name[cnt] = "rho_" + spec_names[i];
+        set_scalar_bc(bc, phys_bc); bcs[cnt] = bc; name[cnt] = "rho_" + spec_names[i];
+        cnt++;
     }
 
-    StateDescriptor::BndryFunc bndryfunc(cns_bcfill);
+    // Get AUX names
+    for (int i = 0; i < NUM_AUX; ++i) {
+        set_scalar_bc(bc, phys_bc); bcs[cnt] = bc; name[cnt] = "aux_" + i;
+        cnt++;
+    }
+
+    StateDescriptor::BndryFunc bndryfunc(cns_bcfill); // <---
     bndryfunc.setRunOnGPU(true);
 
-    desc_lst.setComponent(State_Type, URHO, name, bcs, bndryfunc);
+    desc_lst.setComponent(State_Type, 0, name, bcs, bndryfunc);
 
     // Setup React_Type
     store_in_checkpoint = do_react;
     desc_lst.addDescriptor(Reactions_Type, amrex::IndexType::TheCellType(),
-                           amrex::StateDescriptor::Point, 0, NUM_SPECIES+2, 
+                           amrex::StateDescriptor::Point, 0, LEN_REACT, 
                            &eb_mf_cell_cons_interp, state_data_extrap, store_in_checkpoint);
 
-    amrex::Vector<amrex::BCRec> react_bcs(NUM_SPECIES+2);
-    amrex::Vector<std::string>  react_name(NUM_SPECIES+2);
+    amrex::Vector<amrex::BCRec> react_bcs(LEN_REACT);
+    amrex::Vector<std::string>  react_name(LEN_REACT);
 
+    cnt = 0;
+    // For each field
+#if (NUM_FIELD > 1)
+    for (int nf = 0; nf < NUM_FIELD; ++nf) {
+        for (int i = 0; i < NUM_SPECIES; ++i) {            
+            set_react_src_bc(bc, phys_bc); 
+            react_bcs[cnt] = bc; 
+            react_name[cnt] = "rho_omega_" + spec_names[i] + "_Field" + nf;
+            cnt++; 
+        }
+        set_react_src_bc(bc, phys_bc); react_bcs[cnt] = bc; react_name[cnt] = "rhoe_dot_Field" + nf;    cnt++; 
+        set_react_src_bc(bc, phys_bc); react_bcs[cnt] = bc; react_name[cnt] = "heatRelease_Field" + nf; cnt++;
+    }
+#endif
+
+    // Mean of all fields
     for (int i = 0; i < NUM_SPECIES; ++i) {
         set_react_src_bc(bc, phys_bc); 
-        react_bcs[i] = bc; 
-        react_name[i] = "rho_omega_" + spec_names[i];
+        react_bcs[cnt] = bc; 
+        react_name[cnt] = "rho_omega_" + spec_names[i];
+        cnt++;
     }
-    set_react_src_bc(bc, phys_bc);
-    react_bcs[NUM_SPECIES] = bc;
-    react_name[NUM_SPECIES] = "rhoe_dot";
-    set_react_src_bc(bc, phys_bc);
-    react_bcs[NUM_SPECIES + 1] = bc;
-    react_name[NUM_SPECIES + 1] = "heatRelease";
+    set_react_src_bc(bc, phys_bc); react_bcs[cnt] = bc; react_name[cnt] = "rhoe_dot";   cnt++;
+    set_react_src_bc(bc, phys_bc); react_bcs[cnt] = bc; react_name[cnt] = "heatRelease"; cnt++;
 
     amrex::StateDescriptor::BndryFunc bndryfunc2(cns_react_bcfill);
     bndryfunc2.setRunOnGPU(true);
 
-    desc_lst.setComponent(Reactions_Type, 0, react_name, react_bcs, bndryfunc2);
+    desc_lst.setComponent(Reactions_Type, 0, react_name, react_bcs, bndryfunc2); // <---
 
     // Setup Cost_Type
     desc_lst.addDescriptor(Cost_Type, IndexType::TheCellType(), StateDescriptor::Point,
@@ -183,48 +216,48 @@ CNS::variableSetUp()
 
     StateDescriptor::setBndryFuncThreadSafety(true);
 
-    // DEFINE DERIVED QUANTITIES
+    // DEFINE DERIVED QUANTITIES (derived based on mean field)
     // Pressure
     derive_lst.add("pressure", IndexType::TheCellType(), 1,
                    cns_derpres, amrex::DeriveRec::TheSameBox);
-    derive_lst.addComponent("pressure", desc_lst, State_Type, URHO, NVAR);
+    derive_lst.addComponent("pressure", desc_lst, State_Type, UMF, NVAR);
 
     // Velocities
     derive_lst.add("x_velocity", IndexType::TheCellType(), 1,
                    cns_dervel, amrex::DeriveRec::TheSameBox);
-    derive_lst.addComponent("x_velocity", desc_lst, State_Type, URHO, 1);
-    derive_lst.addComponent("x_velocity", desc_lst, State_Type, UMX, 1);
+    derive_lst.addComponent("x_velocity", desc_lst, State_Type, UMF + URHO, 1);
+    derive_lst.addComponent("x_velocity", desc_lst, State_Type, UMF + UMX, 1);
 
     derive_lst.add("y_velocity", IndexType::TheCellType(), 1,
                    cns_dervel, amrex::DeriveRec::TheSameBox);
-    derive_lst.addComponent("y_velocity", desc_lst, State_Type, URHO, 1);
-    derive_lst.addComponent("y_velocity", desc_lst, State_Type, UMY, 1);
+    derive_lst.addComponent("y_velocity", desc_lst, State_Type, UMF + URHO, 1);
+    derive_lst.addComponent("y_velocity", desc_lst, State_Type, UMF + UMY, 1);
 
 #if (AMREX_SPACEDIM == 3)
     derive_lst.add("z_velocity", IndexType::TheCellType(), 1,
                    cns_dervel, amrex::DeriveRec::TheSameBox);
-    derive_lst.addComponent("z_velocity", desc_lst, State_Type, URHO, 1);
-    derive_lst.addComponent("z_velocity", desc_lst, State_Type, UMZ, 1);
+    derive_lst.addComponent("z_velocity", desc_lst, State_Type, UMF + URHO, 1);
+    derive_lst.addComponent("z_velocity", desc_lst, State_Type, UMF + UMZ, 1);
 #endif
 
     // Vorticity
     derive_lst.add("magvort", amrex::IndexType::TheCellType(), 1, 
                    cns_dermagvort, amrex::DeriveRec::GrowBoxByOne);
-    derive_lst.addComponent("magvort", desc_lst, State_Type, URHO, AMREX_SPACEDIM + 1);
+    derive_lst.addComponent("magvort", desc_lst, State_Type, UMF, AMREX_SPACEDIM + 1);
 
     // Numerical schlieren
     derive_lst.add("divu", amrex::IndexType::TheCellType(), 1, 
                    cns_derdivu, amrex::DeriveRec::GrowBoxByOne);
-    derive_lst.addComponent("divu", desc_lst, State_Type, URHO, AMREX_SPACEDIM + 1);
+    derive_lst.addComponent("divu", desc_lst, State_Type, UMF, AMREX_SPACEDIM + 1);
 
     derive_lst.add("divrho", amrex::IndexType::TheCellType(), 1, 
                    cns_derdivrho, amrex::DeriveRec::GrowBoxByOne);
-    derive_lst.addComponent("divrho", desc_lst, State_Type, URHO, 1);
+    derive_lst.addComponent("divrho", desc_lst, State_Type, UMF, 1);
 
     // Mach number
     derive_lst.add("MachNumber", amrex::IndexType::TheCellType(), 1, 
                    cns_dermachnumber, amrex::DeriveRec::TheSameBox);
-    derive_lst.addComponent("MachNumber", desc_lst, State_Type, URHO, NVAR);
+    derive_lst.addComponent("MachNumber", desc_lst, State_Type, UMF, NVAR);
 }
 
 void

@@ -43,7 +43,7 @@ CNS::cns_flux_redistribute (const Box& bx,
     int bx_khi = bx.bigEnd()[2];
 #endif
 
-    amrex::ParallelFor(bxg1, NEQNS,
+    amrex::ParallelFor(bxg1, NVAR,
     [=] AMREX_GPU_DEVICE (int i, int j, int k, int n) noexcept
     {
         if (flag(i,j,k).isSingleValued())
@@ -70,7 +70,7 @@ CNS::cns_flux_redistribute (const Box& bx,
         }
     });
 
-    amrex::ParallelFor(bxg1, NEQNS,
+    amrex::ParallelFor(bxg1, NVAR,
     [=] AMREX_GPU_DEVICE (int i, int j, int k, int n) noexcept
     {
         bool valid_dst_cell;
@@ -176,7 +176,7 @@ CNS::cns_flux_redistribute (const Box& bx,
         } // isSingleValued
     });
 
-    amrex::ParallelFor(bx, NEQNS,
+    amrex::ParallelFor(bx, NVAR,
     [=] AMREX_GPU_DEVICE (int i, int j, int k, int n) noexcept
     {
         if (!flag(i,j,k).isCovered())

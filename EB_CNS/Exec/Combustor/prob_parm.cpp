@@ -6,7 +6,7 @@
 
 ProbParm::ProbParm ()
 {
-    inflow_state = (amrex::Real*)The_Arena()->alloc(sizeof(Real)*NUM_STATE);
+    inflow_state = (amrex::Real*)The_Arena()->alloc(sizeof(Real)*NVAR);
 }
 
 ProbParm::~ProbParm ()
