@@ -40,21 +40,20 @@ CNS::compute_dSdt_box(const Box& bx,
     }
 
     amrex::ParallelFor(bxg2,
-    [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept
-    {
+    [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept {
         cns_ctoprim(i, j, k, sfab, q, *lparm);
     });
 
     if (do_visc == 1)
     {
        auto const& coefs = diff_coeff.array();
-       if(use_const_visc == 1 ) {
-          amrex::ParallelFor(bxg2,
-          [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept
-          {
-              cns_constcoef(i, j, k, coefs, *lparm);
-          });
-       } else {
+    //    if(use_const_visc == 1 ) {
+    //       amrex::ParallelFor(bxg2,
+    //       [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept
+    //       {
+    //           cns_constcoef(i, j, k, coefs, *lparm);
+    //       });
+    //    } else {
         //   amrex::ParallelFor(bxg2,
         //   [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept
         //   {
@@ -76,7 +75,7 @@ CNS::compute_dSdt_box(const Box& bx,
                 trans.get_transport_coeffs(
                     tbx, qar_yin, qar_Tin, qar_rhoin, rhoD, mu, xi, lambda, ltransparm);
             });
-       }
+    //    }
     }
 
     const Box& bxg1 = amrex::grow(bx,1);

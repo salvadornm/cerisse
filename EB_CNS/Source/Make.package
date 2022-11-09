@@ -20,4 +20,3 @@ CEXE_sources += init_eb2.cpp
 CEXE_sources += react.cpp
 
 CEXE_headers += parm.H
-CEXE_sources += parm.cpp

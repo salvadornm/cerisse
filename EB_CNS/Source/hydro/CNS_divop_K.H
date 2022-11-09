@@ -112,7 +112,7 @@ void eb_compute_div(int i, int j, int k, int n, IntVect const& blo, IntVect cons
 
         GpuArray<Real,NVAR> flux_hyp_wall;
         compute_hyp_wallflux(q(i,j,k,QRHO),AMREX_D_DECL(q(i,j,k,QU),q(i,j,k,QV),q(i,j,k,QW)),
-                             q(i,j,k,QPRES),apx(i,j,k),apx(i+1,j,k),apy(i,j,k),apy(i,j+1,k),
+                             q(i,j,k,QPRES),q(i,j,k,QG),apx(i,j,k),apx(i+1,j,k),apy(i,j,k),apy(i,j+1,k),
                              flux_hyp_wall,parm);
 
         // Here we assume dx == dy == dz
@@ -271,7 +271,7 @@ void eb_compute_div(int i, int j, int k, int n, IntVect const& blo, IntVect cons
 
         GpuArray<Real,NVAR> flux_hyp_wall;
         compute_hyp_wallflux(q(i,j,k,QRHO),AMREX_D_DECL(q(i,j,k,QU),q(i,j,k,QV),q(i,j,k,QW)),
-                             q(i,j,k,QPRES),apx(i,j,k),apx(i+1,j,k),apy(i,j,k),apy(i,j+1,k),
+                             q(i,j,k,QPRES),q(i,j,k,QG),apx(i,j,k),apx(i+1,j,k),apy(i,j,k),apy(i,j+1,k),
                              apz(i,j,k),apz(i,j,k+1),flux_hyp_wall,parm);
 
         // Here we assume dx == dy == dz

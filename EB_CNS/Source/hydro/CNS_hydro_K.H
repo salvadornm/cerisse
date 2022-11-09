@@ -17,8 +17,10 @@ cns_ctoprim(int i, int j, int k,
 {
     using amrex::Real;
 
-    Real rho = amrex::max(u(i,j,k,URHO), parm.smallr);
-    Real rhoinv = Real(1.0)/rho;
+    // Real rho = amrex::max(u(i,j,k,URHO), parm.smallr);
+    // Real rhoinv = Real(1.0)/rho;
+    Real rho = u(i,j,k,URHO);
+    Real rhoinv = Real(1.0) / rho;
     AMREX_D_TERM(Real ux = u(i,j,k,UMX)*rhoinv; ,
                  Real uy = u(i,j,k,UMY)*rhoinv; ,
                  Real uz = u(i,j,k,UMZ)*rhoinv;);
@@ -39,12 +41,12 @@ cns_ctoprim(int i, int j, int k,
     // q(i,j,k,QEINT) is e, not (rho e)
 
     auto eos = pele::physics::PhysicsType::eos();
-    Real T, p, cs;
+    Real T, p, cs, gamma;
     // eos.Y2WBAR(massfrac, wbar);
     eos.EY2T(ei, massfrac, T); 
     eos.RTY2P(rho, T, massfrac, p);
     eos.RTY2Cs(rho, T, massfrac, cs);
-    // eos.RTY2G(rho, T, massfrac, gam1);
+    eos.RTY2G(rho, T, massfrac, gamma);
     // eos.RTY2dpde_dpdre(rho, T, massfrac, dpde, dpdr_e);
 
     q(i,j,k,QRHO) = rho;
@@ -54,9 +56,10 @@ cns_ctoprim(int i, int j, int k,
     q(i,j,k,QEINT) = ei;
     q(i,j,k,QPRES) = p;
     q(i,j,k,QCS) = cs;
-    q(i,j,k,QTEMP) = T;
-    // q(i,j,k,QCS) = std::sqrt(parm.eos_gamma*p*rhoinv);
+    q(i,j,k,QTEMP) = T; 
+    q(i,j,k,QG) = gamma;
     // q(i,j,k,QTEMP) = ei/parm.cv;
+    // q(i,j,k,QCS) = std::sqrt(parm.eos_gamma*p*rhoinv);    
 }
 
 AMREX_GPU_DEVICE AMREX_FORCE_INLINE
@@ -68,20 +71,24 @@ cns_flux_to_dudt (int i, int j, int k, int n,
                                amrex::Array4<amrex::Real const> const& fz),
                   amrex::GpuArray<amrex::Real,AMREX_SPACEDIM> const& dxinv) noexcept
 {
-#if (AMREX_SPACEDIM == 2)
-    dudt(i,j,k,n) = dxinv[0] * (fx(i,j,k,n) - fx(i+1,j,k,n))
-        +           dxinv[1] * (fy(i,j,k,n) - fy(i,j+1,k,n));
-#else
-    dudt(i,j,k,n) = dxinv[0] * (fx(i,j,k,n) - fx(i+1,j,k,n))
-        +           dxinv[1] * (fy(i,j,k,n) - fy(i,j+1,k,n))
-        +           dxinv[2] * (fz(i,j,k,n) - fz(i,j,k+1,n));
-#endif
+    dudt(i,j,k,n) = AMREX_D_TERM(dxinv[0] * (fx(i,j,k,n) - fx(i+1,j,k,n)),
+                               + dxinv[1] * (fy(i,j,k,n) - fy(i,j+1,k,n)),
+                               + dxinv[2] * (fz(i,j,k,n) - fz(i,j,k+1,n)));
+// #if (AMREX_SPACEDIM == 2)
+//     dudt(i,j,k,n) = dxinv[0] * (fx(i,j,k,n) - fx(i+1,j,k,n))
+//         +           dxinv[1] * (fy(i,j,k,n) - fy(i,j+1,k,n));
+// #else
+//     dudt(i,j,k,n) = dxinv[0] * (fx(i,j,k,n) - fx(i+1,j,k,n))
+//         +           dxinv[1] * (fy(i,j,k,n) - fy(i,j+1,k,n))
+//         +           dxinv[2] * (fz(i,j,k,n) - fz(i,j,k+1,n));
+// #endif
 }
 
 namespace {
 
 AMREX_GPU_DEVICE AMREX_FORCE_INLINE
-amrex::Real limiter (amrex::Real dlft, amrex::Real drgt, amrex::Real plm_theta) noexcept
+amrex::Real
+limiter (amrex::Real dlft, amrex::Real drgt, amrex::Real plm_theta) noexcept
 {
     using amrex::Real;
 
@@ -398,7 +405,8 @@ AMREX_GPU_DEVICE AMREX_FORCE_INLINE
 void
 compute_hyp_wallflux (const amrex::Real rho,
                       AMREX_D_DECL(const amrex::Real u, const amrex::Real v, const amrex::Real w),
-                      const amrex::Real p, const amrex::Real axm, const amrex::Real axp,
+                      const amrex::Real p, const amrex::Real gamma, 
+                      const amrex::Real axm, const amrex::Real axp,
                       const amrex::Real aym, const amrex::Real ayp,
 #if (AMREX_SPACEDIM == 3)
                       const amrex::Real azm, const amrex::Real azp,
@@ -419,7 +427,7 @@ compute_hyp_wallflux (const amrex::Real rho,
 
     Real AMREX_D_DECL(momfluxn, momfluxt1, momfluxt2);
 
-    riemann(parm.eos_gamma, parm.smallp, parm.smallr,
+    riemann(gamma, parm.smallp, parm.smallr,
             rho,  un, p, 0., 0.,
             rho, -un, p, 0., 0.,
             fluxw[URHO], AMREX_D_DECL(momfluxn, momfluxt1, momfluxt2), fluxw[UEDEN]);
@@ -465,7 +473,7 @@ cns_riemann_x (int i, int j, int k,
 #else
     Real ut2r = q(i,j,k,QW) - Real(0.5) * dq(i,j,k,4);
 #endif
-    riemann(parm.eos_gamma, parm.smallp, parm.smallr,
+    riemann(q(i,j,k,QG), parm.smallp, parm.smallr,
             rl, ul, pl, ut1l, ut2l, rr, ur, pr, ut1r, ut2r, fx(i,j,k,URHO),
             AMREX_D_DECL(fx(i,j,k,UMX), fx(i,j,k,UMY), fx(i,j,k,UMZ)), fx(i,j,k,UEDEN));
 }
@@ -506,7 +514,7 @@ cns_riemann_y (int i, int j, int k,
     Real ut2r = q(i,j,k,QW) - Real(0.5) * dq(i,j,k,4);
 #endif
 
-    riemann(parm.eos_gamma, parm.smallp, parm.smallr,
+    riemann(q(i,j,k,QG), parm.smallp, parm.smallr,
             rl, ul, pl, ut1l, ut2l, rr, ur, pr, ut1r, ut2r,
             fy(i,j,k,URHO), AMREX_D_DECL(fy(i,j,k,UMY), fy(i,j,k,UMX), fy(i,j,k,UMZ)), fy(i,j,k,UEDEN));
 }
@@ -548,7 +556,7 @@ cns_riemann_z (int i, int j, int k,
     Real ut2r = q(i,j,k,QV) - Real(0.5) * dq(i,j,k,4);
 #endif
 
-    riemann(parm.eos_gamma, parm.smallp, parm.smallr,
+    riemann(q(i,j,k,QG), parm.smallp, parm.smallr,
             rl, ul, pl, ut1l, ut2l, rr, ur, pr, ut1r, ut2r,
             fz(i,j,k,URHO), fz(i,j,k,UMZ), fz(i,j,k,UMX), fz(i,j,k,UMY), fz(i,j,k,UEDEN));
 }

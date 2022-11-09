@@ -113,13 +113,13 @@ CNS::compute_dSdt_box_eb(const Box& bx,
     });
 
     if (do_visc == 1) {        
-        if(use_const_visc == 1) {
-            auto const& coefs = diff_coeff.array();
-            amrex::ParallelFor(bxg4,
-            [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept {
-                cns_constcoef_eb(i, j, k, flag, coefs, *lparm);
-            });
-        } else {
+        // if(use_const_visc == 1) {
+        //     auto const& coefs = diff_coeff.array();
+        //     amrex::ParallelFor(bxg4,
+        //     [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept {
+        //         cns_constcoef_eb(i, j, k, flag, coefs, *lparm);
+        //     });
+        // } else {
         //   amrex::ParallelFor(bxg4,
         //   [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept
         //   {
@@ -141,7 +141,7 @@ CNS::compute_dSdt_box_eb(const Box& bx,
                 trans.get_transport_coeffs(
                     tbx, qar_yin, qar_Tin, qar_rhoin, rhoD, mu, xi, lambda, ltransparm);
             });
-        }
+        // }
     }
 
     auto const& slope = slopetmp.array();

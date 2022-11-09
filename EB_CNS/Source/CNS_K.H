@@ -17,34 +17,32 @@ cns_estdt(int i, int j, int k, amrex::Array4<Real const> const& state,
           amrex::GpuArray<amrex::Real,AMREX_SPACEDIM> const& dx,
           Parm const& parm) noexcept
 {
-    using amrex::Real;
+    amrex::Real rho = state(i, j, k, URHO);    
+    amrex::Real rhoinv = Real(1.0) / rho;
+    AMREX_D_TERM(amrex::Real vx = state(i, j, k, UMX) * rhoinv; ,
+                 amrex::Real vy = state(i, j, k, UMY) * rhoinv; ,
+                 amrex::Real vz = state(i, j, k, UMZ) * rhoinv;);
+    amrex::Real T = state(i, j, k, UTEMP);
+    amrex::Real massfrac[NUM_SPECIES];
+    for (int n = 0; n < NUM_SPECIES; ++n) {
+        massfrac[n] = state(i, j, k, UFS + n) * rhoinv;
+    }
 
-    Real rho = state(i,j,k,URHO);
-    Real mx  = state(i,j,k,UMX);
-    Real my  = state(i,j,k,UMY);
-#if (AMREX_SPACEDIM == 3)
-    Real mz  = state(i,j,k,UMZ);
-#endif
-    Real ei  = state(i,j,k,UEINT);
-    Real rhoinv = Real(1.0)/amrex::max(rho,parm.smallr);
-    Real vx = mx*rhoinv;
-    Real vy = my*rhoinv;
-#if (AMREX_SPACEDIM == 3)
-    Real vz = mz*rhoinv;
-#endif
-    Real p = amrex::max((parm.eos_gamma-Real(1.0))*ei, parm.smallp);
-    Real cs = std::sqrt(parm.eos_gamma*p*rhoinv);
-    Real dtx = dx[0]/(amrex::Math::abs(vx)+cs);
-    Real dty = dx[1]/(amrex::Math::abs(vy)+cs);
-#if (AMREX_SPACEDIM == 3)
-    Real dtz = dx[2]/(amrex::Math::abs(vz)+cs);
-#endif
+    amrex::Real p, cs;
+    auto eos = pele::physics::PhysicsType::eos();
+    eos.RTY2P(rho, T, massfrac, p);
+    eos.RTY2Cs(rho, T, massfrac, cs);
 
-#if (AMREX_SPACEDIM == 2)
-    return amrex::min(dtx,dty);
-#else
-    return amrex::min(dtx,amrex::min(dty,dtz));
-#endif
+    AMREX_D_TERM(
+        amrex::Real dt  = dx[0]/(amrex::Math::abs(vx)+cs); 
+        ,
+        amrex::Real dty = dx[1]/(amrex::Math::abs(vy)+cs);
+        dt = amrex::min(dt,dty);
+        ,
+        amrex::Real dtz = dx[2]/(amrex::Math::abs(vz)+cs);
+        dt = amrex::min(dt,dtz););  
+    
+    return dt;
 }
 
 
@@ -56,7 +54,7 @@ cns_compute_temperature(int i, int j, int k,
 {
     // Reset Eint and compute T
     
-    amrex::Real rhoinv = amrex::Real(1.0)/S(i,j,k,URHO);
+    amrex::Real rhoinv = amrex::Real(1.0) / S(i,j,k,URHO);
     amrex::Real mx = S(i,j,k,UMX);
     amrex::Real my = S(i,j,k,UMY);
 #if (AMREX_SPACEDIM == 2)
