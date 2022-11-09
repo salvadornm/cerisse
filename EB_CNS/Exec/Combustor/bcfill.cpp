@@ -21,20 +21,23 @@ struct CnsFillExtDir
 
         const Box& domain_box = geom.Domain();
 
-        const BCRec& bc = bcr[bcomp+0];
+        const BCRec& bc = bcr[bcomp];
+        // const int* bc = bcr[bcomp]->data();
 
-        AMREX_D_TERM(int i = iv[0];,
-                     int j = iv[1];,
-                     int k = iv[2];);
+        // AMREX_D_TERM(int i = iv[0];,
+        //              int j = iv[1];,
+        //              int k = iv[2];);
 
         // The combustor problem is hard-wired for inflow at low-z right now
         // Print() << i << j << k << dcomp << std::endl;
-        if (bc.lo(2) == BCType::ext_dir and k < domain_box.smallEnd(2))
+        if ((bc.lo(2) == BCType::ext_dir) && (iv[2] < domain_box.smallEnd(2)))
+        // if ((bc[2] == amrex::BCType::ext_dir) && (iv[2] < domain_box.smallEnd(2)))
         {
-            for (int nf = 0; nf < NUM_FIELD; ++nf) {
-                for (int nc = 0; nc < numcomp; ++nc) {
+            for (int nf = 0; nf <= NUM_FIELD; ++nf) {
+                for (int nc = 0; nc < NVAR; ++nc) {
                     // Print() << nf << " " << NVAR << " " << dcomp + nc << std::endl;
-                    dest(i, j, k, nf*NVAR + dcomp + nc) = inflow_state[dcomp + nc];
+                    if (nf*NVAR + nc < numcomp)
+                        dest(iv, dcomp + nf*NVAR + nc) = inflow_state[dcomp + nc];
                 }
             }
         }
