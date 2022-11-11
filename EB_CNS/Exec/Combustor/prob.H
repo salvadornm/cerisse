@@ -8,6 +8,17 @@
 #include "CNS.H"
 #include "prob_parm.H"
 
+/**
+ * \brief Initialise state data.
+ * 
+ * @param i         x position.
+ * @param j         y position.
+ * @param k         z position.
+ * @param state     state data.
+ * @param geomdata  domain geometry data.
+ * @param parm      Parm data defined in parm.H.
+ * @param prob_parm ProbParm data as defined in prob_parm.H and initialised in amrex_probinit.
+ */
 AMREX_GPU_DEVICE
 AMREX_FORCE_INLINE
 void
@@ -35,19 +46,23 @@ cns_initdata (int i, int j, int k,
     for (int n = 0; n < NUM_SPECIES; ++n) {
         state(i,j,k,UFS+n) = state(i,j,k,URHO) * prob_parm.massfrac[n];
     }
+
+    for (int n = NVAR; n < LEN_STATE; ++n) {
+        state(i,j,k,n) = amrex::Real(0.0);
+    }
 }
 
 /**
  * \brief Fill external boundary conditions for ghost cells.
  * 
- * @param x ghost cell cooridinates.
- * @param s_int flow state inside of the domain.
- * @param s_ext flow state to be filled.
- * @param idir direction (0: x, 1: y, 2: z).
- * @param sgn high or low boundary (1: low, -1: high).
- * @param time time.
- * @param geomdata domain geometry data.
- * @param prob_parm ProbParm data as initialised in amrex_probinit.
+ * @param x         ghost cell cooridinates.
+ * @param s_int     flow state inside of the domain.
+ * @param s_ext     flow state to be filled.
+ * @param idir      direction (0: x, 1: y, 2: z).
+ * @param sgn       high or low boundary (1: low, -1: high).
+ * @param time      time.
+ * @param geomdata  domain geometry data.
+ * @param prob_parm ProbParm data as defined in prob_parm.H and initialised in amrex_probinit.
  * @sa CnsFillExtDir
  * @sa CnsFillExtDir::operator()
  */
@@ -70,6 +85,28 @@ bcnormal (const amrex::Real x[AMREX_SPACEDIM],
             }
         }
     }
+}
+
+/**
+ * \brief Modify state data and/or add turbulence to fields after restart.
+ * 
+ * @param i         x position.
+ * @param j         y position.
+ * @param k         z position.
+ * @param state     state data.
+ * @param geomdata  domain geometry data.
+ * @param parm      Parm data defined in parm.H.
+ * @param prob_parm ProbParm data as defined in prob_parm.H and initialised in amrex_probinit.
+ */
+AMREX_GPU_DEVICE
+AMREX_FORCE_INLINE
+void
+cns_prob_post_restart (int i, int j, int k, 
+                       amrex::Array4<amrex::Real> const& state,
+                       amrex::GeometryData const& geomdata,
+                       Parm const& parm,
+                       ProbParm const& prob_parm)
+{
 }
 
 #endif

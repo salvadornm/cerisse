@@ -36,6 +36,11 @@ std::string CNS::chem_integrator = "Reactor_Null";
 pele::physics::transport::TransportParams<
   pele::physics::PhysicsType::transport_type> CNS::trans_parms;
 amrex::Vector<std::string> CNS::spec_names;
+bool     CNS::use_typical_vals_chem = true; // tell chem_integrator typical value of Temp
+int      CNS::reset_typical_vals_int = 10;  // interval to reset the typical value
+int      CNS::rk_reaction_iter = 0;
+
+bool     CNS::do_restart_fields = false;
 
 int      CNS::plm_iorder     = 2;     // [1,2] 1: slopes are zero'd,  2: second order slopes
 Real     CNS::plm_theta      = 2.0;   // [1,2] 1: minmod; 2: van Leer's MC
@@ -46,14 +51,14 @@ int      CNS::do_reredistribution = 1;
 
 bool     CNS::signalStopJob = false;
 
-CNS::CNS() {}
+CNS::CNS () {}
 
-CNS::CNS(Amr&            papa,
-         int             lev,
-         const Geometry& level_geom,
-         const BoxArray& bl,
-         const DistributionMapping& dm,
-         Real            time) : AmrLevel(papa,lev,level_geom,bl,dm,time)
+CNS::CNS (Amr&            papa,
+          int             lev,
+          const Geometry& level_geom,
+          const BoxArray& bl,
+          const DistributionMapping& dm,
+          Real            time) : AmrLevel(papa,lev,level_geom,bl,dm,time)
 {
     if (do_reflux && level > 0) {
         flux_reg.define(bl, papa.boxArray(level-1),
@@ -77,7 +82,7 @@ CNS::CNS(Amr&            papa,
     }
 }
 
-CNS::~CNS() 
+CNS::~CNS () 
 {
     if (do_react) {
         reactor->close();
@@ -85,7 +90,7 @@ CNS::~CNS()
 }
 
 void
-CNS::init(AmrLevel& old)
+CNS::init (AmrLevel& old)
 {
     BL_PROFILE("CNS::init(old)");
 
@@ -113,7 +118,7 @@ CNS::init(AmrLevel& old)
 }
 
 void
-CNS::init()
+CNS::init ()
 {
     // This version inits the data on a new level that did not
     // exist before regridding.
@@ -133,7 +138,7 @@ CNS::init()
 }
 
 void
-CNS::initData()
+CNS::initData ()
 {
     BL_PROFILE("CNS::initData()");
 
@@ -142,7 +147,7 @@ CNS::initData()
     S_new.setVal(0.0);
 
     Parm const* lparm = d_parm;
-    ProbParm const* lprobparm = d_prob_parm;
+    ProbParm const* lprobparm = d_prob_parm; // <T> const* = pointer to constant <T>; const <T>* == <T> const*
 
     if (verbose != 0) {
         Print() << "Initializing the data at level " << level << std::endl;
@@ -172,48 +177,48 @@ CNS::initData()
 }
 
 void
-CNS::computeInitialDt(int                    finest_level,
-                      int                    /*sub_cycle*/,
-                      Vector<int>&           n_cycle,
-                      const Vector<IntVect>& /*ref_ratio*/,
-                      Vector<Real>&          dt_level,
-                      Real                   stop_time)
+CNS::computeInitialDt (int                    finest_level,
+                       int                    /*sub_cycle*/,
+                       Vector<int>&           n_cycle,
+                       const Vector<IntVect>& /*ref_ratio*/,
+                       Vector<Real>&          dt_level,
+                       Real                   stop_time)
 {
-  // Grids have been constructed, compute dt for all levels.
-  if (level > 0) return;
+    // Grids have been constructed, compute dt for all levels.
+    if (level > 0) return;
 
-  Real dt_0 = std::numeric_limits<Real>::max();
-  int n_factor = 1;
-  for (int i = 0; i <= finest_level; i++) {
-    dt_level[i] = getLevel(i).initialTimeStep();
-    n_factor *= n_cycle[i];
-    dt_0 = std::min<amrex::Real>(dt_0, n_factor*dt_level[i]);
-  }
+    Real dt_0 = std::numeric_limits<Real>::max();
+    int n_factor = 1;
+    for (int i = 0; i <= finest_level; i++) {
+        dt_level[i] = getLevel(i).estTimeStep();
+        n_factor *= n_cycle[i];
+        dt_0 = std::min<amrex::Real>(dt_0, n_factor*dt_level[i]);
+    }
 
-  // Limit dt's by the value of stop_time.
-  const Real eps = 0.001*dt_0;
-  Real cur_time  = state[State_Type].curTime();
-  if (stop_time >= 0.0) {
-    if ((cur_time + dt_0) > (stop_time - eps))
-      dt_0 = stop_time - cur_time;
-  }
+    // Limit dt's by the value of stop_time.
+    const Real eps = 0.001*dt_0;
+    Real cur_time  = state[State_Type].curTime();
+    if (stop_time >= 0.0) {
+        if ((cur_time + dt_0) > (stop_time - eps))
+        dt_0 = stop_time - cur_time;
+    }
 
-  n_factor = 1;
-  for (int i = 0; i <= finest_level; i++) {
-    n_factor *= n_cycle[i];
-    dt_level[i] = dt_0/n_factor;
-  }
+    n_factor = 1;
+    for (int i = 0; i <= finest_level; i++) {
+        n_factor *= n_cycle[i];
+        dt_level[i] = dt_0/n_factor;
+    }
 }
 
 void
-CNS::computeNewDt(int                    finest_level,
-                  int                    /*sub_cycle*/,
-                  Vector<int>&           n_cycle,
-                  const Vector<IntVect>& /*ref_ratio*/,
-                  Vector<Real>&          dt_min,
-                  Vector<Real>&          dt_level,
-                  Real                   stop_time,
-                  int                    post_regrid_flag)
+CNS::computeNewDt (int                    finest_level,
+                   int                    /*sub_cycle*/,
+                   Vector<int>&           n_cycle,
+                   const Vector<IntVect>& /*ref_ratio*/,
+                   Vector<Real>&          dt_min,
+                   Vector<Real>&          dt_level,
+                   Real                   stop_time,
+                   int                    post_regrid_flag)
 {
     // We are at the end of a coarse grid timecycle.
     // Compute the timesteps for the next iteration.
@@ -226,24 +231,24 @@ CNS::computeNewDt(int                    finest_level,
     if (post_regrid_flag == 1) {
         // Limit dt's by pre-regrid dt
         for (int i = 0; i <= finest_level; i++) {
-            dt_min[i] = std::min(dt_min[i],dt_level[i]);
+            dt_min[i] = std::min(dt_min[i], dt_level[i]);
         }
     } else {
-        // Limit dt's by change_max * old dt
+        // Limit dt's by change_max * old dt (TODO: Do we really need this?)
         static Real change_max = 1.1;
         for (int i = 0; i <= finest_level; i++) {
             if ((verbose != 0) && ParallelDescriptor::IOProcessor()) {
                 if (dt_min[i] > change_max * dt_level[i]) {
-                    Print() << "PeleC::compute_new_dt : limiting dt at level "
+                    Print() << " ... Compute new dt : limiting dt at level "
                             << i << '\n';
-                    Print() << " ... new dt computed: " << dt_min[i] << '\n';
-                    Print() << " ... but limiting to: "
+                    Print() << "     new dt computed: " << dt_min[i] << '\n';
+                    Print() << "     but limiting to: "
                             << change_max * dt_level[i] << " = " << change_max
                             << " * " << dt_level[i] << '\n';
                 }
             }
 
-            dt_min[i] = std::min(dt_min[i], change_max * dt_level[i]);
+            dt_min[i] = std::min(dt_min[i], change_max*dt_level[i]);
         }
     }
 
@@ -272,12 +277,15 @@ CNS::computeNewDt(int                    finest_level,
 }
 
 void
-CNS::post_regrid(int /*lbase*/, int /*new_finest*/)
+CNS::post_regrid (int /*lbase*/, int /*new_finest*/)
 {
+    if (do_react && use_typical_vals_chem) {
+        set_typical_values_chem();
+    }
 }
 
 void
-CNS::post_timestep(int /*iteration*/)
+CNS::post_timestep (int /*iteration*/)
 {
     BL_PROFILE("CNS::post_timestep()");
 
@@ -287,7 +295,7 @@ CNS::post_timestep(int /*iteration*/)
         MultiFab& S_fine = fine_level.get_new_data(State_Type);
         fine_level.flux_reg.Reflux(S_crse, *volfrac, S_fine, *fine_level.volfrac);
 
-        if (verbose && amrex::ParallelDescriptor::IOProcessor()) {
+        if ((verbose != 0) && amrex::ParallelDescriptor::IOProcessor()) {
             amrex::Print() << "Reflux() at level " << level
                            << " : time = " << state[State_Type].curTime() << std::endl;
         }
@@ -296,21 +304,30 @@ CNS::post_timestep(int /*iteration*/)
     if (level < parent->finestLevel()) {
         avgDown();
     }
-}
 
-void
-CNS::postCoarseTimeStep(Real /*time*/)
-{
-    // This only computes sum on level 0
-    if (verbose >= 2) {
-        printTotal();
+    // Re-compute temperature and reset typical_values_chem
+    amrex::MultiFab& S_new = get_new_data(State_Type);
+    computeTemp(S_new, 0);
+    if ( do_react && use_typical_vals_chem 
+      && parent->levelSteps(0) % reset_typical_vals_int == 0) {
+        set_typical_values_chem();
     }
 }
 
 void
-CNS::printTotal() const
+CNS::postCoarseTimeStep (Real /*time*/)
+{
+    // This only computes sum on level 0
+    // if (verbose >= 2) { 
+    printTotal(); //must do because this checks for nan as well
+    // }
+}
+
+void
+CNS::printTotal () const
 {
     // Print total and check for nan
+    BL_PROFILE("CNS::printTotal()");
 
     const MultiFab& S_new = get_new_data(State_Type);
     MultiFab mf(grids, dmap, 1, 0);
@@ -340,17 +357,19 @@ CNS::printTotal() const
 }
 
 void
-CNS::post_init(Real /*stop_time*/)
+CNS::post_init (Real /*stop_time*/)
 {
     if (level > 0) return;
     for (int k = parent->finestLevel()-1; k >= 0; --k) {
         getLevel(k).avgDown();
     }
 
-    if (do_react) {
-        const MultiFab& S_new = get_new_data(State_Type);
-              MultiFab& I_R   = get_new_data(Reactions_Type);
-        reaction_source(I_R, S_new, parent->cumTime(), parent->dtLevel(level), true);
+    if (do_react) {        
+        if (use_typical_vals_chem) {
+            set_typical_values_chem();
+        }
+
+        react_source(parent->cumTime(), parent->dtLevel(level), true);
     }
 
     if (verbose >= 2) {
@@ -359,12 +378,62 @@ CNS::post_init(Real /*stop_time*/)
 }
 
 void
-CNS::post_restart()
+CNS::post_restart ()
 {
+    // Initialize reactor
+    if (do_react) {
+        if (chem_integrator == "ReactorNull") {
+            Print() << "WARNING: turning on reactions while using ReactorNull. "
+                       "Make sure this is intended." << std::endl;
+        }
+
+        reactor = pele::physics::reactions::ReactorBase::create(chem_integrator);
+        reactor->init(1, 1);
+
+        if (use_typical_vals_chem) {
+            set_typical_values_chem();
+        }
+    }
+    
+    MultiFab& S_new = get_new_data(State_Type);
+
+    // Populate fields (when restarting from a different number of fields)
+    if (do_restart_fields) {
+        Print() << "Resetting field state data ..." << std::endl;
+        
+        // Move aux variables
+        MultiFab::Copy(S_new, S_new, NVAR, UFA, NUM_AUX, 0);
+
+        // Copy mean to fields
+        for (int nf = 1; nf < NUM_FIELD+1; ++nf) {
+            MultiFab::Copy(S_new, S_new, 0, nf*NVAR, NVAR, 0);
+        }
+
+        if (do_react) {
+            Print() << "Resetting field reaction data ..." << std::endl;
+
+            MultiFab& I_R = get_new_data(Reactions_Type);
+
+            // Copy mean to fields
+            for (int nf = 1; nf < NUM_FIELD+1; ++nf) {
+                MultiFab::Copy(I_R, I_R, 0, nf*NREACT, NREACT, 0);
+            }
+        }
+    }
+
+    Parm const* lparm = d_parm;
+    ProbParm const* lprobparm = d_prob_parm;
+    const auto geomdata = geom.data();
+    auto const& sarrs = S_new.arrays();
+    amrex::ParallelFor(S_new,
+    [=] AMREX_GPU_DEVICE (int box_no, int i, int j, int k) noexcept {
+        // Modify restarted data and/or add turbulence
+        cns_prob_post_restart(i, j, k, sarrs[box_no], geomdata, *lparm, *lprobparm);
+    });
 }
 
 int
-CNS::okToContinue() 
+CNS::okToContinue () 
 {
     if (level > 0) {
         return 1;
@@ -387,7 +456,8 @@ CNS::okToContinue()
 }
 
 void
-CNS::errorEst(TagBoxArray& tags, int, int, Real /*time*/, int, int)
+CNS::errorEst (TagBoxArray& tags, int /*clearval*/, int /*tagval*/, 
+               Real /*time*/, int /*n_error_buf = 0*/, int /*ngrow*/)
 {
     BL_PROFILE("CNS::errorEst()");
 
@@ -422,17 +492,16 @@ CNS::errorEst(TagBoxArray& tags, int, int, Real /*time*/, int, int)
         const MultiFab& S_new = get_new_data(State_Type);
         const Real cur_time = state[State_Type].curTime();
         MultiFab rho(S_new.boxArray(), S_new.DistributionMap(), 1, 1);
-        FillPatch(*this, rho, rho.nGrow(), cur_time, State_Type, UMF + URHO, 1, 0);
+        FillPatch(*this, rho, rho.nGrow(), cur_time, State_Type, URHO, 1, 0);
 
         const char   tagval = TagBox::SET;
-//        const char clearval = TagBox::CLEAR;
+        // const char clearval = TagBox::CLEAR;
         const Real dengrad_threshold = refine_dengrad;
 
         auto const& tagma = tags.arrays();
         auto const& rhoma = rho.const_arrays();
         ParallelFor(rho,
-        [=] AMREX_GPU_DEVICE (int box_no, int i, int j, int k) noexcept
-        {
+        [=] AMREX_GPU_DEVICE (int box_no, int i, int j, int k) noexcept {
             cns_tag_graderror(i, j, k, tagma[box_no], rhoma[box_no], dengrad_threshold, tagval);
         });
         Gpu::streamSynchronize();
@@ -440,7 +509,7 @@ CNS::errorEst(TagBoxArray& tags, int, int, Real /*time*/, int, int)
 }
 
 void
-CNS::read_params()
+CNS::read_params ()
 {
     ParmParse pp("cns");
 
@@ -462,23 +531,23 @@ CNS::read_params()
         phys_bc.setHi(i,hi_bc[i]);
     }
 
-    pp.query("do_reflux", do_reflux);
+    // pp.query("do_reflux", do_reflux); // How can you not do reflux?!
 
     pp.query("do_visc", do_visc);
 
-    if (do_visc) {
-        pp.query("use_const_visc",use_const_visc);
-        if (use_const_visc) {
-            pp.get("const_visc_mu",h_parm->const_visc_mu);
-            pp.get("const_visc_ki",h_parm->const_visc_ki);
-            pp.get("const_lambda" ,h_parm->const_lambda);
-        }
-    } else {
-       use_const_visc = true;
-       h_parm->const_visc_mu = 0.0;
-       h_parm->const_visc_ki = 0.0;
-       h_parm->const_lambda  = 0.0;
-    }
+    // if (do_visc) {
+    //     pp.query("use_const_visc",use_const_visc);
+    //     if (use_const_visc) {
+    //         pp.get("const_visc_mu",h_parm->const_visc_mu);
+    //         pp.get("const_visc_ki",h_parm->const_visc_ki);
+    //         pp.get("const_lambda" ,h_parm->const_lambda);
+    //     }
+    // } else {
+    //    use_const_visc = true;
+    //    h_parm->const_visc_mu = 0.0;
+    //    h_parm->const_visc_ki = 0.0;
+    //    h_parm->const_lambda  = 0.0;
+    // }
 
     pp.query("refine_cutcells", refine_cutcells);
 
@@ -504,16 +573,21 @@ CNS::read_params()
 
     pp.query("do_react", do_react);
     pp.query("chem_integrator", chem_integrator);
+    pp.query("rk_reaction_iter", rk_reaction_iter);
+    pp.query("use_typical_vals_chem", use_typical_vals_chem);
+    pp.query("reset_typical_vals_int", reset_typical_vals_int);
+
+    pp.query("do_restart_fields", do_restart_fields);
 
     // pp.query("gravity", gravity);
 
-    pp.query("eos_gamma", h_parm->eos_gamma);
-    pp.query("eos_mu"   , h_parm->eos_mu);
-    pp.query("Pr"       , h_parm->Pr);
-    pp.query("C_S"      , h_parm->C_S);
-    pp.query("T_S"      , h_parm->T_S);
+    // pp.query("eos_gamma", h_parm->eos_gamma);
+    // pp.query("eos_mu"   , h_parm->eos_mu);
+    // pp.query("Pr"       , h_parm->Pr);
+    // pp.query("C_S"      , h_parm->C_S);
+    // pp.query("T_S"      , h_parm->T_S);
 
-    h_parm->Initialize();
+    // h_parm->Initialize();
     amrex::Gpu::copyAsync(amrex::Gpu::hostToDevice, h_parm, h_parm+1, d_parm);
 
     // eb_weights_type:
@@ -535,7 +609,7 @@ CNS::read_params()
 }
 
 void
-CNS::avgDown()
+CNS::avgDown ()
 {
     BL_PROFILE("CNS::avgDown()");
 
@@ -562,7 +636,7 @@ CNS::avgDown()
 }
 
 void
-CNS::buildMetrics()
+CNS::buildMetrics ()
 {
     BL_PROFILE("CNS::buildMetrics()");
 
@@ -595,7 +669,7 @@ CNS::buildMetrics()
 }
 
 Real
-CNS::estTimeStep()
+CNS::estTimeStep ()
 {
     BL_PROFILE("CNS::estTimeStep()");
 
@@ -639,49 +713,45 @@ CNS::estTimeStep()
     return estdt;
 }
 
-Real
-CNS::initialTimeStep()
-{
-    return estTimeStep();
-}
+// Real
+// CNS::initialTimeStep ()
+// {
+//     return estTimeStep();
+// }
 
 void
-CNS::computeTemp(MultiFab& State, int ng)
+CNS::computeTemp (MultiFab& State, int ng)
 {
     BL_PROFILE("CNS::computeTemp()");
 
     auto const& fact = dynamic_cast<EBFArrayBoxFactory const&>(State.Factory());
     auto const& flags = fact.getMultiEBCellFlagFab();
 
-    Parm const* lparm = d_parm;
-
     // This will reset Eint and compute Temperature
-// #ifdef AMREX_USE_OMP
-// #pragma omp parallel if (Gpu::notInLaunchRegion())
-// #endif
-//     for (MFIter mfi(State,true); mfi.isValid(); ++mfi)
-//     {
-//         const Box& bx = mfi.growntilebox(ng);
+#ifdef AMREX_USE_OMP
+#pragma omp parallel if (Gpu::notInLaunchRegion())
+#endif
+    for (MFIter mfi(State, TilingIfNotGPU()); mfi.isValid(); ++mfi)
+    {
+        const Box& bx = mfi.growntilebox(ng);
 
-//         const auto& flag = flags[mfi];
-//         auto s_arr = State.array(mfi);
+        auto s_arr = State.array(mfi);
 
-//         if (flag.getType(bx) != FabType::covered) {
-//             amrex::ParallelFor(bx,
-//             [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept
-//             {
-//                 cns_compute_temperature(i, j, k, s_arr, *lparm);
-//             });
-//         }
-//     }
-    auto const& sarrs = State.arrays();
-    auto const& flagarrs = flags.const_arrays();
-    const amrex::IntVect ngs(ng);
-    amrex::ParallelFor(
-        State, ngs, [=] AMREX_GPU_DEVICE(int nbx, int i, int j, int k) noexcept {
-            if (!flagarrs[nbx](i, j, k).isCovered()) {
-                cns_compute_temperature(i, j, k, sarrs[nbx], *lparm);
-            }
-        });
+        if (flags[mfi].getType(bx) != FabType::covered) {
+            amrex::ParallelFor(bx,
+            [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept {
+                cns_compute_temperature(i, j, k, s_arr);
+            });
+        }
+    }
+    // auto const& sarrs = State.arrays();
+    // auto const& flagarrs = flags.const_arrays();
+    // const amrex::IntVect ngs(ng);
+    // amrex::ParallelFor(
+    //     State, ngs, [=] AMREX_GPU_DEVICE(int nbx, int i, int j, int k) noexcept {
+    //         if (!flagarrs[nbx](i, j, k).isCovered()) {
+    //             cns_compute_temperature(i, j, k, sarrs[nbx]);
+    //         }
+    //     });
     amrex::Gpu::synchronize();
 }
