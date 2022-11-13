@@ -1,4 +1,3 @@
-
 #include <AMReX_EB2.H>
 #include <AMReX_EB2_IF.H>
 
@@ -10,14 +9,16 @@
 using namespace amrex;
 
 void
-initialize_EB2(const Geometry& geom, const int /*required_coarsening_level*/,
-               const int max_coarsening_level)
+initialize_EB2 (const Geometry& geom, const int /*required_coarsening_level*/,
+                const int max_coarsening_level)
 {
     BL_PROFILE("initializeEB2");
 
     ParmParse ppeb2("eb2");
     std::string geom_type;
-    ppeb2.get("geom_type", geom_type);
+    ppeb2.get("geom_type", geom_type); 
+    //for some reason, amrex::Build will run get geom_type anyway, 
+    //so even if we use pp.query we cannot get rid of the error
 
 #if (AMREX_SPACEDIM == 3)
     if (geom_type == "combustor")

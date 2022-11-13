@@ -2,15 +2,20 @@
 #define CNS_H
 
 #include <AMReX_AmrLevel.H>
+
+#if (AMREX_SPACEDIM > 1) //1D cannot have EB
 #include <AMReX_EBCellFlag.H>
 #include <AMReX_EBFluxRegister.H>
+#else
+#include <AMReX_YAFluxRegister.H>
+#endif
 
 #include "index_macros.H"
-#include "PelePhysics.H"
-#include "ReactorBase.H"
 #include "parm.H"
 #include "prob_parm.H"
 
+#include "PelePhysics.H"
+#include "ReactorBase.H"
 
 using namespace amrex;
 
@@ -132,6 +137,7 @@ public:
                              amrex::Array4<amrex::Real    >& fyfab,
                              amrex::Array4<amrex::Real    >& fzfab));
 
+#if (AMREX_SPACEDIM > 1) //1D cannot have EB
     void compute_dSdt_box_eb (const amrex::Box& bx,
                               amrex::Array4<amrex::Real       const> const& Sfab,
                               amrex::Array4<amrex::Real            > const& dSdtfab,
@@ -162,8 +168,8 @@ public:
     void cns_flux_redistribute (const amrex::Box& bx,
                                 amrex::Array4<amrex::Real            > const& dqdt,
                                 amrex::Array4<amrex::Real            > const& divc,
-                                amrex::Array4<amrex::Real            > const& optmp,
-                                amrex::Array4<amrex::Real            > const& del_m,
+                                // amrex::Array4<amrex::Real            > const& optmp,
+                                // amrex::Array4<amrex::Real            > const& del_m,
                                 amrex::Array4<amrex::Real       const> const& redistwgt,
                                 amrex::Array4<amrex::Real       const> const& vfrac,
                                 amrex::Array4<amrex::EBCellFlag const> const& flag,
@@ -174,6 +180,7 @@ public:
                                 amrex::Array4<amrex::Real            > const& dm_as_fine,
                                 amrex::Array4<int               const> const& lev_mask,
                                 amrex::Real dt);
+#endif
 
     static Parm* h_parm;
     static Parm* d_parm;
@@ -184,7 +191,9 @@ protected:
 
     static void read_params ();
 
+#if (AMREX_SPACEDIM > 1) //1D cannot have EB
     const amrex::MultiFab& volFrac () const { return *volfrac; }
+#endif
 
     CNS& getLevel (int lev) { return dynamic_cast<CNS&>(parent->getLevel(lev)); }
 
@@ -196,20 +205,29 @@ protected:
     // amrex::Real initialTimeStep ();
 
     void compute_dSdt (const amrex::MultiFab& S, amrex::MultiFab& dSdt, amrex::Real dt,
+#if (AMREX_SPACEDIM > 1) //1D cannot have EB
                        amrex::EBFluxRegister* fr_as_crse, amrex::EBFluxRegister* fr_as_fine,
+#else
+                       amrex::YAFluxRegister* fr_as_crse, amrex::YAFluxRegister* fr_as_fine,
+#endif
                        bool write_to_flux_register);
 
     void printTotal() const;
 
+#if (AMREX_SPACEDIM > 1) //1D cannot have EB
     const amrex::MultiFab* volfrac;
     const amrex::MultiCutFab* bndrycent;
     std::array<const amrex::MultiCutFab*,AMREX_SPACEDIM> areafrac;
     std::array<const amrex::MultiCutFab*,AMREX_SPACEDIM> facecent;
+#endif
 
     amrex::iMultiFab level_mask;
 
+#if (AMREX_SPACEDIM > 1) //1D cannot have EB
     amrex::EBFluxRegister flux_reg;
-
+#else
+    amrex::YAFluxRegister flux_reg;
+#endif
     // static constexpr int NUM_GROW = 5;
 
     enum StateDataType { State_Type = 0, Reactions_Type, Cost_Type };

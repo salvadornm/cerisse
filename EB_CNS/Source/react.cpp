@@ -2,15 +2,34 @@
 
 // #include "index_macros.H"
 #include "CNS.H"
-#include "PelePhysics.H"
+// #include "PelePhysics.H"
 
 void
-CNS::reaction_source(amrex::MultiFab& react_src,
-                     const amrex::MultiFab& S_new,
-                     amrex::Real /*time*/,
-                     amrex::Real dt,
-                     bool react_init,
-                     amrex::MultiFab* aux_src)
+CNS::set_typical_values_chem ()
+{
+  // if (use_typical_vals_chem_usr) {
+  //   reactor->set_typ_vals_ode(typical_values_chem_usr);
+  // } else {
+  amrex::MultiFab& S_new = get_new_data(State_Type);
+  amrex::Real minTemp = S_new.min(UTEMP);
+  amrex::Real maxTemp = S_new.max(UTEMP);
+  amrex::Vector<amrex::Real> typical_values_chem(NUM_SPECIES + 1, 1e-10);
+
+  for (int n = 0; n < NUM_SPECIES; n++) {
+    amrex::Real rhoYs_min = S_new.min(UFS + n);
+    amrex::Real rhoYs_max = S_new.max(UFS + n);
+    typical_values_chem[n] = amrex::max<amrex::Real>(
+      0.5 * (rhoYs_min + rhoYs_max), 1.e-10);
+  }
+  typical_values_chem[NUM_SPECIES] = 0.5 * (minTemp + maxTemp);
+  reactor->set_typ_vals_ode(typical_values_chem);
+  // }
+}
+
+void
+CNS::react_source (amrex::Real /*time*/,
+                   amrex::Real dt,
+                   bool react_init)
 {
   // Update I_R, do not recompute S_new
   BL_PROFILE("CNS::reaction_source()");
@@ -21,10 +40,9 @@ CNS::reaction_source(amrex::MultiFab& react_src,
 
   if ((verbose != 0) && amrex::ParallelDescriptor::IOProcessor()) {
     if (react_init) {
-      amrex::Print() << "... Initializing reactions, using interval dt = " << dt
-                     << std::endl;
+      amrex::Print() << " ... Initialising reactions" << std::endl;
     } else {
-      amrex::Print() << "... Computing reactions for dt = " << dt << std::endl;
+      amrex::Print() << " ... Computing reactions" << std::endl;
     }
   }
 
@@ -294,14 +312,17 @@ CNS::reaction_source(amrex::MultiFab& react_src,
 //     S_new.FillBoundary(geom.periodicity());
 //   }
 
-  if (verbose > 1) {
+  if (verbose >= 2) {
     const int IOProc = amrex::ParallelDescriptor::IOProcessorNumber();
-    amrex::Real run_time = amrex::ParallelDescriptor::second() - strt_time;
+    amrex::Real max_runtime = amrex::ParallelDescriptor::second() - strt_time;
+    amrex::Real min_runtime = max_runtime;
 
-    amrex::ParallelDescriptor::ReduceRealMax(run_time, IOProc);
+    amrex::ParallelDescriptor::ReduceRealMax(max_runtime, IOProc);
+    amrex::ParallelDescriptor::ReduceRealMin(min_runtime, IOProc);
 
     if (amrex::ParallelDescriptor::IOProcessor()) {
-      amrex::Print() << "CNS::react_state() runtime = " << run_time << "\n";
+      amrex::Print() << "CNS::react_state() runtime = [" << min_runtime << 
+                                                   "..." << max_runtime << "]\n";
     }
   }
 }

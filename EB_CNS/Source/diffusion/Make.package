@@ -1,2 +1,5 @@
 CEXE_headers += CNS_diffusion_K.H
-CEXE_headers += CNS_diffusion_eb_K.H
+
+ifneq ($(DIM), 1)
+  CEXE_headers += CNS_diffusion_eb_K.H
+endif

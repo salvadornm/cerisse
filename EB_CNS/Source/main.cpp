@@ -1,16 +1,21 @@
-
 #include <AMReX.H>
 #include <AMReX_ParmParse.H>
 #include <AMReX_ParallelDescriptor.H>
 #include <AMReX_Amr.H>
+
+#if (AMREX_SPACEDIM > 1) //1D cannot have EB
 #include <AMReX_EB2.H>
+#endif
 
 #include "CNS.H"
 
 using namespace amrex;
 
 amrex::LevelBld* getLevelBld ();
+
+#if (AMREX_SPACEDIM > 1) //1D cannot have EB
 void initialize_EB2 (const Geometry& geom, const int required_level, const int max_level);
+#endif
 
 int main (int argc, char* argv[])
 {
@@ -50,10 +55,12 @@ int main (int argc, char* argv[])
         timer_init = amrex::second();
 
         Amr amr(getLevelBld());
-        AmrLevel::SetEBSupportLevel(EBSupport::full);
-        AmrLevel::SetEBMaxGrowCells(NUM_GROW, 4, 2);
 
+#if (AMREX_SPACEDIM > 1) //1D cannot have EB
+        AmrLevel::SetEBSupportLevel(EBSupport::full);//need both area and volume fractions
+        AmrLevel::SetEBMaxGrowCells(NUM_GROW, 4, 2); //5 for ebcellflags, 4 for vfrac, 2 is not used for EBSupport::volume
         initialize_EB2(amr.Geom(amr.maxLevel()), amr.maxLevel(), amr.maxLevel());
+#endif
 
         amr.init(strt_time,stop_time);
 

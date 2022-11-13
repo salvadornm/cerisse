@@ -6,12 +6,12 @@
 
 // Number of stochastic fields
 #ifndef NUM_FIELD
-#define NUM_FIELD  2
+#define NUM_FIELD 0
 #endif
 
 // Aux states
 #ifndef NUM_AUX
-#define NUM_AUX  0
+#define NUM_AUX 0
 #endif
 
 // State variables 
@@ -20,7 +20,7 @@
 #define URHO   0
 #define UMX    1
 #define UMY    2
-#define UMZ    3 // We have UMZ no matter what AMREX_SPACEDIM
+#define UMZ    3 // We have UMY and UMZ no matter what AMREX_SPACEDIM
 #define UEDEN  4
 #define UEINT  5
 #define UTEMP  6

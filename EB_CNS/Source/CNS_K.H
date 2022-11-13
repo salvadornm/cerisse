@@ -13,9 +13,9 @@
 
 AMREX_GPU_DEVICE AMREX_FORCE_INLINE
 amrex::Real
-cns_estdt(int i, int j, int k, amrex::Array4<Real const> const& state,
-          amrex::GpuArray<amrex::Real,AMREX_SPACEDIM> const& dx,
-          Parm const& parm) noexcept
+cns_estdt (int i, int j, int k, amrex::Array4<Real const> const& state,
+           amrex::GpuArray<amrex::Real,AMREX_SPACEDIM> const& dx,
+           Parm const& parm) noexcept
 {
     amrex::Real rho = state(i, j, k, URHO);    
     amrex::Real rhoinv = Real(1.0) / rho;
@@ -48,21 +48,17 @@ cns_estdt(int i, int j, int k, amrex::Array4<Real const> const& state,
 
 AMREX_GPU_DEVICE AMREX_FORCE_INLINE
 void
-cns_compute_temperature(int i, int j, int k, 
-                        amrex::Array4<amrex::Real> const& S,
-                        Parm const& parm) noexcept
+cns_compute_temperature (int i, int j, int k, 
+                         amrex::Array4<amrex::Real> const& S) noexcept
 {
     // Reset Eint and compute T
     
     amrex::Real rhoinv = amrex::Real(1.0) / S(i,j,k,URHO);
     amrex::Real mx = S(i,j,k,UMX);
     amrex::Real my = S(i,j,k,UMY);
-#if (AMREX_SPACEDIM == 2)
-    S(i,j,k,UEINT) = S(i,j,k,UEDEN) - amrex::Real(0.5) * rhoinv * (mx*mx + my*my);
-#else
     amrex::Real mz = S(i,j,k,UMZ);
-    S(i,j,k,UEINT) = S(i,j,k,UEDEN) - amrex::Real(0.5) * rhoinv * (mx*mx + my*my + mz*mz);
-#endif
+
+    S(i,j,k,UEINT) = S(i,j,k,UEDEN) - amrex::Real(0.5) * rhoinv * (AMREX_D_TERM(mx*mx, + my*my, + mz*mz));
 
     amrex::Real massfrac[NUM_SPECIES];
     for (int n = 0; n < NUM_SPECIES; ++n) {
@@ -70,14 +66,7 @@ cns_compute_temperature(int i, int j, int k,
     }
 
     auto eos = pele::physics::PhysicsType::eos();
-    eos.EY2T(rhoinv * S(i,j,k,UEINT), massfrac, S(i,j,k,UTEMP));
-
-    // amrex::Real cv;
-    // eos.TY2Cv(S(i,j,k,UTEMP), massfrac, cv);
-    // S(i,j,k,UTEMP) = rhoinv * S(i,j,k,UEINT) * amrex::Real(1.0) / cv;
-    // S(i,j,k,UTEMP) = rhoinv * S(i,j,k,UEINT) * amrex::Real(1.0) / parm.cv;
-
-    // S(i,j,k,UTEMP) = 1500.; //for debug
+    eos.EY2T(rhoinv*S(i,j,k,UEINT), massfrac, S(i,j,k,UTEMP));
 }
 
 #endif

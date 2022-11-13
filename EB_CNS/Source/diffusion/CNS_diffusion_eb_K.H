@@ -79,7 +79,6 @@ cns_diff_eb_x (int i, int j, int k,
                               (q(i,j,k,QW)+q(i-1,j,k,QW))*tauxz+
                               (coeffs(i,j,k,CLAM) +coeffs(i-1,j,k,CLAM))*dTdx );
 #endif
-
 }
 
 AMREX_GPU_DEVICE AMREX_FORCE_INLINE
@@ -152,7 +151,6 @@ cns_diff_eb_y (int i, int j, int k, amrex::Array4<amrex::Real const> const& q,
                              +(q(i,j,k,QW)+q(i,j-1,k,QW))*tauyz
                              +(coeffs(i,j,k,CLAM) +coeffs(i,j-1,k,CLAM))*dTdy );
 #endif
-
 }
 
 #if (AMREX_SPACEDIM == 3)

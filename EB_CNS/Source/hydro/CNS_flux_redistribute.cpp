@@ -1,13 +1,17 @@
-#include <parm.H>
-#include <CNS_hydro_K.H>
-#include <CNS_hydro_eb_K.H>
-
 #include <AMReX_EBFluxRegister.H>
 #include <AMReX_YAFluxRegister.H>
 #include <AMReX_EBFArrayBox.H>
 #include <AMReX_MultiCutFab.H>
 #include <AMReX_YAFluxRegister_K.H>
+#if (AMREX_SPACEDIM == 2)
+#include <AMReX_EBMultiFabUtil_2D_C.H>
+#elif (AMREX_SPACEDIM == 3)
 #include <AMReX_EBMultiFabUtil_3D_C.H>
+#endif
+
+#include "parm.H"
+#include "CNS_hydro_K.H"
+#include "CNS_hydro_eb_K.H"
 
 using namespace amrex;
 
@@ -15,8 +19,8 @@ void
 CNS::cns_flux_redistribute (const Box& bx,
                             Array4<Real            > const& dqdt,
                             Array4<Real            > const& divc,
-                            Array4<Real            > const& optmp,
-                            Array4<Real            > const& delm,
+                            // Array4<Real            > const& optmp,
+                            // Array4<Real            > const& delm,
                             Array4<Real       const> const& redistwgt,
                             Array4<Real       const> const& vfrac,
                             Array4<EBCellFlag const> const& flag,
@@ -29,6 +33,14 @@ CNS::cns_flux_redistribute (const Box& bx,
                             Real dt)
 {
     const Box& bxg1 = amrex::grow(bx,1);
+    const Box& bxg2 = amrex::grow(bx,2);
+
+    FArrayBox optmp_fab(bxg2, NVAR);
+    FArrayBox delta_m_fab(bxg1, NVAR);
+    optmp_fab.setVal(0);
+    delta_m_fab.setVal(0);
+    auto const& optmp = optmp_fab.array();
+    auto const& delm = delta_m_fab.array();
 
     Parm* l_parm = d_parm;
 

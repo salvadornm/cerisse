@@ -4,7 +4,9 @@ TOP =  ../..
 
 EBASE = Cerisse
 
-USE_EB = TRUE
+ifneq ($(DIM), 1)
+   USE_EB = TRUE
+endif
 USE_SUNDIALS = TRUE
 LAZY = TRUE
 BL_NO_FORT = TRUE
@@ -27,10 +29,14 @@ INCLUDE_LOCATIONS += $(Blocs)
 VPATH_LOCATIONS   += $(Blocs)
 
 # ================== AMREX ==================
-Adirs := Base Boundary AmrCore Amr EB
+Adirs := Base Boundary AmrCore Amr
 Apack	+= $(foreach dir, $(Adirs), $(AMREX_HOME)/Src/$(dir)/Make.package)
 
 include $(Apack)
+
+ifneq ($(DIM), 1)
+   include $(AMREX_HOME)/Src/EB/Make.package
+endif
 
 # =============== PELE_PHYSICS ===============
 Pdirs := Source Eos Transport Reactions

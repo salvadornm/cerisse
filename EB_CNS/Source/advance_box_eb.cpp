@@ -3,11 +3,9 @@
 #include "CNS_hydro_eb_K.H"
 #include "CNS_divop_K.H"
 #include "CNS_diffusion_eb_K.H"
-#include "diffcoef.H"
 
 #include <AMReX_EBFArrayBox.H>
 #include <AMReX_MultiCutFab.H>
-
 #if (AMREX_SPACEDIM == 2)
 #include <AMReX_EBMultiFabUtil_2D_C.H>
 #elif (AMREX_SPACEDIM == 3)
@@ -17,32 +15,31 @@
 using namespace amrex;
 
 void
-CNS::compute_dSdt_box_eb(const Box& bx,
-                         Array4<Real const> const&       sfab,
-                         Array4<Real      > const&       dsdtfab,
-                         /*std::array<FArrayBox*, AMREX_SPACEDIM> const& flux,*/
-                         AMREX_D_DECL(
-                            Array4<Real   > const&       fx_out_arr,
-                            Array4<Real   > const&       fy_out_arr,
-                            Array4<Real   > const&       fz_out_arr),
-                         Array4<EBCellFlag const> const& flag,
-                         Array4<Real       const> const& vfrac,
-                         AMREX_D_DECL(
-                            Array4<Real    const> const& apx,
-                            Array4<Real    const> const& apy,
-                            Array4<Real    const> const& apz),
-                         AMREX_D_DECL(
-                            Array4<Real    const> const& fcx,
-                            Array4<Real    const> const& fcy,
-                            Array4<Real    const> const& fcz),
-                         Array4<Real       const> const& bcent,
-                         int                             as_crse,
-                         Array4<Real            > const& drho_as_crse,
-                         Array4<int        const> const& rrflag_as_crse,
-                         int                             as_fine,
-                         Array4<Real            > const& dm_as_fine,
-                         Array4<int        const> const& lev_mask,
-                         Real                            dt)
+CNS::compute_dSdt_box_eb (const Box& bx,
+                          Array4<Real const> const&       sfab,
+                          Array4<Real      > const&       dsdtfab,
+                          AMREX_D_DECL(
+                            Array4<Real    > const&       fx_out_arr,
+                            Array4<Real    > const&       fy_out_arr,
+                            Array4<Real    > const&       fz_out_arr),
+                          Array4<EBCellFlag const> const& flag,
+                          Array4<Real       const> const& vfrac,
+                          AMREX_D_DECL(
+                            Array4<Real     const> const& apx,
+                            Array4<Real     const> const& apy,
+                            Array4<Real     const> const& apz),
+                          AMREX_D_DECL(
+                            Array4<Real     const> const& fcx,
+                            Array4<Real     const> const& fcy,
+                            Array4<Real     const> const& fcz),
+                          Array4<Real       const> const& bcent,
+                          int                             as_crse,
+                          Array4<Real            > const& drho_as_crse,
+                          Array4<int        const> const& rrflag_as_crse,
+                          int                             as_fine,
+                          Array4<Real            > const& dm_as_fine,
+                          Array4<int        const> const& lev_mask,
+                          Real                            dt)
 {
     BL_PROFILE("CNS::compute_dSdt_box_eb()");
 
@@ -55,45 +52,71 @@ CNS::compute_dSdt_box_eb(const Box& bx,
     const auto dxinv = geom.InvCellSizeArray();
 
     // Quantities for redistribution
-    FArrayBox divc,optmp,redistwgt,delta_m;
+    FArrayBox divc,redistwgt;//,optmp,delta_m;
     divc.resize(bxg2, NVAR);
-    optmp.resize(bxg2, NVAR);
-    delta_m.resize(bxg1, NVAR);
+    // optmp.resize(bxg2, NVAR);
+    // delta_m.resize(bxg1, NVAR);
     redistwgt.resize(bxg2, 1);
-
     // Set to zero just in case
     divc.setVal<RunOn::Device>(0.0);
-    optmp.setVal<RunOn::Device>(0.0);
-    delta_m.setVal<RunOn::Device>(0.0);
+    // optmp.setVal<RunOn::Device>(0.0);
+    // delta_m.setVal<RunOn::Device>(0.0);
     redistwgt.setVal<RunOn::Device>(0.0);
 
     // Primitive variables
     FArrayBox qtmp;
     qtmp.resize(bxg5, NPRIM);
+    auto const& q = qtmp.array();
+
+    Parm const* lparm = d_parm;
+    amrex::ParallelFor(bxg5,
+    [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept {
+        cns_ctoprim(i, j, k, sfab, q, *lparm);
+    });
 
     // Slopes
     FArrayBox slopetmp;
     slopetmp.resize(bxg4, NVAR);
+    auto const& slope = slopetmp.array();
 
+    auto l_plm_iorder = plm_iorder;
+    auto l_plm_theta = plm_theta;
+
+    // Transport coef
     FArrayBox diff_coeff;
     if (do_visc == 1) {
-       diff_coeff.resize(bxg4, NCOEF);
+        diff_coeff.resize(bxg4, NCOEF);
+        
+        auto const& qar_yin   = qtmp.array(QFS);
+        auto const& qar_Tin   = qtmp.array(QTEMP);
+        auto const& qar_rhoin = qtmp.array(QRHO);
+        auto const& rhoD   = diff_coeff.array(CRHOD);
+        auto const& mu     = diff_coeff.array(CMU);
+        auto const& xi     = diff_coeff.array(CXI);
+        auto const& lambda = diff_coeff.array(CLAM);
+        
+        BL_PROFILE("PelePhysics::get_transport_coeffs()");
+        // Get Transport coefs on GPU.
+        auto const* ltransparm = trans_parms.device_trans_parm();
+        amrex::launch(bxg4, [=] AMREX_GPU_DEVICE(amrex::Box const& tbx) {
+            auto trans = pele::physics::PhysicsType::transport();
+            trans.get_transport_coeffs(
+                tbx, qar_yin, qar_Tin, qar_rhoin, rhoD, mu, xi, lambda, ltransparm);
+        });
     }
 
+    // Temporary flux before redistribution
     FArrayBox flux_tmp[AMREX_SPACEDIM];
     for (int idim=0; idim < AMREX_SPACEDIM; ++idim) {
         flux_tmp[idim].resize(amrex::surroundingNodes(bxg3,idim),NVAR);
         flux_tmp[idim].setVal<RunOn::Device>(0.);
     }
 
-    Parm const* lparm = d_parm;
-
     AMREX_D_TERM(auto const& fxfab = flux_tmp[0].array();,
                  auto const& fyfab = flux_tmp[1].array();,
                  auto const& fzfab = flux_tmp[2].array(););
 
-    auto const& q = qtmp.array();
-
+    // EB weights
     GpuArray<Real,3> weights;
     weights[0] = 0.;
     weights[1] = 1.;
@@ -107,128 +130,74 @@ CNS::compute_dSdt_box_eb(const Box& bx,
         });
     }
 
-    amrex::ParallelFor(bxg5,
-    [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept {
-        cns_ctoprim(i, j, k, sfab, q, *lparm);
-    });
-
-    if (do_visc == 1) {        
-        // if(use_const_visc == 1) {
-        //     auto const& coefs = diff_coeff.array();
-        //     amrex::ParallelFor(bxg4,
-        //     [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept {
-        //         cns_constcoef_eb(i, j, k, flag, coefs, *lparm);
-        //     });
-        // } else {
-        //   amrex::ParallelFor(bxg4,
-        //   [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept
-        //   {
-        //       cns_diffcoef_eb(i, j, k, q, flag, coefs, *lparm);
-        //   });
-            auto const& qar_yin   = qtmp.array(QFS);
-            auto const& qar_Tin   = qtmp.array(QTEMP);
-            auto const& qar_rhoin = qtmp.array(QRHO);
-            auto const& rhoD   = diff_coeff.array(CRHOD);
-            auto const& mu     = diff_coeff.array(CMU);
-            auto const& xi     = diff_coeff.array(CXI);
-            auto const& lambda = diff_coeff.array(CLAM);
-            
-            BL_PROFILE("PelePhysics::get_transport_coeffs()");
-            // Get Transport coefs on GPU.
-            auto const* ltransparm = trans_parms.device_trans_parm();
-            amrex::launch(bxg4, [=] AMREX_GPU_DEVICE(amrex::Box const& tbx) {
-                auto trans = pele::physics::PhysicsType::transport();
-                trans.get_transport_coeffs(
-                    tbx, qar_yin, qar_Tin, qar_rhoin, rhoD, mu, xi, lambda, ltransparm);
-            });
-        // }
-    }
-
-    auto const& slope = slopetmp.array();
-
-    auto l_plm_iorder = plm_iorder;
-    auto l_plm_theta = plm_theta;
-
     // x-direction
     int cdir = 0;
     const Box& xslpbx = amrex::grow(bxg3, cdir, 1);
     amrex::ParallelFor(xslpbx,
-    [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept
-    {
+    [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept {
         cns_slope_eb_x(i, j, k, slope, q, flag, l_plm_iorder, l_plm_theta);
     });
 
     const Box& xflxbx = amrex::surroundingNodes(bxg3,cdir);
     amrex::ParallelFor(xflxbx,
-    [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept
-    {
+    [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept {
         cns_riemann_x(i, j, k, fxfab, slope, q, *lparm);
         for (int n = UEINT; n < NVAR; ++n) fxfab(i,j,k,n) = Real(0.0);
     });
 
-
-    if (do_visc == 1)
-    {
+    if (do_visc == 1) {
         auto const& coefs = diff_coeff.array();
         amrex::ParallelFor(xflxbx,
-        [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept
-        {
+        [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept {
             cns_diff_eb_x(i, j, k, q, coefs, flag, dxinv, weights, fxfab);
         });
     }
 
-
+#if (AMREX_SPACEDIM >= 2)
     // y-direction
     cdir = 1;
     const Box& yslpbx = amrex::grow(bxg3, cdir, 1);
     amrex::ParallelFor(yslpbx,
-    [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept
-    {
+    [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept {
         cns_slope_eb_y(i, j, k, slope, q, flag, l_plm_iorder, l_plm_theta);
     });
 
     const Box& yflxbx = amrex::surroundingNodes(bxg3,cdir);
     amrex::ParallelFor(yflxbx,
-    [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept
-    {
+    [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept {
         cns_riemann_y(i, j, k, fyfab, slope, q, *lparm);
         for (int n = UEINT; n < NVAR; ++n) fyfab(i,j,k,n) = Real(0.0);
     });
 
-    if(do_visc == 1)
-    {
+    if(do_visc == 1) {
        auto const& coefs = diff_coeff.array();
        amrex::ParallelFor(yflxbx,
-       [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept
-       {
+       [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept {
            cns_diff_eb_y(i, j, k, q, coefs, flag, dxinv, weights, fyfab);
        });
     }
+#endif
 
 #if (AMREX_SPACEDIM == 3)
     // z-direction
     cdir = 2;
     const Box& zslpbx = amrex::grow(bxg3, cdir, 1);
     amrex::ParallelFor(zslpbx,
-    [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept
-    {
+    [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept {
         cns_slope_eb_z(i, j, k, slope, q, flag, l_plm_iorder, l_plm_theta);
     });
 
     const Box& zflxbx = amrex::surroundingNodes(bxg3,cdir);
     amrex::ParallelFor(zflxbx,
-    [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept
-    {
+    [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept {
         cns_riemann_z(i, j, k, fzfab, slope, q, *lparm);
         for (int n = UEINT; n < NVAR; ++n) fzfab(i,j,k,n) = Real(0.0);
     });
 
-    if(do_visc == 1)
-    {
+    if(do_visc == 1) {
        auto const& coefs = diff_coeff.array();
        amrex::ParallelFor(zflxbx,
-       [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept
-       {
+       [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept {
            cns_diff_eb_z(i, j, k, q, coefs, flag, dxinv, weights, fzfab);
        });
     }
@@ -252,8 +221,8 @@ CNS::compute_dSdt_box_eb(const Box& bx,
     //    rather than directly into dsdtfab
     auto const& divc_arr = divc.array();
 
-    bool l_do_visc = do_visc;
-    auto l_eb_weights_type = eb_weights_type;
+    // bool l_do_visc = do_visc;
+    // auto l_eb_weights_type = eb_weights_type;
 
     auto const& coefs = diff_coeff.array();
     auto const& redistwgt_arr = redistwgt.array();
@@ -263,19 +232,19 @@ CNS::compute_dSdt_box_eb(const Box& bx,
     {
        // This does the divergence but not the redistribution -- we will do that later
        // We do compute the weights here though
-       eb_compute_div(i,j,k,n,blo,bhi,q,divc_arr,
-                      AMREX_D_DECL(fx_in_arr ,fy_in_arr ,fz_in_arr),
-                      AMREX_D_DECL(fx_out_arr,fy_out_arr,fz_out_arr),
+       eb_compute_div(i, j, k, n, blo, bhi, q, divc_arr,
+                      AMREX_D_DECL(fx_in_arr, fy_in_arr, fz_in_arr),
+                      AMREX_D_DECL(fx_out_arr, fy_out_arr, fz_out_arr),
                       flag, vfrac, bcent, coefs, redistwgt_arr,
                       AMREX_D_DECL(apx, apy, apz),
-                      AMREX_D_DECL(fcx, fcy, fcz), dxinv, *lparm, l_eb_weights_type, l_do_visc);
+                      AMREX_D_DECL(fcx, fcy, fcz), dxinv, *lparm, eb_weights_type, do_visc);
     });
 
-    auto const& optmp_arr = optmp.array();
-    auto const& del_m_arr = delta_m.array();
+    // auto const& optmp_arr = optmp.array();
+    // auto const& del_m_arr = delta_m.array();
 
     // Now do redistribution
-    cns_flux_redistribute(bx,dsdtfab,divc_arr,optmp_arr,del_m_arr,redistwgt_arr,vfrac,flag,
+    cns_flux_redistribute(bx,dsdtfab,divc_arr,redistwgt_arr,vfrac,flag,
                           as_crse, drho_as_crse, rrflag_as_crse, as_fine, dm_as_fine, lev_mask, dt);
 
 //     if (gravity != Real(0.0))

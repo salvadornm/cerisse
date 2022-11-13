@@ -16,8 +16,8 @@ struct Parm
     // amrex::Real C_S = 1.458e-5; // constant in Sutherland's law
     // amrex::Real T_S = 110.4;    // Sutherland temperature
 
-    amrex::Real smallr = 1.e-19;
-    amrex::Real smallp = 1.e-10;
+    amrex::Real smallr = 1.e-19; // small rho
+    amrex::Real smallp = 1.e-10; // small p
 
     // amrex::Real const_visc_mu = -1.0;
     // amrex::Real const_visc_ki = -1.0;

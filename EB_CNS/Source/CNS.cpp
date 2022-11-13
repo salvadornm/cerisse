@@ -1,14 +1,15 @@
-
-#include <CNS.H>
-#include <CNS_K.H>
-#include <tagging.H>
-#include <parm.H>
-#include <prob.H>
-
-#include <AMReX_EBMultiFabUtil.H>
 #include <AMReX_ParmParse.H>
-#include <AMReX_EBAmrUtil.H>
+
+#if (AMREX_SPACEDIM > 1) //1D cannot have EB
+#include <AMReX_EBMultiFabUtil.H>
 #include <AMReX_EBFArrayBox.H>
+#include <AMReX_EBAmrUtil.H>
+#endif
+
+#include "CNS.H"
+#include "CNS_K.H"
+#include "tagging.H"
+#include "prob.H"
 
 #include <climits>
 
@@ -293,7 +294,11 @@ CNS::post_timestep (int /*iteration*/)
         CNS& fine_level = getLevel(level+1);
         MultiFab& S_crse = get_new_data(State_Type);
         MultiFab& S_fine = fine_level.get_new_data(State_Type);
+#if (AMREX_SPACEDIM > 1) //1D cannot have EB
         fine_level.flux_reg.Reflux(S_crse, *volfrac, S_fine, *fine_level.volfrac);
+#else
+        fine_level.flux_reg.Reflux(S_crse);
+#endif
 
         if ((verbose != 0) && amrex::ParallelDescriptor::IOProcessor()) {
             amrex::Print() << "Reflux() at level " << level
@@ -334,7 +339,9 @@ CNS::printTotal () const
     std::array<Real,6> tot;
     for (int comp = 0; comp < 6; ++comp) {
         MultiFab::Copy(mf, S_new, comp, 0, 1, 0);
+#if (AMREX_SPACEDIM > 1) //1D cannot have EB
         MultiFab::Multiply(mf, *volfrac, 0, 0, 1, 0);
+#endif
         tot[comp] = mf.sum(0,true) * geom.ProbSize();
     }
 #ifdef BL_LAZY
@@ -461,10 +468,12 @@ CNS::errorEst (TagBoxArray& tags, int /*clearval*/, int /*tagval*/,
 {
     BL_PROFILE("CNS::errorEst()");
 
+#if (AMREX_SPACEDIM > 1) //1D cannot have EB (and hence cut-cells)
     if (refine_cutcells) {
         const MultiFab& S_new = get_new_data(State_Type);
         TagCutCells(tags, S_new);
     }
+#endif
 
     if (!refine_boxes.empty())
     {
@@ -595,6 +604,7 @@ CNS::read_params ()
     //   1 -- use_total_energy_as_eb_weights-
     //   2 -- use_mass_as_eb_weights
     //   3 -- use_volfrac_as_eb_weights
+#if (AMREX_SPACEDIM > 1) //1D cannot have EB
     pp.query("eb_weights_type", eb_weights_type);
     if (eb_weights_type < 0 || eb_weights_type > 3) {
         amrex::Abort("CNS: eb_weights_type must be 0, 1, 2 or 3");
@@ -604,7 +614,7 @@ CNS::read_params ()
     if (do_reredistribution != 0 && do_reredistribution != 1) {
         amrex::Abort("CNS: do_reredistibution must be 0 or 1");
     }
-
+#endif
     amrex::Gpu::streamSynchronize();
 }
 
@@ -622,16 +632,27 @@ CNS::avgDown ()
     MultiFab volume(S_fine.boxArray(), S_fine.DistributionMap(), 1, 0);
     geom.GetVolume(volume);
 
+#if (AMREX_SPACEDIM > 1) //1D cannot have EB
     amrex::EB_average_down(S_fine, S_crse, volume, fine_lev.volFrac(),
                            0, S_fine.nComp(), fine_ratio);
-    const int nghost = 0;
-    computeTemp(S_crse, nghost);
+#else
+    const amrex::Geometry& fgeom = getLevel(level + 1).geom;
+    const amrex::Geometry& cgeom = geom;
+    amrex::average_down(S_fine, S_crse, fgeom, cgeom, 
+                        0, S_fine.nComp(), fine_ratio);
+#endif
+    computeTemp(S_crse, 0);
 
     if (do_react) {
               MultiFab& R_crse =          get_new_data(Reactions_Type);
         const MultiFab& R_fine = fine_lev.get_new_data(Reactions_Type);
+#if (AMREX_SPACEDIM > 1) //1D cannot have EB
         amrex::EB_average_down(R_fine, R_crse, volume, fine_lev.volFrac(),
-                               0, S_fine.nComp(), fine_ratio);
+                               0, R_fine.nComp(), fine_ratio);
+#else
+        amrex::average_down(R_fine, R_crse, fgeom, cgeom, 
+                            0, R_fine.nComp(), fine_ratio);
+#endif
     }
 }
 
@@ -650,12 +671,13 @@ CNS::buildMetrics ()
 //         amrex::Abort("CNS: must have dx == dy == dz\n");
 // #endif
 
+#if (AMREX_SPACEDIM > 1) //1D cannot have EB
     const auto& ebfactory = dynamic_cast<EBFArrayBoxFactory const&>(Factory());
-
     volfrac = &(ebfactory.getVolFrac());
     bndrycent = &(ebfactory.getBndryCent());
     areafrac = ebfactory.getAreaFrac();
     facecent = ebfactory.getFaceCent();
+#endif
 
     Parm const* l_parm = d_parm;
 
@@ -677,8 +699,10 @@ CNS::estTimeStep ()
     const MultiFab& S = get_new_data(State_Type);
     Parm const* lparm = d_parm;
 
+#if (AMREX_SPACEDIM > 1) //1D cannot have EB
     auto const& fact = dynamic_cast<EBFArrayBoxFactory const&>(S.Factory());
     auto const& flags = fact.getMultiEBCellFlagFab();
+#endif
 
     Real estdt = std::numeric_limits<Real>::max();
 
@@ -693,9 +717,11 @@ CNS::estTimeStep ()
     for (MFIter mfi(S,false); mfi.isValid(); ++mfi)
     {
         const Box& bx = mfi.tilebox();
-        const auto& flag = flags[mfi];
         auto const& s_arr = S.array(mfi);
+#if (AMREX_SPACEDIM > 1) //1D cannot have EB
+        const auto& flag = flags[mfi];
         if (flag.getType(bx) != FabType::covered)
+#endif
         {
           reduce_op.eval(bx, reduce_data, [=]
             AMREX_GPU_DEVICE (int i, int j, int k) -> ReduceTuple
@@ -724,34 +750,25 @@ CNS::computeTemp (MultiFab& State, int ng)
 {
     BL_PROFILE("CNS::computeTemp()");
 
+    // This will reset Eint and compute Temperature
+
+#if (AMREX_SPACEDIM > 1) //1D cannot have EB
     auto const& fact = dynamic_cast<EBFArrayBoxFactory const&>(State.Factory());
     auto const& flags = fact.getMultiEBCellFlagFab();
+    auto const& flagarrs = flags.const_arrays();
+#endif
 
-    // This will reset Eint and compute Temperature
 #ifdef AMREX_USE_OMP
 #pragma omp parallel if (Gpu::notInLaunchRegion())
 #endif
-    for (MFIter mfi(State, TilingIfNotGPU()); mfi.isValid(); ++mfi)
-    {
-        const Box& bx = mfi.growntilebox(ng);
-
-        auto s_arr = State.array(mfi);
-
-        if (flags[mfi].getType(bx) != FabType::covered) {
-            amrex::ParallelFor(bx,
-            [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept {
-                cns_compute_temperature(i, j, k, s_arr);
-            });
-        }
-    }
-    // auto const& sarrs = State.arrays();
-    // auto const& flagarrs = flags.const_arrays();
-    // const amrex::IntVect ngs(ng);
-    // amrex::ParallelFor(
-    //     State, ngs, [=] AMREX_GPU_DEVICE(int nbx, int i, int j, int k) noexcept {
-    //         if (!flagarrs[nbx](i, j, k).isCovered()) {
-    //             cns_compute_temperature(i, j, k, sarrs[nbx]);
-    //         }
-    //     });
+    auto const& sarrs = State.arrays();    
+    const amrex::IntVect ngs(ng);
+    amrex::ParallelFor(
+        State, ngs, [=] AMREX_GPU_DEVICE(int nbx, int i, int j, int k) noexcept {
+#if (AMREX_SPACEDIM > 1) //1D cannot have EB
+            if (!flagarrs[nbx](i, j, k).isCovered()) 
+#endif
+                cns_compute_temperature(i, j, k, sarrs[nbx]);            
+        });
     amrex::Gpu::synchronize();
 }
