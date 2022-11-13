@@ -1,5 +1,5 @@
-AMREX_HOME = ../../../../PeleC/Submodules/AMReX
-PELE_PHYSICS_HOME = ../../../../PeleC/Submodules/PelePhysics
+AMREX_HOME = ../../Submodules/amrex
+PELE_PHYSICS_HOME = ../../Submodules/PelePhysics
 TOP =  ../..
 
 EBASE = Cerisse
