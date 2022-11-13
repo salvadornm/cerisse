@@ -1,3 +1,5 @@
+#include <AMReX_Derive.H>
+
 #include "CNS.H"
 #include "derive.H"
 #include "prob.H"
