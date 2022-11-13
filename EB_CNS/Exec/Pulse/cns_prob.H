@@ -8,7 +8,7 @@
 #include "cns_prob_parm.H"
 
 AMREX_GPU_DEVICE
-inline
+AMREX_FORCE_INLINE
 void
 cns_initdata (int i, int j, int k, amrex::Array4<amrex::Real> const& state,
               amrex::GeometryData const& geomdata, Parm const& parm, ProbParm const& prob_parm)
@@ -31,16 +31,14 @@ cns_initdata (int i, int j, int k, amrex::Array4<amrex::Real> const& state,
     Real r = std::sqrt(x*x + y*y + z*z);
 
     if (r > prob_parm.rpulse) {
-        state(i,j,k,URHO ) = prob_parm.rho0;
+        state(i,j,k,URHO) = prob_parm.rho0;
     } else {
-        state(i,j,k,URHO ) = prob_parm.rho0 + prob_parm.drho0 * exp(-16.*r*r) * std::pow(std::cos(pi*r),6.0);
+        state(i,j,k,URHO) = prob_parm.rho0 + prob_parm.drho0 * exp(-16.*r*r) * std::pow(std::cos(pi*r),6.0);
     }
 
-    state(i,j,k,UMX  ) = Real(0.0);
-    state(i,j,k,UMY  ) = Real(0.0);
-#if (AMREX_SPACEDIM == 3)
-    state(i,j,k,UMZ  ) = Real(0.0);
-#endif
+    state(i,j,k,UMX) = Real(0.0);
+    state(i,j,k,UMY) = Real(0.0);
+    state(i,j,k,UMZ) = Real(0.0);
 
     Real Pt = prob_parm.p0 * std::pow( (state(i,j,k,URHO) / prob_parm.rho0), parm.eos_gamma );
 
