@@ -30,47 +30,71 @@ struct CnsFillExtDir
             prob_lo[1] + static_cast<amrex::Real>(iv[1] + 0.5) * dx[1],
             prob_lo[2] + static_cast<amrex::Real>(iv[2] + 0.5) * dx[2])};
 
-        amrex::Real s_int[NUM_STATE] = {0.0};
-        amrex::Real s_ext[NUM_STATE] = {0.0};
+        amrex::Real s_int[LEN_STATE] = {0.0};
+        amrex::Real s_ext[LEN_STATE] = {0.0};
 
-        // Fill internal state data        
+        // Fill internal state data then run bcnormal to fill external state data
         if // x-lo
         ((bc.lo(0) == BCType::ext_dir) && (iv[0] < domlo[0])) {
+            const int idir = 0;
             const amrex::IntVect loc(AMREX_D_DECL(domlo[0], iv[1], iv[2]));
             const int sgn = +1;
+
+            for (int nc = 0; nc < numcomp; ++nc) s_int[dcomp + nc] = dest(loc, dcomp + nc);// Fill internal state data 
+            bcnormal(x, s_int, s_ext, idir, sgn, time, geom, *lprobparm);                  // Call bcnormal from prob.H
+            for (int nc = 0; nc < numcomp; ++nc) dest(iv, dcomp + nc) = s_ext[dcomp + nc]; // Only take the wanted components
         } else if // x-hi
         ((bc.hi(0) == BCType::ext_dir) && (iv[0] > domhi[0])) {
+            const int idir = 0;
             const amrex::IntVect loc(AMREX_D_DECL(domhi[0], iv[1], iv[2]));
             const int sgn = -1;
+            
+            for (int nc = 0; nc < numcomp; ++nc) s_int[dcomp + nc] = dest(loc, dcomp + nc);
+            bcnormal(x, s_int, s_ext, idir, sgn, time, geom, *lprobparm);
+            for (int nc = 0; nc < numcomp; ++nc) dest(iv, dcomp + nc) = s_ext[dcomp + nc]; 
         }
-#if AMREX_SPACEDIM > 1        
+#if AMREX_SPACEDIM >= 2        
         else if // y-lo
         ((bc.lo(1) == BCType::ext_dir) && (iv[1] < domlo[1])) {
+            const int idir = 1;
             const amrex::IntVect loc(AMREX_D_DECL(iv[0], domlo[1], iv[2]));
             const int sgn = +1;
+
+            for (int nc = 0; nc < numcomp; ++nc) s_int[dcomp + nc] = dest(loc, dcomp + nc);
+            bcnormal(x, s_int, s_ext, idir, sgn, time, geom, *lprobparm);
+            for (int nc = 0; nc < numcomp; ++nc) dest(iv, dcomp + nc) = s_ext[dcomp + nc]; 
         } else if // y-hi
         ((bc.hi(1) == BCType::ext_dir) && (iv[1] > domhi[1])) {
+            const int idir = 1;
             const amrex::IntVect loc(AMREX_D_DECL(iv[0], domhi[1], iv[2]));
             const int sgn = -1;
+
+            for (int nc = 0; nc < numcomp; ++nc) s_int[dcomp + nc] = dest(loc, dcomp + nc);
+            bcnormal(x, s_int, s_ext, idir, sgn, time, geom, *lprobparm);
+            for (int nc = 0; nc < numcomp; ++nc) dest(iv, dcomp + nc) = s_ext[dcomp + nc]; 
         }
 #endif
 #if AMREX_SPACEDIM == 3
         else if // z-lo
         ((bc.lo(2) == BCType::ext_dir) && (iv[2] < domlo[2])) {
+            const int idir = 2;
             const amrex::IntVect loc(AMREX_D_DECL(iv[0], iv[1], domlo[2]));
             const int sgn = +1;
+
+            for (int nc = 0; nc < numcomp; ++nc) s_int[dcomp + nc] = dest(loc, dcomp + nc);
+            bcnormal(x, s_int, s_ext, idir, sgn, time, geom, *lprobparm);
+            for (int nc = 0; nc < numcomp; ++nc) dest(iv, dcomp + nc) = s_ext[dcomp + nc]; 
         } else if // z-hi
         ((bc.hi(2) == BCType::ext_dir) && (iv[2] > domhi[2])) {
+            const int idir = 2;
             const amrex::IntVect loc(AMREX_D_DECL(iv[0], iv[1], domhi[2]));
             const int sgn = -1;
+
+            for (int nc = 0; nc < numcomp; ++nc) s_int[dcomp + nc] = dest(loc, dcomp + nc);
+            bcnormal(x, s_int, s_ext, idir, sgn, time, geom, *lprobparm);
+            for (int nc = 0; nc < numcomp; ++nc) dest(iv, dcomp + nc) = s_ext[dcomp + nc]; 
         }
 #endif
-        for (int nc = 0; nc < numcomp; ++n) s_int[dcomp + nc] = dest(loc, dcomp + nc);
-
-        // Run bcnormal to fill external state data        
-        bcnormal(x, s_int, s_ext, idir, sgn, time, geom, *lprobparm);
-        // Only take the wanted components
-        for (int nc = 0; nc < numcomp; ++n) dest(iv, dcomp + nc) = s_ext[dcomp + nc];
     }
 };
 
