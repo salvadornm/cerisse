@@ -107,7 +107,7 @@ CNS::variableSetUp ()
     read_params();
 
 #if (AMREX_SPACEDIM > 1) //1D cannot have EB
-    Interpolater* interp = &eb_mf_cell_cons_interp;
+    EBMFCellConsLinInterp* interp = &eb_mf_cell_cons_interp;
 #else
     Interpolater* interp = &cell_cons_interp; //or pc_interp, lincc_interp
 #endif
