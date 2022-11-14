@@ -14,5 +14,5 @@ EB_CNS_hybF90/Exec/*/*.visit
 EB_CNS_hybF90/Exec/*/Backtrace*
 EB_CNS_hybF90/Exec/*/tmp_build_dir
 
-#vscode data
+# vscode data
 .vscode/*
