@@ -2,18 +2,17 @@
 EB_CNS/Exec/*/*.ex*
 EB_CNS/Exec/*/plt*
 EB_CNS/Exec/*/chk*
+EB_CNS/Exec/*/*.visit
 EB_CNS/Exec/*/Backtrace*
 EB_CNS/Exec/*/tmp_build_dir
 
-# data in Exec of CNS hybrid
-EB_CNS/Exec/*/*.EX*
-EB_CNS/Exec/*/plt*
-EB_CNS/Exec/*/chk*
-EB_CNS/Exec/*/Backtrace*
-EB_CNS/Exec/*/tmp_build_dir
+# data in Exec of hybrid CNS
+EB_CNS_hybF90/Exec/*/*.ex*
+EB_CNS_hybF90/Exec/*/plt*
+EB_CNS_hybF90/Exec/*/chk*
+EB_CNS_hybF90/Exec/*/*.visit
+EB_CNS_hybF90/Exec/*/Backtrace*
+EB_CNS_hybF90/Exec/*/tmp_build_dir
 
 #vscode data
-.vscode/configurationCache.log
-.vscode/dryrun.log
-.vscode/settings.json
-.vscode/targets.log
+.vscode/*
