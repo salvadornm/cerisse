@@ -28,9 +28,8 @@ cns_estdt (int i, int j, int k, amrex::Array4<Real const> const& state,
         massfrac[n] = state(i, j, k, UFS + n) * rhoinv;
     }
 
-    amrex::Real p, cs;
+    amrex::Real cs;
     auto eos = pele::physics::PhysicsType::eos();
-    eos.RTY2P(rho, T, massfrac, p);
     eos.RTY2Cs(rho, T, massfrac, cs);
 
     AMREX_D_TERM(
