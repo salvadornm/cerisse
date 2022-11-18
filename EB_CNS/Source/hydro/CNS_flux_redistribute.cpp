@@ -16,7 +16,7 @@
 using namespace amrex;
 
 void
-CNS::cns_flux_redistribute (const Box& bx,
+CNS::cns_flux_redistribute (const Box&                      bx,
                             Array4<Real            > const& dqdt,
                             Array4<Real            > const& divc,
                             // Array4<Real            > const& optmp,
@@ -37,8 +37,8 @@ CNS::cns_flux_redistribute (const Box& bx,
 
     FArrayBox optmp_fab(bxg2, NVAR);
     FArrayBox delta_m_fab(bxg1, NVAR);
-    optmp_fab.setVal(0);
-    delta_m_fab.setVal(0);
+    optmp_fab.setVal(0.0);
+    delta_m_fab.setVal(0.0);
     auto const& optmp = optmp_fab.array();
     auto const& delm = delta_m_fab.array();
 

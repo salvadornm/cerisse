@@ -130,6 +130,7 @@ void eb_compute_div(int i, int j, int k, int n, IntVect const& blo, IntVect cons
 
 // #else // 3-d starts here
 
+// for (int n = 0; n < UEINT; ++n) {
     if (flag(i,j,k).isCovered())
     {
         divu(i,j,k,n) = 0.0;
@@ -289,20 +290,23 @@ void eb_compute_div(int i, int j, int k, int n, IntVect const& blo, IntVect cons
 #endif
 
         divu(i,j,k,n) = (1.0/vfrc(i,j,k)) *
-            ( AMREX_D_TERM(dxinv[0] * (apx(i+1,j,k)*fxp-apx(i,j,k)*fxm) ,
-                         + dxinv[1] * (apy(i,j+1,k)*fyp-apy(i,j,k)*fym) ,
-                         + dxinv[2] * (apz(i,j,k+1)*fzp-apz(i,j,k)*fzm)) );
-
+            ( AMREX_D_TERM(dxinv[0] * (apx(i+1,j,k)*fxp - apx(i,j,k)*fxm) ,
+                         + dxinv[1] * (apy(i,j+1,k)*fyp - apy(i,j,k)*fym) ,
+                         + dxinv[2] * (apz(i,j,k+1)*fzp - apz(i,j,k)*fzm)) );
+// }
         GpuArray<Real,NVAR> flux_hyp_wall;
         compute_hyp_wallflux(q(i,j,k,QRHO),AMREX_D_DECL(q(i,j,k,QU),q(i,j,k,QV),q(i,j,k,QW)),
-                             q(i,j,k,QPRES),q(i,j,k,QG),apx(i,j,k),apx(i+1,j,k),apy(i,j,k),apy(i,j+1,k),
+                             q(i,j,k,QPRES),&q(i,j,k,UFS),apx(i,j,k),apx(i+1,j,k),apy(i,j,k),apy(i,j+1,k),
 #if (AMREX_SPACEDIM == 3)
                              apz(i,j,k),apz(i,j,k+1),
 #endif
                              flux_hyp_wall,parm);
 
-        // Here we assume dx == dy == dz
-        divu(i,j,k,n) +=  flux_hyp_wall[n]*dxinv[0]/vfrc(i,j,k);
+        // // Here we assume dx == dy == dz
+        divu(i,j,k,n) += flux_hyp_wall[n]*dxinv[0]/vfrc(i,j,k);
+        // divu(i,j,k,UMX) += flux_hyp_wall[UMX] * a_cut;
+        // divu(i,j,k,UMY) += flux_hyp_wall[UMY] * a_cut;
+        // divu(i,j,k,UMZ) += flux_hyp_wall[UMZ] * a_cut;
 
         if (do_visc)
         {
@@ -313,7 +317,7 @@ void eb_compute_div(int i, int j, int k, int n, IntVect const& blo, IntVect cons
                                   apz(i,j,k),apz(i,j,k+1),
 #endif
                                   flux_diff_wall);
-            divu(i,j,k,n) +=  flux_diff_wall[n]*dxinv[1]/vfrc(i,j,k);
+            divu(i,j,k,n) += flux_diff_wall[n]*dxinv[1]/vfrc(i,j,k);
             // divu(i,j,k,n) +=  flux_diff_wall[n]*(dxinv[0]*dxinv[0])/vfrc(i,j,k); //why??
         }
     }
@@ -326,7 +330,7 @@ void eb_compute_div(int i, int j, int k, int n, IntVect const& blo, IntVect cons
     if (eb_weights_type == 0) { 
         redistwgt(i,j,k) = 1.0; 
     } else if (eb_weights_type == 1) { 
-        redistwgt(i,j,k) = q(i,j,k,QRHO)*( q(i,j,k,QEINT) 
+        redistwgt(i,j,k) = q(i,j,k,QRHO)*( q(i,j,k,QEINT)  
                          + 0.5*(AMREX_D_TERM(q(i,j,k,QU)*q(i,j,k,QU), 
                                            + q(i,j,k,QV)*q(i,j,k,QV), 
                                            + q(i,j,k,QW)*q(i,j,k,QW))) );

@@ -15,7 +15,7 @@
 using namespace amrex;
 
 void
-CNS::compute_dSdt_box_eb (const Box& bx,
+CNS::compute_dSdt_box_eb (const Box&                      bx,
                           Array4<Real const> const&       sfab,
                           Array4<Real      > const&       dsdtfab,
                           AMREX_D_DECL(
@@ -76,7 +76,7 @@ CNS::compute_dSdt_box_eb (const Box& bx,
 
     // Slopes
     FArrayBox slopetmp;
-    slopetmp.resize(bxg4, NVAR);
+    slopetmp.resize(bxg4, 5+NUM_SPECIES);
     auto const& slope = slopetmp.array();
 
     auto l_plm_iorder = plm_iorder;
@@ -142,7 +142,7 @@ CNS::compute_dSdt_box_eb (const Box& bx,
     amrex::ParallelFor(xflxbx,
     [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept {
         cns_riemann_x(i, j, k, fxfab, slope, q, *lparm);
-        for (int n = UEINT; n < NVAR; ++n) fxfab(i,j,k,n) = Real(0.0);
+        for (int n = UFA; n < NUM_AUX; ++n) fxfab(i,j,k,n) = Real(0.0);
     });
 
     if (do_visc == 1) {
@@ -166,7 +166,7 @@ CNS::compute_dSdt_box_eb (const Box& bx,
     amrex::ParallelFor(yflxbx,
     [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept {
         cns_riemann_y(i, j, k, fyfab, slope, q, *lparm);
-        for (int n = UEINT; n < NVAR; ++n) fyfab(i,j,k,n) = Real(0.0);
+        for (int n = UFA; n < NUM_AUX; ++n) fyfab(i,j,k,n) = Real(0.0);
     });
 
     if(do_visc == 1) {
@@ -191,7 +191,7 @@ CNS::compute_dSdt_box_eb (const Box& bx,
     amrex::ParallelFor(zflxbx,
     [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept {
         cns_riemann_z(i, j, k, fzfab, slope, q, *lparm);
-        for (int n = UEINT; n < NVAR; ++n) fzfab(i,j,k,n) = Real(0.0);
+        for (int n = UFA; n < NUM_AUX; ++n) fzfab(i,j,k,n) = Real(0.0);
     });
 
     if(do_visc == 1) {
@@ -227,7 +227,7 @@ CNS::compute_dSdt_box_eb (const Box& bx,
     auto const& coefs = diff_coeff.array();
     auto const& redistwgt_arr = redistwgt.array();
 
-    amrex::ParallelFor(bxg2, UEINT,
+    amrex::ParallelFor(bxg2, NVAR,
     [=] AMREX_GPU_DEVICE (int i, int j, int k, int n) noexcept
     {
        // This does the divergence but not the redistribution -- we will do that later
@@ -244,7 +244,7 @@ CNS::compute_dSdt_box_eb (const Box& bx,
     // auto const& del_m_arr = delta_m.array();
 
     // Now do redistribution
-    cns_flux_redistribute(bx,dsdtfab,divc_arr,redistwgt_arr,vfrac,flag,
+    cns_flux_redistribute(bx, dsdtfab, divc_arr, redistwgt_arr, vfrac, flag,
                           as_crse, drho_as_crse, rrflag_as_crse, as_fine, dm_as_fine, lev_mask, dt);
 
 //     if (gravity != Real(0.0))

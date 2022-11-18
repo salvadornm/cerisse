@@ -10,12 +10,12 @@
 #include <AMReX_YAFluxRegister.H>
 #endif
 
+#include "PelePhysics.H"
+#include "ReactorBase.H"
+
 #include "index_macros.H"
 #include "parm.H"
 #include "prob_parm.H"
-
-#include "PelePhysics.H"
-#include "ReactorBase.H"
 
 using namespace amrex;
 

@@ -267,7 +267,7 @@ CNS::compute_dSdt (const MultiFab& S, MultiFab& dSdt, Real dt,
             }
 #endif
         }
-
+        
         Gpu::streamSynchronize();
 
         wt = (amrex::second() - wt) / bx.d_numPts();

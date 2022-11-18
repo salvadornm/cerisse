@@ -24,6 +24,280 @@
 
 // }
 
+// AMREX_GPU_DEVICE AMREX_FORCE_INLINE
+// void
+// cns_slope_eb_x (int i, int j, int k,
+//                 amrex::Array4<amrex::Real> const& dq,
+//                 amrex::Array4<amrex::Real const> const& q,
+//                 amrex::Array4<amrex::EBCellFlag const> const& flag,
+//                 int plm_iorder, amrex::Real plm_theta) noexcept
+// {
+//     using amrex::Real;
+
+//     Real dlft0 = Real(0.0); // rho
+//     Real dlft1 = Real(0.0); // normal u
+//     Real dlft2 = Real(0.0); // p
+//     Real dlft3 = Real(0.0); // transverse u
+//     Real dlft4 = Real(0.0); // transverse u
+//     Real dlft5[NUM_SPECIES] = {Real(0.)}; // y
+
+//     Real drgt0 = Real(0.0);
+//     Real drgt1 = Real(0.0);
+//     Real drgt2 = Real(0.0);
+//     Real drgt3 = Real(0.0);
+//     Real drgt4 = Real(0.0);
+//     Real drgt5[NUM_SPECIES] = {Real(0.)}; // y
+
+//     if (plm_iorder == 1) {
+//         dq(i,j,k,0) = Real(0.);
+//         dq(i,j,k,1) = Real(0.);
+//         dq(i,j,k,2) = Real(0.);
+//         dq(i,j,k,3) = Real(0.);
+//         dq(i,j,k,4) = Real(0.);
+//         for (int n = 0; n < NUM_SPECIES; ++n) {
+//             dq(i,j,k,5+n) = Real(0.);
+//         }
+//     } else if (plm_iorder == 2) {
+//         if (flag(i,j,k).isConnected(-1,0,0))
+//         {
+//             dlft0 = Real(0.5)*(q(i,j,k,QPRES)-q(i-1,j,k,QPRES))/q(i,j,k,QCS) - Real(0.5)*q(i,j,k,QRHO)*(q(i,j,k,QU) - q(i-1,j,k,QU));
+//             dlft1 = (q(i,j,k,QRHO)-q(i-1,j,k,QRHO)) - (q(i,j,k,QPRES) - q(i-1,j,k,QPRES))/(q(i,j,k,QCS)*q(i,j,k,QCS));
+//             dlft2 = Real(0.5)*(q(i,j,k,QPRES)-q(i-1,j,k,QPRES))/q(i,j,k,QCS) + Real(0.5)*q(i,j,k,QRHO)*(q(i,j,k,QU) - q(i-1,j,k,QU));
+//             dlft3 = q(i,j,k,QV) - q(i-1,j,k,QV);
+//             dlft4 = q(i,j,k,QW) - q(i-1,j,k,QW);
+//             for (int n = 0; n < NUM_SPECIES; ++n)
+//                 dlft5[n] = q(i,j,k,QFS+n) - q(i-1,j,k,QFS+n);
+//         }        
+
+//         if (flag(i,j,k).isConnected(1,0,0))
+//         {
+//             drgt0 = Real(0.5)*(q(i+1,j,k,QPRES)-q(i,j,k,QPRES))/q(i,j,k,QCS) - Real(0.5)*q(i,j,k,QRHO)*(q(i+1,j,k,QU) - q(i,j,k,QU));
+//             drgt1 = (q(i+1,j,k,QRHO)-q(i,j,k,QRHO)) - (q(i+1,j,k,QPRES) - q(i,j,k,QPRES))/(q(i,j,k,QCS)*q(i,j,k,QCS));
+//             drgt2 = Real(0.5)*(q(i+1,j,k,QPRES)-q(i,j,k,QPRES))/q(i,j,k,QCS) + Real(0.5)*q(i,j,k,QRHO)*(q(i+1,j,k,QU) - q(i,j,k,QU));
+//             drgt3 = q(i+1,j,k,QV) - q(i,j,k,QV);
+//             drgt4 = q(i+1,j,k,QW) - q(i,j,k,QW);
+//             for (int n = 0; n < NUM_SPECIES; ++n)
+//                 drgt5[n] = q(i+1,j,k,QFS+n) - q(i,j,k,QFS+n);
+//         }
+
+//         dq(i,j,k,0) = limiter(dlft0, drgt0, plm_theta);
+//         dq(i,j,k,1) = limiter(dlft1, drgt1, plm_theta);
+//         dq(i,j,k,2) = limiter(dlft2, drgt2, plm_theta);
+//         dq(i,j,k,3) = limiter(dlft3, drgt3, plm_theta);
+//         dq(i,j,k,4) = limiter(dlft4, drgt4, plm_theta);
+//         for (int n = 0; n < NUM_SPECIES; ++n)
+//             dq(i,j,k,5+n) = limiter(dlft5[n], drgt5[n], plm_theta);
+//     }
+// }
+
+// AMREX_GPU_DEVICE AMREX_FORCE_INLINE
+// void
+// cns_slope_eb_y (int i, int j, int k,
+//                 amrex::Array4<amrex::Real> const& dq,
+//                 amrex::Array4<amrex::Real const> const& q,
+//                 amrex::Array4<amrex::EBCellFlag const> const& flag,
+//                 int plm_iorder, amrex::Real plm_theta) noexcept
+// {
+//     using amrex::Real;
+
+//     Real dlft0 = Real(0.0);
+//     Real dlft1 = Real(0.0);
+//     Real dlft2 = Real(0.0);
+//     Real dlft3 = Real(0.0);
+//     Real dlft4 = Real(0.0);
+//     Real dlft5[NUM_SPECIES] = {Real(0.)};
+
+//     Real drgt0 = Real(0.0);
+//     Real drgt1 = Real(0.0);
+//     Real drgt2 = Real(0.0);
+//     Real drgt3 = Real(0.0);
+//     Real drgt4 = Real(0.0);
+//     Real drgt5[NUM_SPECIES] = {Real(0.)};
+
+//     if (plm_iorder == 1) {
+//         dq(i,j,k,0) = Real(0.);
+//         dq(i,j,k,1) = Real(0.);
+//         dq(i,j,k,2) = Real(0.);
+//         dq(i,j,k,3) = Real(0.);
+//         dq(i,j,k,4) = Real(0.);
+//         for (int n = 0; n < NUM_SPECIES; ++n) {
+//             dq(i,j,k,5+n) = Real(0.);
+//         }
+//     } else if (plm_iorder == 2) {
+//         if (flag(i,j,k).isConnected(0,-1,0))
+//         {
+//             dlft0 = Real(0.5)*(q(i,j,k,QPRES)-q(i,j-1,k,QPRES))/q(i,j,k,QCS) - Real(0.5)*q(i,j,k,QRHO)*(q(i,j,k,QV) - q(i,j-1,k,QV));
+//             dlft1 = (q(i,j,k,QRHO)-q(i,j-1,k,QRHO)) - (q(i,j,k,QPRES) - q(i,j-1,k,QPRES))/(q(i,j,k,QCS)*q(i,j,k,QCS));
+//             dlft2 = Real(0.5)*(q(i,j,k,QPRES)-q(i,j-1,k,QPRES))/q(i,j,k,QCS) + Real(0.5)*q(i,j,k,QRHO)*(q(i,j,k,QV) - q(i,j-1,k,QV));
+//             dlft3 =q(i,j,k,QU) - q(i,j-1,k,QU);
+//             dlft4 = q(i,j,k,QW) - q(i,j-1,k,QW);
+//             for (int n = 0; n < NUM_SPECIES; ++n)
+//                 dlft5[n] = q(i,j,k,QFS+n) - q(i,j-1,k,QFS+n);
+//         }
+
+//         if (flag(i,j,k).isConnected(0,1,0))
+//         {
+//             drgt0 = Real(0.5)*(q(i,j+1,k,QPRES)-q(i,j,k,QPRES))/q(i,j,k,QCS) - Real(0.5)*q(i,j,k,QRHO)*(q(i,j+1,k,QV) - q(i,j,k,QV));
+//             drgt1 = (q(i,j+1,k,QRHO)-q(i,j,k,QRHO)) - (q(i,j+1,k,QPRES) - q(i,j,k,QPRES))/(q(i,j,k,QCS)*q(i,j,k,QCS));
+//             drgt2 = Real(0.5)*(q(i,j+1,k,QPRES)-q(i,j,k,QPRES))/q(i,j,k,QCS) + Real(0.5)*q(i,j,k,QRHO)*(q(i,j+1,k,QV) - q(i,j,k,QV));
+//             drgt3 = q(i,j+1,k,QU) - q(i,j,k,QU);
+//             drgt4 = q(i,j+1,k,QW) - q(i,j,k,QW);
+//             for (int n = 0; n < NUM_SPECIES; ++n)
+//                 drgt5[n] = q(i,j+1,k,QFS+n) - q(i,j,k,QFS+n);
+//         }
+
+//         dq(i,j,k,0) = limiter(dlft0, drgt0, plm_theta);
+//         dq(i,j,k,1) = limiter(dlft1, drgt1, plm_theta);
+//         dq(i,j,k,2) = limiter(dlft2, drgt2, plm_theta);
+//         dq(i,j,k,3) = limiter(dlft3, drgt3, plm_theta);
+//         dq(i,j,k,4) = limiter(dlft4, drgt4, plm_theta);
+//         for (int n = 0; n < NUM_SPECIES; ++n)
+//             dq(i,j,k,5+n) = limiter(dlft5[n], drgt5[n], plm_theta);
+//    }
+// }
+
+// #if (AMREX_SPACEDIM == 3)
+// AMREX_GPU_DEVICE AMREX_FORCE_INLINE
+// void
+// cns_slope_eb_z (int i, int j, int k,
+//                 amrex::Array4<amrex::Real> const& dq,
+//                 amrex::Array4<amrex::Real const> const& q,
+//                 amrex::Array4<amrex::EBCellFlag const> const& flag,
+//                 int plm_iorder, amrex::Real plm_theta) noexcept
+// {
+//     using amrex::Real;
+
+//     Real dlft0 = Real(0.0);
+//     Real dlft1 = Real(0.0);
+//     Real dlft2 = Real(0.0);
+//     Real dlft3 = Real(0.0);
+//     Real dlft4 = Real(0.0);
+//     Real dlft5[NUM_SPECIES] = {Real(0.)};
+
+//     Real drgt0 = Real(0.0);
+//     Real drgt1 = Real(0.0);
+//     Real drgt2 = Real(0.0);
+//     Real drgt3 = Real(0.0);
+//     Real drgt4 = Real(0.0);
+//     Real drgt5[NUM_SPECIES] = {Real(0.)};
+
+//     if (plm_iorder == 1) {
+//         dq(i,j,k,0) = Real(0.);
+//         dq(i,j,k,1) = Real(0.);
+//         dq(i,j,k,2) = Real(0.);
+//         dq(i,j,k,3) = Real(0.);
+//         dq(i,j,k,4) = Real(0.);
+//         for (int n = 0; n < NUM_SPECIES; ++n) {
+//             dq(i,j,k,5+n) = Real(0.);
+//         }
+//     } else if (plm_iorder == 2) {
+//         if (flag(i,j,k).isConnected(0,0,-1))
+//         {
+//             dlft0 = Real(0.5)*(q(i,j,k,QPRES)-q(i,j,k-1,QPRES))/q(i,j,k,QCS) - Real(0.5)*q(i,j,k,QRHO)*(q(i,j,k,QW) - q(i,j,k-1,QW));
+//             dlft1 = (q(i,j,k,QRHO)-q(i,j,k-1,QRHO)) - (q(i,j,k,QPRES) - q(i,j,k-1,QPRES))/(q(i,j,k,QCS)*q(i,j,k,QCS));
+//             dlft2 = Real(0.5)*(q(i,j,k,QPRES)-q(i,j,k-1,QPRES))/q(i,j,k,QCS) + Real(0.5)*q(i,j,k,QRHO)*(q(i,j,k,QW) - q(i,j,k-1,QW));
+//             dlft3 = q(i,j,k,QU) - q(i,j,k-1,QU);
+//             dlft4 = q(i,j,k,QV) - q(i,j,k-1,QV);
+//             for (int n = 0; n < NUM_SPECIES; ++n)
+//                 dlft5[n] = q(i,j,k,QFS+n) - q(i,j,k-1,QFS+n);
+//         }
+
+//         if (flag(i,j,k).isConnected(0,0,1))
+//         {
+//             drgt0 = Real(0.5)*(q(i,j,k+1,QPRES)-q(i,j,k,QPRES))/q(i,j,k,QCS) - Real(0.5)*q(i,j,k,QRHO)*(q(i,j,k+1,QW) - q(i,j,k,QW));
+//             drgt1 = (q(i,j,k+1,QRHO)-q(i,j,k,QRHO)) - (q(i,j,k+1,QPRES) - q(i,j,k,QPRES))/(q(i,j,k,QCS)*q(i,j,k,QCS));
+//             drgt2 = Real(0.5)*(q(i,j,k+1,QPRES)-q(i,j,k,QPRES))/q(i,j,k,QCS) + Real(0.5)*q(i,j,k,QRHO)*(q(i,j,k+1,QW) - q(i,j,k,QW));
+//             drgt3 = q(i,j,k+1,QU) - q(i,j,k,QU);
+//             drgt4 = q(i,j,k+1,QV) - q(i,j,k,QV);
+//             for (int n = 0; n < NUM_SPECIES; ++n)
+//                 drgt5[n] = q(i,j,k+1,QFS+n) - q(i,j,k,QFS+n);
+//         }
+
+//         dq(i,j,k,0) = limiter(dlft0, drgt0, plm_theta);
+//         dq(i,j,k,1) = limiter(dlft1, drgt1, plm_theta);
+//         dq(i,j,k,2) = limiter(dlft2, drgt2, plm_theta);
+//         dq(i,j,k,3) = limiter(dlft3, drgt3, plm_theta);
+//         dq(i,j,k,4) = limiter(dlft4, drgt4, plm_theta);
+//         for (int n = 0; n < NUM_SPECIES; ++n)
+//             dq(i,j,k,5+n) = limiter(dlft5[n], drgt5[n], plm_theta);
+//    }
+// }
+// #endif
+
+AMREX_GPU_DEVICE
+AMREX_FORCE_INLINE
+void
+cns_slope_eb (int i, int j, int k, int dir,
+              amrex::Array4<amrex::Real> const& dq,
+              amrex::Array4<amrex::Real const> const& q,
+              amrex::Array4<amrex::EBCellFlag const> const& flag,
+              int plm_iorder, amrex::Real plm_theta) noexcept
+{
+    using amrex::Real;
+
+    amrex::IntVect iv(AMREX_D_DECL(i, j, k));
+    amrex::IntVect dir_iv = amrex::IntVect::TheDimensionVector(dir);
+
+    int QUN, QUT, QUTT;
+    if (dir == 0) {
+        QUN = QU;  QUT = QV;  QUTT = QW;
+    } else if (dir == 1) {
+        QUN = QV;  QUT = QU;  QUTT = QW;
+    } else {
+        QUN = QW;  QUT = QU;  QUTT = QV;
+    }
+
+    Real dlft0 = Real(0.0);
+    Real dlft1 = Real(0.0);
+    Real dlft2 = Real(0.0);
+    Real dlft3 = Real(0.0);
+    Real dlft4 = Real(0.0);
+    Real dlft5[NUM_SPECIES] = {Real(0.)};
+
+    Real drgt0 = Real(0.0);
+    Real drgt1 = Real(0.0);
+    Real drgt2 = Real(0.0);
+    Real drgt3 = Real(0.0);
+    Real drgt4 = Real(0.0);
+    Real drgt5[NUM_SPECIES] = {Real(0.)};
+
+    if (plm_iorder == 1) {
+        for (int n = 0; n < NVAR; ++n)
+            dq(iv,n) = Real(0.);
+        
+    } else if (plm_iorder == 2) {
+        if (flag(iv).isConnected(-dir_iv))
+        {
+            dlft0 = Real(0.5)*(q(iv,QPRES)-q(iv-dir_iv,QPRES))/q(iv,QCS) - Real(0.5)*q(iv,QRHO)*(q(iv,QUN) - q(iv-dir_iv,QUN));
+            dlft1 = (q(iv,QRHO)-q(iv-dir_iv,QRHO)) - (q(iv,QPRES) - q(iv-dir_iv,QPRES))/(q(i,j,k,QCS)*q(i,j,k,QCS));
+            dlft2 = Real(0.5)*(q(iv,QPRES)-q(iv-dir_iv,QPRES))/q(iv,QCS) + Real(0.5)*q(iv,QRHO)*(q(iv,QUN) - q(iv-dir_iv,QUN));
+            dlft3 = q(iv,QUT) - q(iv-dir_iv,QUT);
+            dlft4 = q(iv,QUTT) - q(iv-dir_iv,QUTT);
+            for (int n = 0; n < NUM_SPECIES; ++n)
+                dlft5[n] = q(iv,QFS+n) - q(iv-dir_iv,QFS+n);
+        }
+
+        if (flag(iv).isConnected(dir_iv))
+        {
+            drgt0 = Real(0.5)*(q(iv+dir_iv,QPRES)-q(iv,QPRES))/q(iv,QCS) - Real(0.5)*q(iv,QRHO)*(q(iv+dir_iv,QUN) - q(iv,QUN));
+            drgt1 = (q(iv+dir_iv,QRHO)-q(iv,QRHO)) - (q(iv+dir_iv,QPRES) - q(iv,QPRES))/(q(i,j,k,QCS)*q(i,j,k,QCS));
+            drgt2 = Real(0.5)*(q(iv+dir_iv,QPRES)-q(iv,QPRES))/q(iv,QCS) + Real(0.5)*q(iv,QRHO)*(q(iv+dir_iv,QUN) - q(iv,QUN));
+            drgt3 = q(iv+dir_iv,QUT) - q(iv,QUT);
+            drgt4 = q(iv+dir_iv,QUTT) - q(iv,QUTT);
+            for (int n = 0; n < NUM_SPECIES; ++n)
+                drgt5[n] = q(iv+dir_iv,QFS+n) - q(iv,QFS+n);
+        }
+
+        dq(iv,0) = limiter(dlft0, drgt0, plm_theta);
+        dq(iv,1) = limiter(dlft1, drgt1, plm_theta);
+        dq(iv,2) = limiter(dlft2, drgt2, plm_theta);
+        dq(iv,3) = limiter(dlft3, drgt3, plm_theta);
+        dq(iv,4) = limiter(dlft4, drgt4, plm_theta);
+        for (int n = 0; n < NUM_SPECIES; ++n)
+            dq(iv,5+n) = limiter(dlft5[n], drgt5[n], plm_theta);
+   }
+}
+
 AMREX_GPU_DEVICE AMREX_FORCE_INLINE
 void
 cns_slope_eb_x (int i, int j, int k,
@@ -32,52 +306,7 @@ cns_slope_eb_x (int i, int j, int k,
                 amrex::Array4<amrex::EBCellFlag const> const& flag,
                 int plm_iorder, amrex::Real plm_theta) noexcept
 {
-    using amrex::Real;
-
-    Real dlft0 = Real(0.0); // rho
-    Real dlft1 = Real(0.0); // normal u
-    Real dlft2 = Real(0.0); // p
-    Real dlft3 = Real(0.0); // transverse u
-    Real dlft4 = Real(0.0); // transverse u
-
-    Real drgt0 = Real(0.0);
-    Real drgt1 = Real(0.0);
-    Real drgt2 = Real(0.0);
-    Real drgt3 = Real(0.0);
-    Real drgt4 = Real(0.0);
-
-    if (plm_iorder == 1) {
-        dq(i,j,k,0) = Real(0.);
-        dq(i,j,k,1) = Real(0.);
-        dq(i,j,k,2) = Real(0.);
-        dq(i,j,k,3) = Real(0.);
-        dq(i,j,k,4) = Real(0.);
-
-    } else if (plm_iorder == 2) {
-        if (flag(i,j,k).isConnected(-1,0,0))
-        {
-            dlft0 = Real(0.5)*(q(i,j,k,QPRES)-q(i-1,j,k,QPRES))/q(i,j,k,QCS) - Real(0.5)*q(i,j,k,QRHO)*(q(i,j,k,QU) - q(i-1,j,k,QU));
-            dlft1 = (q(i,j,k,QRHO)-q(i-1,j,k,QRHO)) - (q(i,j,k,QPRES) - q(i-1,j,k,QPRES))/(q(i,j,k,QCS)*q(i,j,k,QCS));
-            dlft2 = Real(0.5)*(q(i,j,k,QPRES)-q(i-1,j,k,QPRES))/q(i,j,k,QCS) + Real(0.5)*q(i,j,k,QRHO)*(q(i,j,k,QU) - q(i-1,j,k,QU));
-            dlft3 = q(i,j,k,QV) - q(i-1,j,k,QV);
-            dlft4 = q(i,j,k,QW) - q(i-1,j,k,QW);
-        }
-
-        if (flag(i,j,k).isConnected(1,0,0))
-        {
-            drgt0 = Real(0.5)*(q(i+1,j,k,QPRES)-q(i,j,k,QPRES))/q(i,j,k,QCS) - Real(0.5)*q(i,j,k,QRHO)*(q(i+1,j,k,QU) - q(i,j,k,QU));
-            drgt1 = (q(i+1,j,k,QRHO)-q(i,j,k,QRHO)) - (q(i+1,j,k,QPRES) - q(i,j,k,QPRES))/(q(i,j,k,QCS)*q(i,j,k,QCS));
-            drgt2 = Real(0.5)*(q(i+1,j,k,QPRES)-q(i,j,k,QPRES))/q(i,j,k,QCS) + Real(0.5)*q(i,j,k,QRHO)*(q(i+1,j,k,QU) - q(i,j,k,QU));
-            drgt3 = q(i+1,j,k,QV) - q(i,j,k,QV);
-            drgt4 = q(i+1,j,k,QW) - q(i,j,k,QW);
-        }
-
-        dq(i,j,k,0) = limiter(dlft0, drgt0, plm_theta);
-        dq(i,j,k,1) = limiter(dlft1, drgt1, plm_theta);
-        dq(i,j,k,2) = limiter(dlft2, drgt2, plm_theta);
-        dq(i,j,k,3) = limiter(dlft3, drgt3, plm_theta);
-        dq(i,j,k,4) = limiter(dlft4, drgt4, plm_theta);
-    }
+    cns_slope_eb(i, j, k, 0, dq, q, flag, plm_iorder, plm_theta);
 }
 
 AMREX_GPU_DEVICE AMREX_FORCE_INLINE
@@ -88,55 +317,9 @@ cns_slope_eb_y (int i, int j, int k,
                 amrex::Array4<amrex::EBCellFlag const> const& flag,
                 int plm_iorder, amrex::Real plm_theta) noexcept
 {
-    using amrex::Real;
-
-    Real dlft0 = Real(0.0);
-    Real dlft1 = Real(0.0);
-    Real dlft2 = Real(0.0);
-    Real dlft3 = Real(0.0);
-    Real dlft4 = Real(0.0);
-
-    Real drgt0 = Real(0.0);
-    Real drgt1 = Real(0.0);
-    Real drgt2 = Real(0.0);
-    Real drgt3 = Real(0.0);
-    Real drgt4 = Real(0.0);
-
-    if (plm_iorder == 1) {
-        dq(i,j,k,0) = Real(0.);
-        dq(i,j,k,1) = Real(0.);
-        dq(i,j,k,2) = Real(0.);
-        dq(i,j,k,3) = Real(0.);
-        dq(i,j,k,4) = Real(0.);
-
-    } else if (plm_iorder == 2) {
-        if (flag(i,j,k).isConnected(0,-1,0))
-        {
-            dlft0 = Real(0.5)*(q(i,j,k,QPRES)-q(i,j-1,k,QPRES))/q(i,j,k,QCS) - Real(0.5)*q(i,j,k,QRHO)*(q(i,j,k,QV) - q(i,j-1,k,QV));
-            dlft1 = (q(i,j,k,QRHO)-q(i,j-1,k,QRHO)) - (q(i,j,k,QPRES) - q(i,j-1,k,QPRES))/(q(i,j,k,QCS)*q(i,j,k,QCS));
-            dlft2 = Real(0.5)*(q(i,j,k,QPRES)-q(i,j-1,k,QPRES))/q(i,j,k,QCS) + Real(0.5)*q(i,j,k,QRHO)*(q(i,j,k,QV) - q(i,j-1,k,QV));
-            dlft3 =q(i,j,k,QU) - q(i,j-1,k,QU);
-            dlft4 = q(i,j,k,QW) - q(i,j-1,k,QW);
-        }
-
-        if (flag(i,j,k).isConnected(0,1,0))
-        {
-            drgt0 = Real(0.5)*(q(i,j+1,k,QPRES)-q(i,j,k,QPRES))/q(i,j,k,QCS) - Real(0.5)*q(i,j,k,QRHO)*(q(i,j+1,k,QV) - q(i,j,k,QV));
-            drgt1 = (q(i,j+1,k,QRHO)-q(i,j,k,QRHO)) - (q(i,j+1,k,QPRES) - q(i,j,k,QPRES))/(q(i,j,k,QCS)*q(i,j,k,QCS));
-            drgt2 = Real(0.5)*(q(i,j+1,k,QPRES)-q(i,j,k,QPRES))/q(i,j,k,QCS) + Real(0.5)*q(i,j,k,QRHO)*(q(i,j+1,k,QV) - q(i,j,k,QV));
-            drgt3 = q(i,j+1,k,QU) - q(i,j,k,QU);
-            drgt4 = q(i,j+1,k,QW) - q(i,j,k,QW);
-        }
-
-        dq(i,j,k,0) = limiter(dlft0, drgt0, plm_theta);
-        dq(i,j,k,1) = limiter(dlft1, drgt1, plm_theta);
-        dq(i,j,k,2) = limiter(dlft2, drgt2, plm_theta);
-        dq(i,j,k,3) = limiter(dlft3, drgt3, plm_theta);
-        dq(i,j,k,4) = limiter(dlft4, drgt4, plm_theta);
-   }
+    cns_slope_eb(i, j, k, 1, dq, q, flag, plm_iorder, plm_theta);
 }
 
-#if (AMREX_SPACEDIM == 3)
 AMREX_GPU_DEVICE AMREX_FORCE_INLINE
 void
 cns_slope_eb_z (int i, int j, int k,
@@ -145,55 +328,7 @@ cns_slope_eb_z (int i, int j, int k,
                 amrex::Array4<amrex::EBCellFlag const> const& flag,
                 int plm_iorder, amrex::Real plm_theta) noexcept
 {
-    using amrex::Real;
-
-    Real dlft0, dlft1, dlft2, dlft3, dlft4;
-    Real drgt0, drgt1, drgt2, drgt3, drgt4;
-
-    if (plm_iorder == 1) {
-        dq(i,j,k,0) = Real(0.);
-        dq(i,j,k,1) = Real(0.);
-        dq(i,j,k,2) = Real(0.);
-        dq(i,j,k,3) = Real(0.);
-        dq(i,j,k,4) = Real(0.);
-
-    } else if (plm_iorder == 2) {
-        if (flag(i,j,k).isConnected(0,0,-1))
-        {
-            dlft0 = Real(0.5)*(q(i,j,k,QPRES)-q(i,j,k-1,QPRES))/q(i,j,k,QCS) - Real(0.5)*q(i,j,k,QRHO)*(q(i,j,k,QW) - q(i,j,k-1,QW));
-            dlft1 = (q(i,j,k,QRHO)-q(i,j,k-1,QRHO)) - (q(i,j,k,QPRES) - q(i,j,k-1,QPRES))/(q(i,j,k,QCS)*q(i,j,k,QCS));
-            dlft2 = Real(0.5)*(q(i,j,k,QPRES)-q(i,j,k-1,QPRES))/q(i,j,k,QCS) + Real(0.5)*q(i,j,k,QRHO)*(q(i,j,k,QW) - q(i,j,k-1,QW));
-            dlft3 = q(i,j,k,QU) - q(i,j,k-1,QU);
-            dlft4 = q(i,j,k,QV) - q(i,j,k-1,QV);
-        } else {
-            dlft0 = Real(0.0);
-            dlft1 = Real(0.0);
-            dlft2 = Real(0.0);
-            dlft3 = Real(0.0);
-            dlft4 = Real(0.0);
-        }
-
-        if (flag(i,j,k).isConnected(0,0,1))
-        {
-            drgt0 = Real(0.5)*(q(i,j,k+1,QPRES)-q(i,j,k,QPRES))/q(i,j,k,QCS) - Real(0.5)*q(i,j,k,QRHO)*(q(i,j,k+1,QW) - q(i,j,k,QW));
-            drgt1 = (q(i,j,k+1,QRHO)-q(i,j,k,QRHO)) - (q(i,j,k+1,QPRES) - q(i,j,k,QPRES))/(q(i,j,k,QCS)*q(i,j,k,QCS));
-            drgt2 = Real(0.5)*(q(i,j,k+1,QPRES)-q(i,j,k,QPRES))/q(i,j,k,QCS) + Real(0.5)*q(i,j,k,QRHO)*(q(i,j,k+1,QW) - q(i,j,k,QW));
-            drgt3 = q(i,j,k+1,QU) - q(i,j,k,QU);
-            drgt4 = q(i,j,k+1,QV) - q(i,j,k,QV);
-        } else {
-            drgt0 = Real(0.0);
-            drgt1 = Real(0.0);
-            drgt2 = Real(0.0);
-            drgt3 = Real(0.0);
-            drgt4 = Real(0.0);
-        }
-
-        dq(i,j,k,0) = limiter(dlft0, drgt0, plm_theta);
-        dq(i,j,k,1) = limiter(dlft1, drgt1, plm_theta);
-        dq(i,j,k,2) = limiter(dlft2, drgt2, plm_theta);
-        dq(i,j,k,3) = limiter(dlft3, drgt3, plm_theta);
-        dq(i,j,k,4) = limiter(dlft4, drgt4, plm_theta);
-   }
+    cns_slope_eb(i, j, k, 2, dq, q, flag, plm_iorder, plm_theta);
 }
-#endif
+
 #endif
