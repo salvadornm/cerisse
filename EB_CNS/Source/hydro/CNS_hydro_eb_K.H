@@ -247,54 +247,38 @@ cns_slope_eb (int i, int j, int k, int dir,
         QUN = QW;  QUT = QU;  QUTT = QV;
     }
 
-    Real dlft0 = Real(0.0);
-    Real dlft1 = Real(0.0);
-    Real dlft2 = Real(0.0);
-    Real dlft3 = Real(0.0);
-    Real dlft4 = Real(0.0);
-    Real dlft5[NUM_SPECIES] = {Real(0.)};
-
-    Real drgt0 = Real(0.0);
-    Real drgt1 = Real(0.0);
-    Real drgt2 = Real(0.0);
-    Real drgt3 = Real(0.0);
-    Real drgt4 = Real(0.0);
-    Real drgt5[NUM_SPECIES] = {Real(0.)};
+    Real dlft[5+NUM_SPECIES] = {Real(0.)};
+    Real drgt[5+NUM_SPECIES] = {Real(0.)};
 
     if (plm_iorder == 1) {
-        for (int n = 0; n < NVAR; ++n)
+        for (int n = 0; n < 5+NUM_SPECIES; ++n)
             dq(iv,n) = Real(0.);
         
     } else if (plm_iorder == 2) {
         if (flag(iv).isConnected(-dir_iv))
         {
-            dlft0 = Real(0.5)*(q(iv,QPRES)-q(iv-dir_iv,QPRES))/q(iv,QCS) - Real(0.5)*q(iv,QRHO)*(q(iv,QUN) - q(iv-dir_iv,QUN));
-            dlft1 = (q(iv,QRHO)-q(iv-dir_iv,QRHO)) - (q(iv,QPRES) - q(iv-dir_iv,QPRES))/(q(i,j,k,QCS)*q(i,j,k,QCS));
-            dlft2 = Real(0.5)*(q(iv,QPRES)-q(iv-dir_iv,QPRES))/q(iv,QCS) + Real(0.5)*q(iv,QRHO)*(q(iv,QUN) - q(iv-dir_iv,QUN));
-            dlft3 = q(iv,QUT) - q(iv-dir_iv,QUT);
-            dlft4 = q(iv,QUTT) - q(iv-dir_iv,QUTT);
+            dlft[0] = q(iv,QRHO) - q(iv-dir_iv,QRHO);
+            dlft[1] = q(iv,QUN) - q(iv-dir_iv,QUN);
+            dlft[2] = q(iv,QPRES) - q(iv-dir_iv,QPRES);
+            dlft[3] = q(iv,QUT) - q(iv-dir_iv,QUT);
+            dlft[4] = q(iv,QUTT) - q(iv-dir_iv,QUTT);
             for (int n = 0; n < NUM_SPECIES; ++n)
-                dlft5[n] = q(iv,QFS+n) - q(iv-dir_iv,QFS+n);
+                dlft[5+n] = q(iv,QFS+n) - q(iv-dir_iv,QFS+n);
         }
 
         if (flag(iv).isConnected(dir_iv))
         {
-            drgt0 = Real(0.5)*(q(iv+dir_iv,QPRES)-q(iv,QPRES))/q(iv,QCS) - Real(0.5)*q(iv,QRHO)*(q(iv+dir_iv,QUN) - q(iv,QUN));
-            drgt1 = (q(iv+dir_iv,QRHO)-q(iv,QRHO)) - (q(iv+dir_iv,QPRES) - q(iv,QPRES))/(q(i,j,k,QCS)*q(i,j,k,QCS));
-            drgt2 = Real(0.5)*(q(iv+dir_iv,QPRES)-q(iv,QPRES))/q(iv,QCS) + Real(0.5)*q(iv,QRHO)*(q(iv+dir_iv,QUN) - q(iv,QUN));
-            drgt3 = q(iv+dir_iv,QUT) - q(iv,QUT);
-            drgt4 = q(iv+dir_iv,QUTT) - q(iv,QUTT);
+            drgt[0] = q(iv+dir_iv,QRHO) - q(iv,QRHO);
+            drgt[1] = q(iv+dir_iv,QUN) - q(iv,QUN);
+            drgt[2] = q(iv+dir_iv,QPRES) - q(iv,QPRES);
+            drgt[3] = q(iv+dir_iv,QUT) - q(iv,QUT);
+            drgt[4] = q(iv+dir_iv,QUTT) - q(iv,QUTT);
             for (int n = 0; n < NUM_SPECIES; ++n)
-                drgt5[n] = q(iv+dir_iv,QFS+n) - q(iv,QFS+n);
+                drgt[5+n] = q(iv+dir_iv,QFS+n) - q(iv,QFS+n);
         }
 
-        dq(iv,0) = limiter(dlft0, drgt0, plm_theta);
-        dq(iv,1) = limiter(dlft1, drgt1, plm_theta);
-        dq(iv,2) = limiter(dlft2, drgt2, plm_theta);
-        dq(iv,3) = limiter(dlft3, drgt3, plm_theta);
-        dq(iv,4) = limiter(dlft4, drgt4, plm_theta);
-        for (int n = 0; n < NUM_SPECIES; ++n)
-            dq(iv,5+n) = limiter(dlft5[n], drgt5[n], plm_theta);
+        for (int n = 0; n < 5+NUM_SPECIES; ++n)
+            dq(iv,n) = limiter(dlft[n], drgt[n], plm_theta);
    }
 }
 

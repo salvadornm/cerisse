@@ -5,7 +5,7 @@ geometry.is_periodic = 0 0 0
 geometry.coord_sys   = 0  # 0 => cart, 1 => RZ  2=>spherical
 geometry.prob_lo     = 0.    0.  
 geometry.prob_hi     = 2.5   1.25
-amr.n_cell           = 160   80
+amr.n_cell           = 80    40
 
 # >>>>>>>>>>>>> BC FLAGS <<<<<<<<<<<<<<<<
 # 0 = Interior            3 = Symmetry
@@ -18,7 +18,7 @@ cns.hi_bc       =  2 2
 cns.do_visc  = 0
 cns.do_react = 0
 
-cns.cfl = 0.1
+cns.cfl = 0.3
 cns.dt_cutoff = 5.e-20
 
 cns.v = 2
@@ -29,7 +29,7 @@ amr.loadbalance_with_workestimates = 1
 amr.loadbalance_level0_int = 100
 
 # REFINEMENT / REGRIDDING
-amr.max_level       = 2       # maximum level number allowed
+amr.max_level       = 3       # maximum level number allowed
 amr.ref_ratio       = 2 2 2 2 # refinement ratio
 amr.regrid_int      = 10      # how often to regrid
 amr.blocking_factor = 8
@@ -37,13 +37,13 @@ amr.max_grid_size   = 64
 amr.n_error_buf     = 2 2 2 2 # number of buffer cells in error est
 amr.grid_eff        = 0.7
 
-cns.refine_dengrad = 0.0002
+cns.refine_dengrad = 0.2
 cns.refine_max_dengrad_lev = 10
 
 eb2.geom_type = plane
 eb2.plane_point = 0.5 0.0 0.0
 eb2.plane_normal = 0.5 -0.866 0.0 # slope: 30 deg
-cns.eb_weights_type = 1
+cns.eb_weights_type = 2
 
 # CHECKPOINT FILES
 amr.checkpoint_files_output = 0

@@ -601,7 +601,7 @@ CNS::read_params ()
 
     // eb_weights_type:
     //   0 -- weights = 1
-    //   1 -- use_total_energy_as_eb_weights-
+    //   1 -- use_total_energy_as_eb_weights
     //   2 -- use_mass_as_eb_weights
     //   3 -- use_volfrac_as_eb_weights
 #if (AMREX_SPACEDIM > 1) //1D cannot have EB

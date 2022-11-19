@@ -32,7 +32,8 @@ cns_ctoprim (int i, int j, int k,
     auto eos = pele::physics::PhysicsType::eos();
     amrex::Real T, p, cs, gamma;
     // eos.Y2WBAR(massfrac, wbar);
-    eos.EY2T(ei, massfrac, T); 
+    eos.EY2T(ei, massfrac, T);
+    T = amrex::max(T, 1e-10);
     eos.RTY2P(rho, T, massfrac, p);
     eos.RTY2Cs(rho, T, massfrac, cs);
     // eos.RTY2G(rho, T, massfrac, gamma);
@@ -252,17 +253,29 @@ cns_slope (int i, int j, int k, int dir,
             dq(iv,n) = Real(0.);
         }
     } else if (plm_iorder == 2) {
-        Real dlft = Real(0.5)*(q(iv,QPRES)-q(iv-dir_iv,QPRES))/q(iv,QCS) - Real(0.5)*q(iv,QRHO)*(q(iv,QUN) - q(iv-dir_iv,QUN));
-        Real drgt = Real(0.5)*(q(iv+dir_iv,QPRES)-q(iv,QPRES))/q(iv,QCS) - Real(0.5)*q(iv,QRHO)*(q(iv+dir_iv,QUN) - q(iv,QUN));
+        // Real dlft = Real(0.5)*(q(iv,QPRES)-q(iv-dir_iv,QPRES))/q(iv,QCS) - Real(0.5)*q(iv,QRHO)*(q(iv,QUN) - q(iv-dir_iv,QUN));
+        // Real drgt = Real(0.5)*(q(iv+dir_iv,QPRES)-q(iv,QPRES))/q(iv,QCS) - Real(0.5)*q(iv,QRHO)*(q(iv+dir_iv,QUN) - q(iv,QUN));
+        // dq(iv,0) = limiter(dlft, drgt, plm_theta);
+
+        // Real cs2 = q(iv,QCS)*q(iv,QCS);
+        // dlft = (q(iv,QRHO)-q(iv-dir_iv,QRHO)) - (q(iv,QPRES) - q(iv-dir_iv,QPRES))/cs2;
+        // drgt = (q(iv+dir_iv,QRHO)-q(iv,QRHO)) - (q(iv+dir_iv,QPRES) - q(iv,QPRES))/cs2;
+        // dq(iv,1) = limiter(dlft, drgt, plm_theta);
+
+        // dlft = Real(0.5)*(q(iv,QPRES)-q(iv-dir_iv,QPRES))/q(iv,QCS) + Real(0.5)*q(iv,QRHO)*(q(iv,QUN) - q(iv-dir_iv,QUN));
+        // drgt = Real(0.5)*(q(iv+dir_iv,QPRES)-q(iv,QPRES))/q(iv,QCS) + Real(0.5)*q(iv,QRHO)*(q(iv+dir_iv,QUN) - q(iv,QUN));
+        // dq(iv,2) = limiter(dlft, drgt, plm_theta);
+
+        Real dlft = q(iv,QRHO) - q(iv-dir_iv,QRHO);
+        Real drgt = q(iv+dir_iv,QRHO) - q(iv,QRHO);
         dq(iv,0) = limiter(dlft, drgt, plm_theta);
 
-        Real cs2 = q(iv,QCS)*q(iv,QCS);
-        dlft = (q(iv,QRHO)-q(iv-dir_iv,QRHO)) - (q(iv,QPRES) - q(iv-dir_iv,QPRES))/cs2;
-        drgt = (q(iv+dir_iv,QRHO)-q(iv,QRHO)) - (q(iv+dir_iv,QPRES) - q(iv,QPRES))/cs2;
+        dlft = q(iv,QUN) - q(iv-dir_iv,QUN);
+        drgt = q(iv+dir_iv,QUN) - q(iv,QUN);
         dq(iv,1) = limiter(dlft, drgt, plm_theta);
 
-        dlft = Real(0.5)*(q(iv,QPRES)-q(iv-dir_iv,QPRES))/q(iv,QCS) + Real(0.5)*q(iv,QRHO)*(q(iv,QUN) - q(iv-dir_iv,QUN));
-        drgt = Real(0.5)*(q(iv+dir_iv,QPRES)-q(iv,QPRES))/q(iv,QCS) + Real(0.5)*q(iv,QRHO)*(q(iv+dir_iv,QUN) - q(iv,QUN));
+        dlft = q(iv,QPRES) - q(iv-dir_iv,QPRES);
+        drgt = q(iv+dir_iv,QPRES) - q(iv,QPRES);
         dq(iv,2) = limiter(dlft, drgt, plm_theta);
 
         dlft = q(iv,QUT) - q(iv-dir_iv,QUT);
@@ -794,16 +807,16 @@ cns_riemann (int i, int j, int k, int dir,
         UMN = UMZ; UMT = UMX; UMTT = UMY;  
     }
     
-    Real cl = q(iv-iv_dir,QCS);
-    Real rl = q(iv-iv_dir,QRHO) + Real(0.5) * ((dq(iv-iv_dir,0)+dq(iv-iv_dir,2))/cl + dq(iv-iv_dir,1));
+    Real cl;// = q(iv-iv_dir,QCS);
+    Real rl = q(iv-iv_dir,QRHO) + Real(0.5) * dq(iv-iv_dir,0);//((dq(iv-iv_dir,0)+dq(iv-iv_dir,2))/cl + dq(iv-iv_dir,1));
     rl = amrex::max(rl, parm.smallr);
     AMREX_D_TERM(
-        Real ul = q(iv-iv_dir,QUN) + Real(0.5) * ((dq(iv-iv_dir,2)-dq(iv-iv_dir,0))/q(iv-iv_dir,QRHO)); 
+        Real ul = q(iv-iv_dir,QUN) + Real(0.5) * dq(iv-iv_dir,1); //((dq(iv-iv_dir,2)-dq(iv-iv_dir,0))/q(iv-iv_dir,QRHO)); 
         Real ut1l = 0.; Real ut2l = 0.;
         ,
         ut1l = q(iv-iv_dir,QUT) + Real(0.5) * dq(iv-iv_dir,3); ,
         ut2l = q(iv-iv_dir,QUTT) + Real(0.5) * dq(iv-iv_dir,4););
-    Real pl = q(iv-iv_dir,QPRES) + Real(0.5) * (dq(iv-iv_dir,0)+dq(iv-iv_dir,2))*cl;
+    Real pl = q(iv-iv_dir,QPRES) + Real(0.5) * dq(iv-iv_dir,2); // (dq(iv-iv_dir,0)+dq(iv-iv_dir,2))*cl;
     pl = amrex::max(pl, parm.smallp);
     Real yl[NUM_SPECIES];
     for (int n = 0; n < NUM_SPECIES; ++n) {
@@ -815,16 +828,16 @@ cns_riemann (int i, int j, int k, int dir,
     eos.RYP2E(rl, yl, pl, el);
     el += 0.5*(AMREX_D_TERM(ul*ul, +ut1l*ut1l, +ut2l*ut2l));
 
-    Real cr = q(i,j,k,QCS);
-    Real rr = q(i,j,k,QRHO) - Real(0.5) * ((dq(i,j,k,0)+dq(i,j,k,2))/cr + dq(i,j,k,1));
+    Real cr;// = q(i,j,k,QCS);
+    Real rr = q(i,j,k,QRHO) - Real(0.5) * dq(i,j,k,0); //((dq(i,j,k,0)+dq(i,j,k,2))/cr + dq(i,j,k,1));
     rr = amrex::max(rr, parm.smallr);
     AMREX_D_TERM(
-        Real ur = q(i,j,k,QUN) - Real(0.5) * ((dq(i,j,k,2)-dq(i,j,k,0))/q(i,j,k,QRHO)); 
+        Real ur = q(i,j,k,QUN) - Real(0.5) * dq(i,j,k,1); //((dq(i,j,k,2)-dq(i,j,k,0))/q(i,j,k,QRHO)); 
         Real ut1r = 0.; Real ut2r = 0.;
         ,
         ut1r = q(i,j,k,QUT) - Real(0.5) * dq(i,j,k,3); ,
         ut2r = q(i,j,k,QUTT) - Real(0.5) * dq(i,j,k,4););
-    Real pr = q(i,j,k,QPRES) - Real(0.5) * (dq(i,j,k,0)+dq(i,j,k,2))*cr;
+    Real pr = q(i,j,k,QPRES) - Real(0.5) * dq(i,j,k,2); //(dq(i,j,k,0)+dq(i,j,k,2))*cr;
     pr = amrex::max(pr, parm.smallp);
     Real yr[NUM_SPECIES];
     for (int n = 0; n < NUM_SPECIES; ++n) {

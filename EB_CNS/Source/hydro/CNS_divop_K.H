@@ -302,7 +302,7 @@ void eb_compute_div(int i, int j, int k, int n, IntVect const& blo, IntVect cons
 #endif
                              flux_hyp_wall,parm);
 
-        // // Here we assume dx == dy == dz
+        // Here we assume dx == dy == dz
         divu(i,j,k,n) += flux_hyp_wall[n]*dxinv[0]/vfrc(i,j,k);
         // divu(i,j,k,UMX) += flux_hyp_wall[UMX] * a_cut;
         // divu(i,j,k,UMY) += flux_hyp_wall[UMY] * a_cut;
@@ -330,12 +330,12 @@ void eb_compute_div(int i, int j, int k, int n, IntVect const& blo, IntVect cons
     if (eb_weights_type == 0) { 
         redistwgt(i,j,k) = 1.0; 
     } else if (eb_weights_type == 1) { 
-        redistwgt(i,j,k) = q(i,j,k,QRHO)*( q(i,j,k,QEINT)  
-                         + 0.5*(AMREX_D_TERM(q(i,j,k,QU)*q(i,j,k,QU), 
+        redistwgt(i,j,k) = q(i,j,k,QRHO)*( q(i,j,k,QEINT)
+                         /*+ 0.5*(AMREX_D_TERM(q(i,j,k,QU)*q(i,j,k,QU), 
                                            + q(i,j,k,QV)*q(i,j,k,QV), 
-                                           + q(i,j,k,QW)*q(i,j,k,QW))) );
+                                           + q(i,j,k,QW)*q(i,j,k,QW)))*/ );
     } else if (eb_weights_type == 2) { 
-        redistwgt(i,j,k) = q(i,j,k,QRHO);
+        redistwgt(i,j,k) = q(i,j,k,QRHO)*vfrc(i,j,k);
     } else if (eb_weights_type == 3) { 
         redistwgt(i,j,k) = vfrc(i,j,k); 
     }

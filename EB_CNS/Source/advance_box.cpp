@@ -93,9 +93,6 @@ CNS::compute_dSdt_box (const Box& bx,
     FArrayBox slopetmp(bxg1, 5+NUM_SPECIES);
     auto const& slope = slopetmp.array();
 
-    auto l_plm_iorder = plm_iorder;
-    auto l_plm_theta = plm_theta;
-
     // Transport coef
     FArrayBox diff_coeff;
     if (do_visc == 1) {
@@ -119,13 +116,12 @@ CNS::compute_dSdt_box (const Box& bx,
         });
     }
 
-// amrex::Print() << "debug: advance_box.cpp 124" << std::endl;
     // x-direction
     int cdir = 0;
     const Box& xslpbx = amrex::grow(bx, cdir, 1);
     amrex::ParallelFor(xslpbx,
     [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept {
-        cns_slope_x(i, j, k, slope, q, l_plm_iorder, l_plm_theta);
+        cns_slope_x(i, j, k, slope, q, plm_iorder, plm_theta);
     });
 
     const Box& xflxbx = amrex::surroundingNodes(bx,cdir);
@@ -144,13 +140,12 @@ CNS::compute_dSdt_box (const Box& bx,
     }
 
 #if (AMREX_SPACEDIM >= 2)
-// amrex::Print() << "debug: advance_box.cpp 149" << std::endl;
     // y-direction
     cdir = 1;
     const Box& yslpbx = amrex::grow(bx, cdir, 1);
     amrex::ParallelFor(yslpbx,
     [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept {
-        cns_slope_y(i, j, k, slope, q, l_plm_iorder, l_plm_theta);
+        cns_slope_y(i, j, k, slope, q, plm_iorder, plm_theta);
     });
 
     const Box& yflxbx = amrex::surroundingNodes(bx,cdir);
@@ -175,7 +170,7 @@ CNS::compute_dSdt_box (const Box& bx,
     const Box& zslpbx = amrex::grow(bx, cdir, 1);
     amrex::ParallelFor(zslpbx,
     [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept {
-        cns_slope_z(i, j, k, slope, q, l_plm_iorder, l_plm_theta);
+        cns_slope_z(i, j, k, slope, q, plm_iorder, plm_theta);
     });
     const Box& zflxbx = amrex::surroundingNodes(bx,cdir);
     amrex::ParallelFor(zflxbx,
@@ -192,13 +187,11 @@ CNS::compute_dSdt_box (const Box& bx,
        });
     }
 #endif
-// amrex::Print() << "debug: advance_box.cpp 197" << std::endl;
     amrex::ParallelFor(bx, NVAR,
     [=] AMREX_GPU_DEVICE (int i, int j, int k, int n) noexcept
     {
         cns_flux_to_dudt(i, j, k, n, dsdtfab, AMREX_D_DECL(fxfab,fyfab,fzfab), dxinv);
     });
-// amrex::Print() << "debug: advance_box.cpp 203" << std::endl;
 //     if (do_ext_src) {
 //     ...
 //         const Real g = gravity;
@@ -218,5 +211,4 @@ CNS::compute_dSdt_box (const Box& bx,
 //     }
 
     Gpu::streamSynchronize();
-// amrex::Print() << "debug: advance_box.cpp 221" << std::endl;
 }

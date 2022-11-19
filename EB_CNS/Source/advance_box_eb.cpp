@@ -52,20 +52,14 @@ CNS::compute_dSdt_box_eb (const Box&                      bx,
     const auto dxinv = geom.InvCellSizeArray();
 
     // Quantities for redistribution
-    FArrayBox divc,redistwgt;//,optmp,delta_m;
-    divc.resize(bxg2, NVAR);
-    // optmp.resize(bxg2, NVAR);
-    // delta_m.resize(bxg1, NVAR);
-    redistwgt.resize(bxg2, 1);
-    // Set to zero just in case
+    FArrayBox divc,redistwgt;
+    divc.resize(bxg2, NVAR); //div before redist
+    redistwgt.resize(bxg2, 1); //what is this??
     divc.setVal<RunOn::Device>(0.0);
-    // optmp.setVal<RunOn::Device>(0.0);
-    // delta_m.setVal<RunOn::Device>(0.0);
     redistwgt.setVal<RunOn::Device>(0.0);
 
     // Primitive variables
-    FArrayBox qtmp;
-    qtmp.resize(bxg5, NPRIM);
+    FArrayBox qtmp(bxg5, NPRIM);
     auto const& q = qtmp.array();
 
     Parm const* lparm = d_parm;
