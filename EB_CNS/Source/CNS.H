@@ -264,7 +264,7 @@ protected:
 
     static bool do_restart_fields;
 
-    static int plm_iorder;
+    static int recon_scheme;
     static amrex::Real plm_theta;
 
     static int eb_weights_type;

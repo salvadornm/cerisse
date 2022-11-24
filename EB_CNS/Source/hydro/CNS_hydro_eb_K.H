@@ -30,7 +30,7 @@
 //                 amrex::Array4<amrex::Real> const& dq,
 //                 amrex::Array4<amrex::Real const> const& q,
 //                 amrex::Array4<amrex::EBCellFlag const> const& flag,
-//                 int plm_iorder, amrex::Real plm_theta) noexcept
+//                 int recon_scheme, amrex::Real plm_theta) noexcept
 // {
 //     using amrex::Real;
 
@@ -48,7 +48,7 @@
 //     Real drgt4 = Real(0.0);
 //     Real drgt5[NUM_SPECIES] = {Real(0.)}; // y
 
-//     if (plm_iorder == 1) {
+//     if (recon_scheme == 1) {
 //         dq(i,j,k,0) = Real(0.);
 //         dq(i,j,k,1) = Real(0.);
 //         dq(i,j,k,2) = Real(0.);
@@ -57,7 +57,7 @@
 //         for (int n = 0; n < NUM_SPECIES; ++n) {
 //             dq(i,j,k,5+n) = Real(0.);
 //         }
-//     } else if (plm_iorder == 2) {
+//     } else if (recon_scheme == 2) {
 //         if (flag(i,j,k).isConnected(-1,0,0))
 //         {
 //             dlft0 = Real(0.5)*(q(i,j,k,QPRES)-q(i-1,j,k,QPRES))/q(i,j,k,QCS) - Real(0.5)*q(i,j,k,QRHO)*(q(i,j,k,QU) - q(i-1,j,k,QU));
@@ -96,7 +96,7 @@
 //                 amrex::Array4<amrex::Real> const& dq,
 //                 amrex::Array4<amrex::Real const> const& q,
 //                 amrex::Array4<amrex::EBCellFlag const> const& flag,
-//                 int plm_iorder, amrex::Real plm_theta) noexcept
+//                 int recon_scheme, amrex::Real plm_theta) noexcept
 // {
 //     using amrex::Real;
 
@@ -114,7 +114,7 @@
 //     Real drgt4 = Real(0.0);
 //     Real drgt5[NUM_SPECIES] = {Real(0.)};
 
-//     if (plm_iorder == 1) {
+//     if (recon_scheme == 1) {
 //         dq(i,j,k,0) = Real(0.);
 //         dq(i,j,k,1) = Real(0.);
 //         dq(i,j,k,2) = Real(0.);
@@ -123,7 +123,7 @@
 //         for (int n = 0; n < NUM_SPECIES; ++n) {
 //             dq(i,j,k,5+n) = Real(0.);
 //         }
-//     } else if (plm_iorder == 2) {
+//     } else if (recon_scheme == 2) {
 //         if (flag(i,j,k).isConnected(0,-1,0))
 //         {
 //             dlft0 = Real(0.5)*(q(i,j,k,QPRES)-q(i,j-1,k,QPRES))/q(i,j,k,QCS) - Real(0.5)*q(i,j,k,QRHO)*(q(i,j,k,QV) - q(i,j-1,k,QV));
@@ -163,7 +163,7 @@
 //                 amrex::Array4<amrex::Real> const& dq,
 //                 amrex::Array4<amrex::Real const> const& q,
 //                 amrex::Array4<amrex::EBCellFlag const> const& flag,
-//                 int plm_iorder, amrex::Real plm_theta) noexcept
+//                 int recon_scheme, amrex::Real plm_theta) noexcept
 // {
 //     using amrex::Real;
 
@@ -181,7 +181,7 @@
 //     Real drgt4 = Real(0.0);
 //     Real drgt5[NUM_SPECIES] = {Real(0.)};
 
-//     if (plm_iorder == 1) {
+//     if (recon_scheme == 1) {
 //         dq(i,j,k,0) = Real(0.);
 //         dq(i,j,k,1) = Real(0.);
 //         dq(i,j,k,2) = Real(0.);
@@ -190,7 +190,7 @@
 //         for (int n = 0; n < NUM_SPECIES; ++n) {
 //             dq(i,j,k,5+n) = Real(0.);
 //         }
-//     } else if (plm_iorder == 2) {
+//     } else if (recon_scheme == 2) {
 //         if (flag(i,j,k).isConnected(0,0,-1))
 //         {
 //             dlft0 = Real(0.5)*(q(i,j,k,QPRES)-q(i,j,k-1,QPRES))/q(i,j,k,QCS) - Real(0.5)*q(i,j,k,QRHO)*(q(i,j,k,QW) - q(i,j,k-1,QW));
@@ -231,7 +231,7 @@ cns_slope_eb (int i, int j, int k, int dir,
               amrex::Array4<amrex::Real> const& dq,
               amrex::Array4<amrex::Real const> const& q,
               amrex::Array4<amrex::EBCellFlag const> const& flag,
-              int plm_iorder, amrex::Real plm_theta) noexcept
+              int recon_scheme, amrex::Real plm_theta) noexcept
 {
     using amrex::Real;
 
@@ -250,11 +250,11 @@ cns_slope_eb (int i, int j, int k, int dir,
     Real dlft[5+NUM_SPECIES] = {Real(0.)};
     Real drgt[5+NUM_SPECIES] = {Real(0.)};
 
-    if (plm_iorder == 1) {
+    if (recon_scheme == 1) {
         for (int n = 0; n < 5+NUM_SPECIES; ++n)
             dq(iv,n) = Real(0.);
         
-    } else if (plm_iorder == 2) {
+    } else if (recon_scheme == 2) {
         if (flag(iv).isConnected(-dir_iv))
         {
             dlft[0] = q(iv,QRHO) - q(iv-dir_iv,QRHO);
@@ -288,9 +288,9 @@ cns_slope_eb_x (int i, int j, int k,
                 amrex::Array4<amrex::Real> const& dq,
                 amrex::Array4<amrex::Real const> const& q,
                 amrex::Array4<amrex::EBCellFlag const> const& flag,
-                int plm_iorder, amrex::Real plm_theta) noexcept
+                int recon_scheme, amrex::Real plm_theta) noexcept
 {
-    cns_slope_eb(i, j, k, 0, dq, q, flag, plm_iorder, plm_theta);
+    cns_slope_eb(i, j, k, 0, dq, q, flag, recon_scheme, plm_theta);
 }
 
 AMREX_GPU_DEVICE AMREX_FORCE_INLINE
@@ -299,9 +299,9 @@ cns_slope_eb_y (int i, int j, int k,
                 amrex::Array4<amrex::Real> const& dq,
                 amrex::Array4<amrex::Real const> const& q,
                 amrex::Array4<amrex::EBCellFlag const> const& flag,
-                int plm_iorder, amrex::Real plm_theta) noexcept
+                int recon_scheme, amrex::Real plm_theta) noexcept
 {
-    cns_slope_eb(i, j, k, 1, dq, q, flag, plm_iorder, plm_theta);
+    cns_slope_eb(i, j, k, 1, dq, q, flag, recon_scheme, plm_theta);
 }
 
 AMREX_GPU_DEVICE AMREX_FORCE_INLINE
@@ -310,9 +310,9 @@ cns_slope_eb_z (int i, int j, int k,
                 amrex::Array4<amrex::Real> const& dq,
                 amrex::Array4<amrex::Real const> const& q,
                 amrex::Array4<amrex::EBCellFlag const> const& flag,
-                int plm_iorder, amrex::Real plm_theta) noexcept
+                int recon_scheme, amrex::Real plm_theta) noexcept
 {
-    cns_slope_eb(i, j, k, 2, dq, q, flag, plm_iorder, plm_theta);
+    cns_slope_eb(i, j, k, 2, dq, q, flag, recon_scheme, plm_theta);
 }
 
 #endif

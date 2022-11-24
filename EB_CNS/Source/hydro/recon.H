@@ -194,19 +194,19 @@ cns_recon (int i, int j, int k, int n, int dir,
            amrex::Array4<amrex::Real const> const& q,
            amrex::Array4<amrex::Real> const& ql,
            amrex::Array4<amrex::Real> const& qr,
-           int plm_iorder, amrex::Real plm_theta) noexcept
+           int recon_scheme, amrex::Real plm_theta) noexcept
 {
   using amrex::Real;
 
   const amrex::IntVect iv(AMREX_D_DECL(i, j, k));
   const amrex::IntVect iv_dir = amrex::IntVect::TheDimensionVector(dir);
   
-  if (plm_iorder == 1) {
+  if (recon_scheme == 1) {
     // Simple Godunov
     qr(iv,n) = q(iv,n);
     ql(iv+iv_dir,n) = q(iv,n);
 
-  } else if (plm_iorder == 2) {
+  } else if (recon_scheme == 2) {
     // MUSCL    
     Real s[3];
     s[0] = q(iv-iv_dir,n);
@@ -215,7 +215,7 @@ cns_recon (int i, int j, int k, int n, int dir,
 
     muscl(s, qr(iv,n), ql(iv+iv_dir,n), plm_theta);
 
-  } else if (plm_iorder == 3) {
+  } else if (recon_scheme == 3) {
     // WENO-JS5
     Real s[5];    
     s[0] = q(iv-2*iv_dir,n);

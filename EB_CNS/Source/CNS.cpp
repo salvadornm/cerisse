@@ -43,7 +43,7 @@ int      CNS::rk_reaction_iter = 0;
 
 bool     CNS::do_restart_fields = false;
 
-int      CNS::plm_iorder     = 2;     // [1,2] 1: slopes are zero'd,  2: second order slopes
+int      CNS::recon_scheme   = 4;     // 1: basic Godunov; 2: MUSCL; 3: WENO-JS5; 4: WENO-Z5
 Real     CNS::plm_theta      = 2.0;   // [1,2] 1: minmod; 2: van Leer's MC
 // Real     CNS::gravity        = 0.0;
 
@@ -537,8 +537,8 @@ CNS::read_params ()
     //  2 -- piecewise linear
     //  3 -- WENO-JS 5th order
     //  4 -- WENO-Z 5th order
-    pp.query("recon_scheme", plm_iorder); 
-    if (plm_iorder == 2) {
+    pp.query("recon_scheme", recon_scheme); 
+    if (recon_scheme == 2) {
         pp.query("limiter_theta", plm_theta);
     }
 

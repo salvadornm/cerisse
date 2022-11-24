@@ -144,7 +144,7 @@ CNS::compute_dSdt_box (const Box& bx,
         const Box& qlrbox = amrex::grow(bx,cdir,1);
         amrex::ParallelFor(qlrbox, NCHAR,
         [=] AMREX_GPU_DEVICE (int i, int j, int k, int n) noexcept {
-            cns_recon(i, j, k, n, cdir, w, wl, wr, plm_iorder, plm_theta);
+            cns_recon(i, j, k, n, cdir, w, wl, wr, recon_scheme, plm_theta);
         });
 
         // Solve Riemann problem
