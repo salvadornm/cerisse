@@ -35,7 +35,7 @@ cns_ctoprim (int i, int j, int k,
     eos.EY2T(ei, massfrac, T);
     T = amrex::max(T, 1e-10);
     eos.RTY2P(rho, T, massfrac, p);
-    eos.RTY2Cs(rho, T, massfrac, cs);
+    // eos.RTY2Cs(rho, T, massfrac, cs);
     // eos.RTY2G(rho, T, massfrac, gamma);
     // eos.RTY2dpde_dpdre(rho, T, massfrac, dpde, dpdr_e);
 
@@ -45,7 +45,7 @@ cns_ctoprim (int i, int j, int k,
                  q(i,j,k,QW) = uz;);
     q(i,j,k,QEINT) = ei;
     q(i,j,k,QPRES) = p;
-    q(i,j,k,QCS) = cs;
+    // q(i,j,k,QCS) = cs;
     q(i,j,k,QTEMP) = T; 
     // q(i,j,k,QG) = gamma;
 }

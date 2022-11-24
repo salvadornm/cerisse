@@ -131,11 +131,11 @@ public:
     void compute_dSdt_box (const amrex::Box& bx,
                            amrex::Array4<amrex::Real const>& Sfab,
                            amrex::Array4<amrex::Real      >& dSdtfab,
-                           /*const std::array<FArrayBox*, AMREX_SPACEDIM>& flux*/
-                           AMREX_D_DECL(
+                           const std::array<FArrayBox*, AMREX_SPACEDIM>& flux
+                           /*AMREX_D_DECL(
                              amrex::Array4<amrex::Real    >& fxfab,
                              amrex::Array4<amrex::Real    >& fyfab,
-                             amrex::Array4<amrex::Real    >& fzfab));
+                             amrex::Array4<amrex::Real    >& fzfab)*/);
 
 #if (AMREX_SPACEDIM > 1) //1D cannot have EB
     void compute_dSdt_box_eb (const amrex::Box& bx,

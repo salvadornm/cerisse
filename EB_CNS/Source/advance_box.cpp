@@ -1,21 +1,12 @@
 #include "CNS.H"
-#include "CNS_hydro_K.H"
+// #include "CNS_hydro_K.H"
 #include "CNS_diffusion_K.H"
+
+#include "hyperbolics.H"
 
 using namespace amrex;
 
 /* =============== Pusedocode ===============
- *  if vpdf || vspdf || uq:
- *      for nf: 
- *          q <- ctoprim(S)
- *          qL, qR <- recon(q)
- *          flx += pressure_flux(qL, qR)
- *  else:
- *      <q> <- ctoprim(<S>)
- *      <q>L, <q>R <- recon(<q>)  
- *      <flx> += pressure_flux(<q>L, <q>R)
- *      <flx> += advection_flux(<q>L, <q>R)
- * 
  *  if do_visc:       
  *      if vpdf || vspdf || uq:
  *          for nf: 
@@ -25,6 +16,19 @@ using namespace amrex;
  *          <diff_coef> <- get_trans_coef()
  *          <flx> += diffusion_flux(<q>)
  * 
+ *  if vpdf || vspdf || uq:
+ *      for nf: 
+ *          q <- ctoprim(S)
+ *          w <- qtochar(q)
+ *          wL, wR <- recon(w)
+ *          flx += pressure_flux(wL, wR)
+ *  else:
+ *      q <- ctoprim(<S>)
+ *      w <- qtochar(q)
+ *      wL, wR <- recon(w)  
+ *      <flx> += pressure_flux(wL, wR)
+ *      <flx> += advection_flux(wL, wR)
+ * 
  *  if vspdf || vpdf:
  *      flx <- reduce_average_fields(flx)
  *  else if spdf:
@@ -32,7 +36,7 @@ using namespace amrex;
  * 
  *  if vspdf || vpdf || uq:
  *      for nf: 
- *          flx += advection_flux(qL, qR)
+ *          flx += advection_flux(wL, wR)
  * 
  *  dsdt <- div_and_redistribute(flx)
  *  
@@ -67,31 +71,43 @@ void
 CNS::compute_dSdt_box (const Box& bx,
                        Array4<Real const>& sfab,
                        Array4<Real      >& dsdtfab,
-                       AMREX_D_DECL(
+                       const std::array<FArrayBox*, AMREX_SPACEDIM>& flxfab
+                       //FArrayBox           flxfab[AMREX_SPACEDIM]
+                       /*AMREX_D_DECL(
                          Array4<Real    >& fxfab,
                          Array4<Real    >& fyfab,
-                         Array4<Real    >& fzfab))
+                         Array4<Real    >& fzfab)*/)
 {
     BL_PROFILE("CNS::compute_dSdt_box()");
     
     const Box& bxg1 = amrex::grow(bx,1);
     const Box& bxg2 = amrex::grow(bx,2);
+    const Box& bxg3 = amrex::grow(bx,3);
     
     const auto dxinv = geom.InvCellSizeArray();
     
     // Primitive variables
-    FArrayBox qtmp(bxg2, NPRIM);
+    FArrayBox qtmp(bxg3, LEN_PRIM);
     auto const& q = qtmp.array();
 
     Parm const* lparm = d_parm;
-    amrex::ParallelFor(bxg2,
+    // for (int nf = 0; nf <= NUM_FIELD; ++nf){
+    //     auto const& qfill = qtmp.array(nf*NPRIM);
+    amrex::ParallelFor(bxg3,
     [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept {
         cns_ctoprim(i, j, k, sfab, q, *lparm);
     });
+    // }
 
     // Slopes
-    FArrayBox slopetmp(bxg1, 5+NUM_SPECIES);
-    auto const& slope = slopetmp.array();
+    // FArrayBox slopetmp(bxg1, 5+NUM_SPECIES);
+    // auto const& slope = slopetmp.array();
+    FArrayBox wtmp(bxg3, NCHAR);
+    FArrayBox wl_tmp(bxg2, NCHAR);
+    FArrayBox wr_tmp(bxg2, NCHAR);
+    auto const& w = wtmp.array();
+    auto const& wl = wl_tmp.array();
+    auto const& wr = wr_tmp.array();
 
     // Transport coef
     FArrayBox diff_coeff;
@@ -116,82 +132,46 @@ CNS::compute_dSdt_box (const Box& bx,
         });
     }
 
-    // x-direction
-    int cdir = 0;
-    const Box& xslpbx = amrex::grow(bx, cdir, 1);
-    amrex::ParallelFor(xslpbx,
-    [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept {
-        cns_slope_x(i, j, k, slope, q, plm_iorder, plm_theta);
-    });
+    // Loop directions
+    for (int cdir = 0; cdir < AMREX_SPACEDIM; ++cdir) {
+        // Convert primitive to characteristic
+        amrex::ParallelFor(bxg3,
+        [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept {
+            cns_ctochar(i, j, k, cdir, q, w);
+        });
 
-    const Box& xflxbx = amrex::surroundingNodes(bx,cdir);
-    amrex::ParallelFor(xflxbx,
-    [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept {
-        cns_riemann_x(i, j, k, fxfab, slope, q, *lparm);
-        // for (int n = UEINT; n < NVAR; ++n) fxfab(i,j,k,n) = Real(0.0);
-    });
+        // Reconstruction
+        const Box& qlrbox = amrex::grow(bx,cdir,1);
+        amrex::ParallelFor(qlrbox, NCHAR,
+        [=] AMREX_GPU_DEVICE (int i, int j, int k, int n) noexcept {
+            cns_recon(i, j, k, n, cdir, w, wl, wr, plm_iorder, plm_theta);
+        });
 
-    if (do_visc == 1) {
-       auto const& coefs = diff_coeff.array();
-       amrex::ParallelFor(xflxbx,
-       [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept {
-           cns_diff_x(i, j, k, q, coefs, dxinv, fxfab);
-       });
+        // Solve Riemann problem
+        const Box& flxbx = amrex::surroundingNodes(bx,cdir);
+        auto const& flx_arr = flxfab[cdir]->array();
+        amrex::ParallelFor(flxbx,
+        [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept {
+            cns_riemann(i, j, k, cdir, flx_arr, q, wl, wr, *lparm);
+            for (int n = UFA; n < NUM_AUX; ++n) flx_arr(i,j,k,n) = Real(0.0);
+        });
+
+        // Get viscous fluxes
+        if (do_visc == 1) {
+            auto const& coefs = diff_coeff.array();
+            amrex::ParallelFor(flxbx,
+            [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept {
+                cns_diff(i, j, k, cdir, q, coefs, dxinv, flx_arr);
+            });
+        }
     }
-
-#if (AMREX_SPACEDIM >= 2)
-    // y-direction
-    cdir = 1;
-    const Box& yslpbx = amrex::grow(bx, cdir, 1);
-    amrex::ParallelFor(yslpbx,
-    [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept {
-        cns_slope_y(i, j, k, slope, q, plm_iorder, plm_theta);
-    });
-
-    const Box& yflxbx = amrex::surroundingNodes(bx,cdir);
-    amrex::ParallelFor(yflxbx,
-    [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept {
-        cns_riemann_y(i, j, k, fyfab, slope, q, *lparm);
-        // for (int n = UEINT; n < NVAR; ++n) fyfab(i,j,k,n) = Real(0.0);
-    });
-
-    if(do_visc == 1) {
-       auto const& coefs = diff_coeff.array();
-       amrex::ParallelFor(yflxbx,
-       [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept {
-           cns_diff_y(i, j, k, q, coefs, dxinv, fyfab);
-       });
-    }
-#endif
-
-#if (AMREX_SPACEDIM == 3)
-    // z-direction
-    cdir = 2;
-    const Box& zslpbx = amrex::grow(bx, cdir, 1);
-    amrex::ParallelFor(zslpbx,
-    [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept {
-        cns_slope_z(i, j, k, slope, q, plm_iorder, plm_theta);
-    });
-    const Box& zflxbx = amrex::surroundingNodes(bx,cdir);
-    amrex::ParallelFor(zflxbx,
-    [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept {
-        cns_riemann_z(i, j, k, fzfab, slope, q, *lparm);
-        // for (int n = UEINT; n < NVAR; ++n) fzfab(i,j,k,n) = Real(0.0);
-    });
-
-    if(do_visc == 1) {
-       auto const& coefs = diff_coeff.array();
-       amrex::ParallelFor(zflxbx,
-       [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept {
-           cns_diff_z(i, j, k, q, coefs, dxinv, fzfab);
-       });
-    }
-#endif
+    
     amrex::ParallelFor(bx, NVAR,
     [=] AMREX_GPU_DEVICE (int i, int j, int k, int n) noexcept
     {
-        cns_flux_to_dudt(i, j, k, n, dsdtfab, AMREX_D_DECL(fxfab,fyfab,fzfab), dxinv);
+        cns_div(i, j, k, n, dsdtfab, AMREX_D_DECL(flxfab[0]->array(),flxfab[1]->array(),flxfab[2]->array()), dxinv);
     });
+
 //     if (do_ext_src) {
 //     ...
 //         const Real g = gravity;

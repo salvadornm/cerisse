@@ -178,12 +178,12 @@ CNS::compute_dSdt (const MultiFab& S, MultiFab& dSdt, Real dt,
 #endif
                 Array4<Real const>    s_arr =    S.array(mfi);
                 Array4<Real      > dsdt_arr = dSdt.array(mfi);
-                AMREX_D_TERM(
-                    Array4<Real  > xflx_arr = flux[0].array(); ,
-                    Array4<Real  > yflx_arr = flux[1].array(); ,
-                    Array4<Real  > zflx_arr = flux[2].array();)
+                // AMREX_D_TERM(
+                //     Array4<Real  > xflx_arr = flux[0].array(); ,
+                //     Array4<Real  > yflx_arr = flux[1].array(); ,
+                //     Array4<Real  > zflx_arr = flux[2].array();)
 
-                compute_dSdt_box(bx, s_arr, dsdt_arr, AMREX_D_DECL(xflx_arr, yflx_arr, zflx_arr));
+                compute_dSdt_box(bx, s_arr, dsdt_arr, {AMREX_D_DECL(&flux[0],&flux[1],&flux[2])});
 
                 if (write_to_flux_register) {
                     if (fr_as_crse) {

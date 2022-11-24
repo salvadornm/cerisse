@@ -1,5 +1,6 @@
 #include "CNS.H"
 #include "CNS_hydro_K.H"
+// #include "hyperbolics.H"
 #include "CNS_hydro_eb_K.H"
 #include "CNS_divop_K.H"
 #include "CNS_diffusion_eb_K.H"
@@ -111,10 +112,7 @@ CNS::compute_dSdt_box_eb (const Box&                      bx,
                  auto const& fzfab = flux_tmp[2].array(););
 
     // EB weights
-    GpuArray<Real,3> weights;
-    weights[0] = 0.;
-    weights[1] = 1.;
-    weights[2] = 0.5;
+    GpuArray<const Real, 3> weights{0.0, 1.0, 0.5};
 
     // Initialize dm_as_fine to 0
     if (as_fine) {

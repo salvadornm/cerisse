@@ -19,8 +19,8 @@
 // Index per field
 #define URHO   0
 #define UMX    1
-#define UMY    2
-#define UMZ    3 // We have UMY and UMZ no matter what AMREX_SPACEDIM
+#define UMY    2 // For now, we have UMY and 
+#define UMZ    3 // UMZ no matter what AMREX_SPACEDIM
 #define UEDEN  4
 #define UEINT  5
 #define UTEMP  6
@@ -36,13 +36,18 @@
 #define QV     2
 #define QW     3
 #define QPRES  4
-#define QCS    5
+#define QC     5
 #define QEINT  6
 #define QTEMP  7
-#define QG     8
-#define QFS    9
-#define NPRIM  int(9 + NUM_SPECIES)
+#define QFS    8
+#define NPRIM  int(8 + NUM_SPECIES)
 #define LEN_PRIM  int(NPRIM * (NUM_FIELD + 1))
+
+// Characteristic variables
+#define NCHAR int(NUM_SPECIES + AMREX_SPACEDIM + 1)
+#define WMAT  0
+#define WACO  int(NUM_SPECIES)
+#define WUT   int(NUM_SPECIES + 2)
 
 // Transport coefficients (_MeanField, _Field0, _Field1, ...)
 #define CMU    0  // dynamic viscosity

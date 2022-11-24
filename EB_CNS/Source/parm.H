@@ -18,6 +18,7 @@ struct Parm
 
     amrex::Real smallr = 1.e-19; // small rho
     amrex::Real smallp = 1.e-10; // small p
+    amrex::Real smallu = 1.e-12; // small u
 
     // amrex::Real const_visc_mu = -1.0;
     // amrex::Real const_visc_ki = -1.0;

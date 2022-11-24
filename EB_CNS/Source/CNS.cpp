@@ -532,6 +532,16 @@ CNS::read_params ()
     pp.query("cfl", cfl);
     pp.query("dt_cutoff", dt_cutoff);
 
+    // recon_scheme
+    //  1 -- piecewise constant
+    //  2 -- piecewise linear
+    //  3 -- WENO-JS 5th order
+    //  4 -- WENO-Z 5th order
+    pp.query("recon_scheme", plm_iorder); 
+    if (plm_iorder == 2) {
+        pp.query("limiter_theta", plm_theta);
+    }
+
     Vector<int> lo_bc(AMREX_SPACEDIM), hi_bc(AMREX_SPACEDIM);
     pp.getarr("lo_bc", lo_bc, 0, AMREX_SPACEDIM);
     pp.getarr("hi_bc", hi_bc, 0, AMREX_SPACEDIM);
