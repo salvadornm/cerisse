@@ -186,10 +186,8 @@ wenoz5 (amrex::Real s[5], amrex::Real& sm, amrex::Real& sp) noexcept
  * @param qr   right state at a face.
  * @param recon_scheme reconstruction scheme, 1:piecewise constant, 2:MUSCL, 3:WENO-JS5, 4:WENO-Z5.
  * @param plt_theta a paramter in MUSCL limiter, between 1.0 and 2.0.
- * \sa q2cha, cha2q
  */
-AMREX_GPU_DEVICE AMREX_FORCE_INLINE
-void
+AMREX_GPU_DEVICE AMREX_FORCE_INLINE void
 cns_recon (int i, int j, int k, int n, int dir,
            amrex::Array4<amrex::Real const> const& q,
            amrex::Array4<amrex::Real> const& ql,
