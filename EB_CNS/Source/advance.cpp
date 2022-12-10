@@ -4,19 +4,9 @@
 #endif
 
 #include "CNS.H"
+#include "pdf_model.H"
 
 using namespace amrex;
-
-/*
- * NOTE FOR FUTURE DEVELOPER(S): 
- *
- * When implementing stochastic fields, I use this file to contain all modifications.
- * The function advance deals with the entire state and reaction fab, while the 
- * compute_dSdt breaks the fab down into fields and feeds each field to the 
- * compute_dSdt_box(_eb) funstion. As a rule, only this file (and react.cpp) should  
- * contain stochastic field information, e.g. LEN_STATE, NUM_FIELD, and other files 
- * should see inputs of indivial field, e.g. NVAR, same as AMReX or PeleC.
- */
 
 Real
 CNS::advance(Real time, Real dt, int /*iteration*/, int /*ncycle*/)
@@ -63,20 +53,28 @@ CNS::advance(Real time, Real dt, int /*iteration*/, int /*ncycle*/)
     }
 
     // Start time-stepping
+    // if (Euler1) {
+    //     if (verbose > 0) amrex::Print() << " ... Forward Euler: Computing dSdt^{n}" << std::endl;
+
+    //     FillPatch(*this, Sborder, NUM_GROW, time, State_Type, 0, LEN_STATE);
+    //     compute_dSdt(Sborder, dSdt_old, dt, fr_as_crse, fr_as_fine, true);
+    //     MultiFab::LinComb(S_new, 1.0, Sborder, 0, dt, dSdt_old, 0, 0, LEN_STATE, 0);
+    //     if (do_react) {
+    //         react_source(time, dt, false);
+    //         MultiFab::Saxpy(S_new, dt, I_R, 0, UFS, NUM_SPECIES, 0);
+    //     }
+    // } else {    
     // RK2 stage 1: U^* = U^n + dt*dUdt^n + dt*I_R^n
     if (verbose > 0) amrex::Print() << " ... RK Step 1: Computing dSdt^{n}" << std::endl;
 
     FillPatch(*this, Sborder, NUM_GROW, time, State_Type, 0, LEN_STATE);
-    // if (verbose >= 2) amrex::Print() << "                 ... RK Step 1.1" << std::endl;
     compute_dSdt(Sborder, dSdt_old, 0.5*dt, fr_as_crse, fr_as_fine, true);
-    // if (verbose >= 2) amrex::Print() << "                 ... RK Step 1.2" << std::endl;
     MultiFab::LinComb(S_new, 1.0, Sborder, 0, dt, dSdt_old, 0, 0, LEN_STATE, 0);
-    // if (verbose >= 2) amrex::Print() << "                 ... RK Step 1.3" << std::endl;
     if (do_react) {
         MultiFab::Saxpy(S_new, dt, I_R, 0, UFS, NUM_SPECIES, 0);
-        MultiFab::Saxpy(S_new, dt, I_R, NUM_SPECIES, UEDEN, 1, 0);
+        // MultiFab::Saxpy(S_new, dt, I_R, NUM_SPECIES, UEDEN, 1, 0);
     }
-    computeTemp(S_new, 0); // Update EINT and TEMP
+    //computeTemp(S_new, 0); // Update EINT and TEMP
     
     // RK2 stage 2: U^{n+1} = U^n + 0.5*dt*(dUdt^n + dUdt^{n+1}) + dt*I_R^{n+1}
     if (verbose > 0) amrex::Print() << " ... RK Step 2: Computing dSdt^{n+1}" << std::endl;
@@ -85,37 +83,43 @@ CNS::advance(Real time, Real dt, int /*iteration*/, int /*ncycle*/)
     compute_dSdt(Sborder, dSdt_new, 0.5*dt, fr_as_crse, fr_as_fine, (rk_reaction_iter < 1));
     MultiFab::LinComb(S_new, 1.0, S_old, 0, 0.5*dt, dSdt_old, 0, 0, LEN_STATE, 0);
     MultiFab::Saxpy(S_new, 0.5*dt, dSdt_new, 0, 0, LEN_STATE, 0); // U^** = U^n + 0.5*dt*(dUdt^n + dUdt^{n+1})
-
     if (do_react) {
         react_source(time, dt, false); // Compute I_R^{n+1}(U^**)
 
         // Finally, U^{n+1} = U^** + dt*I_R^{n+1}
         MultiFab::Saxpy(S_new, dt, I_R, 0, UFS, NUM_SPECIES, 0);
-        MultiFab::Saxpy(S_new, dt, I_R, NUM_SPECIES, UEDEN, 1, 0);
+        // MultiFab::Saxpy(S_new, dt, I_R, NUM_SPECIES, UEDEN, 1, 0);
     }
-    computeTemp(S_new, 0); // Update EINT and TEMP
+    //computeTemp(S_new, 0); // Update EINT and TEMP
     
     // Iterate to couple chemistry
-    if (do_react && (rk_reaction_iter > 1)) {
-        for (int iter = 1; iter < rk_reaction_iter; ++iter) {
-            if (verbose > 0) {
-                amrex::Print() << " ... Re-computing dSdt^{n+1}: iter " 
-                               << iter << " of " << rk_reaction_iter << ")" << std::endl;
-            }
+    // if (do_react && (rk_reaction_iter > 1)) {
+    //     for (int iter = 1; iter < rk_reaction_iter; ++iter) {
+    //         if (verbose > 0) {
+    //             amrex::Print() << " ... Re-computing dSdt^{n+1}: iter " 
+    //                            << iter << " of " << rk_reaction_iter << ")" << std::endl;
+    //         }
 
-            FillPatch(*this, Sborder, NUM_GROW, time+dt, State_Type, 0, LEN_STATE);
-            compute_dSdt(Sborder, dSdt_new, 0.5*dt, fr_as_crse, fr_as_fine, (iter == rk_reaction_iter));
+    //         FillPatch(*this, Sborder, NUM_GROW, time+dt, State_Type, 0, LEN_STATE);
+    //         compute_dSdt(Sborder, dSdt_new, 0.5*dt, fr_as_crse, fr_as_fine, (iter == rk_reaction_iter));
             
-            MultiFab::LinComb(S_new, 1.0, S_old, 0, 0.5*dt, dSdt_old, 0, 0, LEN_STATE, 0);
-            MultiFab::Saxpy(S_new, 0.5*dt, dSdt_new, 0, 0, LEN_STATE, 0);
+    //         MultiFab::LinComb(S_new, 1.0, S_old, 0, 0.5*dt, dSdt_old, 0, 0, LEN_STATE, 0);
+    //         MultiFab::Saxpy(S_new, 0.5*dt, dSdt_new, 0, 0, LEN_STATE, 0);
             
-            react_source(time, dt, false);
+    //         react_source(time, dt, false);
 
-            MultiFab::Saxpy(S_new, dt, I_R, 0, UFS, NUM_SPECIES, 0);
-            MultiFab::Saxpy(S_new, dt, I_R, NUM_SPECIES, UEDEN, 1, 0);
+    //         MultiFab::Saxpy(S_new, dt, I_R, 0, UFS, NUM_SPECIES, 0);
+    //         MultiFab::Saxpy(S_new, dt, I_R, NUM_SPECIES, UEDEN, 1, 0);
             
-            computeTemp(S_new, 0);
-        }
+    //         computeTemp(S_new, 0);
+    //     }
+    // }
+    // }
+
+    if (NUM_FIELD > 0) {
+        computeAvg(S_new);
+        compute_pdf_model(S_new, dt);
+        computeAvg(S_new);
     }
 
     return dt;
@@ -178,10 +182,6 @@ CNS::compute_dSdt (const MultiFab& S, MultiFab& dSdt, Real dt,
 #endif
                 Array4<Real const>    s_arr =    S.array(mfi);
                 Array4<Real      > dsdt_arr = dSdt.array(mfi);
-                // AMREX_D_TERM(
-                //     Array4<Real  > xflx_arr = flux[0].array(); ,
-                //     Array4<Real  > yflx_arr = flux[1].array(); ,
-                //     Array4<Real  > zflx_arr = flux[2].array();)
 
                 compute_dSdt_box(bx, s_arr, dsdt_arr, {AMREX_D_DECL(&flux[0],&flux[1],&flux[2])});
 
@@ -272,6 +272,6 @@ CNS::compute_dSdt (const MultiFab& S, MultiFab& dSdt, Real dt,
 
         wt = (amrex::second() - wt) / bx.d_numPts();
         cost[mfi].plus<RunOn::Device>(wt, bx);
-    }
+    } // mfi loop
 } // omp parallel
 }
