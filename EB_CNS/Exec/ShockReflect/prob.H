@@ -11,9 +11,9 @@
 /**
  * \brief Initialise state data.
  * 
- * @param i         x position.
- * @param j         y position.
- * @param k         z position.
+ * @param i         x index.
+ * @param j         y index.
+ * @param k         z index.
  * @param state     state data.
  * @param geomdata  domain geometry data.
  * @param parm      Parm data defined in parm.H.
@@ -22,11 +22,11 @@
 AMREX_GPU_DEVICE
 AMREX_FORCE_INLINE
 void
-cns_initdata (int i, int j, int k, 
-              amrex::Array4<amrex::Real> const& state,
-              amrex::GeometryData const& geomdata,
-              Parm const& /*parm*/,
-              ProbParm const& prob_parm)
+prob_initdata (int i, int j, int k, 
+               amrex::Array4<amrex::Real> const& state,
+               amrex::GeometryData const& geomdata,
+               Parm const& /*parm*/,
+               ProbParm const& prob_parm)
 {
     // Geometry
     const amrex::Real* prob_lo = geomdata.ProbLo();
@@ -34,25 +34,27 @@ cns_initdata (int i, int j, int k,
     const amrex::Real x = prob_lo[0] + (i + 0.5) * dx[0];
     const amrex::Real y = prob_lo[1] + (j + 0.5) * dx[1];
 
-    // Set the states
-    if (x < 1./6. + 1./sqrt(3.)*y) {
-        state(i, j, k, URHO) = prob_parm.rho_l;
-        state(i, j, k, UMX) = prob_parm.rho_l * prob_parm.u_l;
-        state(i, j, k, UMY) = prob_parm.rho_l * prob_parm.v_l;
-        state(i, j, k, UMZ) = 0.0;
-        state(i, j, k, UEDEN) = prob_parm.rhoe_l + 0.5 * prob_parm.rho_l * (prob_parm.u_l * prob_parm.u_l + prob_parm.v_l * prob_parm.v_l);
-        state(i, j, k, UEINT) = prob_parm.rhoe_l;
-        state(i, j, k, UTEMP) = prob_parm.T_l;
-        state(i, j, k, UFS) = prob_parm.rho_l;
-    } else {
-        state(i, j, k, URHO) = prob_parm.rho_r;
-        state(i, j, k, UMX) = 0.0;
-        state(i, j, k, UMY) = 0.0;
-        state(i, j, k, UMZ) = 0.0;
-        state(i, j, k, UEDEN) = prob_parm.rhoe_r;
-        state(i, j, k, UEINT) = prob_parm.rhoe_r;
-        state(i, j, k, UTEMP) = prob_parm.T_r;
-        state(i, j, k, UFS) = prob_parm.rho_r;
+    for (int nf = 0; nf <= NUM_FIELD; ++nf) {
+        // Set the states
+        if (x < 1./6. + 1./sqrt(3.)*y) {
+            state(i, j, k, nf*NVAR + URHO) = prob_parm.rho_l;
+            state(i, j, k, nf*NVAR + UMX) = prob_parm.rho_l * prob_parm.u_l;
+            state(i, j, k, nf*NVAR + UMY) = prob_parm.rho_l * prob_parm.v_l;
+            state(i, j, k, nf*NVAR + UMZ) = 0.0;
+            state(i, j, k, nf*NVAR + UEDEN) = prob_parm.rhoe_l + 0.5 * prob_parm.rho_l * (prob_parm.u_l * prob_parm.u_l + prob_parm.v_l * prob_parm.v_l);
+            // state(i, j, k, nf*NVAR + UEINT) = prob_parm.rhoe_l;
+            // state(i, j, k, nf*NVAR + UTEMP) = prob_parm.T_l;
+            state(i, j, k, nf*NVAR + UFS) = prob_parm.rho_l;
+        } else {
+            state(i, j, k, nf*NVAR + URHO) = prob_parm.rho_r;
+            state(i, j, k, nf*NVAR + UMX) = 0.0;
+            state(i, j, k, nf*NVAR + UMY) = 0.0;
+            state(i, j, k, nf*NVAR + UMZ) = 0.0;
+            state(i, j, k, nf*NVAR + UEDEN) = prob_parm.rhoe_r;
+            // state(i, j, k, nf*NVAR + UEINT) = prob_parm.rhoe_r;
+            // state(i, j, k, nf*NVAR + UTEMP) = prob_parm.T_r;
+            state(i, j, k, nf*NVAR + UFS) = prob_parm.rho_r;
+        }
     }
 }
 
@@ -82,54 +84,56 @@ bcnormal (const amrex::Real x[AMREX_SPACEDIM],
           amrex::GeometryData const& /*geomdata*/,
           ProbParm const& prob_parm)
 {
-    if (idir == 0 && sgn == 1) { //xlo
-        // post shock conditions
-        s_ext[URHO] = prob_parm.rho_l;
-        s_ext[UMX] = prob_parm.rho_l * prob_parm.u_l;
-        s_ext[UMY] = prob_parm.rho_l * prob_parm.v_l;
-        s_ext[UMZ] = 0.0;
-        s_ext[UEDEN] = prob_parm.rhoe_l + 0.5 * prob_parm.rho_l * (prob_parm.u_l * prob_parm.u_l + prob_parm.v_l * prob_parm.v_l);
-        s_ext[UEINT] = prob_parm.rhoe_l;
-        s_ext[UTEMP] = prob_parm.T_l;
-        s_ext[UFS] = prob_parm.rho_l;
-    } else if (idir == 1) {
-        if (sgn == 1) { //ylo
-            if (x[0] < 1./6.) {
-                // FOExtrap
-                for (int i = 0; i < LEN_STATE; ++i) s_ext[i] = s_int[i];
-            } else {
-                // SlipWall
-                s_ext[URHO] = s_int[URHO];
-                s_ext[UMX] = s_int[UMX];
-                s_ext[UMY] =-s_int[UMY];
-                s_ext[UMZ] = s_int[UMZ];
-                s_ext[UEDEN] = s_int[UEDEN];
-                s_ext[UEINT] = s_int[UEINT];
-                s_ext[UTEMP] = s_int[UTEMP];
-                s_ext[UFS] = s_int[UFS];
+    for (int nf = 0; nf <= NUM_FIELD; ++nf) {
+        if (idir == 0 && sgn == 1) { //xlo
+            // post shock conditions
+            s_ext[nf*NVAR + URHO] = prob_parm.rho_l;
+            s_ext[nf*NVAR + UMX] = prob_parm.rho_l * prob_parm.u_l;
+            s_ext[nf*NVAR + UMY] = prob_parm.rho_l * prob_parm.v_l;
+            s_ext[nf*NVAR + UMZ] = 0.0;
+            s_ext[nf*NVAR + UEDEN] = prob_parm.rhoe_l + 0.5 * prob_parm.rho_l * (prob_parm.u_l * prob_parm.u_l + prob_parm.v_l * prob_parm.v_l);
+            // s_ext[nf*NVAR + UEINT] = prob_parm.rhoe_l;
+            // s_ext[nf*NVAR + UTEMP] = prob_parm.T_l;
+            s_ext[nf*NVAR + UFS] = prob_parm.rho_l;
+        } else if (idir == 1) {
+            if (sgn == 1) { //ylo
+                if (x[0] < 1./6.) {
+                    // FOExtrap
+                    for (int i = 0; i < LEN_STATE; ++i) s_ext[i] = s_int[i];
+                } else {
+                    // SlipWall
+                    s_ext[nf*NVAR + URHO] = s_int[URHO];
+                    s_ext[nf*NVAR + UMX] = s_int[UMX];
+                    s_ext[nf*NVAR + UMY] =-s_int[UMY];
+                    s_ext[nf*NVAR + UMZ] = s_int[UMZ];
+                    s_ext[nf*NVAR + UEDEN] = s_int[UEDEN];
+                    // s_ext[nf*NVAR + UEINT] = s_int[UEINT];
+                    // s_ext[nf*NVAR + UTEMP] = s_int[UTEMP];
+                    s_ext[nf*NVAR + UFS] = s_int[UFS];
+                }
+            } else { //yhi
+                // moving shock conditions
+                amrex::Real us = 10. * prob_parm.c_r / sqrt(3.) * 2.; //shock speed
+                if (x[0] - us*time < 1./6. + 1./sqrt(3.)*x[1]) {
+                    s_ext[nf*NVAR + URHO] = prob_parm.rho_l;
+                    s_ext[nf*NVAR + UMX] = prob_parm.rho_l * prob_parm.u_l;
+                    s_ext[nf*NVAR + UMY] = prob_parm.rho_l * prob_parm.v_l;
+                    s_ext[nf*NVAR + UMZ] = 0.0;
+                    s_ext[nf*NVAR + UEDEN] = prob_parm.rhoe_l + 0.5 * prob_parm.rho_l * (prob_parm.u_l * prob_parm.u_l + prob_parm.v_l * prob_parm.v_l);
+                    // s_ext[nf*NVAR + UEINT] = prob_parm.rhoe_l;
+                    // s_ext[nf*NVAR + UTEMP] = prob_parm.T_l;
+                    s_ext[nf*NVAR + UFS] = prob_parm.rho_l;
+                } else {
+                    s_ext[nf*NVAR + URHO] = prob_parm.rho_r;
+                    s_ext[nf*NVAR + UMX] = 0.0;
+                    s_ext[nf*NVAR + UMY] = 0.0;
+                    s_ext[nf*NVAR + UMZ] = 0.0;
+                    s_ext[nf*NVAR + UEDEN] = prob_parm.rhoe_r;
+                    // s_ext[nf*NVAR + UEINT] = prob_parm.rhoe_r;
+                    // s_ext[nf*NVAR + UTEMP] = prob_parm.T_r;
+                    s_ext[nf*NVAR + UFS] = prob_parm.rho_r;
+                }  
             }
-        } else { //yhi
-            // moving shock conditions
-            amrex::Real us = 10. * prob_parm.c_r / sqrt(3.) * 2.; //shock speed
-            if (x[0] - us*time < 1./6. + 1./sqrt(3.)*x[1]) {
-                s_ext[URHO] = prob_parm.rho_l;
-                s_ext[UMX] = prob_parm.rho_l * prob_parm.u_l;
-                s_ext[UMY] = prob_parm.rho_l * prob_parm.v_l;
-                s_ext[UMZ] = 0.0;
-                s_ext[UEDEN] = prob_parm.rhoe_l + 0.5 * prob_parm.rho_l * (prob_parm.u_l * prob_parm.u_l + prob_parm.v_l * prob_parm.v_l);
-                s_ext[UEINT] = prob_parm.rhoe_l;
-                s_ext[UTEMP] = prob_parm.T_l;
-                s_ext[UFS] = prob_parm.rho_l;
-            } else {
-                s_ext[URHO] = prob_parm.rho_r;
-                s_ext[UMX] = 0.0;
-                s_ext[UMY] = 0.0;
-                s_ext[UMZ] = 0.0;
-                s_ext[UEDEN] = prob_parm.rhoe_r;
-                s_ext[UEINT] = prob_parm.rhoe_r;
-                s_ext[UTEMP] = prob_parm.T_r;
-                s_ext[UFS] = prob_parm.rho_r;
-            }  
         }
     }
 }
