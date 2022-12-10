@@ -22,32 +22,34 @@
 #define UMY    2 // For now, we have UMY and 
 #define UMZ    3 // UMZ no matter what AMREX_SPACEDIM
 #define UEDEN  4
-#define UEINT  5
-#define UTEMP  6
-#define UFS    7
-#define NVAR   int(7 + NUM_SPECIES)
-#define UFA    int(NVAR * (NUM_FIELD + 1))
-// Total components of state fab
-#define LEN_STATE  int(UFA + NUM_AUX)
+//#define UEINT  5
+//#define UTEMP  6
+#define UFS    5
+#define NVAR   int(UFS + NUM_SPECIES) // Number of variables per field
+#define UFA    int(NVAR * (NUM_FIELD + 1)) // Aux variables
+#define LEN_STATE  int(UFA + NUM_AUX) // Total components of state fab
 
-// Primitive variables (_MeanField, _Field0, _Field1, ...)
+// Primitive variables
 #define QRHO   0
 #define QU     1
 #define QV     2
 #define QW     3
 #define QPRES  4
-#define QC     5
-#define QEINT  6
-#define QTEMP  7
-#define QFS    8
-#define NPRIM  int(8 + NUM_SPECIES)
+#define QC     5 // speed of sound
+#define QG     6 // gamma
+#define QEINT  7
+#define QTEMP  8
+#define QFS    9
+#define NPRIM  int(QFS + NUM_SPECIES)
 #define LEN_PRIM  int(NPRIM * (NUM_FIELD + 1))
 
 // Characteristic variables
-#define NCHAR int(NUM_SPECIES + AMREX_SPACEDIM + 1)
-#define WMAT  0
-#define WACO  int(NUM_SPECIES)
-#define WUT   int(NUM_SPECIES + 2)
+#define WRHO  0                    // material waves (rho)
+#define WY    1                    // Y, simply advected
+#define WACO  int(NUM_SPECIES + 1)     // acoustic waves
+#define WC    int(NUM_SPECIES + 3) // speed of sound
+#define WUT   int(NUM_SPECIES + 4) // tangential velocities
+#define NCHAR int(NUM_SPECIES + AMREX_SPACEDIM + 3)
 
 // Transport coefficients (_MeanField, _Field0, _Field1, ...)
 #define CMU    0  // dynamic viscosity
@@ -58,7 +60,7 @@
 #define LEN_COEF  int(NCOEF * (NUM_FIELD + 1))
 
 // Reaction variables (_MeanField, _Field0, _Field1, ...)
-#define NREACT     int(NUM_SPECIES + 2)
+#define NREACT     int(NUM_SPECIES + 1)
 #define LEN_REACT  int(NREACT * (NUM_FIELD + 1))
 
 #endif

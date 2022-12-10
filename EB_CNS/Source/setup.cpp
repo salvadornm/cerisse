@@ -123,8 +123,8 @@ CNS::variableSetUp ()
     amrex::Vector<std::string>  name(LEN_STATE);
     amrex::BCRec bc;
 
-    pele::physics::eos::speciesNames<
-        pele::physics::PhysicsType::eos_type>(spec_names);
+    amrex::Vector<std::string> spec_names;
+    pele::physics::eos::speciesNames<pele::physics::PhysicsType::eos_type>(spec_names);
     
     if (amrex::ParallelDescriptor::IOProcessor()) {
         // Print species names
@@ -148,8 +148,8 @@ CNS::variableSetUp ()
     set_y_vel_bc(bc,phys_bc);  bcs[cnt] = bc; name[cnt] = "ymom";    cnt++;
     set_z_vel_bc(bc,phys_bc);  bcs[cnt] = bc; name[cnt] = "zmom";    cnt++;
     set_scalar_bc(bc,phys_bc); bcs[cnt] = bc; name[cnt] = "rho_E";   cnt++;
-    set_scalar_bc(bc,phys_bc); bcs[cnt] = bc; name[cnt] = "rho_e";   cnt++;
-    set_scalar_bc(bc,phys_bc); bcs[cnt] = bc; name[cnt] = "Temp";    cnt++;
+    // set_scalar_bc(bc,phys_bc); bcs[cnt] = bc; name[cnt] = "rho_e";   cnt++;
+    // set_scalar_bc(bc,phys_bc); bcs[cnt] = bc; name[cnt] = "Temp";    cnt++;
     for (int i = 0; i < NUM_SPECIES; ++i) {
         set_scalar_bc(bc, phys_bc); bcs[cnt] = bc; name[cnt] = "rho_" + spec_names[i];
         cnt++;
@@ -162,8 +162,8 @@ CNS::variableSetUp ()
         set_y_vel_bc(bc,phys_bc);  bcs[cnt] = bc; name[cnt] = "ymom_Field"    + std::to_string(nf); cnt++;
         set_z_vel_bc(bc,phys_bc);  bcs[cnt] = bc; name[cnt] = "zmom_Field"    + std::to_string(nf); cnt++;
         set_scalar_bc(bc,phys_bc); bcs[cnt] = bc; name[cnt] = "rho_E_Field"   + std::to_string(nf); cnt++;
-        set_scalar_bc(bc,phys_bc); bcs[cnt] = bc; name[cnt] = "rho_e_Field"   + std::to_string(nf); cnt++;
-        set_scalar_bc(bc,phys_bc); bcs[cnt] = bc; name[cnt] = "Temp_Field"    + std::to_string(nf); cnt++;
+        // set_scalar_bc(bc,phys_bc); bcs[cnt] = bc; name[cnt] = "rho_e_Field"   + std::to_string(nf); cnt++;
+        // set_scalar_bc(bc,phys_bc); bcs[cnt] = bc; name[cnt] = "Temp_Field"    + std::to_string(nf); cnt++;
         for (int i = 0; i < NUM_SPECIES; ++i) {
             set_scalar_bc(bc, phys_bc); bcs[cnt] = bc; name[cnt] = "rho_" + spec_names[i] + "_Field" + std::to_string(nf);
             cnt++;
@@ -198,7 +198,7 @@ CNS::variableSetUp ()
         react_name[cnt] = "rho_omega_" + spec_names[i];
         cnt++;
     }
-    set_react_src_bc(bc, phys_bc); react_bcs[cnt] = bc; react_name[cnt] = "rhoe_dot";    cnt++;
+    // set_react_src_bc(bc, phys_bc); react_bcs[cnt] = bc; react_name[cnt] = "rhoe_dot";    cnt++;
     set_react_src_bc(bc, phys_bc); react_bcs[cnt] = bc; react_name[cnt] = "heatRelease"; cnt++;
 
     // For each field
@@ -209,7 +209,7 @@ CNS::variableSetUp ()
             react_name[cnt] = "rho_omega_" + spec_names[i] + "_Field" + std::to_string(nf);
             cnt++; 
         }
-        set_react_src_bc(bc, phys_bc); react_bcs[cnt] = bc; react_name[cnt] = "rhoe_dot_Field"    + std::to_string(nf); cnt++; 
+        // set_react_src_bc(bc, phys_bc); react_bcs[cnt] = bc; react_name[cnt] = "rhoe_dot_Field"    + std::to_string(nf); cnt++; 
         set_react_src_bc(bc, phys_bc); react_bcs[cnt] = bc; react_name[cnt] = "heatRelease_Field" + std::to_string(nf); cnt++;
     }
 
@@ -237,6 +237,11 @@ CNS::variableSetUp ()
     StateDescriptor::setBndryFuncThreadSafety(true);
 
     // DEFINE DERIVED QUANTITIES (Derive from MEAN field)
+    // Temperature
+    derive_lst.add("temp", IndexType::TheCellType(), 1,
+                   cns_dertemp, amrex::DeriveRec::TheSameBox);
+    derive_lst.addComponent("temp", desc_lst, State_Type, URHO, NVAR);
+
     // Pressure
     derive_lst.add("pressure", IndexType::TheCellType(), 1,
                    cns_derpres, amrex::DeriveRec::TheSameBox);
@@ -254,7 +259,6 @@ CNS::variableSetUp ()
     derive_lst.addComponent("y_velocity", desc_lst, State_Type, URHO, 1);
     derive_lst.addComponent("y_velocity", desc_lst, State_Type, UMY, 1);
 #endif
-
 #if (AMREX_SPACEDIM == 3)
     derive_lst.add("z_velocity", IndexType::TheCellType(), 1,
                    cns_dervel, amrex::DeriveRec::TheSameBox);

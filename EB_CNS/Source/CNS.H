@@ -126,9 +126,11 @@ public:
 
     amrex::Real estTimeStep ();
 
-    void computeTemp (amrex::MultiFab& State, int ng);
+    // void computeTemp (amrex::MultiFab& State, int ng);
+    void computeAvg (MultiFab& State);
 
     void compute_dSdt_box (const amrex::Box& bx,
+                           //const amrex::Real dWdt[NUM_FIELD][AMREX_SPACEDIM],
                            amrex::Array4<amrex::Real const>& Sfab,
                            amrex::Array4<amrex::Real      >& dSdtfab,
                            const std::array<FArrayBox*, AMREX_SPACEDIM>& flux
@@ -139,6 +141,7 @@ public:
 
 #if (AMREX_SPACEDIM > 1) //1D cannot have EB
     void compute_dSdt_box_eb (const amrex::Box& bx,
+                              //const amrex::Real dWdt[NUM_FIELD][AMREX_SPACEDIM],
                               amrex::Array4<amrex::Real       const> const& Sfab,
                               amrex::Array4<amrex::Real            > const& dSdtfab,
                               /*std::array<FArrayBox*, AMREX_SPACEDIM> const& flux,*/
@@ -181,6 +184,8 @@ public:
                                 amrex::Array4<int               const> const& lev_mask,
                                 amrex::Real dt);
 #endif
+    
+    void compute_pdf_model (amrex::MultiFab& S, amrex::Real dt);
 
     static Parm* h_parm;
     static Parm* d_parm;
@@ -239,15 +244,21 @@ protected:
     static pele::physics::transport::TransportParams<
         pele::physics::PhysicsType::transport_type> trans_parms;
 
-    static amrex::Vector<std::string> spec_names;
+    // static amrex::Vector<std::string> spec_names;
 
     static std::string chem_integrator;
 
     std::unique_ptr<pele::physics::reactions::ReactorBase> reactor;
 
-    void react_source(amrex::Real time, amrex::Real dt, bool react_init = false);
+    void react_source (amrex::Real time, amrex::Real dt, bool react_init = false);
 
-    void set_typical_values_chem();
+    void fill_ext_src (int i, int j, int k, amrex::Real time,
+                       amrex::GeometryData const& geomdata, 
+                       amrex::Array4<const amrex::Real> const& state, 
+                       amrex::Array4<amrex::Real> const& ext_src, 
+                       Parm const& parm, ProbParm const& prob_parm);
+
+    void set_typical_values_chem ();
 
     // Parameters
     static int verbose;
@@ -257,7 +268,8 @@ protected:
 
     static bool do_visc;
     static bool do_react;
-    static bool use_const_visc;
+    static bool do_ext_src;
+    // static bool use_const_visc;
     static bool use_typical_vals_chem;
     static int  reset_typical_vals_int;
     static int  rk_reaction_iter;
@@ -266,6 +278,9 @@ protected:
 
     static int recon_scheme;
     static amrex::Real plm_theta;
+
+    static bool do_vpdf;
+    static bool do_spdf;
 
     static int eb_weights_type;
     static int do_reredistribution;
@@ -285,7 +300,7 @@ protected:
     static bool signalStopJob;
 };
 
-void cns_bcfill(
+void cns_bcfill (
     amrex::Box const& bx, 
     amrex::FArrayBox& data,
     const int dcomp, 
@@ -296,7 +311,7 @@ void cns_bcfill(
     const int bcomp,
     const int scomp);
 
-void cns_react_bcfill(
+void cns_react_bcfill (
     amrex::Box const& bx, 
     amrex::FArrayBox& data,
     const int dcomp, 

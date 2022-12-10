@@ -30,13 +30,12 @@ Vector<RealBox> CNS::refine_boxes;
 RealBox* CNS::dp_refine_boxes;
 
 bool     CNS::do_visc        = true;  // diffusion is on by default
-bool     CNS::use_const_visc = false; // diffusion does not use constant viscosity by default
-
+// bool     CNS::use_const_visc = false; // diffusion does not use constant viscosity by default
+bool     CNS::do_ext_src     = true;
 bool     CNS::do_react       = false; // reaction is off by default
 std::string CNS::chem_integrator = "Reactor_Null";
 pele::physics::transport::TransportParams<
   pele::physics::PhysicsType::transport_type> CNS::trans_parms;
-amrex::Vector<std::string> CNS::spec_names;
 bool     CNS::use_typical_vals_chem = true; // tell chem_integrator typical value of Temp
 int      CNS::reset_typical_vals_int = 10;  // interval to reset the typical value
 int      CNS::rk_reaction_iter = 0;
@@ -44,10 +43,12 @@ int      CNS::rk_reaction_iter = 0;
 bool     CNS::do_restart_fields = false;
 
 int      CNS::recon_scheme   = 4;     // 1: basic Godunov; 2: MUSCL; 3: WENO-JS5; 4: WENO-Z5
-Real     CNS::plm_theta      = 2.0;   // [1,2] 1: minmod; 2: van Leer's MC
-// Real     CNS::gravity        = 0.0;
+Real     CNS::plm_theta      = 2.0;   // [1,2] 1: minmod; 2: van Leer's MC (higher sharper)
 
-int      CNS::eb_weights_type = 0;   // [0,1,2,3] 0: weights are all 1
+bool     CNS::do_vpdf = true;
+bool     CNS::do_spdf = false;
+
+int      CNS::eb_weights_type = 0;   // [0,1,2,3] 0: weights are all 1; 1: eint; 2: cell mass; 3: volfrac
 int      CNS::do_reredistribution = 1;
 
 bool     CNS::signalStopJob = false;
@@ -157,14 +158,14 @@ CNS::initData ()
     auto const& sarrs = S_new.arrays();
     amrex::ParallelFor(S_new,
     [=] AMREX_GPU_DEVICE (int box_no, int i, int j, int k) noexcept {
-        cns_initdata(i, j, k, sarrs[box_no], geomdata, *lparm, *lprobparm);
+        prob_initdata(i, j, k, sarrs[box_no], geomdata, *lparm, *lprobparm);
         // Verify that the sum of (rho Y)_i = rho at every cell
         // cns_check_initial_species(i, j, k, sarrs[box_no]);
     });
     amrex::Gpu::synchronize();
 
     // Compute the initial temperature (will override what was set in initdata)
-    computeTemp(S_new, 0);
+    // computeTemp(S_new, 0);
 
     // set_body_state(S_new);
     // amrex::Real cur_time = state[State_Type].curTime();
@@ -188,6 +189,7 @@ CNS::computeInitialDt (int                    finest_level,
     // Grids have been constructed, compute dt for all levels.
     if (level > 0) return;
 
+    // Find the minimum over all levels
     Real dt_0 = std::numeric_limits<Real>::max();
     int n_factor = 1;
     for (int i = 0; i <= finest_level; i++) {
@@ -236,7 +238,7 @@ CNS::computeNewDt (int                    finest_level,
         }
     } else {
         // Limit dt's by change_max * old dt (TODO: Do we really need this?)
-        static Real change_max = 1.1;
+        static Real change_max = 1.2;
         for (int i = 0; i <= finest_level; i++) {
             if ((verbose != 0) && ParallelDescriptor::IOProcessor()) {
                 if (dt_min[i] > change_max * dt_level[i]) {
@@ -311,12 +313,12 @@ CNS::post_timestep (int /*iteration*/)
     }
 
     // Re-compute temperature and reset typical_values_chem
-    amrex::MultiFab& S_new = get_new_data(State_Type);
-    computeTemp(S_new, 0);
-    if ( do_react && use_typical_vals_chem 
-      && parent->levelSteps(0) % reset_typical_vals_int == 0) {
-        set_typical_values_chem();
-    }
+    // amrex::MultiFab& S_new = get_new_data(State_Type);
+    // computeTemp(S_new, 0);
+    // if ( do_react && use_typical_vals_chem 
+    //   && parent->levelSteps(0) % reset_typical_vals_int == 0) {
+    //     set_typical_values_chem();
+    // }
 }
 
 void
@@ -328,10 +330,11 @@ CNS::postCoarseTimeStep (Real /*time*/)
     // }
 }
 
+/** \brief Print total and check for nan 
+ */
 void
 CNS::printTotal () const
-{
-    // Print total and check for nan
+{    
     BL_PROFILE("CNS::printTotal()");
 
     const MultiFab& S_new = get_new_data(State_Type);
@@ -349,9 +352,9 @@ CNS::printTotal () const
 #endif
             ParallelDescriptor::ReduceRealSum(tot.data(), 5, ParallelDescriptor::IOProcessorNumber());
             amrex::Print().SetPrecision(17) << "\n[CNS] Total mass       = " << tot[0] << "\n"
-                                            <<   "      Total x-momentum = " << tot[1] << "\n"
-                                            <<   "      Total y-momentum = " << tot[2] << "\n"
-                                            <<   "      Total z-momentum = " << tot[3] << "\n"
+                              AMREX_D_TERM( <<   "      Total x-momentum = " << tot[1] << "\n" ,
+                                            <<   "      Total y-momentum = " << tot[2] << "\n" ,
+                                            <<   "      Total z-momentum = " << tot[3] << "\n" )
                                             <<   "      Total energy     = " << tot[4] << "\n"
                                             <<   "      Total int energy = " << tot[5] << "\n";
 #ifdef BL_LAZY
@@ -511,7 +514,7 @@ CNS::errorEst (TagBoxArray& tags, int /*clearval*/, int /*tagval*/,
         auto const& rhoma = rho.const_arrays();
         ParallelFor(rho,
         [=] AMREX_GPU_DEVICE (int box_no, int i, int j, int k) noexcept {
-            cns_tag_graderror(i, j, k, tagma[box_no], rhoma[box_no], dengrad_threshold, tagval);
+            cns_tag_grad(i, j, k, tagma[box_no], rhoma[box_no], dengrad_threshold, tagval);
         });
         Gpu::streamSynchronize();
     }
@@ -538,9 +541,7 @@ CNS::read_params ()
     //  3 -- WENO-JS 5th order
     //  4 -- WENO-Z 5th order
     pp.query("recon_scheme", recon_scheme); 
-    if (recon_scheme == 2) {
-        pp.query("limiter_theta", plm_theta);
-    }
+    if (recon_scheme == 2) { pp.query("limiter_theta", plm_theta); } // MUSCL specific parameter
 
     Vector<int> lo_bc(AMREX_SPACEDIM), hi_bc(AMREX_SPACEDIM);
     pp.getarr("lo_bc", lo_bc, 0, AMREX_SPACEDIM);
@@ -553,20 +554,6 @@ CNS::read_params ()
     // pp.query("do_reflux", do_reflux); // How can you not do reflux?!
 
     pp.query("do_visc", do_visc);
-
-    // if (do_visc) {
-    //     pp.query("use_const_visc",use_const_visc);
-    //     if (use_const_visc) {
-    //         pp.get("const_visc_mu",h_parm->const_visc_mu);
-    //         pp.get("const_visc_ki",h_parm->const_visc_ki);
-    //         pp.get("const_lambda" ,h_parm->const_lambda);
-    //     }
-    // } else {
-    //    use_const_visc = true;
-    //    h_parm->const_visc_mu = 0.0;
-    //    h_parm->const_visc_ki = 0.0;
-    //    h_parm->const_lambda  = 0.0;
-    // }
 
     pp.query("refine_cutcells", refine_cutcells);
 
@@ -611,7 +598,7 @@ CNS::read_params ()
 
     // eb_weights_type:
     //   0 -- weights = 1
-    //   1 -- use_total_energy_as_eb_weights
+    //   1 -- use_int_energy_as_eb_weights
     //   2 -- use_mass_as_eb_weights
     //   3 -- use_volfrac_as_eb_weights
 #if (AMREX_SPACEDIM > 1) //1D cannot have EB
@@ -651,7 +638,7 @@ CNS::avgDown ()
     amrex::average_down(S_fine, S_crse, fgeom, cgeom, 
                         0, S_fine.nComp(), fine_ratio);
 #endif
-    computeTemp(S_crse, 0);
+    // computeTemp(S_crse, 0);
 
     if (do_react) {
               MultiFab& R_crse =          get_new_data(Reactions_Type);
@@ -670,16 +657,15 @@ void
 CNS::buildMetrics ()
 {
     BL_PROFILE("CNS::buildMetrics()");
+    
+#if (AMREX_SPACEDIM > 1) //1D cannot have EB    
+    // make sure dx == dy == dz if use EB
+    const Real* dx = geom.CellSize();
 
-    // make sure dx == dy == dz
-//     const Real* dx = geom.CellSize();
-// #if (AMREX_SPACEDIM == 2)
-//     if (std::abs(dx[0]-dx[1]) > 1.e-12*dx[0])
-//         amrex::Abort("CNS: must have dx == dy\n");
-// #else
-//     if (std::abs(dx[0]-dx[1]) > 1.e-12*dx[0] || std::abs(dx[0]-dx[2]) > 1.e-12*dx[0])
-//         amrex::Abort("CNS: must have dx == dy == dz\n");
-// #endif
+    if (AMREX_D_TERM(, std::abs(dx[0]-dx[1]) > 1.e-12*dx[0], 
+                    || std::abs(dx[0]-dx[2]) > 1.e-12*dx[0]))
+        amrex::Abort("EB must have dx == dy == dz (for cut surface fluxes)\n");
+#endif
 
 #if (AMREX_SPACEDIM > 1) //1D cannot have EB
     const auto& ebfactory = dynamic_cast<EBFArrayBoxFactory const&>(Factory());
@@ -755,30 +741,31 @@ CNS::estTimeStep ()
 //     return estTimeStep();
 // }
 
-void
-CNS::computeTemp (MultiFab& State, int ng)
-{
-    BL_PROFILE("CNS::computeTemp()");
+// void
+// CNS::computeTemp (MultiFab& State, int ng)
+// {
+//     BL_PROFILE("CNS::computeTemp()");
 
-    // This will reset Eint and compute Temperature
+//     // This will reset Eint and compute Temperature
 
-#if (AMREX_SPACEDIM > 1) //1D cannot have EB
-    auto const& fact = dynamic_cast<EBFArrayBoxFactory const&>(State.Factory());
-    auto const& flags = fact.getMultiEBCellFlagFab();
-    auto const& flagarrs = flags.const_arrays();
-#endif
+// #if (AMREX_SPACEDIM > 1) //1D cannot have EB
+//     auto const& fact = dynamic_cast<EBFArrayBoxFactory const&>(State.Factory());
+//     auto const& flags = fact.getMultiEBCellFlagFab();
+//     auto const& flagarrs = flags.const_arrays();
+// #endif
 
-#ifdef AMREX_USE_OMP
-#pragma omp parallel if (Gpu::notInLaunchRegion())
-#endif
-    auto const& sarrs = State.arrays();    
-    const amrex::IntVect ngs(ng);
-    amrex::ParallelFor(
-        State, ngs, [=] AMREX_GPU_DEVICE(int nbx, int i, int j, int k) noexcept {
-#if (AMREX_SPACEDIM > 1) //1D cannot have EB
-            if (!flagarrs[nbx](i, j, k).isCovered()) 
-#endif
-                cns_compute_temperature(i, j, k, sarrs[nbx]);            
-        });
-    amrex::Gpu::synchronize();
-}
+// #ifdef AMREX_USE_OMP
+// #pragma omp parallel if (Gpu::notInLaunchRegion())
+// #endif
+//     auto const& sarrs = State.arrays();    
+//     const amrex::IntVect ngs(ng);
+//     amrex::ParallelFor(
+//         State, ngs, [=] AMREX_GPU_DEVICE(int nbx, int i, int j, int k) noexcept {
+// #if (AMREX_SPACEDIM > 1) //1D cannot have EB
+//             if (!flagarrs[nbx](i, j, k).isCovered()) 
+// #endif
+//                 cns_compute_temperature(i, j, k, sarrs[nbx]);            
+//         });
+
+//     amrex::Gpu::synchronize();
+// }
