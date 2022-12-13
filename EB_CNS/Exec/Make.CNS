@@ -8,6 +8,7 @@ ifneq ($(DIM), 1)
    USE_EB = TRUE
 endif
 USE_SUNDIALS = TRUE
+USE_SUNDIALS_PP = TRUE
 LAZY = TRUE
 BL_NO_FORT = TRUE
 
