@@ -6,7 +6,7 @@
 
 // Number of stochastic fields
 #ifndef NUM_FIELD
-#define NUM_FIELD 0
+#define NUM_FIELD 16
 #endif
 
 // Aux states
@@ -22,10 +22,8 @@
 #define UMY    2 // For now, we have UMY and 
 #define UMZ    3 // UMZ no matter what AMREX_SPACEDIM
 #define UEDEN  4
-//#define UEINT  5
-//#define UTEMP  6
 #define UFS    5
-#define NVAR   int(UFS + NUM_SPECIES) // Number of variables per field
+#define NVAR   int(5 + NUM_SPECIES) // Number of variables per field
 #define UFA    int(NVAR * (NUM_FIELD + 1)) // Aux variables
 #define LEN_STATE  int(UFA + NUM_AUX) // Total components of state fab
 
@@ -40,7 +38,7 @@
 #define QEINT  7
 #define QTEMP  8
 #define QFS    9
-#define NPRIM  int(QFS + NUM_SPECIES)
+#define NPRIM  int(9 + NUM_SPECIES)
 #define LEN_PRIM  int(NPRIM * (NUM_FIELD + 1))
 
 // Characteristic variables

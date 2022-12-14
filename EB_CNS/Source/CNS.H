@@ -206,9 +206,6 @@ protected:
 
     void buildMetrics ();
 
-    // Compute initial time step.
-    // amrex::Real initialTimeStep ();
-
     void compute_dSdt (const amrex::MultiFab& S, amrex::MultiFab& dSdt, amrex::Real dt,
 #if (AMREX_SPACEDIM > 1) //1D cannot have EB
                        amrex::EBFluxRegister* fr_as_crse, amrex::EBFluxRegister* fr_as_fine,
@@ -269,7 +266,7 @@ protected:
     static bool do_visc;
     static bool do_react;
     static bool do_ext_src;
-    // static bool use_const_visc;
+    
     static bool use_typical_vals_chem;
     static int  reset_typical_vals_int;
     static int  rk_reaction_iter;
@@ -295,10 +292,10 @@ protected:
     static amrex::Vector<amrex::RealBox> refine_boxes;
     static amrex::RealBox* dp_refine_boxes;
 
-    // static amrex::Real gravity;
-
     static bool signalStopJob;
 };
+
+// Below are bcfill functions declared here so that setup.cpp can find them.
 
 void cns_bcfill (
     amrex::Box const& bx, 

@@ -6,31 +6,15 @@
 
 struct Parm
 {
-    // amrex::Real eos_gamma = 1.4;
-    // amrex::Real eos_mu = 28.97;  // mean molecular weight
-
-    // amrex::Real cv;
-    // amrex::Real cp;
-
-    // amrex::Real Pr  = 0.72;     // Prandtl number
-    // amrex::Real C_S = 1.458e-5; // constant in Sutherland's law
-    // amrex::Real T_S = 110.4;    // Sutherland temperature
-
     const amrex::Real smallr = 1.e-19; // small rho
     const amrex::Real smallp = 1.e-10; // small p
     const amrex::Real smallu = 1.e-12; // small u
     const amrex::Real smally = 1.e-10; // tol of |sum(Y)-1|
 
-    // amrex::Real const_visc_mu = -1.0;
-    // amrex::Real const_visc_ki = -1.0;
-    // amrex::Real const_lambda  = -1.0;
-
     static constexpr int level_mask_interior   = 0; // valid cells
     static constexpr int level_mask_covered    = 1; // ghost cells covered by valid cells of this level
     static constexpr int level_mask_notcovered = 2; // ghost cells not covered
     static constexpr int level_mask_physbnd    = 3; // outside domain
-
-    // void Initialize ();
 };
 
 #endif
