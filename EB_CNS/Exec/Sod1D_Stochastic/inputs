@@ -1,5 +1,6 @@
 max_step = 200
-stop_time = 1.959e-6 #= 0.2*sqrt(rhoL/pL)
+#stop_time = 1.959e-6 #= 0.2*sqrt(rhoL/pL)
+stop_time = 5e-6
 
 geometry.is_periodic = 0
 geometry.coord_sys   = 0  # 0 => cart, 1 => RZ  2=>spherical
@@ -20,7 +21,7 @@ cns.do_react = 0
 
 cns.recon_scheme = 4
 
-cns.cfl = 0.3
+cns.cfl = 0.1
 cns.dt_cutoff = 5.e-20
 
 cns.v = 2
@@ -35,7 +36,7 @@ amr.max_level       = 2       # maximum level number allowed
 amr.ref_ratio       = 2 2 2 2 # refinement ratio
 amr.regrid_int      = 10      # how often to regrid
 amr.blocking_factor = 8
-amr.max_grid_size   = 32
+amr.max_grid_size   = 64
 amr.n_error_buf     = 2 2 2 2 # number of buffer cells in error est
 amr.grid_eff        = 0.7
 
@@ -56,9 +57,10 @@ amr.plot_int          = 10       # number of timesteps between plotfiles
 amr.derive_plot_vars  = temp pressure x_velocity MachNumber divrho divu magvort
 
 # PROBLEM PARAMETERS
-prob.p_l = 1e7
+prob.p_l = 1e6
 prob.u_l = 0.0
-prob.rho_l = 9.6e-4
-prob.p_r = 1e6
+prob.rho_l = 7.29e-4
+prob.sd_u_l = 2000.0
+prob.p_r = 5e5
 prob.u_r = 0.0
-prob.rho_r = 1.2e-4
+prob.rho_r = 4.56e-4

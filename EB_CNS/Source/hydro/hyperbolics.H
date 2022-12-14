@@ -70,8 +70,8 @@ cns_ctoprim (int i, int j, int k, int ns,
     q(i,j,k,QTEMP) = T;
 
     if (isnan(cs)) {amrex::Print() << "cs is nan!!!\n";
-        amrex::Print() << rho << " " << T << " " << p << "\n";
-        amrex::Print() << ei << " " << massfrac[0] << " " << massfrac[1] << "\n";
+        amrex::Print() << "i=" << i << " ns=" << ns << ": " << rho << " " << T << " " << p << "\n";
+        amrex::Print() << u(i,j,k,ns+UEDEN) << " " << ei << " " << massfrac[0] << " " << massfrac[1] << "\n";
         amrex::Error();
     }
 }
@@ -398,7 +398,7 @@ hllc (const amrex::Real rl,
         AMREX_D_TERM(
             uout   = ul; ,
             ut1out = ut1l; ,
-            ut2out = ut2l;);
+            ut2out = ut2l;)
         pout = pl;
         for (int n = 0; n < NUM_SPECIES; ++n) {
             yout[n] = yl[n];
@@ -410,7 +410,7 @@ hllc (const amrex::Real rl,
         AMREX_D_TERM(
             uout   = ur; ,
             ut1out = ut1r; ,
-            ut2out = ut2r;);
+            ut2out = ut2r;)
         pout = pr;
         for (int n = 0; n < NUM_SPECIES; ++n) {
             yout[n] = yr[n];
@@ -425,7 +425,7 @@ hllc (const amrex::Real rl,
             AMREX_D_TERM(
                 uout   = sstar; ,
                 ut1out = ut1l; ,
-                ut2out = ut2l;);
+                ut2out = ut2l;)
             pout = pl + rl*(sl-ul)*(sstar-ul);
             for (int n = 0; n < NUM_SPECIES; ++n) {
                 yout[n] = yl[n];
@@ -437,7 +437,7 @@ hllc (const amrex::Real rl,
             AMREX_D_TERM(
                 uout   = sstar; ,
                 ut1out = ut1r; ,
-                ut2out = ut2r;);
+                ut2out = ut2r;)
             pout = pr + rr*(sr-ur)*(sstar-ur);
             for (int n = 0; n < NUM_SPECIES; ++n) {
                 yout[n] = yr[n];
@@ -449,7 +449,7 @@ hllc (const amrex::Real rl,
             AMREX_D_TERM(
                 uout   = 0.5*(ul+ur); ,
                 ut1out = 0.5*(ut1l+ut1r); ,
-                ut2out = 0.5*(ut2l+ut2r););
+                ut2out = 0.5*(ut2l+ut2r);)
             pout = 0.5*(pl+pr);
             for (int n = 0; n < NUM_SPECIES; ++n) {
                 yout[n] = 0.5*(yl[n]+yr[n]);                
@@ -468,14 +468,14 @@ hllc (const amrex::Real rl,
     AMREX_D_TERM(
         flxu   = rhoout*uout*uout; ,
         flxut  = rhoout*uout*ut1out; ,
-        flxutt = rhoout*uout*ut2out;);
-    flxrhoe = rhoout*uout*eout + uout*pout;
+        flxutt = rhoout*uout*ut2out;)
+    flxrhoe = rhoout*uout*eout;
     for (int n = 0; n < NUM_SPECIES; ++n) {
         flxrhoy[n] = rhoout*uout*yout[n];
         flxrho += flxrhoy[n];
     }
     pflxu += pout;
-    // pflxe += uout*pout;
+    pflxe += uout*pout;
 }
 
 // #if (AMREX_SPACEDIM > 1)
@@ -765,7 +765,7 @@ cns_riemann (int i, int j, int k, int dir,
          rr, AMREX_D_DECL(ur, ut1r, ut2r), pr, cr, er, yr,
          adv_flx(i,j,k,URHO), 
          AMREX_D_DECL(adv_flx(i,j,k,UMN), adv_flx(i,j,k,UMT), adv_flx(i,j,k,UMTT)), 
-        //  p_flx(i,j,k,UMN), p_flx(i,j,k,UEDEN),
+         p_flx(i,j,k,UMN), p_flx(i,j,k,UEDEN),
          adv_flx(i,j,k,UEDEN),
          ry_flx, //&adv_flx(i,j,k,UFS),
          parm);
@@ -796,8 +796,9 @@ void q2w (amrex::IntVect iv, int n, int QUN,
     }
 }
 
-/** \brief Reconstruction and Riemann solver all-in-one. * 
-*/
+/** 
+ * \brief Reconstruction and Riemann solver all-in-one.
+ */
 void
 recon_riemann_aio (int i, int j, int k, int dir,
                    amrex::Array4<amrex::Real const> const& q,

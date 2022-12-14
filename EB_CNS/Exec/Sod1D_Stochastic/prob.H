@@ -42,8 +42,8 @@ prob_initdata (int i, int j, int k,
     // Set the states
     for (int nf = 0; nf <= NUM_FIELD; ++nf) {
         state(i, j, k, nf*NVAR + URHO) = mask ? prob_parm.rho_l : prob_parm.rho_r;
-        state(i, j, k, nf*NVAR + UMX) = mask ? prob_parm.rho_l * prob_parm.u_l // + (nf>0) * amrex::Real(nf-6) * prob_parm.sd_u_l / 3.0;
-                                             : prob_parm.rho_l * prob_parm.u_l; 
+        state(i, j, k, nf*NVAR + UMX) = mask ? prob_parm.rho_l * (prob_parm.u_l + (nf>0) * (amrex::Real(nf-1) / amrex::Real(NUM_FIELD-1) - 0.5) * prob_parm.sd_u_l)
+                                             : prob_parm.rho_r * prob_parm.u_r; 
         state(i, j, k, nf*NVAR + UMY) = 0.0;
         state(i, j, k, nf*NVAR + UMZ) = 0.0;
         state(i, j, k, nf*NVAR + UEDEN) = mask ? prob_parm.rhoe_l + 0.5 * state(i, j, k, nf*NVAR + UMX) * state(i, j, k, nf*NVAR + UMX) / prob_parm.rho_l

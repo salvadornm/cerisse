@@ -131,16 +131,16 @@ CNS::compute_dSdt_box (const Box& bx,
     }
 
     // A fab to store the viscous fluxes in VPDF or VSPDF
-    FArrayBox v_flux_fab;
-    auto const& vflx_arr = v_flux_fab.array();
+    FArrayBox vflux_fab;    
     
     for (int cdir = 0; cdir < AMREX_SPACEDIM; ++cdir) { // Loop through space direction
         const Box& flxbx = amrex::surroundingNodes(bx,cdir);
         const Box& reconbox = amrex::grow(bx,cdir,1);
-        if (do_visc == 1) {
-            v_flux_fab.resize(flxbx, NVAR);
-            v_flux_fab.setVal(0.0);
-        }
+        // if (do_visc == 1) {
+            vflux_fab.resize(flxbx, NVAR);
+            vflux_fab.setVal(0.0);            
+        // }
+        auto const& vflx_arr = vflux_fab.array();
 
         for (int nf = 0; nf <= NUM_FIELD; ++nf) {       // Loop through fields
             // Convert primitive to characteristic
@@ -160,8 +160,8 @@ CNS::compute_dSdt_box (const Box& bx,
             auto const& flx_arr = flxfab[cdir]->array(nf*NVAR);
             amrex::ParallelFor(flxbx,
             [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept {
-                cns_riemann(i, j, k, cdir, flx_arr, /*nf > 1 ? pflx_arr :*/ flx_arr, q, wl, wr, 0, *lparm);
-            // });
+                cns_riemann(i, j, k, cdir, flx_arr, /*nf > 1 ? vflx_arr :*/ flx_arr, q, wl, wr, 0, *lparm);
+            });
 
             // auto const& q = qtmp.array(nf*NPRIM);
             // auto const& flx_arr = flxfab[cdir]->array(nf*NVAR);
@@ -171,22 +171,22 @@ CNS::compute_dSdt_box (const Box& bx,
             
             // amrex::ParallelFor(flxbx,
             // [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept {
-                amrex::Real check_rho_flx = 0.0;
-                for (int n = 0; n < NUM_SPECIES; ++n) {
-                    check_rho_flx += flx_arr(i, j, k, UFS+n);
-                }
-                if (std::abs(check_rho_flx - flx_arr(i, j, k, URHO)) > 1e-20) {
-                    amrex::Print() << i << " in bx " << bx;
-                    amrex::Print() << ": sum(rY_flx) = " << check_rho_flx << ", sum(rho_flx) = " << flx_arr(i, j, k, URHO) << std::endl;
-                    amrex::Print() << flx_arr(i, j, k, UFS) << " " << flx_arr(i, j, k, UFS+1) << std::endl;
+                // amrex::Real check_rho_flx = 0.0;
+                // for (int n = 0; n < NUM_SPECIES; ++n) {
+                //     check_rho_flx += flx_arr(i, j, k, UFS+n);
+                // }
+                // if (std::abs(check_rho_flx - flx_arr(i, j, k, URHO)) > 1e-20) {
+                //     amrex::Print() << i << " in bx " << bx;
+                //     amrex::Print() << ": sum(rY_flx) = " << check_rho_flx << ", sum(rho_flx) = " << flx_arr(i, j, k, URHO) << std::endl;
+                    // amrex::Print() << flx_arr(i, j, k, UFS) << " " << flx_arr(i, j, k, UFS+1) << std::endl;
                                        
-                    amrex::Real yl0 = wl(i, j, k, WY);
-                    amrex::Real yl1 = wl(i, j, k, WY+1);
-                    amrex::Real rl = wl(i, j, k, WRHO) + (wl(i, j, k, WACO) + wl(i, j, k, WACO+1)) / q(i-1, j, k, QC);
-                    amrex::Print() << yl0 << " " << yl1 << " " << rl << std::endl;
+                    // amrex::Real yl0 = wl(i, j, k, WY);
+                    // amrex::Real yl1 = wl(i, j, k, WY+1);
+                    // amrex::Real rl = wl(i, j, k, WRHO) + (wl(i, j, k, WACO) + wl(i, j, k, WACO+1)) / q(i-1, j, k, QC);
+                    // amrex::Print() << yl0 << " " << yl1 << " " << rl << std::endl;
                     // amrex::Error();
-                }
-            });
+                // }
+            // });
 
             // Store viscous fluxes separately
             if (do_visc == 1) {
@@ -197,50 +197,49 @@ CNS::compute_dSdt_box (const Box& bx,
                 });
             }
             
-            // amrex::Print() << "dir = " << cdir << " nf = " << nf << ": ";
-            // for (int n = 0; n < NVAR; ++n)
-            //    amrex::Print() << pflx_arr(lbound(bx).x,0,0,n) << " ";
-            // amrex::Print() << std::endl;
-        }
-        
-        // // Zero aux variable fluxes (no need. fluxes are zeroed at initialisation)
-        // amrex::ParallelFor(flxbx,
-        // [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept {
-        //     for (int na = 0; na < NUM_AUX; ++na) flx_arr(i,j,k,UFA+na) = Real(0.0);
-        // });
+        } //for fields
 
-        if ((NUM_FIELD > 0) && (do_visc == 1)) {
-            auto const& flx_arr = flxfab[cdir]->array();
-            amrex::ParallelFor(flxbx,
-            [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept {
-                // Average the viscous fluxes
-                AMREX_D_TERM(
-                    vflx_arr(i, j, k, UMX) /= amrex::Real(NUM_FIELD); ,
-                    vflx_arr(i, j, k, UMY) /= amrex::Real(NUM_FIELD); ,
-                    vflx_arr(i, j, k, UMZ) /= amrex::Real(NUM_FIELD););
-                vflx_arr(i, j, k, UEDEN) /= amrex::Real(NUM_FIELD);
-                
-                // Add to hyperbolic fluxes
-                for (int nf = 1; nf <= NUM_FIELD; ++nf) {
-                    AMREX_D_TERM(
-                        flx_arr(i, j, k, nf*NVAR + UMX) += vflx_arr(i, j, k, UMX); ,
-                        flx_arr(i, j, k, nf*NVAR + UMY) += vflx_arr(i, j, k, UMY); ,
-                        flx_arr(i, j, k, nf*NVAR + UMZ) += vflx_arr(i, j, k, UMZ););
-                    flx_arr(i, j, k, nf*NVAR + UEDEN) += vflx_arr(i, j, k, UEDEN);
-                }
-            });
-        }
+        // if ((NUM_FIELD > 0) /*&& (do_visc == 1)*/) {
+        //     auto const& flx_arr = flxfab[cdir]->array();
+        //     amrex::ParallelFor(flxbx,
+        //     [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept {
+        //         // Average the viscous fluxes
+        //         AMREX_D_TERM(
+        //             vflx_arr(i, j, k, UMX) /= amrex::Real(NUM_FIELD); ,
+        //             vflx_arr(i, j, k, UMY) /= amrex::Real(NUM_FIELD); ,
+        //             vflx_arr(i, j, k, UMZ) /= amrex::Real(NUM_FIELD);)
+        //         vflx_arr(i, j, k, UEDEN) /= amrex::Real(NUM_FIELD);
 
-        // amrex::Print() << "bx = " << flxbx << ": ";
-        // for (int n = 0; n <= NUM_FIELD; ++n) {
-        // for (int i = 0; i < NVAR; ++i) {
-        //     amrex::Print() << flx_arr(0, 0, 0, n*NVAR + i) << " ";
+        //         amrex::Real mean_rho = sarr(i, j, k, URHO);
+        //         // for (int nf = 1; nf <= NUM_FIELD; ++nf) {
+        //         //     mean_rho += flx_arr(i, j, k, nf*NVAR + URHO) * flx_arr(i, j, k, nf*NVAR + URHO) 
+        //         //                 / amrex::max(flx_arr(i, j, k, nf*NVAR + UMX+cdir), 1e-6);
+        //         // }
+        //         // mean_rho /= amrex::Real(NUM_FIELD);
+
+        //         amrex::Real rho;
+        //         // Add to hyperbolic fluxes
+        //         for (int nf = 1; nf <= NUM_FIELD; ++nf) {
+        //             rho = sarr(i, j, k, nf*NVAR + URHO);
+                    
+        //             // <p>*rho/<rho>
+        //             AMREX_D_TERM(
+        //                 flx_arr(i, j, k, nf*NVAR + UMX) += rho / mean_rho * vflx_arr(i, j, k, UMX); ,
+        //                 flx_arr(i, j, k, nf*NVAR + UMY) += rho / mean_rho * vflx_arr(i, j, k, UMY); ,
+        //                 flx_arr(i, j, k, nf*NVAR + UMZ) += rho / mean_rho * vflx_arr(i, j, k, UMZ);)            
+
+        //             // u*<p>*rho/<rho>
+        //             flx_arr(i, j, k, nf*NVAR + UEDEN) += AMREX_D_TERM( 
+        //                 sarr(i, j, k, nf*NVAR + UMX) / mean_rho * vflx_arr(i, j, k, UMX) ,
+        //               + sarr(i, j, k, nf*NVAR + UMY) / mean_rho * vflx_arr(i, j, k, UMY) ,
+        //               + sarr(i, j, k, nf*NVAR + UMZ) / mean_rho * vflx_arr(i, j, k, UMZ));
+        //             // // <u*p>*rho/<rho>
+        //             // flx_arr(i, j, k, nf*NVAR + UEDEN) += rho / mean_rho * vflx_arr(i, j, k, UEDEN);        
+        //         }
+        //     });
         // }
-        // amrex::Print() << "| ";
-        // }
-        // amrex::Print() << std::endl;
 
-    }
+    } //for dir
 
     // Compute flux divergence
     amrex::ParallelFor(bx, LEN_STATE,
@@ -260,25 +259,6 @@ CNS::compute_dSdt_box (const Box& bx,
             fill_ext_src(i, j, k, time, geomdata, sarr, dsdtarr, *lparm, *lprobparm);
         });
     }
-
-    // Average dsdt to mean
-    // if (NUM_FIELD > 0) {
-    //     const amrex::Real NFinv = 1.0/amrex::Real(NUM_FIELD);
-    //     amrex::ParallelFor(bx,
-    //     [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept {            
-    //         for (int n = 0; n < NVAR; ++n) {
-    //             dsdtarr(i, j, k, n) = 0.0;
-    //             for (int nf = 1; nf <= NUM_FIELD; ++nf) {
-    //                 dsdtarr(i, j, k, n) += NFinv * dsdtarr(i, j, k, nf*NVAR + n);
-    //             }
-    //         }
-    //     });
-    // }
-
-    // Add turbulence model
-    // if (NUM_FIELD > 0) {
-    //     vpdf_langevin_model(bx, sarr, dsdtarr, dWdt, dxinv);
-    // }
 
     Gpu::streamSynchronize();
 }

@@ -14,6 +14,7 @@ amrex_probinit (const int* /*init*/,
     pp.query("p_l",   CNS::h_prob_parm->p_l);
     pp.query("u_l",   CNS::h_prob_parm->u_l);
     pp.query("rho_l", CNS::h_prob_parm->rho_l);
+    pp.query("sd_u_l", CNS::h_prob_parm->sd_u_l);
     pp.query("p_r",   CNS::h_prob_parm->p_r);
     pp.query("u_r",   CNS::h_prob_parm->u_r);
     pp.query("rho_r", CNS::h_prob_parm->rho_r);
