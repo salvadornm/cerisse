@@ -10,7 +10,8 @@ Real     CNS::dt_cutoff = 5.e-20;
 int      CNS::do_reflux = 1;
 int      CNS::refine_cutcells        = 1;
 int      CNS::refine_max_dengrad_lev = -1;
-Real     CNS::refine_dengrad         = 1.e10;
+//Real     CNS::refine_dengrad         = 1.e10;
+Vector<Real> CNS::refine_dengrad;
 Vector<RealBox> CNS::refine_boxes;
 RealBox* CNS::dp_refine_boxes;
 

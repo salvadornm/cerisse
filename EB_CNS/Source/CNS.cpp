@@ -414,18 +414,20 @@ CNS::errorEst (TagBoxArray& tags, int /*clearval*/, int /*tagval*/,
         const MultiFab& S_new = get_new_data(State_Type);
         const Real cur_time = state[State_Type].curTime();
         MultiFab rho(S_new.boxArray(), S_new.DistributionMap(), 1, 1);
-        FillPatch(*this, rho, rho.nGrow(), cur_time, State_Type, URHO, 1, 0);
 
-        const char   tagval = TagBox::SET;
-        // const char clearval = TagBox::CLEAR;
-        const Real dengrad_threshold = refine_dengrad;
-
+        const char tagval = TagBox::SET;
+        const Real dengrad_threshold = refine_dengrad[level];
         auto const& tagma = tags.arrays();
         auto const& rhoma = rho.const_arrays();
-        ParallelFor(rho,
-        [=] AMREX_GPU_DEVICE (int box_no, int i, int j, int k) noexcept {
-            cns_tag_grad(i, j, k, tagma[box_no], rhoma[box_no], dengrad_threshold, tagval);
-        });
+
+        for (int n = 0; n < NUM_SPECIES; ++n) {
+            FillPatch(*this, rho, rho.nGrow(), cur_time, State_Type, UFS+n, 1, 0);
+            
+            ParallelFor(rho,
+            [=] AMREX_GPU_DEVICE (int box_no, int i, int j, int k) noexcept {
+                cns_tag_grad(i, j, k, tagma[box_no], rhoma[box_no], dengrad_threshold, tagval);
+            });
+        }
         Gpu::streamSynchronize();
     }
 }
@@ -501,6 +503,7 @@ void
 CNS::read_params ()
 {
     ParmParse pp("cns");
+    ParmParse pa("amr");
 
     pp.query("v", verbose);
 
@@ -535,7 +538,23 @@ CNS::read_params ()
     pp.query("refine_cutcells", refine_cutcells);
 
     pp.query("refine_max_dengrad_lev", refine_max_dengrad_lev);
-    pp.query("refine_dengrad", refine_dengrad);
+    //pp.query("refine_dengrad", refine_dengrad);
+
+    int numvals = pp.countval("refine_dengrad");
+    int max_level; pa.query("max_level", max_level);
+    if (numvals == max_level) {
+        pp.queryarr("refine_dengrad", refine_dengrad);
+    } else {
+        refine_dengrad.resize(max_level);
+        Vector<Real> refine_dengrad_tmp;
+        pp.queryarr("refine_dengrad", refine_dengrad_tmp);
+        for (int lev = 0; lev < numvals; ++lev) {
+            refine_dengrad[lev] = refine_dengrad_tmp[lev];
+        }
+        for (int lev = numvals; lev < max_level; ++lev) {
+            refine_dengrad[lev] = refine_dengrad_tmp[numvals-1];
+        }
+    } 
 
     int irefbox = 0;
     Vector<Real> refboxlo, refboxhi;
