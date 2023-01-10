@@ -6,7 +6,7 @@
 
 // Number of stochastic fields
 #ifndef NUM_FIELD
-#define NUM_FIELD 16
+#define NUM_FIELD 0
 #endif
 
 // Aux states

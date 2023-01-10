@@ -14,6 +14,10 @@ BL_NO_FORT = TRUE
 
 DEFINES += -DCRSEGRNDOMP # Coarse-grained OMP approach
 
+ifdef NUM_FIELD
+   DEFINES += -DNUM_FIELD=$(NUM_FIELD)
+endif
+
 ifeq ($(USE_CUDA),TRUE)
    CXXFLAGS+=-Xptxas --disable-optimizer-constants -Xcompiler=-std=c++17
 endif
