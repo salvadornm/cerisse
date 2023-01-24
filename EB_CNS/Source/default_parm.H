@@ -18,13 +18,16 @@ RealBox* CNS::dp_refine_boxes;
 bool     CNS::do_visc        = true;  // diffusion is on by default
 // bool     CNS::use_const_visc = false; // diffusion does not use constant viscosity by default
 bool     CNS::do_ext_src     = true;
+
 bool     CNS::do_react       = false; // reaction is off by default
 std::string CNS::chem_integrator = "Reactor_Null";
 pele::physics::transport::TransportParams<
   pele::physics::PhysicsType::transport_type> CNS::trans_parms;
-bool     CNS::use_typical_vals_chem = true; // tell chem_integrator typical value of Temp
+bool     CNS::use_typical_vals_chem = false; // tell chem_integrator typical value of Temp
 int      CNS::reset_typical_vals_int = 10;  // interval to reset the typical value
 int      CNS::rk_reaction_iter = 0;
+Real     CNS::min_react_temp = 300.0; // turn off reactor below this temperature (only work with CVODE)
+bool     CNS::update_heat_release = true; // write to heat release in I_R? switch it off for some performance gain (approx 3-5%)
 
 bool     CNS::do_restart_fields = false;
 

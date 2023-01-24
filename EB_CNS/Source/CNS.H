@@ -247,7 +247,7 @@ protected:
 
     std::unique_ptr<pele::physics::reactions::ReactorBase> reactor;
 
-    void react_source (amrex::Real time, amrex::Real dt, bool react_init = false);
+    void react_state (amrex::Real time, amrex::Real dt, bool init_react = false);
 
     void fill_ext_src (int i, int j, int k, amrex::Real time,
                        amrex::GeometryData const& geomdata, 
@@ -268,8 +268,10 @@ protected:
     static bool do_ext_src;
     
     static bool use_typical_vals_chem;
-    static int  reset_typical_vals_int;
-    static int  rk_reaction_iter;
+    static int reset_typical_vals_int;
+    static int rk_reaction_iter;
+    static amrex::Real min_react_temp;
+    static bool update_heat_release;
 
     static bool do_restart_fields;
 

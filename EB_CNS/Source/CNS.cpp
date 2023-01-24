@@ -127,9 +127,8 @@ CNS::initData ()
     auto const& sarrs = S_new.arrays();
     amrex::ParallelFor(S_new,
     [=] AMREX_GPU_DEVICE (int box_no, int i, int j, int k) noexcept {
-        prob_initdata(i, j, k, sarrs[box_no], geomdata, *lparm, *lprobparm);
-        // Verify that the sum of (rho Y)_i = rho at every cell
-        // cns_check_initial_species(i, j, k, sarrs[box_no]);
+        prob_initdata(i, j, k, sarrs[box_no], geomdata, *lparm, *lprobparm);        
+        cns_check_species_sum_to_one(i, j, k, sarrs[box_no]); // Verify that the sum of (rho Y)_i = rho at every cell
     });
     amrex::Gpu::synchronize();
 
@@ -307,12 +306,13 @@ CNS::post_init (Real /*stop_time*/)
         getLevel(k).avgDown();
     }
 
-    if (do_react) {        
+    // Initialise reaction
+    if (do_react) { 
         if (use_typical_vals_chem) {
             set_typical_values_chem();
         }
 
-        react_source(parent->cumTime(), parent->dtLevel(level), true);
+        react_state(parent->cumTime(), parent->dtLevel(level), true);
     }
 
     if (verbose >= 2) {
@@ -462,8 +462,7 @@ CNS::printTotal () const
                               AMREX_D_TERM( <<   "      Total x-momentum = " << tot[1] << "\n" ,
                                             <<   "      Total y-momentum = " << tot[2] << "\n" ,
                                             <<   "      Total z-momentum = " << tot[3] << "\n" )
-                                            <<   "      Total energy     = " << tot[4] << "\n"
-                                            <<   "      Total int energy = " << tot[5] << "\n";
+                                            <<   "      Total energy     = " << tot[4] << "\n";
 #ifdef BL_LAZY
         });
 #endif
@@ -541,10 +540,11 @@ CNS::read_params ()
     //pp.query("refine_dengrad", refine_dengrad);
 
     int numvals = pp.countval("refine_dengrad");
-    int max_level; pa.query("max_level", max_level);
+    int max_level;
+    pa.query("max_level", max_level);
     if (numvals == max_level) {
         pp.queryarr("refine_dengrad", refine_dengrad);
-    } else {
+    } else if (max_level > 0) {
         refine_dengrad.resize(max_level);
         Vector<Real> refine_dengrad_tmp;
         pp.queryarr("refine_dengrad", refine_dengrad_tmp);
@@ -558,8 +558,7 @@ CNS::read_params ()
 
     int irefbox = 0;
     Vector<Real> refboxlo, refboxhi;
-    while (pp.queryarr(("refine_box_lo_"+std::to_string(irefbox)).c_str(), refboxlo))
-    {
+    while (pp.queryarr(("refine_box_lo_"+std::to_string(irefbox)).c_str(), refboxlo)) {
         pp.getarr(("refine_box_hi_"+std::to_string(irefbox)).c_str(), refboxhi);
         refine_boxes.emplace_back(refboxlo.data(), refboxhi.data());
         ++irefbox;
@@ -578,6 +577,8 @@ CNS::read_params ()
     pp.query("rk_reaction_iter", rk_reaction_iter);
     pp.query("use_typical_vals_chem", use_typical_vals_chem);
     pp.query("reset_typical_vals_int", reset_typical_vals_int);
+    pp.query("min_react_temp", min_react_temp);
+    pp.query("update_heat_release", update_heat_release);
 
     pp.query("do_restart_fields", do_restart_fields);
 
