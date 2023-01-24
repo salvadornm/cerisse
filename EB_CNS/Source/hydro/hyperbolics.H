@@ -43,7 +43,7 @@ cns_ctoprim (int i, int j, int k, int ns,
         q(i,j,k,QFS+n) = massfrac[n];
     }
     if (std::abs(check_rho - 1.0) > parm.smally) {
-        amrex::Print() << "sum(Y) != 1!!! Diff = " << std::abs(check_rho - 1.0) << "\n";
+        amrex::Print() << "i=" << i << ": sum(Y) - 1 = " << std::abs(check_rho - 1.0) << "!!!\n";
         for (int n = 0; n < NUM_SPECIES; n++) {
             massfrac[n] /= check_rho;
             q(i,j,k,QFS+n) = massfrac[n];
@@ -69,10 +69,12 @@ cns_ctoprim (int i, int j, int k, int ns,
     q(i,j,k,QEINT) = ei;
     q(i,j,k,QTEMP) = T;
 
-    if (isnan(cs)) {amrex::Print() << "cs is nan!!!\n";
-        amrex::Print() << "i=" << i << " ns=" << ns << ": " << rho << " " << T << " " << p << "\n";
-        amrex::Print() << u(i,j,k,ns+UEDEN) << " " << ei << " " << massfrac[0] << " " << massfrac[1] << "\n";
-        amrex::Error();
+    if (isnan(cs)) {
+        amrex::Print() << "i=" << i << " ns=" << ns << ": rho=" << rho << " T=" << T << " p=" << p;// << "\n";
+        amrex::Print() << " rhoE=" << u(i,j,k,ns+UEDEN) << " ei=" << ei << "\n";
+        for (int n = 0; n < NUM_SPECIES; n++) amrex::Print() << u(i,j,k,ns+UFS+n) << " ";
+        amrex::Print() << "\n";
+        amrex::Abort("cs is nan");
     }
 }
 
@@ -466,16 +468,16 @@ hllc (const amrex::Real rl,
 
     flxrho = 0.;
     AMREX_D_TERM(
-        flxu   = rhoout*uout*uout; ,
+        flxu   = rhoout*uout*uout + pout; ,
         flxut  = rhoout*uout*ut1out; ,
         flxutt = rhoout*uout*ut2out;)
-    flxrhoe = rhoout*uout*eout;
+    flxrhoe = uout*(rhoout*eout + pout);
     for (int n = 0; n < NUM_SPECIES; ++n) {
         flxrhoy[n] = rhoout*uout*yout[n];
         flxrho += flxrhoy[n];
     }
-    pflxu += pout;
-    pflxe += uout*pout;
+    pflxu = pout;
+    pflxe = uout;
 }
 
 // #if (AMREX_SPACEDIM > 1)

@@ -38,6 +38,8 @@ CNS::compute_pdf_model (amrex::MultiFab& S, amrex::Real dt)
 {
     BL_PROFILE("CNS::compute_pdf_model()");
 
+    if (verbose > 0) amrex::Print() << " ... Computing PDF source term" << std::endl;
+
     const auto* dx = geom.CellSize();
 
     // Prepare Wiener process for vpdf. It is constant over space.

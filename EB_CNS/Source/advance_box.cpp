@@ -71,12 +71,7 @@ void
 CNS::compute_dSdt_box (const Box& bx,
                        Array4<Real const>& sarr,
                        Array4<Real      >& dsdtarr,
-                       const std::array<FArrayBox*, AMREX_SPACEDIM>& flxfab
-                       //FArrayBox           flxfab[AMREX_SPACEDIM]
-                       /*AMREX_D_DECL(
-                         Array4<Real    >& fxfab,
-                         Array4<Real    >& fyfab,
-                         Array4<Real    >& fzfab)*/)
+                       const std::array<FArrayBox*, AMREX_SPACEDIM>& flxfab)
 {
     BL_PROFILE("CNS::compute_dSdt_box()");
     
@@ -131,15 +126,17 @@ CNS::compute_dSdt_box (const Box& bx,
     }
 
     // A fab to store the viscous fluxes in VPDF or VSPDF
-    FArrayBox vflux_fab;    
+    FArrayBox vflux_fab, pflux_fab;    
     
     for (int cdir = 0; cdir < AMREX_SPACEDIM; ++cdir) { // Loop through space direction
         const Box& flxbx = amrex::surroundingNodes(bx,cdir);
         const Box& reconbox = amrex::grow(bx,cdir,1);
-        // if (do_visc == 1) {
+        pflux_fab.resize(flxbx, LEN_STATE);
+        pflux_fab.setVal(0.0);
+        if (do_visc == 1) {
             vflux_fab.resize(flxbx, NVAR);
             vflux_fab.setVal(0.0);            
-        // }
+        }
         auto const& vflx_arr = vflux_fab.array();
 
         for (int nf = 0; nf <= NUM_FIELD; ++nf) {       // Loop through fields
@@ -158,9 +155,10 @@ CNS::compute_dSdt_box (const Box& bx,
 
             // Solve Riemann problem, store advection and pressure fluxes to flx_arr
             auto const& flx_arr = flxfab[cdir]->array(nf*NVAR);
+            auto const& p_arr = pflux_fab.array(nf*NVAR);
             amrex::ParallelFor(flxbx,
             [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept {
-                cns_riemann(i, j, k, cdir, flx_arr, /*nf > 1 ? vflx_arr :*/ flx_arr, q, wl, wr, 0, *lparm);
+                cns_riemann(i, j, k, cdir, flx_arr, /*nf > 1 ? vflx_arr : flx_arr*/ p_arr, q, wl, wr, 0, *lparm);
             });
 
             // auto const& q = qtmp.array(nf*NPRIM);
@@ -198,6 +196,38 @@ CNS::compute_dSdt_box (const Box& bx,
             }
             
         } //for fields
+
+        if ((NUM_FIELD > 0)) {
+            auto const& flx_arr = flxfab[cdir]->array();
+            auto const& p_arr = pflux_fab.array();
+
+            // amrex::ParallelFor(flxbx,
+            // [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept {
+            //     // Average p
+            //     amrex::Real mean_p = 0.0;
+            //     for (int nf = 1; nf <= NUM_FIELD; ++nf) {
+            //         mean_p += p_arr(i, j, k, nf*NVAR + UMX);
+            //     }
+            //     mean_p /= amrex::Real(NUM_FIELD);
+            //     // amrex::Real mean_p = p_arr(i, j, k, UMX);
+
+            //     // amrex::Real mean_rho = sarr(i, j, k, URHO);
+            //     amrex::Real rho, u, p;
+            //     // Add to hyperbolic fluxes
+            //     for (int nf = 1; nf <= NUM_FIELD; ++nf) {
+            //         // rho = sarr(i, j, k, nf*NVAR + URHO);
+            //         // u = p_arr(i, j, k, nf*NVAR + UEDEN); 
+            //         // u = sarr(i, j, k, nf*NVAR + UMX) / sarr(i, j, k, nf*NVAR + URHO);
+            //         p = p_arr(i, j, k, nf*NVAR + UMX); 
+                    
+            //         // SGS "Force"
+            //         // flx_arr(i, j, k, nf*NVAR + UMX) += -p + mean_p;
+
+            //         // Work done by SGS "Force"
+            //         // flx_arr(i, j, k, nf*NVAR + UEDEN) += u*(-p + mean_p);
+            //     }
+            // });
+        }
 
         // if ((NUM_FIELD > 0) /*&& (do_visc == 1)*/) {
         //     auto const& flx_arr = flxfab[cdir]->array();

@@ -40,8 +40,8 @@ cns_initdata (int i, int j, int k,
         state(i, j, k, UMY) = 0.0;
         state(i, j, k, UMZ) = 0.0;
         state(i, j, k, UEDEN) = prob_parm.rhoe_l + 0.5 * prob_parm.rho_l * prob_parm.u_l * prob_parm.u_l;
-        state(i, j, k, UEINT) = prob_parm.rhoe_l;
-        state(i, j, k, UTEMP) = prob_parm.T_l;
+        // state(i, j, k, UEINT) = prob_parm.rhoe_l;
+        // state(i, j, k, UTEMP) = prob_parm.T_l;
         state(i, j, k, UFS) = prob_parm.rho_l;
     } else {
         state(i, j, k, URHO) = prob_parm.rho_r;
@@ -49,8 +49,8 @@ cns_initdata (int i, int j, int k,
         state(i, j, k, UMY) = 0.0;
         state(i, j, k, UMZ) = 0.0;
         state(i, j, k, UEDEN) = prob_parm.rhoe_r + 0.5 * prob_parm.rho_r * prob_parm.u_r * prob_parm.u_r;
-        state(i, j, k, UEINT) = prob_parm.rhoe_r;
-        state(i, j, k, UTEMP) = prob_parm.T_r;
+        // state(i, j, k, UEINT) = prob_parm.rhoe_r;
+        // state(i, j, k, UTEMP) = prob_parm.T_r;
         state(i, j, k, UFS) = prob_parm.rho_r;
     }
 }

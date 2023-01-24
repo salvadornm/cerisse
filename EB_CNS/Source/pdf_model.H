@@ -29,19 +29,21 @@ vpdf_langevin_model (const amrex::Box& bx,
         eps = amrex::max(eps, 1e-10);
 
         // Compute pressure (store pressure of each field in p[])
+        amrex::IntVect iv({i, j, k});
+        amrex::IntVect iv_dir = amrex::IntVect::TheDimensionVector(0);
         amrex::Real mean_dp = 0.0;
         amrex::Real rho, rhoinv, ei, T, p, massfrac[NUM_SPECIES], dp[NUM_FIELD];
         auto eos = pele::physics::PhysicsType::eos();            
         for (int nf = 1; nf <= NUM_FIELD; ++nf) {
             // i-1
-            rho = s(i-1, j, k, nf*NVAR + URHO);
+            rho = s(iv-iv_dir, nf*NVAR + URHO);
             rhoinv = 1.0 / rho;
-            AMREX_D_TERM(amrex::Real ux = s(i-1, j, k, nf*NVAR + UMX) * rhoinv; ,
-                         amrex::Real uy = s(i-1, j, k, nf*NVAR + UMY) * rhoinv; ,
-                         amrex::Real uz = s(i-1, j, k, nf*NVAR + UMZ) * rhoinv;);
-            ei = s(i-1, j, k, nf*NVAR + UEDEN) * rhoinv - amrex::Real(0.5)*(AMREX_D_TERM(ux*ux, + uy*uy, + uz*uz));
+            AMREX_D_TERM(amrex::Real ux = s(iv-iv_dir, nf*NVAR + UMX) * rhoinv; ,
+                         amrex::Real uy = s(iv-iv_dir, nf*NVAR + UMY) * rhoinv; ,
+                         amrex::Real uz = s(iv-iv_dir, nf*NVAR + UMZ) * rhoinv;);
+            ei = s(iv-iv_dir, nf*NVAR + UEDEN) * rhoinv - amrex::Real(0.5)*(AMREX_D_TERM(ux*ux, + uy*uy, + uz*uz));
             for (int n = 0; n < NUM_SPECIES; ++n) {
-                massfrac[n] = s(i-1, j, k, nf*NVAR + UFS+n) * rhoinv;
+                massfrac[n] = s(iv-iv_dir, nf*NVAR + UFS+n) * rhoinv;
             }
             eos.EY2T(ei, massfrac, T); 
             eos.RTY2P(rho, T, massfrac, p);
@@ -53,14 +55,14 @@ vpdf_langevin_model (const amrex::Box& bx,
                                                                     std::endl;
 
             // i+1
-            rho = s(i+1, j, k, nf*NVAR + URHO);
+            rho = s(iv+iv_dir, nf*NVAR + URHO);
             rhoinv = 1.0 / rho;
-            AMREX_D_TERM(ux = s(i+1, j, k, nf*NVAR + UMX)*rhoinv; ,
-                         uy = s(i+1, j, k, nf*NVAR + UMY)*rhoinv; ,
-                         uz = s(i+1, j, k, nf*NVAR + UMZ)*rhoinv;);
-            ei = s(i+1, j, k, nf*NVAR + UEDEN) * rhoinv - amrex::Real(0.5)*(AMREX_D_TERM(ux*ux, + uy*uy, + uz*uz));
+            AMREX_D_TERM(ux = s(iv+iv_dir, nf*NVAR + UMX)*rhoinv; ,
+                         uy = s(iv+iv_dir, nf*NVAR + UMY)*rhoinv; ,
+                         uz = s(iv+iv_dir, nf*NVAR + UMZ)*rhoinv;);
+            ei = s(iv+iv_dir, nf*NVAR + UEDEN) * rhoinv - amrex::Real(0.5)*(AMREX_D_TERM(ux*ux, + uy*uy, + uz*uz));
             for (int n = 0; n < NUM_SPECIES; ++n) {
-                massfrac[n] = s(i+1, j, k, nf*NVAR + UFS+n) * rhoinv;
+                massfrac[n] = s(iv+iv_dir, nf*NVAR + UFS+n) * rhoinv;
             }
             eos.EY2T(ei, massfrac, T);
             eos.RTY2P(rho, T, massfrac, dp[nf-1]);
@@ -106,8 +108,8 @@ vpdf_langevin_model (const amrex::Box& bx,
                 s(i, j, k, nf*NVAR + UMX+dir) += s(i, j, k, nf*NVAR + URHO) * u_sgs;
 
                 // Enforce consistent e
-                s(i, j, k, nf*NVAR + UEDEN) += - 0.5 * s(i, j, k, nf*NVAR + URHO) * u * u 
-                                               + 0.5 * s(i, j, k, nf*NVAR + URHO) * (u+u_sgs) * (u+u_sgs);
+                // s(i, j, k, nf*NVAR + UEDEN) += - 0.5 * s(i, j, k, nf*NVAR + URHO) * u * u 
+                //                                + 0.5 * s(i, j, k, nf*NVAR + URHO) * (u+u_sgs) * (u+u_sgs);
             }
         }
         // amrex::Print() << "\n";
