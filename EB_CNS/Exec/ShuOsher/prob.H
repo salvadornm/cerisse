@@ -39,10 +39,10 @@ prob_initdata (int i, int j, int k,
     const amrex::Real* dx = geomdata.CellSize();
     const amrex::Real x = prob_lo[0] + (i + 0.5) * dx[0];
 
-    const bool mask = (x <= 0.125);
+    const bool mask = (x <= 1);
 
     // Set the states
-    state(i, j, k, URHO) = mask ? 3.857143 : 1.0 - 0.2*sin(8*M_PI*x);
+    state(i, j, k, URHO) = mask ? 3.857143 : 1.0 + 0.2*sin(5*x);
     state(i, j, k, UMX) = state(i, j, k, URHO) * (mask ? 2.629369 : 0.0); 
     state(i, j, k, UMY) = 0.0;
     state(i, j, k, UMZ) = 0.0;
