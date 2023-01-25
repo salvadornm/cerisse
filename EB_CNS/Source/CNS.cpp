@@ -49,7 +49,7 @@ CNS::CNS (Amr&            papa,
         }
 
         reactor = pele::physics::reactions::ReactorBase::create(chem_integrator);
-        reactor->init(1, 1);
+        reactor->init(1, 1); //init reactor to constant volume type
     }
 }
 
@@ -581,6 +581,8 @@ CNS::read_params ()
     pp.query("update_heat_release", update_heat_release);
 
     pp.query("do_restart_fields", do_restart_fields);
+    pp.query("do_vpdf", do_vpdf);
+    pp.query("do_spdf", do_spdf);
 
     // pp.query("gravity", gravity);
 

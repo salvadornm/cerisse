@@ -93,14 +93,14 @@ bcnormal (const amrex::Real* /*x[AMREX_SPACEDIM]*/,
 {
     // if (time >= 4e-5) {
         // Set inflow states
-        // s_ext[URHO] = prob_parm.rho_l;
-        // s_ext[UMX] = prob_parm.rho_l * prob_parm.u_l;
-        // s_ext[UMY] = 0.0;
-        // s_ext[UMZ] = 0.0;
-        // s_ext[UEDEN] = prob_parm.rhoe_l + 0.5 * prob_parm.rho_l * prob_parm.u_l * prob_parm.u_l;
-        // for (int n = 0; n < NUM_SPECIES; ++n) {
-        //     s_ext[UFS+n] = prob_parm.rho_l * prob_parm.massfrac_l[n];
-        // }
+        s_ext[URHO] = prob_parm.rho_l;
+        s_ext[UMX] = prob_parm.rho_l * prob_parm.u_l;
+        s_ext[UMY] = 0.0;
+        s_ext[UMZ] = 0.0;
+        s_ext[UEDEN] = prob_parm.rhoe_l + 0.5 * prob_parm.rho_l * prob_parm.u_l * prob_parm.u_l;
+        for (int n = 0; n < NUM_SPECIES; ++n) {
+            s_ext[UFS+n] = prob_parm.rho_l * prob_parm.massfrac_l[n];
+        }
     // } else {
     //     // Wall
     //     s_ext[URHO] = s_int[URHO];

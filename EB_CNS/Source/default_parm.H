@@ -34,7 +34,7 @@ bool     CNS::do_restart_fields = false;
 int      CNS::recon_scheme   = 4;     // 1: basic Godunov; 2: MUSCL; 3: WENO-JS5; 4: WENO-Z5
 Real     CNS::plm_theta      = 2.0;   // [1,2] 1: minmod; 2: van Leer's MC (higher sharper)
 
-bool     CNS::do_vpdf = true;
+bool     CNS::do_vpdf = false;
 bool     CNS::do_spdf = false;
 
 int      CNS::eb_weights_type = 0;   // [0,1,2,3] 0: weights are all 1; 1: eint; 2: cell mass; 3: volfrac

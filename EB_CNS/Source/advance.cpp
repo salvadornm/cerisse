@@ -59,7 +59,9 @@ CNS::advance(Real time, Real dt, int /*iteration*/, int /*ncycle*/)
   compute_dSdt(Sborder, dSdt_old, 0.5*dt, fr_as_crse, fr_as_fine, true);
   MultiFab::LinComb(S_new, 1.0, Sborder, 0, dt, dSdt_old, 0, 0, LEN_STATE, 0);
   if (do_react) {
-    MultiFab::Saxpy(S_new, dt, I_R, 0, UFS, NUM_SPECIES, 0);
+    for (int nf = 0; nf <= NUM_FIELD; ++nf) {
+      MultiFab::Saxpy(S_new, dt, I_R, nf*NREACT, nf*NVAR+UFS, NUM_SPECIES, 0);
+    }
   }
   if (NUM_FIELD > 0) {
     // do something

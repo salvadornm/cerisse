@@ -71,8 +71,8 @@ amrex_probinit (const int* /*init*/,
 
     // CNS::h_prob_parm->u_l = 38.08304243848445; 
     // CNS::h_prob_parm->u_r = 284.4938475139773;
-    CNS::h_prob_parm->u_l = 0.0;
-    CNS::h_prob_parm->u_r = 0.0; //38.08304243848445;
+    CNS::h_prob_parm->u_l = 40.0;
+    CNS::h_prob_parm->u_r = 40.0; //38.08304243848445;
 
     CNS::h_prob_parm->massfrac_l[CH4_ID] = 0.05518666598235154;
     CNS::h_prob_parm->massfrac_l[O2_ID] = 0.2201412376866278;
@@ -91,7 +91,7 @@ amrex_probinit (const int* /*init*/,
     auto eos = pele::physics::PhysicsType::eos();
     eos.PYT2RE(p, CNS::h_prob_parm->massfrac_l.begin(), T, CNS::h_prob_parm->rho_l, CNS::h_prob_parm->rhoe_l);
     CNS::h_prob_parm->rhoe_l *= CNS::h_prob_parm->rho_l;
-    eos.PYT2RE(p, CNS::h_prob_parm->massfrac_r.begin(), 2000.0, CNS::h_prob_parm->rho_r, CNS::h_prob_parm->rhoe_r);
+    eos.PYT2RE(p, CNS::h_prob_parm->massfrac_r.begin(), 1800.0, CNS::h_prob_parm->rho_r, CNS::h_prob_parm->rhoe_r);
     CNS::h_prob_parm->rhoe_r *= CNS::h_prob_parm->rho_r;
 
     amrex::Print() << CNS::h_prob_parm->rhoe_l << CNS::h_prob_parm->rhoe_r << std::endl;

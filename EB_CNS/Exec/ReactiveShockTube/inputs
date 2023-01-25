@@ -1,70 +1,70 @@
-max_step = 5000
-stop_time = 2
+max_step = 600
+stop_time = 230e-6
 
-geometry.is_periodic = 0
+geometry.is_periodic = 0 1 1
 geometry.coord_sys   = 0  # 0 => cart, 1 => RZ  2=>spherical
-geometry.prob_lo     = -0.7
-geometry.prob_hi     = 0.1
-amr.n_cell = 128
+geometry.prob_lo     = 0.   -0.75  -0.75
+geometry.prob_hi     = 12    0.75   0.75
+amr.n_cell           = 64    8      8
 
 # >>>>>>>>>>>>> BC FLAGS <<<<<<<<<<<<<<<<
 # 0 = Interior            3 = Symmetry
 # 1 = Inflow (UserBC)     4 = SlipWall = 3
 # 2 = Outflow (FOExtrap)  5 = NoSlipWall
 # >>>>>>>>>>>>> BC FLAGS <<<<<<<<<<<<<<<<
-cns.lo_bc = 2
-cns.hi_bc = 2
+cns.lo_bc       =  4 0 0
+cns.hi_bc       =  2 0 0
 
-cns.do_visc  = 1
+cns.do_visc  = 0
+
 cns.do_react = 1
-#cns.chem_integrator = "ReactorRK64"
-cns.chem_integrator = "ReactorCvode"
+cns.chem_integrator = "ReactorCvode" #"ReactorRK64"
 cvode.solve_type = "denseAJ_direct"
-#ode.analytical_jacobian = 1
-cns.use_typical_vals_chem = 0
-cns.min_react_temp = 300
+ode.clean_init_massfrac = 1
+ode.rtol = 1e-5
+ode.atol = 1e-8
+cns.use_typical_vals_chem = 1
+cns.min_react_temp = 500
 cns.update_heat_release = 1
-
-cns.recon_scheme = 4
 
 cns.cfl = 0.3
 cns.dt_cutoff = 5.e-20
 
+cns.recon_scheme = 4 # 1: Godunov; 2: MUSCL; 3: WENO-JS5; 4: WENO-Z5
+
+cns.do_vpdf = 1
+cns.do_spdf = 0
+
+# VERBOSITY
 cns.v = 2
 amr.v = 1
-#ode.verbose = 1
+ode.verbose = 0
 
 # LOAD BALANCE
 amr.loadbalance_with_workestimates = 1
 amr.loadbalance_level0_int = 1000
 
 # REFINEMENT / REGRIDDING
-amr.max_level       = 3       # maximum level number allowed
+amr.max_level       = 2       # maximum level number allowed
 amr.ref_ratio       = 2 2 2 2 # refinement ratio
-amr.regrid_int      = 10      # how often to regrid
+amr.regrid_int      = 5       # how often to regrid
 amr.blocking_factor = 8
 amr.max_grid_size   = 64
 amr.n_error_buf     = 2 2 2 2 # number of buffer cells in error est
 amr.grid_eff        = 0.7
 
-cns.refine_dengrad = 2.5e-5 #0.2 0.5 # this is not divided by dx
+cns.refine_dengrad = 1e-5
 cns.refine_max_dengrad_lev = 10
 
-#eb2.geom_type = all_regular
+eb2.geom_type = all_regular
 
 # CHECKPOINT FILES
 amr.checkpoint_files_output = 1
 amr.check_file      = chk        # root name of checkpoint file
-amr.check_int       = 5000       # number of timesteps between checkpoints
+amr.check_int       = 200        # number of timesteps between checkpoints
 
 # PLOTFILES
 amr.plot_files_output = 1
 amr.plot_file         = plt      # root name of plotfile
-amr.plot_int          = 500     # number of timesteps between plotfiles
+amr.plot_int          = 10       # number of timesteps between plotfiles
 amr.derive_plot_vars  = temp pressure x_velocity MachNumber divrho divu magvort
-
-# PROBLEM TYPE
-#prob.fuel = "CH4"
-
-#amr.restart = "chk05000"
-#amr.regrid_on_restart = 1
