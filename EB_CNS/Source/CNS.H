@@ -9,6 +9,7 @@
 #else
 #include <AMReX_YAFluxRegister.H>
 #endif
+// #include <AMReX_ErrorList.H>
 
 #include "PelePhysics.H"
 #include "ReactorBase.H"
@@ -47,6 +48,8 @@ public:
                              std::ostream&      os,
                              amrex::VisMF::How  how = amrex::VisMF::NFiles,
                              bool               dump_old = true) override;
+
+    virtual void setPlotVariables() override;
 
     virtual std::string thePlotFileType () const override {
         return {"HyperCLaw-V1.1"};
@@ -185,7 +188,21 @@ public:
                                 amrex::Real dt);
 #endif
     
+    void enforce_consistent_state ();
+
     void compute_pdf_model (amrex::MultiFab& S, amrex::Real dt);
+
+    // This needs to access trans_parm in the class
+    static void cns_dertranscoef (
+        const amrex::Box& bx, 
+        amrex::FArrayBox& derfab, 
+        int dcomp, 
+        int ncomp,
+        const amrex::FArrayBox& datafab, 
+        const amrex::Geometry& geomdata,
+        amrex::Real time, 
+        const int* bcrec, 
+        int level);
 
     static Parm* h_parm;
     static Parm* d_parm;
@@ -241,7 +258,7 @@ protected:
     static pele::physics::transport::TransportParams<
         pele::physics::PhysicsType::transport_type> trans_parms;
 
-    // static amrex::Vector<std::string> spec_names;
+    static amrex::Vector<std::string> spec_names;
 
     static std::string chem_integrator;
 
@@ -259,9 +276,10 @@ protected:
 
     // Parameters
     static int verbose;
-    static amrex::IntVect hydro_tile_size;
+    // static amrex::IntVect hydro_tile_size;
     static amrex::Real cfl;
     static amrex::Real dt_cutoff;
+    // static amrex::Real clip_temp;
 
     static bool do_visc;
     static bool do_react;
@@ -296,6 +314,8 @@ protected:
     static amrex::RealBox* dp_refine_boxes;
 
     static bool signalStopJob;
+
+    // static amrex::Vector<amrex::AMRErrorTag> errtagger;
 };
 
 // Below are bcfill functions declared here so that setup.cpp can find them.

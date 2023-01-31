@@ -1,4 +1,5 @@
 #include <AMReX_ParmParse.H>
+// #include <AMReX_ErrorList.H>
 
 #if (AMREX_SPACEDIM > 1) //1D cannot have EB
 #include <AMReX_EBMultiFabUtil.H>
@@ -78,8 +79,7 @@ CNS::init (AmrLevel& old)
 
     amrex::MultiFab& React_new = get_new_data(Reactions_Type);
     if (do_react) {
-        FillPatch(
-        old, React_new, 0, cur_time, Reactions_Type, 0, React_new.nComp());
+        FillPatch(old, React_new, 0, cur_time, Reactions_Type, 0, React_new.nComp());
     } else {
         React_new.setVal(0);
     }
@@ -206,16 +206,14 @@ CNS::computeNewDt (int                    finest_level,
         }
     } else {
         // Limit dt's by change_max * old dt (TODO: Do we really need this?)
-        static Real change_max = 1.2;
+        static Real change_max = 1.1;
         for (int i = 0; i <= finest_level; i++) {
-            if ((verbose != 0) && ParallelDescriptor::IOProcessor()) {
+            if ((verbose > 0) && ParallelDescriptor::IOProcessor()) {                
+                Print() << " >> Compute new dt: limiting dt at level " << i << '\n';
+                Print() << "    new dt computed: " << dt_min[i] << '\n';
                 if (dt_min[i] > change_max * dt_level[i]) {
-                    Print() << " ... Compute new dt : limiting dt at level "
-                            << i << '\n';
-                    Print() << "     new dt computed: " << dt_min[i] << '\n';
-                    Print() << "     but limiting to: "
-                            << change_max * dt_level[i] << " = " << change_max
-                            << " * " << dt_level[i] << '\n';
+                    Print() << "    but limited to: " << change_max * dt_level[i] 
+                            << " = " << change_max << " * " << dt_level[i] << '\n';
                 }
             }
 
@@ -251,8 +249,10 @@ void
 CNS::post_regrid (int /*lbase*/, int /*new_finest*/)
 {
     if (do_react && use_typical_vals_chem) {
-        set_typical_values_chem();
+        set_typical_values_chem();        
     }
+    
+    enforce_consistent_state();
 }
 
 void
@@ -301,11 +301,6 @@ CNS::postCoarseTimeStep (Real /*time*/)
 void
 CNS::post_init (Real /*stop_time*/)
 {
-    if (level > 0) return;
-    for (int k = parent->finestLevel()-1; k >= 0; --k) {
-        getLevel(k).avgDown();
-    }
-
     // Initialise reaction
     if (do_react) { 
         if (use_typical_vals_chem) {
@@ -314,15 +309,25 @@ CNS::post_init (Real /*stop_time*/)
 
         react_state(parent->cumTime(), parent->dtLevel(level), true);
     }
+    
+    if (level > 0) return;
 
-    if (verbose >= 2) {
-        printTotal();
+    // Average data down from finer levels
+    // so that conserved data is consistent between levels
+    for (int k = parent->finestLevel()-1; k >= 0; --k) {
+        getLevel(k).avgDown();
     }
+
+    printTotal();
 }
 
 void
 CNS::post_restart ()
 {
+    // Copy problem parameter structs to device
+    amrex::Gpu::copy(amrex::Gpu::hostToDevice, h_prob_parm, 
+                     h_prob_parm+1, d_prob_parm);
+
     // Initialize reactor
     if (do_react) {
         if (chem_integrator == "ReactorNull") {
@@ -341,7 +346,7 @@ CNS::post_restart ()
     MultiFab& S_new = get_new_data(State_Type);
 
     // Populate fields (when restarting from a different number of fields)
-    if (do_restart_fields) {
+    if ((NUM_FIELD > 0) && do_restart_fields) {
         Print() << "Resetting field state data ..." << std::endl;
         
         // Move aux variables
@@ -388,8 +393,16 @@ CNS::errorEst (TagBoxArray& tags, int /*clearval*/, int /*tagval*/,
     }
 #endif
 
-    if (!refine_boxes.empty())
-    {
+    // for (int j = 0; j < errtagger.size(); ++j) {
+    //     std::unique_ptr<MultiFab> mf;
+    //     if (errtagger[j].Field() != std::string()) {
+    //         mf = derive(errtagger[j].Field(), time, errtagger[j].NGrow());
+    //     }
+    //     errtagger[j](tags, mf.get(), clearval, tagval, time, level, geom);
+    // }
+
+    // Tag user specified region
+    if (!refine_boxes.empty()) {
         const int n_refine_boxes = refine_boxes.size();
         const auto problo = geom.ProbLoArray();
         const auto dx = geom.CellSizeArray();
@@ -419,17 +432,44 @@ CNS::errorEst (TagBoxArray& tags, int /*clearval*/, int /*tagval*/,
         const Real dengrad_threshold = refine_dengrad[level];
         auto const& tagma = tags.arrays();
         auto const& rhoma = rho.const_arrays();
-
-        for (int n = 0; n < NUM_SPECIES; ++n) {
-            FillPatch(*this, rho, rho.nGrow(), cur_time, State_Type, UFS+n, 1, 0);
-            
-            ParallelFor(rho,
-            [=] AMREX_GPU_DEVICE (int box_no, int i, int j, int k) noexcept {
-                cns_tag_grad(i, j, k, tagma[box_no], rhoma[box_no], dengrad_threshold, tagval);
-            });
-        }
+        const auto dxinv = geom.InvCellSizeArray();
+        
+        FillPatch(*this, rho, rho.nGrow(), cur_time, State_Type, URHO, 1, 0);            
+        ParallelFor(rho,
+        [=] AMREX_GPU_DEVICE (int box_no, int i, int j, int k) noexcept {
+            cns_tag_grad(i, j, k, tagma[box_no], rhoma[box_no], dxinv, dengrad_threshold, tagval);
+        });
         Gpu::streamSynchronize();
     }
+
+    // // Tagging flame tracer
+    // if (!flame_trac_name.empty()) {
+    //     auto it = std::find(spec_names.begin(), spec_names.end(), flame_trac_name);
+
+    //     if (it != spec_names.end()) {
+    //         const auto idx = std::distance(spec_names.begin(), it);
+
+    //         if (level < max_ftracer_lev) {
+    //         const amrex::Real captured_ftracerr = tagging_parm->ftracerr;
+    //         amrex::ParallelFor(
+    //             tilebox, [=] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {
+    //             tag_error(
+    //                 i, j, k, tag_arr, S_derarr, captured_ftracerr, tagval);
+    //             });
+    //         }
+    //         if (level < tagging_parm->max_ftracgrad_lev) {
+    //         const amrex::Real captured_ftracgrad = tagging_parm->ftracgrad;
+    //         amrex::ParallelFor(
+    //             tilebox, [=] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {
+    //             tag_graderror(
+    //                 i, j, k, tag_arr, S_derarr, captured_ftracgrad, tagval);
+    //             });
+    //         }
+
+    //     } else {
+    //         amrex::Abort("Unknown species identified as flame_trac_name");
+    //     }
+    // }
 }
 
 // ========================================================================================
@@ -457,14 +497,16 @@ CNS::printTotal () const
 #ifdef BL_LAZY
     Lazy::QueueReduction( [=] () mutable {
 #endif
-            ParallelDescriptor::ReduceRealSum(tot.data(), 5, ParallelDescriptor::IOProcessorNumber());
+        ParallelDescriptor::ReduceRealSum(tot.data(), 5, ParallelDescriptor::IOProcessorNumber());
+        if (verbose > 1) {
             amrex::Print().SetPrecision(17) << "\n[CNS] Total mass       = " << tot[0] << "\n"
-                              AMREX_D_TERM( <<   "      Total x-momentum = " << tot[1] << "\n" ,
+                                AMREX_D_TERM( <<   "      Total x-momentum = " << tot[1] << "\n" ,
                                             <<   "      Total y-momentum = " << tot[2] << "\n" ,
                                             <<   "      Total z-momentum = " << tot[3] << "\n" )
                                             <<   "      Total energy     = " << tot[4] << "\n";
+        }
 #ifdef BL_LAZY
-        });
+    });
 #endif
 
     // Nan detector
@@ -506,13 +548,14 @@ CNS::read_params ()
 
     pp.query("v", verbose);
 
-    Vector<int> tilesize(AMREX_SPACEDIM);
-    if (pp.queryarr("hydro_tile_size", tilesize, 0, AMREX_SPACEDIM)) {
-        for (int i=0; i<AMREX_SPACEDIM; i++) hydro_tile_size[i] = tilesize[i];
-    }
+    // Vector<int> tilesize(AMREX_SPACEDIM);
+    // if (pp.queryarr("hydro_tile_size", tilesize, 0, AMREX_SPACEDIM)) {
+    //     for (int i=0; i<AMREX_SPACEDIM; i++) hydro_tile_size[i] = tilesize[i];
+    // }
 
     pp.query("cfl", cfl);
     pp.query("dt_cutoff", dt_cutoff);
+    // pp.query("clip_temp", clip_temp);
 
     // recon_scheme
     //  1 -- piecewise constant
@@ -548,10 +591,11 @@ CNS::read_params ()
         refine_dengrad.resize(max_level);
         Vector<Real> refine_dengrad_tmp;
         pp.queryarr("refine_dengrad", refine_dengrad_tmp);
-        for (int lev = 0; lev < numvals; ++lev) {
+        int lev = 0;
+        for (; lev < std::min<int>(numvals, max_level); ++lev) {
             refine_dengrad[lev] = refine_dengrad_tmp[lev];
         }
-        for (int lev = numvals; lev < max_level; ++lev) {
+        for (; lev < max_level; ++lev) {
             refine_dengrad[lev] = refine_dengrad_tmp[numvals-1];
         }
     } 
@@ -718,11 +762,20 @@ CNS::estTimeStep ()
         if (flag.getType(bx) != FabType::covered)
 #endif
         {
-          reduce_op.eval(bx, reduce_data, [=]
+            reduce_op.eval(bx, reduce_data, [=]
             AMREX_GPU_DEVICE (int i, int j, int k) -> ReduceTuple
             {
-                return cns_estdt(i,j,k,s_arr,dx,*lparm);
+                return cns_estdt_hydro(i, j, k, s_arr, dx, *lparm);
             });
+
+            if (do_visc) {
+                auto const* ltransparm = trans_parms.device_trans_parm();
+                reduce_op.eval(bx, reduce_data, [=]
+                AMREX_GPU_DEVICE (int i, int j, int k) -> ReduceTuple
+                {
+                    return cns_estdt_visc(i, j, k, s_arr, dx, *lparm, ltransparm);
+                });
+            }
         }
     } // mfi
 

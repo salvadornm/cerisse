@@ -104,7 +104,7 @@ CNS::react_state (amrex::Real /*time*/,
           
           amrex::Real ei = rEi(i,j,k) / rho_old;
           auto eos = pele::physics::PhysicsType::eos();
-          eos.EY2T(ei, Y, T(i,j,k));
+          eos.REY2T(rho_old, ei, Y, T(i,j,k));
 
           // calculate d[rY, rEi]/dt
           for (int n = 0; n < NUM_SPECIES; ++n) {

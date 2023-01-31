@@ -6,10 +6,10 @@
 
 struct Parm
 {
-    const amrex::Real smallr = 1.e-19; // small rho
-    const amrex::Real smallp = 1.e-10; // small p
-    const amrex::Real smallu = 1.e-12; // small u
-    const amrex::Real smally = 1.e-10; // tol of |sum(Y)-1|
+    const amrex::Real smallr = 1.0e-19; // small rho
+    const amrex::Real smallp = 1.0e-10; // small p
+    const amrex::Real smallu = 1.0e-12; // small u
+    const amrex::Real smally = 1.0e-10; // tol of |sum(Y)-1|
 
     static constexpr int level_mask_interior   = 0; // valid cells
     static constexpr int level_mask_covered    = 1; // ghost cells covered by valid cells of this level

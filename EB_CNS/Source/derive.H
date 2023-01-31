@@ -10,81 +10,125 @@
 #include "CNS.H"
 
 void cns_dertemp(
-    const amrex::Box& bx, 
-    amrex::FArrayBox& derfab, 
-    int dcomp, 
-    int ncomp,
-    const amrex::FArrayBox& datafab, 
-    const amrex::Geometry& geomdata,
-    amrex::Real time, 
-    const int* bcrec, 
-    int level);
+  const amrex::Box& bx, 
+  amrex::FArrayBox& derfab, 
+  int dcomp, 
+  int ncomp,
+  const amrex::FArrayBox& datafab, 
+  const amrex::Geometry& geomdata,
+  amrex::Real time, 
+  const int* bcrec, 
+  int level);
 
 void cns_derpres(
-    const amrex::Box& bx, 
-    amrex::FArrayBox& derfab, 
-    int dcomp, 
-    int ncomp,
-    const amrex::FArrayBox& datafab, 
-    const amrex::Geometry& geomdata,
-    amrex::Real time, 
-    const int* bcrec, 
-    int level);
+  const amrex::Box& bx, 
+  amrex::FArrayBox& derfab, 
+  int dcomp, 
+  int ncomp,
+  const amrex::FArrayBox& datafab, 
+  const amrex::Geometry& geomdata,
+  amrex::Real time, 
+  const int* bcrec, 
+  int level);
 
 void cns_dervel(
-    const amrex::Box& bx, 
-    amrex::FArrayBox& derfab, 
-    int dcomp, 
-    int ncomp,
-    const amrex::FArrayBox& datafab, 
-    const amrex::Geometry& geomdata,
-    amrex::Real time, 
-    const int* bcrec, 
-    int level);
+  const amrex::Box& bx, 
+  amrex::FArrayBox& derfab, 
+  int dcomp, 
+  int ncomp,
+  const amrex::FArrayBox& datafab, 
+  const amrex::Geometry& geomdata,
+  amrex::Real time, 
+  const int* bcrec, 
+  int level);
 
 void cns_dermagvort(
-    const amrex::Box& bx, 
-    amrex::FArrayBox& derfab, 
-    int dcomp, 
-    int ncomp,
-    const amrex::FArrayBox& datafab, 
-    const amrex::Geometry& geomdata,
-    amrex::Real time, 
-    const int* bcrec, 
-    int level);
+  const amrex::Box& bx, 
+  amrex::FArrayBox& derfab, 
+  int dcomp, 
+  int ncomp,
+  const amrex::FArrayBox& datafab, 
+  const amrex::Geometry& geomdata,
+  amrex::Real time, 
+  const int* bcrec, 
+  int level);
 
 void cns_dermachnumber(
-    const amrex::Box& bx, 
-    amrex::FArrayBox& derfab, 
-    int dcomp, 
-    int ncomp,
-    const amrex::FArrayBox& datafab, 
-    const amrex::Geometry& geomdata,
-    amrex::Real time, 
-    const int* bcrec, 
-    int level);
+  const amrex::Box& bx, 
+  amrex::FArrayBox& derfab, 
+  int dcomp, 
+  int ncomp,
+  const amrex::FArrayBox& datafab, 
+  const amrex::Geometry& geomdata,
+  amrex::Real time, 
+  const int* bcrec, 
+  int level);
 
 void cns_derdivu(
-    const amrex::Box& bx, 
-    amrex::FArrayBox& derfab, 
-    int dcomp, 
-    int ncomp,
-    const amrex::FArrayBox& datafab, 
-    const amrex::Geometry& geomdata,
-    amrex::Real time, 
-    const int* bcrec, 
-    int level);
+  const amrex::Box& bx, 
+  amrex::FArrayBox& derfab, 
+  int dcomp, 
+  int ncomp,
+  const amrex::FArrayBox& datafab, 
+  const amrex::Geometry& geomdata,
+  amrex::Real time, 
+  const int* bcrec, 
+  int level);
 
 void cns_derdivrho(
-    const amrex::Box& bx, 
-    amrex::FArrayBox& derfab, 
-    int dcomp, 
-    int ncomp,
-    const amrex::FArrayBox& datafab, 
-    const amrex::Geometry& geomdata,
-    amrex::Real time, 
-    const int* bcrec, 
-    int level);
+  const amrex::Box& bx, 
+  amrex::FArrayBox& derfab, 
+  int dcomp, 
+  int ncomp,
+  const amrex::FArrayBox& datafab, 
+  const amrex::Geometry& geomdata,
+  amrex::Real time, 
+  const int* bcrec, 
+  int level);
+
+void cns_dercp(
+  const amrex::Box& bx, 
+  amrex::FArrayBox& derfab, 
+  int dcomp, 
+  int ncomp,
+  const amrex::FArrayBox& datafab, 
+  const amrex::Geometry& geomdata,
+  amrex::Real time, 
+  const int* bcrec, 
+  int level);
+
+void cns_dercv(
+  const amrex::Box& bx, 
+  amrex::FArrayBox& derfab, 
+  int dcomp, 
+  int ncomp,
+  const amrex::FArrayBox& datafab, 
+  const amrex::Geometry& geomdata,
+  amrex::Real time, 
+  const int* bcrec, 
+  int level);
+
+void cns_dermassfrac(
+  const amrex::Box& bx, 
+  amrex::FArrayBox& derfab, 
+  int dcomp, 
+  int ncomp,
+  const amrex::FArrayBox& datafab, 
+  const amrex::Geometry& geomdata,
+  amrex::Real time, 
+  const int* bcrec, 
+  int level);
+
+void cns_dermolefrac(
+  const amrex::Box& bx, 
+  amrex::FArrayBox& derfab, 
+  int dcomp, 
+  int ncomp,
+  const amrex::FArrayBox& datafab, 
+  const amrex::Geometry& geomdata,
+  amrex::Real time, 
+  const int* bcrec, 
+  int level);
 
 // AMREX_GPU_DEVICE
 // AMREX_FORCE_INLINE

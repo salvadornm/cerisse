@@ -66,40 +66,34 @@ CNS::advance(Real time, Real dt, int /*iteration*/, int /*ncycle*/)
   if (NUM_FIELD > 0) {
     // do something
   }
+  enforce_consistent_state(); // Enforce rho = sum(rhoY)
 
   // RK2 stage 2: U^{n+1} = U^n + 0.5*dt*(dUdt^n + dUdt^{n+1}) + dt*I_R^{n+1}
   if (verbose > 0) amrex::Print() << " >> RK Step 2: Computing dSdt^{n+1}" << std::endl;
   FillPatch(*this, Sborder, NUM_GROW, time+dt, State_Type, 0, LEN_STATE);
-  compute_dSdt(Sborder, dSdt_new, 0.5*dt, fr_as_crse, fr_as_fine, true /*(rk_reaction_iter < 1)*/);
+  compute_dSdt(Sborder, dSdt_new, 0.5*dt, fr_as_crse, fr_as_fine, (rk_reaction_iter < 1));
   MultiFab::LinComb(S_new, 0.5*dt, dSdt_new, 0, 0.5*dt, dSdt_old, 0, 0, LEN_STATE, 0);
   MultiFab::Add(S_new, S_old, 0, 0, LEN_STATE, 0);
   if (do_react) { // Compute I_R^{n+1}(U^**) and do U^{n+1} = U^** + dt*I_R^{n+1}
     react_state(time, dt); 
   }
+  enforce_consistent_state(); // Enforce rho = sum(rhoY)
   
   // Iterate to couple chemistry
-  // if (do_react && (rk_reaction_iter > 1)) {
-  //     for (int iter = 1; iter < rk_reaction_iter; ++iter) {
-  //         if (verbose > 0) {
-  //             amrex::Print() << " ... Re-computing dSdt^{n+1}: iter " 
-  //                            << iter << " of " << rk_reaction_iter << ")" << std::endl;
-  //         }
-
-  //         FillPatch(*this, Sborder, NUM_GROW, time+dt, State_Type, 0, LEN_STATE);
-  //         compute_dSdt(Sborder, dSdt_new, 0.5*dt, fr_as_crse, fr_as_fine, (iter == rk_reaction_iter));
-          
-  //         MultiFab::LinComb(S_new, 1.0, S_old, 0, 0.5*dt, dSdt_old, 0, 0, LEN_STATE, 0);
-  //         MultiFab::Saxpy(S_new, 0.5*dt, dSdt_new, 0, 0, LEN_STATE, 0);
-          
-  //         react_source(time, dt, false);
-
-  //         MultiFab::Saxpy(S_new, dt, I_R, 0, UFS, NUM_SPECIES, 0);
-  //         MultiFab::Saxpy(S_new, dt, I_R, NUM_SPECIES, UEDEN, 1, 0);
-          
-  //         computeTemp(S_new, 0);
-  //     }
-  // }
-  // }
+  if (do_react && (rk_reaction_iter > 1)) {
+    for (int iter = 1; iter < rk_reaction_iter; ++iter) {
+      if (verbose > 0) {
+        amrex::Print() << " >> Re-computing dSdt^{n+1}" << std::endl;
+      }
+      FillPatch(*this, Sborder, NUM_GROW, time+dt, State_Type, 0, LEN_STATE);
+      compute_dSdt(Sborder, dSdt_new, 0.5*dt, fr_as_crse, fr_as_fine, (iter == rk_reaction_iter));
+      
+      MultiFab::LinComb(S_new, 0.5*dt, dSdt_new, 0, 0.5*dt, dSdt_old, 0, 0, LEN_STATE, 0);
+      MultiFab::Add(S_new, S_old, 0, 0, LEN_STATE, 0);      
+      react_state(time, dt);
+    }
+    enforce_consistent_state(); // Enforce rho = sum(rhoY)
+  }
 
   if (NUM_FIELD > 0) {
     computeAvg(S_new);
@@ -107,6 +101,7 @@ CNS::advance(Real time, Real dt, int /*iteration*/, int /*ncycle*/)
     compute_pdf_model(Sborder, dt);
     MultiFab::Copy(S_new, Sborder, 0, 0, LEN_STATE, 0);
     computeAvg(S_new);
+    enforce_consistent_state(); // Enforce rho = sum(rhoY)
   }
 
   return dt;
@@ -159,8 +154,8 @@ CNS::compute_dSdt (const MultiFab& S, MultiFab& dSdt, Real dt,
     {
       // flux is used to store centroid flux needed for reflux
       for (int idim = 0; idim < AMREX_SPACEDIM; ++idim) {
-          flux[idim].resize(amrex::surroundingNodes(bx,idim), LEN_STATE);
-          flux[idim].setVal<RunOn::Device>(0.);
+        flux[idim].resize(amrex::surroundingNodes(bx,idim), LEN_STATE);
+        flux[idim].setVal<RunOn::Device>(0.);
       }
 
 #if (AMREX_SPACEDIM > 1) //1D cannot have EB
@@ -172,13 +167,13 @@ CNS::compute_dSdt (const MultiFab& S, MultiFab& dSdt, Real dt,
         compute_dSdt_box(bx, s_arr, dsdt_arr, {AMREX_D_DECL(&flux[0],&flux[1],&flux[2])});
 
         if (write_to_flux_register) {
-            if (fr_as_crse) {
-                fr_as_crse->CrseAdd(mfi, {AMREX_D_DECL(&flux[0], &flux[1], &flux[2])}, dx, dt, RunOn::Device);
-            }
+          if (fr_as_crse) {
+            fr_as_crse->CrseAdd(mfi, {AMREX_D_DECL(&flux[0], &flux[1], &flux[2])}, dx, dt, RunOn::Device);
+          }
 
-            if (fr_as_fine) {
-                fr_as_fine->FineAdd(mfi, {AMREX_D_DECL(&flux[0], &flux[1], &flux[2])}, dx, dt, RunOn::Device);
-            }
+          if (fr_as_fine) {
+            fr_as_fine->FineAdd(mfi, {AMREX_D_DECL(&flux[0], &flux[1], &flux[2])}, dx, dt, RunOn::Device);
+          }
         }
 #if (AMREX_SPACEDIM > 1) //1D cannot have EB
       } else {
@@ -214,22 +209,6 @@ CNS::compute_dSdt (const MultiFab& S, MultiFab& dSdt, Real dt,
                             as_crse, p_drho_as_crse->array(), p_rrflag_as_crse->const_array(),
                             as_fine, dm_as_fine.array(), level_mask.const_array(mfi), dt);
         
-        // // dSdt_Fields
-        // for (int nf = 0; nf < NUM_FIELD; ++nf) {
-        //     Array4<Real const> const&    s_arr =    S[mfi].array(NVAR + nf*NVAR);
-        //     Array4<Real      > const& dsdt_arr = dSdt[mfi].array(NVAR + nf*NVAR);
-        //     AMREX_D_TERM(
-        //         Array4<Real  > xflx_arr = flux[0].array(NVAR + nf*NVAR); ,
-        //         Array4<Real  > yflx_arr = flux[1].array(NVAR + nf*NVAR); ,
-        //         Array4<Real  > zflx_arr = flux[2].array(NVAR + nf*NVAR);)
-        //     compute_dSdt_box_eb(bx, s_arr, dsdt_arr,
-        //                         AMREX_D_DECL(xflx_arr, yflx_arr, zflx_arr),
-        //                         flags.const_array(mfi), vf_arr,
-        //                         AMREX_D_DECL(apx,apy,apz),AMREX_D_DECL(fcx,fcy,fcz), bcent_arr,
-        //                         as_crse, p_drho_as_crse->array(NVAR + nf*NVAR), p_rrflag_as_crse->const_array(),
-        //                         as_fine, dm_as_fine.array(NVAR + nf*NVAR), level_mask.const_array(mfi), dt);
-        // }
-
         if (write_to_flux_register) {
           if (fr_as_crse) {
             fr_as_crse->CrseAdd(mfi, {AMREX_D_DECL(&flux[0], &flux[1], &flux[2])},
@@ -259,4 +238,89 @@ CNS::compute_dSdt (const MultiFab& S, MultiFab& dSdt, Real dt,
 
   } //end mfi loop
 } //end omp block
+}
+
+/**
+ * \brief This function enforces (1) all rhoY >= 0, (2) rho <- sum(rhoY), (3) T >= min_T, and update rhoU and rhoE accordingly.
+*/
+void
+CNS::enforce_consistent_state ()
+{
+  BL_PROFILE("CNS::enforce_consistent_state()");
+
+  if (verbose > 0) {
+    amrex::Print() << " >> CNS::enforce_consistent_state()" << std::endl;
+  }
+
+  MultiFab& S = get_new_data(State_Type);
+  // auto const& rho = Array4<Real>(state, URHO, 1); //this is how to slice array4!!
+  // auto const& rhoU = Array4<Real>(state, UMX, AMREX_SPACEDIM);
+  // auto const& rhoY = Array4<Real>(state, UFS, NUM_SPECIES);
+  // auto const& rhoE = Array4<Real>(state, UEDEN, 1);
+
+#if (AMREX_SPACEDIM > 1) //1D cannot have EB
+  auto const& fact = dynamic_cast<EBFArrayBoxFactory const&>(S.Factory());
+  auto const& flags = fact.getMultiEBCellFlagFab();
+#endif
+
+#ifdef AMREX_USE_OMP
+#pragma omp parallel if (Gpu::notInLaunchRegion())
+#endif
+{  
+  for (MFIter mfi(S, TilingIfNotGPU()); mfi.isValid(); ++mfi) {
+    const Box& bx = mfi.tilebox();
+      
+#if (AMREX_SPACEDIM > 1) //1D cannot have EB
+    const auto& flag = flags[mfi];
+    if (flag.getType(bx) != FabType::covered)
+#endif
+    {
+      for (int nf = 0; nf <= NUM_FIELD; ++nf) {
+        Array4 s_arr = S.array(mfi, nf*NVAR);
+        ParallelFor(bx, [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept {
+          const IntVect iv{AMREX_D_DECL(i, j, k)};
+          const Real rhoOld = s_arr(iv, URHO);
+          Real rhoinv = 1.0 / rhoOld;
+                    
+          // Clip species rhoYs and get new rho
+          Real rhoNew = 0.0;
+          Real rhoYOld;
+          for (int n = 0; n < NUM_SPECIES; n++) {
+            rhoYOld = s_arr(iv, UFS+n);
+            s_arr(iv, UFS+n) = amrex::min<Real>(rhoOld, amrex::max<Real>(0.0, rhoYOld));
+            rhoNew += s_arr(iv, UFS+n);
+          }
+          s_arr(iv, URHO) = rhoNew;
+
+          // Keep specific energy and velocity, recompute rhoE and mom
+          s_arr(iv, UEDEN) *= rhoNew * rhoinv;
+          for (int n = 0; n < AMREX_SPACEDIM; n++) {
+            s_arr(iv, UMX+n) *= rhoNew * rhoinv;
+          }
+
+          // Calculate temperature (!) this adds energy to the point but without removing the excess ke
+          // rhoinv = 1.0 / rhoNew;
+          // Real Y[NUM_SPECIES];
+          // for (int n = 0; n < NUM_SPECIES; n++) {
+          //   Y[n] = s_arr(iv, UFS+n) * rhoinv;
+          // }
+          // Real ke = 0.5 * rhoinv * (AMREX_D_TERM(s_arr(iv, UMX)*s_arr(iv, UMX) ,
+          //                                       +s_arr(iv, UMY)*s_arr(iv, UMY) ,
+          //                                       +s_arr(iv, UMZ)*s_arr(iv, UMZ)));
+          // Real ei = rhoinv * (s_arr(iv, UEDEN) - ke);
+          // auto eos = pele::physics::PhysicsType::eos();
+          // Real T;
+          // eos.REY2T(rhoNew, ei, Y, T);
+          // if (T < 50.0) {
+          //   std::cout << "Energy added to cell (" << i << "," << j << "," << k << ")\n";
+          //   T = 50.0;
+          //   s_arr(iv, UEDEN) -= ei * rhoNew;
+          //   eos.RTY2E(rhoNew, T, Y, ei);
+          //   s_arr(iv, UEDEN) += ei * rhoNew;
+          // }
+        });
+      } // loop through NUM_FIELD
+    } // EB !covered
+  } // mfi loop
+} // omp block
 }

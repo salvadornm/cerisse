@@ -45,7 +45,7 @@ vpdf_langevin_model (const amrex::Box& bx,
       for (int n = 0; n < NUM_SPECIES; ++n) {
         massfrac[n] = s(iv-iv_dir, nf*NVAR + UFS+n) * rhoinv;
       }
-      eos.EY2T(ei, massfrac, T); 
+      eos.REY2T(rho, ei, massfrac, T); 
       eos.RTY2P(rho, T, massfrac, p);
       if (isnan(p)) amrex::Print() << i << ": p_{i-1} is nan!!! T = " << T << 
                                                             ", ei = " << ei << 
@@ -63,7 +63,7 @@ vpdf_langevin_model (const amrex::Box& bx,
       for (int n = 0; n < NUM_SPECIES; ++n) {
           massfrac[n] = s(iv+iv_dir, nf*NVAR + UFS+n) * rhoinv;
       }
-      eos.EY2T(ei, massfrac, T);
+      eos.REY2T(rho, ei, massfrac, T);
       eos.RTY2P(rho, T, massfrac, dp[nf-1]);
       if (isnan(dp[nf-1])) amrex::Print() << i << ": p_{i+1} is nan!!! T = " << T << 
                                                                    ", ei = " << ei << 
@@ -83,7 +83,7 @@ vpdf_langevin_model (const amrex::Box& bx,
       // for (int n = 0; n < NUM_SPECIES; ++n) {
       //     massfrac[n] = s(i, j, k, nf*NVAR + UFS+n) * rhoinv;
       // }
-      // eos.EY2T(ei, massfrac, T);
+      // eos.REY2T(rho, ei, massfrac, T);
       // eos.RTY2P(rho, T, massfrac, dp[nf-1]);
       // dp[nf-1] *= 2;            
       // mean_dp += 2*dp[nf-1];

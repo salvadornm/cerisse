@@ -8,69 +8,68 @@ void cns_dertemp (const Box& bx, FArrayBox& derfab, int dcomp, int /*ncomp*/,
                   const FArrayBox& datafab, const Geometry& /*geomdata*/,
                   Real /*time*/, const int* /*bcrec*/, int /*level*/)
 {
-    auto const dat = datafab.array();
-    auto Tfab = derfab.array(dcomp);
+  auto const dat = datafab.array();
+  auto Tfab = derfab.array(dcomp);
+  
+  amrex::ParallelFor(bx, [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept {
+    const amrex::Real rho = dat(i, j, k, URHO);
+    const amrex::Real rhoinv = 1.0 / rho;
+    AMREX_D_TERM(amrex::Real vx = dat(i, j, k, UMX) * rhoinv; ,
+                 amrex::Real vy = dat(i, j, k, UMY) * rhoinv; ,
+                 amrex::Real vz = dat(i, j, k, UMZ) * rhoinv;);
+    amrex::Real massfrac[NUM_SPECIES];
+    for (int n = 0; n < NUM_SPECIES; ++n) {
+      massfrac[n] = dat(i, j, k, UFS + n) * rhoinv;
+    }
+    amrex::Real ei = dat(i, j, k, UEDEN) * rhoinv - 0.5* (AMREX_D_TERM(vx*vx, +vy*vy, +vz*vz));
     
-    amrex::ParallelFor(bx, [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept {
-        const amrex::Real rho = dat(i, j, k, URHO);
-        const amrex::Real rhoinv = 1.0 / rho;
-        AMREX_D_TERM(amrex::Real vx = dat(i, j, k, UMX) * rhoinv; ,
-                     amrex::Real vy = dat(i, j, k, UMY) * rhoinv; ,
-                     amrex::Real vz = dat(i, j, k, UMZ) * rhoinv;);
-        amrex::Real massfrac[NUM_SPECIES];
-        for (int n = 0; n < NUM_SPECIES; ++n) {
-            massfrac[n] = dat(i, j, k, UFS + n) * rhoinv;
-        }
-        amrex::Real ei = dat(i, j, k, UEDEN) * rhoinv - 0.5* (AMREX_D_TERM(vx*vx, +vy*vy, +vz*vz));
-        
-        auto eos = pele::physics::PhysicsType::eos();
-        eos.EY2T(ei, massfrac, Tfab(i, j, k));
-    });
+    auto eos = pele::physics::PhysicsType::eos();
+    eos.REY2T(rho, ei, massfrac, Tfab(i, j, k));
+  });
 }
 
 void cns_derpres (const Box& bx, FArrayBox& derfab, int dcomp, int /*ncomp*/,
                   const FArrayBox& datafab, const Geometry& /*geomdata*/,
                   Real /*time*/, const int* /*bcrec*/, int /*level*/)
 {
-    auto const dat = datafab.array();
-    auto pfab = derfab.array(dcomp);
-    // Parm const* parm = CNS::d_parm;
-    amrex::ParallelFor(bx, [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept {
-        // p(i,j,k,dcomp) = (parm->eos_gamma-1.)*rhoe(i,j,k); // change to pelephysics
-        const amrex::Real rho = dat(i, j, k, URHO);
-        const amrex::Real rhoinv = 1.0 / rho;
-        AMREX_D_TERM(amrex::Real vx = dat(i, j, k, UMX) * rhoinv; ,
-                     amrex::Real vy = dat(i, j, k, UMY) * rhoinv; ,
-                     amrex::Real vz = dat(i, j, k, UMZ) * rhoinv;);
-        amrex::Real massfrac[NUM_SPECIES];
-        for (int n = 0; n < NUM_SPECIES; ++n) {
-            massfrac[n] = dat(i, j, k, UFS + n) * rhoinv;
-        }
-        amrex::Real ei = dat(i, j, k, UEDEN) * rhoinv - 0.5* (AMREX_D_TERM(vx*vx, +vy*vy, +vz*vz));
-        amrex::Real T;
-        auto eos = pele::physics::PhysicsType::eos();
-        eos.EY2T(ei, massfrac, T);
-        eos.RTY2P(rho, T, massfrac, pfab(i, j, k));
-    });
+  auto const dat = datafab.array();
+  auto pfab = derfab.array(dcomp);
+
+  amrex::ParallelFor(bx, [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept {
+    const amrex::Real rho = dat(i, j, k, URHO);
+    const amrex::Real rhoinv = 1.0 / rho;
+    AMREX_D_TERM(amrex::Real vx = dat(i, j, k, UMX) * rhoinv; ,
+                 amrex::Real vy = dat(i, j, k, UMY) * rhoinv; ,
+                 amrex::Real vz = dat(i, j, k, UMZ) * rhoinv;);
+    amrex::Real massfrac[NUM_SPECIES];
+    for (int n = 0; n < NUM_SPECIES; ++n) {
+      massfrac[n] = dat(i, j, k, UFS + n) * rhoinv;
+    }
+    amrex::Real ei = dat(i, j, k, UEDEN) * rhoinv - 0.5* (AMREX_D_TERM(vx*vx, +vy*vy, +vz*vz));
+    amrex::Real T;
+    auto eos = pele::physics::PhysicsType::eos();
+    eos.REY2T(rho, ei, massfrac, T);
+    eos.RTY2P(rho, T, massfrac, pfab(i, j, k));
+  });
 }
 
 void cns_dervel (const Box& bx, FArrayBox& derfab, int dcomp, int /*ncomp*/,
-                 const FArrayBox& datfab, const Geometry& /*geomdata*/,
+                 const FArrayBox& datafab, const Geometry& /*geomdata*/,
                  Real /*time*/, const int* /*bcrec*/, int /*level*/)
 {
-    auto const dat = datfab.array();
-    auto vel = derfab.array();
-    amrex::ParallelFor(bx,
-    [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept {
-        vel(i,j,k,dcomp) = dat(i,j,k,1) / dat(i,j,k,0);
-    });
+  auto const dat = datafab.array();
+  auto vel = derfab.array();
+  amrex::ParallelFor(bx,
+  [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept {
+    vel(i,j,k,dcomp) = dat(i,j,k,1) / dat(i,j,k,0);
+  });
 }
 
 void cns_dermagvort (const Box& bx, FArrayBox& derfab, int dcomp, int /*ncomp*/,
-                     const FArrayBox& datfab, const Geometry& geomdata,
+                     const FArrayBox& datafab, const Geometry& geomdata,
                      Real /*time*/, const int* /*bcrec*/, int /*level*/)
 {
-  auto const dat = datfab.const_array();
+  auto const dat = datafab.const_array();
   auto vort = derfab.array(dcomp);
 
   const amrex::Box& gbx = amrex::grow(bx, 1);
@@ -79,7 +78,7 @@ void cns_dermagvort (const Box& bx, FArrayBox& derfab, int dcomp, int /*ncomp*/,
   amrex::Elixir local_eli = local.elixir();
   auto larr = local.array();
 
-  // const auto& flag_fab = amrex::getEBCellFlagFab(datfab);
+  // const auto& flag_fab = amrex::getEBCellFlagFab(datafab);
   // const auto& typ = flag_fab.getType(bx);
   // if (typ == amrex::FabType::covered) {
   //   derfab.setVal<amrex::RunOn::Device>(0.0, bx);
@@ -118,30 +117,30 @@ void cns_dermagvort (const Box& bx, FArrayBox& derfab, int dcomp, int /*ncomp*/,
                  int km = k-1; int kp = k-1; amrex::Real wk = 1.0;)
 
     AMREX_D_TERM(
-        vort(i, j, k) = 0.0;
-        ,
-        const amrex::Real vx = wi * (larr(ip, j, k, 1) - larr(im, j, k, 1)) / dx;
-        const amrex::Real uy = wj * (larr(i, jp, k, 0) - larr(i, jm, k, 0)) / dy;
-        const amrex::Real v3 = vx - uy;
-        ,
-        const amrex::Real wx = wi * (larr(ip, j, k, 2) - larr(im, j, k, 2)) / dx;
-        const amrex::Real wy = wj * (larr(i, jp, k, 2) - larr(i, jm, k, 2)) / dy;
-        const amrex::Real uz = wk * (larr(i, j, kp, 0) - larr(i, j, km, 0)) / dz;
-        const amrex::Real vz = wk * (larr(i, j, kp, 1) - larr(i, j, km, 1)) / dz;
-        const amrex::Real v1 = wy - vz; 
-        const amrex::Real v2 = uz - wx;);
+      vort(i, j, k) = 0.0;
+      ,
+      const amrex::Real vx = wi * (larr(ip, j, k, 1) - larr(im, j, k, 1)) / dx;
+      const amrex::Real uy = wj * (larr(i, jp, k, 0) - larr(i, jm, k, 0)) / dy;
+      const amrex::Real v3 = vx - uy;
+      ,
+      const amrex::Real wx = wi * (larr(ip, j, k, 2) - larr(im, j, k, 2)) / dx;
+      const amrex::Real wy = wj * (larr(i, jp, k, 2) - larr(i, jm, k, 2)) / dy;
+      const amrex::Real uz = wk * (larr(i, j, kp, 0) - larr(i, j, km, 0)) / dz;
+      const amrex::Real vz = wk * (larr(i, j, kp, 1) - larr(i, j, km, 1)) / dz;
+      const amrex::Real v1 = wy - vz; 
+      const amrex::Real v2 = uz - wx;);
     vort(i, j, k) = sqrt(AMREX_D_TERM(0., +v3 * v3, +v1 * v1 + v2 * v2));
   });
 }
 
 void cns_derdivu (const Box& bx, FArrayBox& derfab, int dcomp, int /*ncomp*/,
-                  const FArrayBox& datfab, const Geometry& geomdata,
+                  const FArrayBox& datafab, const Geometry& geomdata,
                   Real /*time*/, const int* /*bcrec*/, int /*level*/)
 {
-  auto const dat = datfab.const_array();
+  auto const dat = datafab.const_array();
   auto divu = derfab.array(dcomp);
 
-  // const auto& flag_fab = amrex::getEBCellFlagFab(datfab);
+  // const auto& flag_fab = amrex::getEBCellFlagFab(datafab);
   // const auto& typ = flag_fab.getType(bx);
   // if (typ == amrex::FabType::covered) {
   //   derfab.setVal<amrex::RunOn::Device>(0.0, bx);
@@ -182,13 +181,13 @@ void cns_derdivu (const Box& bx, FArrayBox& derfab, int dcomp, int /*ncomp*/,
 }
 
 void cns_derdivrho (const Box& bx, FArrayBox& derfab, int dcomp, int /*ncomp*/,
-                    const FArrayBox& datfab, const Geometry& geomdata,
+                    const FArrayBox& datafab, const Geometry& geomdata,
                     Real /*time*/, const int* /*bcrec*/, int /*level*/)
 {
-  auto const dat = datfab.const_array();
+  auto const dat = datafab.const_array();
   auto divrho = derfab.array(dcomp);
   
-  // const auto& flag_fab = amrex::getEBCellFlagFab(datfab);
+  // const auto& flag_fab = amrex::getEBCellFlagFab(datafab);
   // const auto& typ = flag_fab.getType(bx);
   // if (typ == amrex::FabType::covered) {
   //   derfab.setVal<amrex::RunOn::Device>(0.0, bx);
@@ -229,10 +228,10 @@ void cns_derdivrho (const Box& bx, FArrayBox& derfab, int dcomp, int /*ncomp*/,
 }
 
 void cns_dermachnumber (const Box& bx, FArrayBox& derfab, int dcomp, int /*ncomp*/,
-                        const FArrayBox& datfab, const Geometry& /*geomdata*/,
+                        const FArrayBox& datafab, const Geometry& /*geomdata*/,
                         Real /*time*/, const int* /*bcrec*/, int /*level*/)
 {
-  auto const dat = datfab.const_array();
+  auto const dat = datafab.const_array();
   auto mach = derfab.array(dcomp);
 
   amrex::ParallelFor(bx, [=] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {
@@ -241,16 +240,153 @@ void cns_dermachnumber (const Box& bx, FArrayBox& derfab, int dcomp, int /*ncomp
     AMREX_D_TERM(const amrex::Real vxsq = dat(i, j, k, UMX) * dat(i, j, k, UMX) * rhoinv * rhoinv; ,
                  const amrex::Real vysq = dat(i, j, k, UMY) * dat(i, j, k, UMY) * rhoinv * rhoinv; ,
                  const amrex::Real vzsq = dat(i, j, k, UMZ) * dat(i, j, k, UMZ) * rhoinv * rhoinv;);
-    amrex::Real ei = dat(i, j, k, UEDEN) * rhoinv - 0.5* (AMREX_D_TERM(vxsq, +vysq, +vzsq));
+    const amrex::Real ei = dat(i, j, k, UEDEN) * rhoinv - 0.5* (AMREX_D_TERM(vxsq, +vysq, +vzsq));
     amrex::Real massfrac[NUM_SPECIES];
     for (int n = 0; n < NUM_SPECIES; ++n) {
       massfrac[n] = dat(i, j, k, UFS + n) * rhoinv;
     }
     amrex::Real cs, T;
     auto eos = pele::physics::PhysicsType::eos();
-    eos.EY2T(ei, massfrac, T);
+    eos.REY2T(rho, ei, massfrac, T);
     eos.RTY2Cs(rho, T, massfrac, cs);
 
     mach(i, j, k) = sqrt(AMREX_D_TERM(vxsq, +vysq, +vzsq)) / cs;
+  });
+}
+
+void cns_dercp (const Box& bx, FArrayBox& derfab, int dcomp, int /*ncomp*/,
+                const FArrayBox& datafab, const Geometry& /*geomdata*/,
+                Real /*time*/, const int* /*bcrec*/, int /*level*/)
+{
+  auto const dat = datafab.const_array();
+  auto cp_arr = derfab.array(dcomp);
+
+  amrex::ParallelFor(bx, [=] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {
+    const amrex::Real rho = dat(i, j, k, URHO);
+    const amrex::Real rhoinv = 1.0 / rho;
+    AMREX_D_TERM(const amrex::Real vxsq = dat(i, j, k, UMX) * dat(i, j, k, UMX) * rhoinv * rhoinv; ,
+                 const amrex::Real vysq = dat(i, j, k, UMY) * dat(i, j, k, UMY) * rhoinv * rhoinv; ,
+                 const amrex::Real vzsq = dat(i, j, k, UMZ) * dat(i, j, k, UMZ) * rhoinv * rhoinv;);
+    const amrex::Real ei = dat(i, j, k, UEDEN) * rhoinv - 0.5* (AMREX_D_TERM(vxsq, +vysq, +vzsq));
+    amrex::Real massfrac[NUM_SPECIES];
+    for (int n = 0; n < NUM_SPECIES; ++n) {
+      massfrac[n] = dat(i, j, k, UFS + n) * rhoinv;
+    }
+
+    auto eos = pele::physics::PhysicsType::eos();
+    amrex::Real T, cp;
+    eos.REY2T(rho, ei, massfrac, T);
+    eos.RTY2Cp(rho, T, massfrac, cp);
+
+    cp_arr(i, j, k) = cp;
+  });
+}
+
+void cns_dercv (const Box& bx, FArrayBox& derfab, int dcomp, int /*ncomp*/,
+                const FArrayBox& datafab, const Geometry& /*geomdata*/,
+                Real /*time*/, const int* /*bcrec*/, int /*level*/)
+{
+  auto const dat = datafab.const_array();
+  auto cv_arr = derfab.array(dcomp);
+
+  amrex::ParallelFor(bx, [=] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {
+    const amrex::Real rho = dat(i, j, k, URHO);
+    const amrex::Real rhoinv = 1.0 / rho;
+    AMREX_D_TERM(const amrex::Real vxsq = dat(i, j, k, UMX) * dat(i, j, k, UMX) * rhoinv * rhoinv; ,
+                 const amrex::Real vysq = dat(i, j, k, UMY) * dat(i, j, k, UMY) * rhoinv * rhoinv; ,
+                 const amrex::Real vzsq = dat(i, j, k, UMZ) * dat(i, j, k, UMZ) * rhoinv * rhoinv;);
+    const amrex::Real ei = dat(i, j, k, UEDEN) * rhoinv - 0.5* (AMREX_D_TERM(vxsq, +vysq, +vzsq));
+    amrex::Real massfrac[NUM_SPECIES];
+    for (int n = 0; n < NUM_SPECIES; ++n) {
+      massfrac[n] = dat(i, j, k, UFS + n) * rhoinv;
+    }
+    
+    auto eos = pele::physics::PhysicsType::eos();
+    amrex::Real T, cv;
+    eos.REY2T(rho, ei, massfrac, T);
+    eos.RTY2Cv(rho, T, massfrac, cv);
+
+    cv_arr(i, j, k) = cv;
+  });
+}
+
+void CNS::cns_dertranscoef (
+  const amrex::Box& bx, amrex::FArrayBox& derfab, int dcomp, int /*ncomp*/,
+  const amrex::FArrayBox& datafab, const amrex::Geometry& /*geomdata*/,
+  amrex::Real /*time*/, const int* /*bcrec*/, int /*level*/) 
+{
+  auto const dat = datafab.const_array();
+  auto Diag_arr = derfab.array(dcomp);
+  auto mu_arr = derfab.array(dcomp+NUM_SPECIES);
+  auto xi_arr = derfab.array(dcomp+NUM_SPECIES+1);
+  auto lam_arr = derfab.array(dcomp+NUM_SPECIES+2);
+  auto const* ltransparm = trans_parms.device_trans_parm();
+
+  amrex::ParallelFor(bx, [=] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {
+    const amrex::Real rho = dat(i, j, k, URHO);
+    const amrex::Real rhoinv = 1.0 / rho;
+    AMREX_D_TERM(const amrex::Real vxsq = dat(i, j, k, UMX) * dat(i, j, k, UMX) * rhoinv * rhoinv; ,
+                 const amrex::Real vysq = dat(i, j, k, UMY) * dat(i, j, k, UMY) * rhoinv * rhoinv; ,
+                 const amrex::Real vzsq = dat(i, j, k, UMZ) * dat(i, j, k, UMZ) * rhoinv * rhoinv;);
+    const amrex::Real ei = dat(i, j, k, UEDEN) * rhoinv - 0.5* (AMREX_D_TERM(vxsq, +vysq, +vzsq));
+    amrex::Real massfrac[NUM_SPECIES];
+    for (int n = 0; n < NUM_SPECIES; ++n) {
+      massfrac[n] = dat(i, j, k, UFS + n) * rhoinv;
+    }    
+    auto eos = pele::physics::PhysicsType::eos();
+    amrex::Real T;
+    eos.REY2T(rho, ei, massfrac, T);
+
+    amrex::Real mu, xi, lam;
+    amrex::Real Ddiag[NUM_SPECIES];
+    bool get_xi = true, get_mu = true, get_lam = true, get_Ddiag = true;
+    auto trans = pele::physics::PhysicsType::transport();
+    trans.transport(get_xi, get_mu, get_lam, get_Ddiag, T, rho, massfrac, 
+                    Ddiag, mu, xi, lam, ltransparm);
+
+    mu_arr(i, j, k) = mu;
+    xi_arr(i, j, k) = xi;
+    lam_arr(i, j, k) = lam;
+    for (int n = 0; n < NUM_SPECIES; ++n) {
+      Diag_arr(i, j, k, n) = Ddiag[n];
+    }
+  });
+}
+
+void cns_dermassfrac (const Box& bx, FArrayBox& derfab, int dcomp, int /*ncomp*/,
+                      const FArrayBox& datafab, const Geometry& /*geomdata*/,
+                      Real /*time*/, const int* /*bcrec*/, int /*level*/)
+{
+  auto const dat = datafab.const_array();
+  auto massfrac = derfab.array(dcomp);
+
+  amrex::ParallelFor(bx, NUM_FIELD+1, [=] AMREX_GPU_DEVICE(int i, int j, int k, int nf) noexcept {
+    const amrex::Real rho = dat(i, j, k, nf*NVAR + URHO);
+    const amrex::Real rhoinv = 1.0 / rho;
+    for (int n = 0; n < NUM_SPECIES; ++n) {
+      massfrac(i, j, k, nf*NUM_SPECIES + n) = dat(i, j, k, nf*NVAR + UFS + n) * rhoinv;
+    }
+  });
+}
+
+void cns_dermolefrac (const Box& bx, FArrayBox& derfab, int dcomp, int /*ncomp*/,
+                      const FArrayBox& datafab, const Geometry& /*geomdata*/,
+                      Real /*time*/, const int* /*bcrec*/, int /*level*/)
+{
+  auto const dat = datafab.const_array();
+  auto molefrac = derfab.array(dcomp);
+
+  amrex::ParallelFor(bx, NUM_FIELD+1, [=] AMREX_GPU_DEVICE(int i, int j, int k, int nf) noexcept {
+    const amrex::Real rho = dat(i, j, k, nf*NVAR + URHO);
+    const amrex::Real rhoinv = 1.0 / rho;
+    amrex::Real mass[NUM_SPECIES], mole[NUM_SPECIES];
+    for (int n = 0; n < NUM_SPECIES; ++n) {
+      mass[n] = dat(i, j, k, nf*NVAR + UFS + n) * rhoinv;
+    }
+    auto eos = pele::physics::PhysicsType::eos();
+    eos.Y2X(mass, mole);
+    for (int n = 0; n < NUM_SPECIES; ++n) {
+      molefrac(i, j, k, nf*NUM_SPECIES + n) = mole[n];
+    }
   });
 }

@@ -11,7 +11,7 @@
 #include <cmath>
 
 /**
- * \brief Convert state variable to primitive variable, and preserve positivity of 
+ * \brief Convert state variable to primitive variable
  * 
  * @param i    x index.
  * @param j    y index.
@@ -35,25 +35,34 @@ cns_ctoprim (int i, int j, int k, int ns,
                  amrex::Real uz = u(i,j,k,ns+UMZ)*rhoinv;);
     amrex::Real ei = u(i,j,k,ns+UEDEN) * rhoinv - amrex::Real(0.5)*(AMREX_D_TERM(ux*ux, + uy*uy, + uz*uz));
     amrex::Real massfrac[NUM_SPECIES];
-    amrex::Real check_rho = 0.0;
+    amrex::Real sumRhoY = 0.0;
     for (int n = 0; n < NUM_SPECIES; n++) {
-        massfrac[n] = u(i,j,k,ns+UFS+n) * rhoinv;
+        massfrac[n] = u(i,j,k,ns+UFS+n) * rhoinv;        
         // massfrac[n] = amrex::max(massfrac[n], 0.0); //preserve positivity of mass
-        check_rho += massfrac[n];
+        // check_rho += massfrac[n];
+        sumRhoY += u(i,j,k,ns+UFS+n);
         q(i,j,k,QFS+n) = massfrac[n];
     }
-    if (std::abs(check_rho - 1.0) > parm.smally) {
-        amrex::Print() << "i=" << i << ": sum(Y) - 1 = " << std::abs(check_rho - 1.0) << "!!!\n";
-        for (int n = 0; n < NUM_SPECIES; n++) {
-            massfrac[n] /= check_rho;
-            q(i,j,k,QFS+n) = massfrac[n];
-        }
-    }
+    // if (std::abs(sumRhoY - rho) > parm.smallr) {
+        // if (std::abs(check_rho - 1.0) > 1e-4) {
+        //     amrex::Print() << "i,j,k=" << i << "," << j << "," << k << ": sum(Y)-1 = " << check_rho - 1.0 << "!!!\n";
+        // }
+        // if (std::abs(sumRhoY - rho) > 1e-5) {
+            // amrex::Print() << "i,j,k=" << i << "," << j << "," << k << ": sum(rY)-rho = " << sumRhoY - rho << "!!!\n";
+        // }
+        // for (int n = 0; n < NUM_SPECIES; n++) {
+        //     // massfrac[n] /= check_rho;
+        //     // q(i,j,k,QFS+n) = massfrac[n];
+        //     q(i,j,k,ns+URHO) = sumRhoY;
+        // }
+    // }
 
     auto eos = pele::physics::PhysicsType::eos();
     amrex::Real T, p, cs, gamma;
     // eos.Y2WBAR(massfrac, wbar);
-    eos.EY2T(ei, massfrac, T); 
+    eos.REY2T(rho, ei, massfrac, T);
+    if (T < 50.0) std::cout << "T < 50.0 = " << T << std::endl;
+    T = amrex::max<amrex::Real>(T, 50.0); //clip temperature
     eos.RTY2P(rho, T, massfrac, p);
     eos.RTY2Cs(rho, T, massfrac, cs);
     eos.RTY2G(rho, T, massfrac, gamma);
@@ -69,12 +78,14 @@ cns_ctoprim (int i, int j, int k, int ns,
     q(i,j,k,QEINT) = ei;
     q(i,j,k,QTEMP) = T;
 
-    if (isnan(cs)) {
-        amrex::Print() << "i=" << i << " ns=" << ns << ": rho=" << rho << " T=" << T << " p=" << p;// << "\n";
-        amrex::Print() << " rhoE=" << u(i,j,k,ns+UEDEN) << " ei=" << ei << "\n";
-        for (int n = 0; n < NUM_SPECIES; n++) amrex::Print() << u(i,j,k,ns+UFS+n) << " ";
-        amrex::Print() << "\n";
-        amrex::Abort("cs is nan");
+    if (amrex::isnan(cs)) {
+        std::cout << "i=" << i << " j=" << j << " k=" << k << " ns=" << ns << ": rho=" << rho << " T=" << T << " p=" << p;// << "\n";
+        std::cout << " rhoE=" << u(i,j,k,ns+UEDEN) << " ei=" << ei << "\n";
+        for (int n = 0; n < NUM_SPECIES; n++) {
+            std::cout << u(i,j,k,ns+UFS+n) << " ";
+        }
+        std::cout << "\n";
+        // amrex::Abort("cs is nan");
     }
 }
 
@@ -147,7 +158,7 @@ cns_unpackchar (const amrex::Real w1, const amrex::Real w2, const amrex::Real w3
                 amrex::Real& rho, amrex::Real& u, amrex::Real& p,
                 const int sys, Parm const& parm)
 {
-    using amrex::Real;
+    // using amrex::Real;
     
     if (sys == 0) { // speed of sound system
         rho = w1 + (w2 + w3) / c;        
@@ -188,11 +199,6 @@ cns_div (int i, int j, int k, int n,
                                + dxinv[1] * (fy(i,j,k,n) - fy(i,j+1,k,n)),
                                + dxinv[2] * (fz(i,j,k,n) - fz(i,j,k+1,n)));
 }
-
-// AMREX_GPU_DEVICE AMREX_FORCE_INLINE
-// void
-// wave_speed_est (const amrex::Real cl,)
-//c, u, ut1, ut2, e
 
 /**
  * \brief HLLC approximate Riemann solver.
@@ -646,19 +652,21 @@ cns_riemann (int i, int j, int k, int dir,
     // Unpack wl to ql (rl, ul, utl, pl, cl, el, yl)
     // Real g = q(iv-iv_dir,QG);
     Real r = q(iv-iv_dir,QRHO);
-    Real cl = wl(iv,WC);//q(iv-iv_dir,QC);
+    if (wl(iv,WC) < 0.0) std::cout << "cl < 0 = " << wl(iv,WC) << std::endl;
+    Real cl = amrex::max(1e-10, wl(iv,WC));
     Real yl[NUM_SPECIES];
     Real rl, AMREX_D_DECL(ul, ut1l, ut2l), pl, el;
-    Real invr;
     
+    Real sumY = 0.0;
     for (int n = 0; n < NUM_SPECIES; ++n) {
-        yl[n] = wl(iv,WY+n);
-        rl += yl[n];
+        yl[n] = amrex::max<amrex::Real>(0.0, wl(iv,WY+n));
+        sumY += yl[n];
     }
-    if (std::abs(rl - 1.0) > parm.smallr) {
-        invr = 1.0 / rl;
+    Real invsumY;
+    if (std::abs(sumY - 1.0) > parm.smally) {
+        invsumY = 1.0 / sumY;
         for (int n = 0; n < NUM_SPECIES; ++n) {
-            yl[n] *= invr;
+            yl[n] *= invsumY;
         }
     }
     AMREX_D_TERM(,
@@ -698,18 +706,20 @@ cns_riemann (int i, int j, int k, int dir,
     // Convert wr to qr
     // g = q(iv,QG);
     r = q(iv,QRHO);
-    Real cr = wr(iv,WC);//q(iv,QC);
+    if (wr(iv,WC) < 0.0) std::cout << "cr < 0 = " << wr(iv,WC) << std::endl;
+    Real cr = amrex::max(1e-10, wr(iv,WC));
     Real yr[NUM_SPECIES];
     Real rr, AMREX_D_DECL(ur, ut1r, ut2r), pr, er;
 
+    sumY = 0.0;
     for (int n = 0; n < NUM_SPECIES; ++n) {
-        yr[n] = wr(iv,WY+n);
-        rr += yr[n];
+        yr[n] = amrex::max<amrex::Real>(0.0, wr(iv,WY+n));
+        sumY += yr[n];
     }
-    if (std::abs(rr - 1.0) > parm.smallr) {
-        invr = 1.0 / rr;
+    if (std::abs(sumY - 1.0) > parm.smally) {
+        invsumY = 1.0 / sumY;
         for (int n = 0; n < NUM_SPECIES; ++n) {
-            yr[n] *= invr;
+            yr[n] *= invsumY;
         }
     }
     AMREX_D_TERM(,
@@ -718,6 +728,14 @@ cns_riemann (int i, int j, int k, int dir,
 
     cns_unpackchar(wr(iv,WRHO), wr(iv,WACO), wr(iv,WACO+1), cr, r, g, 
                    rr, ur, pr, sys, parm);
+
+    // Shu's positivity preserving limiter (!) need both ends of a cell
+    // amrex::Real m = amrex::min<amrex::Real>(rl, rr);
+    // rl = q(iv, )
+
+    // eos.RYP2E(rl, yl, pl, el);
+    // el += 0.5*(AMREX_D_TERM(ul*ul, +ut1l*ut1l, +ut2l*ut2l));   
+    // eos.RPY2Cs(rl, pl, yl, cl);
 
     eos.RYP2E(rr, yr, pr, er);
     er += 0.5*(AMREX_D_TERM(ur*ur, +ut1r*ut1r, +ut2r*ut2r));
