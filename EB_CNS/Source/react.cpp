@@ -23,7 +23,8 @@ CNS::set_typical_values_chem ()
   // reactor->set_typ_vals_ode(typical_values_chem);
 }
 
-/** \brief Compute I_R and update S_new += dt*I_R
+/** 
+ * \brief Compute I_R and update S_new += dt*I_R
  */
 void
 CNS::react_state (amrex::Real /*time*/,
@@ -193,15 +194,31 @@ CNS::react_state (amrex::Real /*time*/,
 
   if (verbose >= 2) {
     const int IOProc = amrex::ParallelDescriptor::IOProcessorNumber();
+    const int NProcs = amrex::ParallelDescriptor::NProcs();
+    
     amrex::Real max_runtime = amrex::ParallelDescriptor::second() - strt_time;
     amrex::Real min_runtime = max_runtime;
+    amrex::Real sum_runtime = max_runtime;
 
     amrex::ParallelDescriptor::ReduceRealMax(max_runtime, IOProc);
     amrex::ParallelDescriptor::ReduceRealMin(min_runtime, IOProc);
+    amrex::ParallelDescriptor::ReduceRealSum(sum_runtime, IOProc);
+
+    amrex::Real max_fc = fctCount.sum(0, true);
+    amrex::Real min_fc = max_fc;
+    amrex::Real sum_fc = max_fc;
+
+    amrex::ParallelDescriptor::ReduceRealMax(max_fc, IOProc);
+    amrex::ParallelDescriptor::ReduceRealMin(min_fc, IOProc);
+    amrex::ParallelDescriptor::ReduceRealSum(sum_fc, IOProc);
 
     if (amrex::ParallelDescriptor::IOProcessor()) {
       amrex::Print() << "    Runtime = [" << min_runtime << 
+                                    "..." << sum_runtime / NProcs <<
                                     "..." << max_runtime << "]\n";
+      amrex::Print() << "    # RHS eval = [" << min_fc << 
+                                       "..." << sum_fc / NProcs <<
+                                       "..." << max_fc << "]\n";
     }
   }
 }

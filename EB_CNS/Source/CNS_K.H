@@ -48,7 +48,7 @@ cns_estdt_hydro (int i, int j, int k, amrex::Array4<const amrex::Real> const& st
 }
 
 /** 
- * \brief Compute max dt size based on viscous diffusion limit (for now, velocity only).
+ * \brief Compute max dt size based on viscous diffusion limit.
  */
 AMREX_GPU_DEVICE AMREX_FORCE_INLINE amrex::Real
 cns_estdt_visc (int i, int j, int k, 
@@ -110,8 +110,7 @@ cns_check_species_sum_to_one (int i, int j, int k,
   for (int n = 0; n < NUM_SPECIES; n++) {
     sumRhoY += state(i,j,k,UFS+n);
   }
-  // amrex::Print() << "rho - sum(rhoY) = " << rho - sumRhoY << std::endl; // don't print things here, it will display for each cell
-
+  
   if (std::isnan(sumRhoY)) {
     amrex::Abort("Input Y contains nan, (i, j, k) = " + std::to_string(i) + ", " + std::to_string(j) + ", " + std::to_string(k));
 
@@ -123,7 +122,7 @@ cns_check_species_sum_to_one (int i, int j, int k,
     // for (int n = 0; n < NUM_SPECIES; n++) {
     //   state(i,j,k,UFS+n) = state(i,j,k,UFS+n) / sumRhoY * rho;
     // }
-    state(i, j, k, URHO) = sumRhoY;
+    state(i, j, k, URHO) = sumRhoY; // always prioritise rhoY
   }
 }
 

@@ -96,7 +96,7 @@ CNS::advance(Real time, Real dt, int /*iteration*/, int /*ncycle*/)
   }
 
   if (NUM_FIELD > 0) {
-    computeAvg(S_new);
+    // computeAvg(S_new);
     FillPatch(*this, Sborder, 1, time+dt, State_Type, 0, LEN_STATE);
     compute_pdf_model(Sborder, dt);
     MultiFab::Copy(S_new, Sborder, 0, 0, LEN_STATE, 0);

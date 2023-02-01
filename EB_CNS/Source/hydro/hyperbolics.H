@@ -803,326 +803,409 @@ cns_riemann (int i, int j, int k, int dir,
 // vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv
 #include "recon.H"
 
-void q2w (amrex::IntVect iv, int n, int QUN,
-          amrex::Array4<const amrex::Real> const& q, amrex::Real& w,
-          const amrex::Real rho, const amrex::Real cs, const amrex::Real pres) 
-{
-    if (n == 0) { // WRHO
-        w = q(iv,QRHO) - q(iv,QPRES)/cs/cs; 
-    } else if (n == 1) { // WACO
-        w = 0.5 * (q(iv,QPRES)/cs + rho*q(iv,QUN));
-    } else if (n == 2) { // WACO+1
-        w = 0.5 * (q(iv,QPRES)/cs - rho*q(iv,QUN));
+/**
+ * \param iv  (input) index of cell
+ * \param n   (input) which component of characteristic variable (0: material_wave, 1: +acoustic_wave, 2: -acoutic_wave)
+ * \param QUN (input) which component of q is u_normal
+ * \param q   (input) primitive variables array
+ * \param sys (input) indicating what thermodynamics system is used (0: speed of sound, 1: gamma)
+ * \param w   (output) chosen component of characteristic variable
+ */
+void q2w (const amrex::IntVect iv, const int n, const int QUN,
+          amrex::Array4<const amrex::Real> const& q, const int sys,
+          amrex::Real& w) 
+{ 
+  if (sys == 0) { // speed of sound system
+    const Real cs = q(iv,QC);
+    if (n == 0) { // material_wave
+      w = q(iv,QRHO) - q(iv,QPRES)/cs/cs; 
+    } else if (n == 1) { // +acoustic_wave
+      w = 0.5 * (q(iv,QPRES)/cs + q(iv,QRHO)*q(iv,QUN));
+    } else if (n == 2) { // -acoustic_wave
+      w = 0.5 * (q(iv,QPRES)/cs - q(iv,QRHO)*q(iv,QUN));
     }
+  } 
+  else { // specific heat system
+    const Real gamma = q(iv,QG);
+    if (n == 0) { // material_wave
+      w = q(iv,QRHO) - (1.0 - 1.0/gamma); 
+    } else if (n == 1) { // +acoustic_wave
+      w = 0.5*(q(iv,QPRES) + std::sqrt(gamma*q(iv,QRHO)*q(iv,QPRES))*q(iv,QUN));
+    } else if (n == 2) { // -acoustic_wave
+      w = 0.5*(q(iv,QPRES) - std::sqrt(gamma*q(iv,QRHO)*q(iv,QPRES))*q(iv,QUN));
+    }
+  }
+}
+
+// /**
+//  * \param q   (input) primitive variables [rho, u_normal, p]
+//  * \param thv (input) thermodynamics variable, can be c or gamma, consistent with system
+//  * \param sys (input) indicating what thermodynamics system is used (0: speed of sound, 1: gamma)
+//  * \param w   (output) characteristic variables [material_wave, +acoustic_wave, -acoutic_wave]
+//  */
+// void q2w (const amrex::Real q[3],
+//           const amrex::Real thv,
+//           const int sys,
+//           amrex::Real w[3])
+// {
+//   if (sys == 0) { // speed of sound system: thv = c
+//     w[0] = q[0] - q[2]/thv/thv;
+//     w[1] = 0.5 * (q[2]/thv + q[0]*q[1]);
+//     w[2] = 0.5 * (q[2]/thv - q[0]*q[1]);
+//   } 
+//   else { // specific heat system: thv = gamma
+//     w[0] = q[0] * (1.0 - 1.0/thv);
+//     w[1] = 0.5 * (q[2] + std::sqrt(thv*q[0]*q[2])*q[1]);
+//     w[2] = 0.5 * (q[2] - std::sqrt(thv*q[0]*q[2])*q[1]);
+//   }
+// }
+
+/**
+ * \param iv  (input) index of cell in output q
+ * \param QUN (input) which component of q is u_normal
+ * \param w   (input) characteristic variables [material_wave, +acoustic_wave, -acoutic_wave] 
+ * \param thv (input) thermodynamics variable, can be c or gamma, consistent with system
+ * \param sys (input) indicating what thermodynamics system is used (0: speed of sound, 1: gamma)
+ * \param q   (output) primitive variables array at face
+ */
+void w2q (const amrex::IntVect iv, const int QUN,
+          const amrex::Real w[3],
+          const amrex::Real thv,
+          const int sys,
+          amrex::Array4<amrex::Real> const& q)
+{
+  if (sys == 0) { // speed of sound system: thv = c
+    q(iv,QRHO)  = w[0] + (w[1] + w[2]) / thv;        
+    q(iv,QUN)   = (w[1] - w[2]) / q(iv,QRHO);
+    q(iv,QPRES) = (w[1] + w[2]) * thv;
+  } 
+  else { // specific heat system: thv = gamma
+    q(iv,QPRES) = w[1] + w[2];
+    q(iv,QRHO)  = w[0] / (1.0 - (w[1] + w[2]) / thv / q(iv,QPRES));
+    q(iv,QUN)   = (w[1] - w[2]) / std::sqrt(thv*q(iv,QRHO)*q(iv,QPRES));
+  }
 }
 
 /** 
- * \brief Reconstruction and Riemann solver all-in-one.
+ * \brief Reconstruct states at cell interface.
  */
 void
-recon_riemann_aio (int i, int j, int k, int dir,
-                   amrex::Array4<amrex::Real const> const& q,
-                   amrex::Array4<amrex::Real> const& adv_flx,
-                   amrex::Array4<amrex::Real> const& p_flx,
-                   const int recon_scheme, const amrex::Real plm_theta,
-                   Parm const& parm) noexcept
+new_recons (int i, int j, int k, int dir,
+            amrex::Array4<const amrex::Real> const& q,
+            amrex::Array4<amrex::Real> const& ql,
+            amrex::Array4<amrex::Real> const& qr,
+            const int recon_scheme, 
+            const int sys, 
+            const bool do_pp_limiter,
+            const amrex::Real plm_theta,
+            Parm const& parm) noexcept
 {
-    using amrex::Real;
+  using amrex::Real;
 
-    const amrex::IntVect iv(AMREX_D_DECL(i, j, k));
-    const amrex::IntVect iv_dir = amrex::IntVect::TheDimensionVector(dir);
+  const amrex::IntVect iv(AMREX_D_DECL(i, j, k));
+  const amrex::IntVect iv_dir = amrex::IntVect::TheDimensionVector(dir);
 
-    int UMN, UMT, UMTT, QUN, QUT, QUTT;
-    if (dir == 0) {
-        UMN = UMX; UMT = UMY; UMTT = UMZ;  
-        QUN = QU;  QUT = QV;  QUTT = QW;
-    } else if (dir == 1) {
-        UMN = UMY; UMT = UMX; UMTT = UMZ;  
-        QUN = QV;  QUT = QU;  QUTT = QW;
-    } else {
-        UMN = UMZ; UMT = UMX; UMTT = UMY;  
-        QUN = QW;  QUT = QU;  QUTT = QV;
+  int QUN, QUT, QUTT;
+  if (dir == 0) {
+    QUN = QU;  QUT = QV;  QUTT = QW;
+  } else if (dir == 1) {
+    QUN = QV;  QUT = QU;  QUTT = QW;
+  } else {
+    QUN = QW;  QUT = QU;  QUTT = QV;
+  }
+
+  int QTHV;
+  if (sys == 0) {
+    QTHV = QC;
+  } else {
+    QTHV = QG;
+  }
+
+  // Reconstruction
+  Real wm[3], wp[3];
+  Real thvm, thvp;
+
+  if (recon_scheme == 1) { ///////// Godunov /////////
+    ql(iv+iv_dir,QRHO) = qr(iv,QRHO) = q(iv,QRHO);
+    AMREX_D_TERM(ql(iv+iv_dir,QUN)  = qr(iv,QUN)  = q(iv,QUN); ,
+                 ql(iv+iv_dir,QUT)  = qr(iv,QUT)  = q(iv,QUT); ,
+                 ql(iv+iv_dir,QUTT) = qr(iv,QUTT) = q(iv,QUTT););
+    ql(iv+iv_dir,QPRES) = qr(iv,QPRES) = q(iv,QPRES); 
+    for (int n = 0; n < NUM_SPECIES; ++n) {
+      ql(iv+iv_dir,QFS+n) = qr(iv,QFS+n) = q(iv,QFS+n);
+    }
+  } 
+  else if (recon_scheme == 2) { ///////// MUCSL /////////
+    Real s[3]; //stencil
+
+    // Reconstruct euler equation variables
+    for (int n = 0; n < 3; ++n) {
+      q2w(iv-iv_dir, n, QUN, q, sys, s[0]);
+      q2w(iv,        n, QUN, q, sys, s[1]);
+      q2w(iv+iv_dir, n, QUN, q, sys, s[2]);
+      muscl(s, wm[n], wp[n], plm_theta);
+    }
+    // Reconstruct the thermodynamic variable for Jacobian
+    s[0] = q(iv-iv_dir,QTHV);
+    s[1] = q(iv,QTHV);
+    s[2] = q(iv+iv_dir,QTHV);
+    muscl(s, thvm, thvp, plm_theta);
+    // pp_limiter_scalar(thvm, thvp, s[1], 1e-10);
+
+    // Reconstruct other passive scalars
+    AMREX_D_TERM(, {   
+      s[0] = q(iv-iv_dir,QUT);
+      s[1] = q(iv,QUT);
+      s[2] = q(iv+iv_dir,QUT);
+      muscl(s, qr(iv,QUT), ql(iv+iv_dir,QUT), plm_theta);
+    }, {
+      s[0] = q(iv-iv_dir,QUTT);
+      s[1] = q(iv,QUTT);
+      s[2] = q(iv+iv_dir,QUTT);
+      muscl(s, qr(iv,QUTT), ql(iv+iv_dir,QUTT), plm_theta);
+    });
+    for (int n = 0; n < NUM_SPECIES; ++n) {
+      s[0] = q(iv-iv_dir,QFS+n);
+      s[1] = q(iv,QFS+n);
+      s[2] = q(iv+iv_dir,QFS+n);
+      muscl(s, qr(iv,QFS+n), ql(iv+iv_dir,QFS+n), plm_theta);
+    }
+  } 
+  else if (recon_scheme == 3) { ///////// WENO-Z3 /////////
+    // Real s[3]; //stencil
+
+    // // Reconstruct euler equation variables
+    // for (int n = 0; n < 3; ++n) {
+    //   q2w(iv-iv_dir, n, QUN, q, sys, s[0]);
+    //   q2w(iv,        n, QUN, q, sys, s[1]);
+    //   q2w(iv+iv_dir, n, QUN, q, sys, s[2]);
+    //   wenoz3(s, wm[n], wp[n]);
+    // }
+    // // Reconstruct the thermodynamic variable for Jacobian
+    // if (sys == 0) {
+    //   s[0] = q(iv-iv_dir,QC);
+    //   s[1] = q(iv,QC);
+    //   s[2] = q(iv+iv_dir,QC);
+    // } else {
+    //   s[0] = q(iv-iv_dir,QG);
+    //   s[1] = q(iv,QG);
+    //   s[2] = q(iv+iv_dir,QG);
+    // }
+    // wenoz3(s, thvm, thvp);
+    // // pp_limiter_scalar(thvm, thvp, s[1], 1e-10);
+
+    // // Reconstruct other passive scalars
+    // AMREX_D_TERM(, {   
+    //   s[0] = q(iv-iv_dir,QUT);
+    //   s[1] = q(iv,QUT);
+    //   s[2] = q(iv+iv_dir,QUT);
+    //   wenoz3(s, qr(iv,QUT), ql(iv+iv_dir,QUT));
+    // }, {
+    //   s[0] = q(iv-iv_dir,QUTT);
+    //   s[1] = q(iv,QUTT);
+    //   s[2] = q(iv+iv_dir,QUTT);
+    //   wenoz3(s, qr(iv,QUTT), ql(iv+iv_dir,QUTT));
+    // });
+    // for (int n = 0; n < NUM_SPECIES; ++n) {
+    //   s[0] = q(iv-iv_dir,QFS+n);
+    //   s[1] = q(iv,QFS+n);
+    //   s[2] = q(iv+iv_dir,QFS+n);
+    //   wenoz3(s, qr(iv,QFS+n), ql(iv+iv_dir,QFS+n));
+    // }
+  } 
+  else if (recon_scheme == 4) { ///////// WENO-JS5 /////////
+    Real s[5]; //stencil
+
+    // Reconstruct euler equation variables
+    for (int n = 0; n < 3; ++n) {
+      q2w(iv-2*iv_dir, n, QUN, q, sys, s[0]);
+      q2w(iv-iv_dir,   n, QUN, q, sys, s[1]);
+      q2w(iv,          n, QUN, q, sys, s[2]);
+      q2w(iv+iv_dir,   n, QUN, q, sys, s[3]);
+      q2w(iv+2*iv_dir, n, QUN, q, sys, s[4]);
+      wenojs5(s, wm[n], wp[n]);
+    }
+    // Reconstruct the thermodynamic variable for Jacobian
+    s[0] = q(iv-2*iv_dir,QTHV);
+    s[1] = q(iv-iv_dir,QTHV);
+    s[2] = q(iv,QTHV);
+    s[3] = q(iv+iv_dir,QTHV);
+    s[4] = q(iv+2*iv_dir,QTHV);
+    wenojs5(s, thvm, thvp);
+    // pp_limiter_scalar(thvm, thvp, s[2], 1e-10);
+
+    // Reconstruct other passive scalars
+    AMREX_D_TERM(, {
+      s[0] = q(iv-2*iv_dir,QUT);
+      s[1] = q(iv-iv_dir,QUT);
+      s[2] = q(iv,QUT);
+      s[3] = q(iv+iv_dir,QUT);
+      s[4] = q(iv+2*iv_dir,QUT);
+      wenojs5(s, qr(iv,QUT), ql(iv+iv_dir,QUT));
+    }, {
+      s[0] = q(iv-2*iv_dir,QUTT);
+      s[1] = q(iv-iv_dir,QUTT);
+      s[2] = q(iv,QUTT);
+      s[3] = q(iv+iv_dir,QUTT);
+      s[4] = q(iv+2*iv_dir,QUTT);
+      wenojs5(s, qr(iv,QUTT), ql(iv+iv_dir,QUTT));
+    });
+    for (int n = 0; n < NUM_SPECIES; ++n) {
+      s[0] = q(iv-2*iv_dir,QFS+n);
+      s[1] = q(iv-iv_dir,QFS+n);
+      s[2] = q(iv,QFS+n);
+      s[3] = q(iv+iv_dir,QFS+n);
+      s[4] = q(iv+2*iv_dir,QFS+n);
+      wenojs5(s, qr(iv,QFS+n), ql(iv+iv_dir,QFS+n));
+    }
+  } 
+  else { ///////// Default: WENO-Z5 /////////
+    Real s[5]; //stencil
+
+    // Reconstruct euler equation variables
+    for (int n = 0; n < 3; ++n) {
+      q2w(iv-2*iv_dir, n, QUN, q, sys, s[0]);
+      q2w(iv-iv_dir,   n, QUN, q, sys, s[1]);
+      q2w(iv,          n, QUN, q, sys, s[2]);
+      q2w(iv+iv_dir,   n, QUN, q, sys, s[3]);
+      q2w(iv+2*iv_dir, n, QUN, q, sys, s[4]);
+      wenoz5(s, wm[n], wp[n]);
+    }
+    // Reconstruct the thermodynamic variable for Jacobian
+    s[0] = q(iv-2*iv_dir,QTHV);
+    s[1] = q(iv-iv_dir,QTHV);
+    s[2] = q(iv,QTHV);
+    s[3] = q(iv+iv_dir,QTHV);
+    s[4] = q(iv+2*iv_dir,QTHV);
+    wenoz5(s, thvm, thvp);    
+    // pp_limiter_scalar(thvm, thvp, s[2], 1e-10);
+
+    // Reconstruct other passive scalars
+    AMREX_D_TERM(, {
+      s[0] = q(iv-2*iv_dir,QUT);
+      s[1] = q(iv-iv_dir,QUT);
+      s[2] = q(iv,QUT);
+      s[3] = q(iv+iv_dir,QUT);
+      s[4] = q(iv+2*iv_dir,QUT);
+      wenoz5(s, qr(iv,QUT), ql(iv+iv_dir,QUT));
+    }, {
+      s[0] = q(iv-2*iv_dir,QUTT);
+      s[1] = q(iv-iv_dir,QUTT);
+      s[2] = q(iv,QUTT);
+      s[3] = q(iv+iv_dir,QUTT);
+      s[4] = q(iv+2*iv_dir,QUTT);
+      wenoz5(s, qr(iv,QUTT), ql(iv+iv_dir,QUTT));
+    });
+    for (int n = 0; n < NUM_SPECIES; ++n) {
+      s[0] = q(iv-2*iv_dir,QFS+n);
+      s[1] = q(iv-iv_dir,QFS+n);
+      s[2] = q(iv,QFS+n);
+      s[3] = q(iv+iv_dir,QFS+n);
+      s[4] = q(iv+2*iv_dir,QFS+n);
+      wenoz5(s, qr(iv,QFS+n), ql(iv+iv_dir,QFS+n));
+    }
+  } //end of recon
+
+  if (recon_scheme != 1) {
+    // Convert to primitive
+    w2q(iv, QUN, wm, thvm, sys, qr);
+    w2q(iv+iv_dir, QUN, wp, thvp, sys, ql);
+
+    // Enforce sum(Y) = 1
+    Real sumY = 0.0;
+    for (int n = 0; n < NUM_SPECIES; ++n) {
+      ql(iv+iv_dir,QFS+n) = amrex::max<amrex::Real>(0.0, ql(iv+iv_dir,QFS+n));
+      sumY += ql(iv+iv_dir,QFS+n);
+    }
+    if (std::abs(sumY - 1.0) > parm.smally) {
+      Real invsumY = 1.0 / sumY;
+      for (int n = 0; n < NUM_SPECIES; ++n) {
+        ql(iv+iv_dir,QFS+n) *= invsumY;
+      }
+    }
+    sumY = 0.0;
+    for (int n = 0; n < NUM_SPECIES; ++n) {
+      qr(iv,QFS+n) = amrex::max<amrex::Real>(0.0, qr(iv,QFS+n));
+      sumY += qr(iv,QFS+n);
+    }
+    if (std::abs(sumY - 1.0) > parm.smally) {
+      Real invsumY = 1.0 / sumY;
+      for (int n = 0; n < NUM_SPECIES; ++n) {
+        qr(iv,QFS+n) *= invsumY;
+      }
     }
 
-    // Reconstruction
-    Real rr, ur, utr, uttr, pr, er, yr[NUM_SPECIES], cr;
-    Real rl, ul, utl, uttl, pl, el, yl[NUM_SPECIES], cl;
+    // Prositivity preserving limiter
+    if (do_pp_limiter) {
+      // pp_limiter_euler(iv, ql, qr, q, parm.smallr, parm.smallp);
+    }
+  }
+}
 
-    Real rho, cs, pres; //jacobian variables
-    rho = sqrt(q(iv,QRHO) * q(iv-iv_dir,QRHO));
-    // pres = 0.5*(q(iv-iv_dir,QPRES) + q(iv,QPRES));
-    // cs = 0.5*(q(iv-iv_dir,QC) + q(iv,QC));
-    Real rp = sqrt(q(iv,QRHO) / q(iv-iv_dir,QRHO));
-    pres = (q(iv-iv_dir,QPRES) + q(iv,QPRES)*rp)/(1+rp);    
-    cs = (q(iv-iv_dir,QC) + q(iv,QC)*rp)/(1+rp);
-    
-    Real dummy;
-    Real w[3];
+AMREX_GPU_DEVICE AMREX_FORCE_INLINE void
+new_riemann (int i, int j, int k, int dir,
+             amrex::Array4<amrex::Real> const& adv_flx,
+             amrex::Array4<amrex::Real> const& p_flx,
+             amrex::Array4<const amrex::Real> const& ql,
+             amrex::Array4<const amrex::Real> const& qr,
+             Parm const& parm) noexcept
+{
+  using amrex::Real;
 
-    if (recon_scheme == 1) {
-        // Simple Godunov
-        rr = q(iv,QRHO);
-        AMREX_D_TERM(
-            ur = q(iv,QUN); ,
-            utr = q(iv,QUT); ,
-            uttr = q(iv,QUTT););
-        pr = q(iv,QPRES); 
-        for (int n = 0; n < NUM_SPECIES; ++n) {
-            yr[n] = q(iv,QFS+n);
-        }
+  const amrex::IntVect iv(AMREX_D_DECL(i, j, k));
+  const amrex::IntVect iv_dir = amrex::IntVect::TheDimensionVector(dir);
 
-        rl = q(iv-iv_dir,QRHO);
-        AMREX_D_TERM(
-            ul = q(iv-iv_dir,QUN); ,
-            utl = q(iv-iv_dir,QUT); ,
-            uttl = q(iv-iv_dir,QUTT););
-        pl = q(iv-iv_dir,QPRES); 
-        for (int n = 0; n < NUM_SPECIES; ++n) {
-            yl[n] = q(iv-iv_dir,QFS+n);
-        }
+  int UMN, UMT, UMTT, QUN, QUT, QUTT;
+  if (dir == 0) {
+    UMN = UMX; UMT = UMY; UMTT = UMZ;  QUN = QU;  QUT = QV;  QUTT = QW;
+  } else if (dir == 1) {
+    UMN = UMY; UMT = UMX; UMTT = UMZ;  QUN = QV;  QUT = QU;  QUTT = QW;
+  } else {
+    UMN = UMZ; UMT = UMX; UMTT = UMY;  QUN = QW;  QUT = QU;  QUTT = QV;
+  }
 
-    } else if (recon_scheme == 2) {
-        // MUSCL
-        Real s[3];
+  auto eos = pele::physics::PhysicsType::eos();
 
-        // Right
-        for (int n = 0; n < 3; ++n) {
-            q2w(iv-iv_dir, n, QUN, q, s[0], rho, cs, pres);
-            q2w(iv, n, QUN, q, s[1], rho, cs, pres);
-            q2w(iv+iv_dir, n, QUN, q, s[2], rho, cs, pres);            
-            muscl(s, w[n], dummy, plm_theta);            
-        }
-        cns_unpackchar(w[0], w[1], w[2], cs, rho, dummy, rr, ur, pr, 0, parm);
-        AMREX_D_TERM(,
-        {
-            s[0] = q(iv-iv_dir,QUT);
-            s[1] = q(iv,QUT);
-            s[2] = q(iv+iv_dir,QUT);
-            muscl(s, utr, dummy, plm_theta);
-        }
-        ,
-        {
-            s[0] = q(iv-iv_dir,QUTT);
-            s[1] = q(iv,QUTT);
-            s[2] = q(iv+iv_dir,QUTT);
-            muscl(s, uttr, dummy, plm_theta);
-        });
-        for (int n = 0; n < NUM_SPECIES; ++n) {
-            s[0] = q(iv-iv_dir,QFS+n);
-            s[1] = q(iv,QFS+n);
-            s[2] = q(iv+iv_dir,QFS+n);
-            muscl(s, yr[n], dummy, plm_theta);
-        }
+  Real rl, AMREX_D_DECL(ul, ut1l, ut2l), pl, yl[NUM_SPECIES], cl, el;
+  rl = ql(iv,QRHO);
+  AMREX_D_TERM(ul   = ql(iv,QUN); ,
+               ut1l = ql(iv,QUT); ,
+               ut2l = ql(iv,QUTT););
+  pl = ql(iv,QPRES);
+  for (int n = 0; n < NUM_SPECIES; ++n) {
+    yl[n] = ql(iv,QFS+n);
+  }
+  eos.RYP2E(rl, yl, pl, el);
+  el += 0.5*(AMREX_D_TERM(ul*ul, +ut1l*ut1l, +ut2l*ut2l));   
+  eos.RPY2Cs(rl, pl, yl, cl);
 
-        // Left
-        for (int n = 0; n < 3; ++n) {
-            q2w(iv-2*iv_dir, n, QUN, q, s[0], rho, cs, pres);
-            q2w(iv-iv_dir, n, QUN, q, s[1], rho, cs, pres);
-            q2w(iv, n, QUN, q, s[2], rho, cs, pres);          
-            muscl(s, dummy, w[n], plm_theta);            
-        }
-        cns_unpackchar(w[0], w[1], w[2], cs, rho, dummy, rl, ul, pl, 0, parm);
-        AMREX_D_TERM(,
-        {
-            s[0] = q(iv-2*iv_dir,QUT);
-            s[1] = q(iv-iv_dir,QUT);
-            s[2] = q(iv,QUT);
-            muscl(s, dummy, utl, plm_theta);
-        }
-        ,
-        {
-            s[0] = q(iv-2*iv_dir,QUTT);
-            s[1] = q(iv-iv_dir,QUTT);
-            s[2] = q(iv,QUTT);
-            muscl(s, dummy, uttl, plm_theta);
-        });
-        for (int n = 0; n < NUM_SPECIES; ++n) {
-            s[0] = q(iv-2*iv_dir,QFS+n);
-            s[1] = q(iv-iv_dir,QFS+n);
-            s[2] = q(iv,QFS+n);
-            muscl(s, dummy, yl[n], plm_theta);
-        }
+  Real rr, AMREX_D_DECL(ur, ut1r, ut2r), pr, yr[NUM_SPECIES], cr, er;
+  rr = qr(iv,QRHO);
+  AMREX_D_TERM(ur   = qr(iv,QUN); ,
+               ut1r = qr(iv,QUT); ,
+               ut2r = qr(iv,QUTT););
+  pr = qr(iv,QPRES);
+  for (int n = 0; n < NUM_SPECIES; ++n) {
+    yr[n] = qr(iv,QFS+n);
+  }
+  eos.RYP2E(rr, yr, pr, er);
+  er += 0.5*(AMREX_D_TERM(ur*ur, +ut1r*ut1r, +ut2r*ut2r));
+  eos.RPY2Cs(rr, pr, yr, cr);
 
-    } else if (recon_scheme == 3) {
-        // WENO-JS5
-        Real s[5];
+  amrex::Real ry_flx[NUM_SPECIES] = {0.0};
 
-        // Right
-        for (int n = 0; n < 3; ++n) {
-            q2w(iv-2*iv_dir, n, QUN, q, s[0], rho, cs, pres);
-            q2w(iv-iv_dir, n, QUN, q, s[1], rho, cs, pres);
-            q2w(iv, n, QUN, q, s[2], rho, cs, pres);
-            q2w(iv+iv_dir, n, QUN, q, s[3], rho, cs, pres);       
-            q2w(iv+2*iv_dir, n, QUN, q, s[4], rho, cs, pres);     
-            wenojs5(s, w[n], dummy);
-        }
-        cns_unpackchar(w[0], w[1], w[2], cs, rho, dummy, rr, ur, pr, 0, parm);
-        AMREX_D_TERM(,
-        {   
-            s[0] = q(iv-2*iv_dir,QUT);
-            s[1] = q(iv-iv_dir,QUT);
-            s[2] = q(iv,QUT);
-            s[3] = q(iv+iv_dir,QUT);
-            s[4] = q(iv+2*iv_dir,QUT);
-            wenojs5(s, utr, dummy);
-        }
-        ,
-        {
-            s[0] = q(iv-2*iv_dir,QUTT);
-            s[1] = q(iv-iv_dir,QUTT);
-            s[2] = q(iv,QUTT);
-            s[3] = q(iv+iv_dir,QUTT);
-            s[4] = q(iv+2*iv_dir,QUTT);
-            wenojs5(s, uttr, dummy);
-        });
-        for (int n = 0; n < NUM_SPECIES; ++n) {
-            s[0] = q(iv-2*iv_dir,QFS+n);
-            s[1] = q(iv-iv_dir,QFS+n);
-            s[2] = q(iv,QFS+n);
-            s[3] = q(iv+iv_dir,QFS+n);
-            s[4] = q(iv+2*iv_dir,QFS+n);
-            wenojs5(s, yr[n], dummy);
-        }
+  hllc(rl, AMREX_D_DECL(ul, ut1l, ut2l), pl, cl, el, yl,
+        rr, AMREX_D_DECL(ur, ut1r, ut2r), pr, cr, er, yr,
+        adv_flx(i,j,k,URHO), 
+        AMREX_D_DECL(adv_flx(i,j,k,UMN), adv_flx(i,j,k,UMT), adv_flx(i,j,k,UMTT)), 
+        p_flx(i,j,k,UMN), p_flx(i,j,k,UEDEN),
+        adv_flx(i,j,k,UEDEN),
+        ry_flx,
+        parm);
 
-        // Left
-        for (int n = 0; n < 3; ++n) {
-            q2w(iv-3*iv_dir, n, QUN, q, s[0], rho, cs, pres);
-            q2w(iv-2*iv_dir, n, QUN, q, s[1], rho, cs, pres);
-            q2w(iv-iv_dir, n, QUN, q, s[2], rho, cs, pres);
-            q2w(iv, n, QUN, q, s[3], rho, cs, pres);       
-            q2w(iv+iv_dir, n, QUN, q, s[4], rho, cs, pres);          
-            wenojs5(s, dummy, w[n]);            
-        }
-        cns_unpackchar(w[0], w[1], w[2], cs, rho, dummy, rl, ul, pl, 0, parm);
-        AMREX_D_TERM(,
-        {   
-            s[0] = q(iv-3*iv_dir,QUT);
-            s[1] = q(iv-2*iv_dir,QUT);
-            s[2] = q(iv-iv_dir,QUT);
-            s[3] = q(iv,QUT);
-            s[4] = q(iv+iv_dir,QUT);
-            wenojs5(s, dummy, utl);
-        }
-        ,
-        {
-            s[0] = q(iv-3*iv_dir,QUTT);
-            s[1] = q(iv-2*iv_dir,QUTT);
-            s[2] = q(iv-iv_dir,QUTT);
-            s[3] = q(iv,QUTT);
-            s[4] = q(iv+iv_dir,QUTT);
-            wenojs5(s, dummy, uttl);
-        });
-        for (int n = 0; n < NUM_SPECIES; ++n) {
-            s[0] = q(iv-3*iv_dir,QFS+n);
-            s[1] = q(iv-2*iv_dir,QFS+n);
-            s[2] = q(iv-iv_dir,QFS+n);
-            s[3] = q(iv,QFS+n);
-            s[4] = q(iv+iv_dir,QFS+n);
-            wenojs5(s, dummy, yl[n]);
-        }
-    
-    } else {
-        // Default: WENO-Z5
-        Real s[5];   
-
-        // Right
-        for (int n = 0; n < 3; ++n) {
-            q2w(iv-2*iv_dir, n, QUN, q, s[0], rho, cs, pres);
-            q2w(iv-iv_dir, n, QUN, q, s[1], rho, cs, pres);
-            q2w(iv, n, QUN, q, s[2], rho, cs, pres);
-            q2w(iv+iv_dir, n, QUN, q, s[3], rho, cs, pres);       
-            q2w(iv+2*iv_dir, n, QUN, q, s[4], rho, cs, pres);     
-            wenoz5(s, w[n], dummy);
-        }
-        cns_unpackchar(w[0], w[1], w[2], cs, rho, dummy, rr, ur, pr, 0, parm);
-        AMREX_D_TERM(,
-        {   
-            s[0] = q(iv-2*iv_dir,QUT);
-            s[1] = q(iv-iv_dir,QUT);
-            s[2] = q(iv,QUT);
-            s[3] = q(iv+iv_dir,QUT);
-            s[4] = q(iv+2*iv_dir,QUT);
-            wenoz5(s, utr, dummy);
-        }
-        ,
-        {
-            s[0] = q(iv-2*iv_dir,QUTT);
-            s[1] = q(iv-iv_dir,QUTT);
-            s[2] = q(iv,QUTT);
-            s[3] = q(iv+iv_dir,QUTT);
-            s[4] = q(iv+2*iv_dir,QUTT);
-            wenoz5(s, uttr, dummy);
-        });
-        for (int n = 0; n < NUM_SPECIES; ++n) {
-            s[0] = q(iv-2*iv_dir,QFS+n);
-            s[1] = q(iv-iv_dir,QFS+n);
-            s[2] = q(iv,QFS+n);
-            s[3] = q(iv+iv_dir,QFS+n);
-            s[4] = q(iv+2*iv_dir,QFS+n);
-            wenoz5(s, yr[n], dummy);
-        }
-
-        // Left
-        for (int n = 0; n < 3; ++n) {
-            q2w(iv-3*iv_dir, n, QUN, q, s[0], rho, cs, pres);
-            q2w(iv-2*iv_dir, n, QUN, q, s[1], rho, cs, pres);
-            q2w(iv-iv_dir, n, QUN, q, s[2], rho, cs, pres);
-            q2w(iv, n, QUN, q, s[3], rho, cs, pres);       
-            q2w(iv+iv_dir, n, QUN, q, s[4], rho, cs, pres);          
-            wenoz5(s, dummy, w[n]);            
-        }
-        cns_unpackchar(w[0], w[1], w[2], cs, rho, dummy, rl, ul, pl, 0, parm);
-        AMREX_D_TERM(,
-        {   
-            s[0] = q(iv-3*iv_dir,QUT);
-            s[1] = q(iv-2*iv_dir,QUT);
-            s[2] = q(iv-iv_dir,QUT);
-            s[3] = q(iv,QUT);
-            s[4] = q(iv+iv_dir,QUT);
-            wenoz5(s, dummy, utl);
-        }
-        ,
-        {
-            s[0] = q(iv-3*iv_dir,QUTT);
-            s[1] = q(iv-2*iv_dir,QUTT);
-            s[2] = q(iv-iv_dir,QUTT);
-            s[3] = q(iv,QUTT);
-            s[4] = q(iv+iv_dir,QUTT);
-            wenoz5(s, dummy, uttl);
-        });
-        for (int n = 0; n < NUM_SPECIES; ++n) {
-            s[0] = q(iv-3*iv_dir,QFS+n);
-            s[1] = q(iv-2*iv_dir,QFS+n);
-            s[2] = q(iv-iv_dir,QFS+n);
-            s[3] = q(iv,QFS+n);
-            s[4] = q(iv+iv_dir,QFS+n);
-            wenoz5(s, dummy, yl[n]);
-        }
-
-    } //end of recon
-
-    auto eos = pele::physics::PhysicsType::eos();
-
-    eos.RYP2E(rr, yr, pr, er);
-    er += 0.5*(AMREX_D_TERM(ur*ur, +utr*utr, +uttr*uttr));
-    eos.RPY2Cs(rr, pr, yr, cr);
-
-    eos.RYP2E(rl, yl, pl, el);
-    el += 0.5*(AMREX_D_TERM(ul*ul, +utl*utl, +uttl*uttl));
-    eos.RPY2Cs(rl, pl, yl, cl);
-
-    Real ry_flx[NUM_SPECIES] = {0.0};
-
-    hllc(rl, AMREX_D_DECL(ul, utl, uttl), pl, cl, el, yl,
-         rr, AMREX_D_DECL(ur, utr, uttr), pr, cr, er, yr,
-         adv_flx(i,j,k,URHO), 
-         AMREX_D_DECL(adv_flx(i,j,k,UMN), adv_flx(i,j,k,UMT), adv_flx(i,j,k,UMTT)), 
-        //  p_flx(i,j,k,UMN), p_flx(i,j,k,UEDEN),
-         adv_flx(i,j,k,UEDEN),
-         ry_flx, //&adv_flx(i,j,k,UFS),
-         parm);
-
-    for (int n = 0; n < NUM_SPECIES; ++n) { adv_flx(i,j,k,UFS+n) = ry_flx[n]; }
+  for (int n = 0; n < NUM_SPECIES; ++n) { 
+    adv_flx(i,j,k,UFS+n) = ry_flx[n]; 
+  }
 }
 
 #endif

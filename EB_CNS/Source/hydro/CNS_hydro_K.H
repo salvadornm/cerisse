@@ -81,152 +81,6 @@ limiter (amrex::Real dlft, amrex::Real drgt, amrex::Real plm_theta) noexcept
 
 }
 
-// AMREX_GPU_DEVICE AMREX_FORCE_INLINE
-// void
-// cns_slope_x (int i, int j, int k,
-//              amrex::Array4<amrex::Real> const& dq,
-//              amrex::Array4<amrex::Real const> const& q,
-//              int recon_scheme, amrex::Real plm_theta) noexcept
-// {
-//     using amrex::Real;
-
-//     if (recon_scheme == 1) {
-//         dq(i,j,k,0) = Real(0.);
-//         dq(i,j,k,1) = Real(0.);
-//         dq(i,j,k,2) = Real(0.);
-//         dq(i,j,k,3) = Real(0.);
-//         dq(i,j,k,4) = Real(0.);
-//         for (int n = 0; n < NUM_SPECIES; ++n) {
-//             dq(i,j,k,5+n) = Real(0.);
-//         }
-//     } else if (recon_scheme == 2) {
-//         Real dlft = Real(0.5)*(q(i,j,k,QPRES)-q(i-1,j,k,QPRES))/q(i,j,k,QCS) - Real(0.5)*q(i,j,k,QRHO)*(q(i,j,k,QU) - q(i-1,j,k,QU));
-//         Real drgt = Real(0.5)*(q(i+1,j,k,QPRES)-q(i,j,k,QPRES))/q(i,j,k,QCS) - Real(0.5)*q(i,j,k,QRHO)*(q(i+1,j,k,QU) - q(i,j,k,QU));
-//         dq(i,j,k,0) = limiter(dlft, drgt, plm_theta);
-
-//         Real cs2 = q(i,j,k,QCS)*q(i,j,k,QCS);
-//         dlft = (q(i,j,k,QRHO)-q(i-1,j,k,QRHO)) - (q(i,j,k,QPRES) - q(i-1,j,k,QPRES))/cs2;
-//         drgt = (q(i+1,j,k,QRHO)-q(i,j,k,QRHO)) - (q(i+1,j,k,QPRES) - q(i,j,k,QPRES))/cs2;
-//         dq(i,j,k,1) = limiter(dlft, drgt, plm_theta);
-
-//         dlft = Real(0.5)*(q(i,j,k,QPRES)-q(i-1,j,k,QPRES))/q(i,j,k,QCS) + Real(0.5)*q(i,j,k,QRHO)*(q(i,j,k,QU) - q(i-1,j,k,QU));
-//         drgt = Real(0.5)*(q(i+1,j,k,QPRES)-q(i,j,k,QPRES))/q(i,j,k,QCS) + Real(0.5)*q(i,j,k,QRHO)*(q(i+1,j,k,QU) - q(i,j,k,QU));
-//         dq(i,j,k,2) = limiter(dlft, drgt, plm_theta);
-
-//         dlft = q(i,j,k,QV) - q(i-1,j,k,QV);
-//         drgt = q(i+1,j,k,QV) - q(i,j,k,QV);
-//         dq(i,j,k,3) = limiter(dlft, drgt, plm_theta);
-
-//         dlft = q(i,j,k,QW) - q(i-1,j,k,QW);
-//         drgt = q(i+1,j,k,QW) - q(i,j,k,QW);
-//         dq(i,j,k,4) = limiter(dlft, drgt, plm_theta);
-
-//         for (int n = 0; n < NUM_SPECIES; ++n) {
-//             dlft = q(i,j,k,QFS+n) - q(i-1,j,k,QFS+n);
-//             drgt = q(i+1,j,k,QFS+n) - q(i,j,k,QFS+n);
-//             dq(i,j,k,5+n) = limiter(dlft, drgt, plm_theta);
-//         }
-//     }
-// }
-
-// AMREX_GPU_DEVICE AMREX_FORCE_INLINE
-// void
-// cns_slope_y (int i, int j, int k,
-//              amrex::Array4<amrex::Real> const& dq,
-//              amrex::Array4<amrex::Real const> const& q,
-//              int recon_scheme, amrex::Real plm_theta) noexcept
-// {
-//     using amrex::Real;
-
-//     if (recon_scheme == 1) {
-//         dq(i,j,k,0) = Real(0.);
-//         dq(i,j,k,1) = Real(0.);
-//         dq(i,j,k,2) = Real(0.);
-//         dq(i,j,k,3) = Real(0.);
-//         dq(i,j,k,4) = Real(0.);
-//         for (int n = 0; n < NUM_SPECIES; ++n) {
-//             dq(i,j,k,5+n) = Real(0.);
-//         }
-//     } else if (recon_scheme == 2) {
-//         Real dlft = Real(0.5)*(q(i,j,k,QPRES)-q(i,j-1,k,QPRES))/q(i,j,k,QCS) - Real(0.5)*q(i,j,k,QRHO)*(q(i,j,k,QV) - q(i,j-1,k,QV));
-//         Real drgt = Real(0.5)*(q(i,j+1,k,QPRES)-q(i,j,k,QPRES))/q(i,j,k,QCS) - Real(0.5)*q(i,j,k,QRHO)*(q(i,j+1,k,QV) - q(i,j,k,QV));
-//         dq(i,j,k,0) = limiter(dlft, drgt, plm_theta);
-
-//         Real cs2 = q(i,j,k,QCS)*q(i,j,k,QCS);
-//         dlft = (q(i,j,k,QRHO)-q(i,j-1,k,QRHO)) - (q(i,j,k,QPRES) - q(i,j-1,k,QPRES))/cs2;
-//         drgt = (q(i,j+1,k,QRHO)-q(i,j,k,QRHO)) - (q(i,j+1,k,QPRES) - q(i,j,k,QPRES))/cs2;
-//         dq(i,j,k,1) = limiter(dlft, drgt, plm_theta);
-
-//         dlft = Real(0.5)*(q(i,j,k,QPRES)-q(i,j-1,k,QPRES))/q(i,j,k,QCS) + Real(0.5)*q(i,j,k,QRHO)*(q(i,j,k,QV) - q(i,j-1,k,QV));
-//         drgt = Real(0.5)*(q(i,j+1,k,QPRES)-q(i,j,k,QPRES))/q(i,j,k,QCS) + Real(0.5)*q(i,j,k,QRHO)*(q(i,j+1,k,QV) - q(i,j,k,QV));
-//         dq(i,j,k,2) = limiter(dlft, drgt, plm_theta);
-
-//         dlft = q(i,j,k,QU) - q(i,j-1,k,QU);
-//         drgt = q(i,j+1,k,QU) - q(i,j,k,QU);
-//         dq(i,j,k,3) = limiter(dlft, drgt, plm_theta);
-        
-//         dlft = q(i,j,k,QW) - q(i,j-1,k,QW);
-//         drgt = q(i,j+1,k,QW) - q(i,j,k,QW);
-//         dq(i,j,k,4) = limiter(dlft, drgt, plm_theta);
-
-//         for (int n = 0; n < NUM_SPECIES; ++n) {
-//             dlft = q(i,j,k,QFS+n) - q(i,j-1,k,QFS+n);
-//             drgt = q(i,j+1,k,QFS+n) - q(i,j,k,QFS+n);
-//             dq(i,j,k,5+n) = limiter(dlft, drgt, plm_theta);
-//         }
-//     }
-// }
-
-// #if (AMREX_SPACEDIM == 3)
-// AMREX_GPU_DEVICE AMREX_FORCE_INLINE
-// void
-// cns_slope_z (int i, int j, int k,
-//              amrex::Array4<amrex::Real> const& dq,
-//              amrex::Array4<amrex::Real const> const& q,
-//              int recon_scheme, amrex::Real plm_theta) noexcept
-// {
-//     using amrex::Real;
-
-//     if (recon_scheme == 1) {
-//         dq(i,j,k,0) = Real(0.);
-//         dq(i,j,k,1) = Real(0.);
-//         dq(i,j,k,2) = Real(0.);
-//         dq(i,j,k,3) = Real(0.);
-//         dq(i,j,k,4) = Real(0.);
-//         for (int n = 0; n < NUM_SPECIES; ++n) {
-//             dq(i,j,k,5+n) = Real(0.);
-//         }
-//     } else if (recon_scheme == 2) {
-//         Real dlft = Real(0.5)*(q(i,j,k,QPRES)-q(i,j,k-1,QPRES))/q(i,j,k,QCS) - Real(0.5)*q(i,j,k,QRHO)*(q(i,j,k,QW) - q(i,j,k-1,QW));
-//         Real drgt = Real(0.5)*(q(i,j,k+1,QPRES)-q(i,j,k,QPRES))/q(i,j,k,QCS) - Real(0.5)*q(i,j,k,QRHO)*(q(i,j,k+1,QW) - q(i,j,k,QW));
-//         dq(i,j,k,0) = limiter(dlft, drgt, plm_theta);
-
-//         Real cs2 = q(i,j,k,QCS)*q(i,j,k,QCS);
-//         dlft = (q(i,j,k,QRHO)-q(i,j,k-1,QRHO)) - (q(i,j,k,QPRES) - q(i,j,k-1,QPRES))/cs2;
-//         drgt = (q(i,j,k+1,QRHO)-q(i,j,k,QRHO)) - (q(i,j,k+1,QPRES) - q(i,j,k,QPRES))/cs2;
-//         dq(i,j,k,1) = limiter(dlft, drgt, plm_theta);
-
-//         dlft = Real(0.5)*(q(i,j,k,QPRES)-q(i,j,k-1,QPRES))/q(i,j,k,QCS) + Real(0.5)*q(i,j,k,QRHO)*(q(i,j,k,QW) - q(i,j,k-1,QW));
-//         drgt = Real(0.5)*(q(i,j,k+1,QPRES)-q(i,j,k,QPRES))/q(i,j,k,QCS) + Real(0.5)*q(i,j,k,QRHO)*(q(i,j,k+1,QW) - q(i,j,k,QW));
-//         dq(i,j,k,2) = limiter(dlft, drgt, plm_theta);
-
-//         dlft = q(i,j,k,QU) - q(i,j,k-1,QU);
-//         drgt = q(i,j,k+1,QU) - q(i,j,k,QU);
-//         dq(i,j,k,3) = limiter(dlft, drgt, plm_theta);
-
-//         dlft = q(i,j,k,QV) - q(i,j,k-1,QV);
-//         drgt = q(i,j,k+1,QV) - q(i,j,k,QV);
-//         dq(i,j,k,4) = limiter(dlft, drgt, plm_theta);
-
-//         for (int n = 0; n < NUM_SPECIES; ++n) {
-//             dlft = q(i,j,k,QFS+n) - q(i,j,k-1,QFS+n);
-//             drgt = q(i,j,k+1,QFS+n) - q(i,j,k,QFS+n);
-//             dq(i,j,k,5+n) = limiter(dlft, drgt, plm_theta);
-//         }
-//     }
-// }
-// #endif
-
 AMREX_GPU_DEVICE AMREX_FORCE_INLINE
 void
 cns_slope (int i, int j, int k, int dir,
@@ -300,8 +154,7 @@ cns_slope (int i, int j, int k, int dir,
     }
 }
 
-AMREX_GPU_DEVICE AMREX_FORCE_INLINE
-void
+AMREX_GPU_DEVICE AMREX_FORCE_INLINE void
 cns_slope_x (int i, int j, int k,
              amrex::Array4<amrex::Real> const& dq,
              amrex::Array4<amrex::Real const> const& q,
@@ -310,8 +163,7 @@ cns_slope_x (int i, int j, int k,
     cns_slope(i, j, k, 0, dq, q, recon_scheme, plm_theta);
 }
 
-AMREX_GPU_DEVICE AMREX_FORCE_INLINE
-void
+AMREX_GPU_DEVICE AMREX_FORCE_INLINE void
 cns_slope_y (int i, int j, int k,
              amrex::Array4<amrex::Real> const& dq,
              amrex::Array4<amrex::Real const> const& q,
@@ -320,8 +172,7 @@ cns_slope_y (int i, int j, int k,
     cns_slope(i, j, k, 1, dq, q, recon_scheme, plm_theta);
 }
 
-AMREX_GPU_DEVICE AMREX_FORCE_INLINE
-void
+AMREX_GPU_DEVICE AMREX_FORCE_INLINE void
 cns_slope_z (int i, int j, int k,
              amrex::Array4<amrex::Real> const& dq,
              amrex::Array4<amrex::Real const> const& q,

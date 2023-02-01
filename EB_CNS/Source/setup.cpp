@@ -15,17 +15,17 @@ ProbParm* CNS::d_prob_parm = nullptr;
 using BndryFunc = StateDescriptor::BndryFunc;
 
 // Components are:
-//  Interior,      Inflow,          Outflow,          Symmetry,             SlipWall,             NoSlipWall,           UserBC
+// Interior,       Inflow = UserBC,      Outflow,              Symmetry = SlipWall,  SlipWall,             NoSlipWall,           UserBC
 static int scalar_bc[] = {
-  BCType::int_dir, BCType::ext_dir, BCType::foextrap, BCType::reflect_even, BCType::reflect_even, BCType::reflect_even, BCType::ext_dir
+  BCType::int_dir, BCType::ext_dir,      BCType::foextrap,     BCType::reflect_even, BCType::reflect_even, BCType::reflect_even, BCType::ext_dir
 };
 
 static int norm_vel_bc[] = {
-  BCType::int_dir, BCType::ext_dir, BCType::foextrap, BCType::reflect_odd,  BCType::reflect_odd,  BCType::reflect_odd,  BCType::ext_dir
+  BCType::int_dir, BCType::ext_dir,      BCType::foextrap,     BCType::reflect_odd,  BCType::reflect_odd,  BCType::reflect_odd,  BCType::ext_dir
 };
 
 static int tang_vel_bc[] = {
-  BCType::int_dir, BCType::ext_dir, BCType::foextrap, BCType::reflect_even, BCType::reflect_even, BCType::reflect_odd,  BCType::ext_dir
+  BCType::int_dir, BCType::ext_dir,      BCType::foextrap,     BCType::reflect_even, BCType::reflect_even, BCType::reflect_odd,  BCType::ext_dir
 };
 
 static int react_src_bc[] = {
@@ -121,6 +121,7 @@ CNS::variableSetUp ()
   pele::physics::eos::speciesNames<pele::physics::PhysicsType::eos_type>(spec_names);
     
   if (ParallelDescriptor::IOProcessor()) {
+    Print() << NUM_REACTIONS << " Reactions in mechanism \n";
     // Print species names
     Print() << NUM_SPECIES << " Species: ";
     for (int i = 0; i < NUM_SPECIES; i++) {

@@ -19,8 +19,7 @@ CNS::compute_dSdt_box (const Box& bx,
   const auto dxinv = geom.InvCellSizeArray();
   
   // Primitive variables
-  FArrayBox qtmp(bxg3, LEN_PRIM);
-
+  FArrayBox qtmp(bxg3, LEN_PRIM); 
   Parm const* lparm = d_parm;
   for (int nf = 0; nf <= NUM_FIELD; ++nf){
     auto const& qfill = qtmp.array(nf*NPRIM);
@@ -29,20 +28,20 @@ CNS::compute_dSdt_box (const Box& bx,
       cns_ctoprim(i, j, k, nf*NVAR, sarr, qfill, *lparm);
     });
   }
-
-  // Arrays for characteristic reconstruction
-  FArrayBox wtmp(bxg3, NCHAR);
-  FArrayBox wl_tmp(bxg2, NCHAR);
-  FArrayBox wr_tmp(bxg2, NCHAR);
-  auto const& w = wtmp.array();
-  auto const& wl = wl_tmp.array();
-  auto const& wr = wr_tmp.array();
+  
+  // // Arrays for characteristic reconstruction
+  // FArrayBox wtmp(bxg3, NCHAR);
+  FArrayBox wl_tmp(bxg2, NPRIM);
+  FArrayBox wr_tmp(bxg2, NPRIM);
+  // auto const& w = wtmp.array();
+  auto const& ql = wl_tmp.array();
+  auto const& qr = wr_tmp.array();
 
   // Transport coef
   FArrayBox diff_coeff;
   if (do_visc == 1) {
     diff_coeff.resize(bxg2, LEN_COEF);
-
+  
     for (int nf = 0; nf <= NUM_FIELD; ++nf){
       auto const& qar_yin   = qtmp.array(nf*NPRIM + QFS);
       auto const& qar_Tin   = qtmp.array(nf*NPRIM + QTEMP);
@@ -72,38 +71,51 @@ CNS::compute_dSdt_box (const Box& bx,
     pflux_fab.resize(flxbx, LEN_STATE);
     pflux_fab.setVal(0.0);
     if (do_visc == 1) {
-        vflux_fab.resize(flxbx, NVAR);
-        vflux_fab.setVal(0.0);            
+      vflux_fab.resize(flxbx, NVAR);
+      vflux_fab.setVal(0.0);            
     }
     auto const& vflx_arr = vflux_fab.array();
 
     for (int nf = 0; nf <= NUM_FIELD; ++nf) {       // Loop through fields
       // Convert primitive to characteristic
-      auto const& q = qtmp.array(nf*NPRIM);
-      amrex::ParallelFor(bxg3,
-      [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept {
-        cns_ctochar(i, j, k, cdir, q, w, 0);
-      });
+      // auto const& q = qtmp.array(nf*NPRIM);
+      // amrex::ParallelFor(bxg3,
+      // [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept {
+      //   cns_ctochar(i, j, k, cdir, q, w, 0);
+      // });
 
       // Reconstruction            
-      amrex::ParallelFor(reconbox, NCHAR,
-      [=] AMREX_GPU_DEVICE (int i, int j, int k, int n) noexcept {
-        cns_recon(i, j, k, n, cdir, w, wl, wr, recon_scheme, plm_theta);
+      // amrex::ParallelFor(reconbox, NCHAR,
+      // [=] AMREX_GPU_DEVICE (int i, int j, int k, int n) noexcept {
+      //   cns_recon(i, j, k, n, cdir, w, wl, wr, recon_scheme, plm_theta);
+      // });
+
+      // auto const& s = Array4<Real>(sarr, nf*NVAR, NVAR);
+      auto const& q = qtmp.array(nf*NPRIM, NPRIM);
+      // amrex::ParallelFor(bxg3,
+      // [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept {
+      //   cns_ctoprim(i, j, k, 0, s, q, *lparm);
+      // });
+
+      amrex::ParallelFor(reconbox,
+      [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept {
+        new_recons(i, j, k, cdir, q, ql, qr, recon_scheme, 0, false, plm_theta, *lparm);
       });
 
       // Solve Riemann problem, store advection and pressure fluxes to flx_arr
-      auto const& flx_arr = flxfab[cdir]->array(nf*NVAR);
-      auto const& p_arr = pflux_fab.array(nf*NVAR);
+      auto const& flx_arr = flxfab[cdir]->array(nf*NVAR, NVAR);
+      auto const& p_arr = pflux_fab.array(nf*NVAR, NVAR);
       amrex::ParallelFor(flxbx,
       [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept {
-        cns_riemann(i, j, k, cdir, flx_arr, /*nf > 1 ? vflx_arr : flx_arr*/ p_arr, q, wl, wr, 0, *lparm);
+        // cns_riemann(i, j, k, cdir, flx_arr, /*nf > 1 ? vflx_arr : flx_arr*/ p_arr, q, ql, qr, 0, *lparm);
+        new_riemann(i, j, k, cdir, flx_arr, p_arr, ql, qr, *lparm);
       });
 
       // auto const& q = qtmp.array(nf*NPRIM);
       // auto const& flx_arr = flxfab[cdir]->array(nf*NVAR);
       // amrex::ParallelFor(flxbx,
       // [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept {
-      //     recon_riemann_aio(i, j, k, cdir, q, flx_arr, /*nf > 1 ? pflx_arr :*/ flx_arr, recon_scheme, plm_theta, *lparm);
+      //   recon_riemann_aio(i, j, k, cdir, q, flx_arr, /*nf > 1 ? pflx_arr :*/ flx_arr, recon_scheme, plm_theta, *lparm);
       
       // amrex::ParallelFor(flxbx,
       // [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept {
@@ -126,7 +138,22 @@ CNS::compute_dSdt_box (const Box& bx,
 
       // Store viscous fluxes separately
       if (do_visc) {
-        auto const& coefs = diff_coeff.array(nf*NVAR);
+        // auto const& yin   = qtmp.array(nf*NPRIM + QFS, NUM_SPECIES);
+        // auto const& Tin   = qtmp.array(nf*NPRIM + QTEMP, 1);
+        // auto const& rhoin = qtmp.array(nf*NPRIM + QRHO, 1);
+        // auto const& mu     = diff_coeff.array(CMU, 1);
+        // auto const& xi     = diff_coeff.array(CXI, 1);
+        // auto const& lambda = diff_coeff.array(CLAM, 1);
+        // auto const& rhoD   = diff_coeff.array(CRHOD);
+
+        // // Get Transport coefs on GPU
+        // amrex::launch(bxg2, [=] AMREX_GPU_DEVICE(amrex::Box const& tbx) {
+        //   auto trans = pele::physics::PhysicsType::transport();
+        //   trans.get_transport_coeffs(
+        //       tbx, yin, Tin, rhoin, rhoD, mu, xi, lambda, ltransparm);
+        // });
+
+        auto const& coefs = diff_coeff.array(nf*NCOEF);
         amrex::ParallelFor(flxbx,
         [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept {
           cns_diff(i, j, k, cdir, q, coefs, dxinv, nf > 0 ? vflx_arr : flx_arr);
@@ -135,9 +162,9 @@ CNS::compute_dSdt_box (const Box& bx,
       
     } //for fields
 
-    if ((NUM_FIELD > 0)) {
-      auto const& flx_arr = flxfab[cdir]->array();
-      auto const& p_arr = pflux_fab.array();
+    // if ((NUM_FIELD > 0)) {
+    //   auto const& flx_arr = flxfab[cdir]->array();
+    //   auto const& p_arr = pflux_fab.array();
 
       // amrex::ParallelFor(flxbx,
       // [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept {
@@ -165,7 +192,7 @@ CNS::compute_dSdt_box (const Box& bx,
       //         // flx_arr(i, j, k, nf*NVAR + UEDEN) += u*(-p + mean_p);
       //     }
       // });
-    }
+    // }
 
     if ((NUM_FIELD > 0) && (do_visc)) {
         auto const& flx_arr = flxfab[cdir]->array();
