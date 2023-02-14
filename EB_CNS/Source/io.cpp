@@ -105,4 +105,21 @@ CNS::setPlotVariables ()
   } else {
     amrex::Amr::deleteDerivePlotVar("molefrac");
   }
+
+  // Plot stochastic fields
+  bool plot_fields = true;
+  pp.query("plot_fields", plot_fields);
+  if (!plot_fields) {
+    for (int nf = 0; nf < NUM_FIELD; ++nf) {
+      amrex::Amr::deleteStatePlotVar("density_Field" + std::to_string(nf));
+      amrex::Amr::deleteStatePlotVar("xmom_Field" + std::to_string(nf));
+      amrex::Amr::deleteStatePlotVar("ymom_Field" + std::to_string(nf));
+      amrex::Amr::deleteStatePlotVar("zmom_Field" + std::to_string(nf));
+      amrex::Amr::deleteStatePlotVar("rho_E_Field" + std::to_string(nf));
+      for (int i = 0; i < NUM_SPECIES; ++i) {  
+        amrex::Amr::deleteStatePlotVar("rho_omega_" + spec_names[i] + "_Field" + std::to_string(nf));
+      }
+      amrex::Amr::deleteStatePlotVar("heatRelease_Field" + std::to_string(nf));
+    }
+  }
 }
