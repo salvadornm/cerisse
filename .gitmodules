@@ -1,6 +1,3 @@
-[submodule "lib/amrex"]
-	path = lib/amrex
-	url = https://github.com/AMReX-Codes/amrex.git
 [submodule "lib/cgal"]
 	path = lib/cgal
 	url = https://github.com/CGAL/cgal.git
