@@ -18,6 +18,10 @@ ifdef NUM_FIELD
    DEFINES += -DNUM_FIELD=$(NUM_FIELD)
 endif
 
+ifdef NUM_AUX
+   DEFINES += -DNUM_AUX=$(NUM_AUX)
+endif
+
 ifeq ($(USE_CUDA),TRUE)
    CXXFLAGS+=-Xptxas --disable-optimizer-constants -Xcompiler=-std=c++17
 endif
@@ -77,6 +81,9 @@ ifeq ($(Transport_Model),$(filter $(Transport_Model),Simple))
 endif
 ifeq ($(Transport_Model),$(filter $(Transport_Model),Sutherland))
    DEFINES += -DUSE_SUTHERLAND_TRANSPORT
+endif
+ifeq ($(Transport_Model),$(filter $(Transport_Model),ProbTransport))
+   DEFINES += -DUSE_PROB_TRANSPORT
 endif
 
 # Reactions
