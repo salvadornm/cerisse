@@ -1,5 +1,0 @@
-sudo apt install libgmp-dev
-sudo apt install libmpfr-dev
-https://www.boost.org/users/download/
-
-cgal/Scripts/scripts/cgal_create_CMakeLists

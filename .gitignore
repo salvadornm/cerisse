@@ -35,3 +35,8 @@ EB_CNS/Exec/Sod/tmp_build_dir
 .vscode/targets.log
 
 /wrk
+/lib/cgal/build
+/lib/cgal/install/*
+
+/lib/boost/install
+/lib/boost/doc
