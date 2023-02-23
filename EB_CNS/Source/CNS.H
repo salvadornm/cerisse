@@ -14,9 +14,9 @@
 #include "PelePhysics.H"
 #include "ReactorBase.H"
 
+#include "prob_parm.H"
 #include "index_macros.H"
 #include "parm.H"
-#include "prob_parm.H"
 
 using namespace amrex;
 
@@ -208,6 +208,8 @@ public:
 
   static ProbParm* h_prob_parm;
   static ProbParm* d_prob_parm;
+  static pele::physics::transport::TransportParams<
+      pele::physics::PhysicsType::transport_type> trans_parms;
 
 protected:
 
@@ -239,7 +241,9 @@ protected:
     return dynamic_cast<CNS&>(parent->getLevel(lev)); 
   }
 
-  void printTotalandCheckNan() const;
+  void printTotalandCheckNan () const;
+
+  // void writeTimeStat ();
 
   void react_state (amrex::Real time, amrex::Real dt, bool init_react = false);
 
@@ -280,9 +284,6 @@ protected:
   //
   // PelePhysics related
 
-  static pele::physics::transport::TransportParams<
-      pele::physics::PhysicsType::transport_type> trans_parms;
-
   static amrex::Vector<std::string> spec_names;
 
   static std::string chem_integrator;
@@ -320,17 +321,20 @@ protected:
   static int eb_weights_type;
   static int do_reredistribution;
 #endif
-
-  static int refine_cutcells;
-  static int refine_max_dengrad_lev;
-  static amrex::Vector<amrex::Real> refine_dengrad;
+  
+  static int refine_cutcells;  
+  static int refine_cutcells_max_lev;
   static amrex::Vector<amrex::RealBox> refine_boxes;
+  static amrex::Vector<int> refine_boxes_max_lev;
   static amrex::RealBox* dp_refine_boxes;
+  static amrex::Vector<amrex::Real> refine_dengrad;
+  static int refine_dengrad_max_lev;
+  static amrex::Vector<amrex::Real> refine_magvort;
+  static int refine_magvort_max_lev;
+  // static amrex::Vector<amrex::AMRErrorTag> errtagger;
 
   static Parm* h_parm;
   static Parm* d_parm;
-
-  // static amrex::Vector<amrex::AMRErrorTag> errtagger;
 };
 
 // Below are bcfill functions declared here so that setup.cpp can find them.
