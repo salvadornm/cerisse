@@ -74,11 +74,12 @@ CNS::react_state (amrex::Real /*time*/,
     if ((typ == amrex::FabType::singlevalued) || (typ == amrex::FabType::regular)) 
 #endif
     {
-      for (int nf = 0; nf <= NUM_FIELD; ++nf) {
+      for (int nf = NUM_FIELD > 0 ? 1 : 0; nf <= NUM_FIELD; ++nf) {
         // ============== Prepare for react ==============
         const amrex::Array4 sold_arr 
             = init_react ? Snew.array(mfi, nf*NVAR) : Sold.array(mfi, nf*NVAR); //don't have Sold at initialisation
         amrex::Array4 snew_arr = Snew.array(mfi, nf*NVAR);
+        amrex::Array4 I_R_mean_arr = I_R.array(mfi, 0);
         amrex::Array4 I_R_arr = I_R.array(mfi, nf*NREACT);
         amrex::Array4 rY = STemp.array(mfi, 0);
         amrex::Array4 rEi = STemp.array(mfi, NUM_SPECIES);
@@ -146,6 +147,7 @@ CNS::react_state (amrex::Real /*time*/,
         // ================== Unpack data ==================
         amrex::ParallelFor(bx, [=] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {
           if (mask(i,j,k) != -1) {
+            if (T(i,j,k) < 0.0) std::cout << "Reaction causing T < 0 = " << T(i,j,k) << std::endl;
             // update U^{n+1} = U^** + dt*I_R^{n+1}
             if (!init_react) {
               snew_arr(i,j,k,URHO) = 0.0;
@@ -175,8 +177,15 @@ CNS::react_state (amrex::Real /*time*/,
                 I_R_arr(i,j,k,NUM_SPECIES) -= hi[n] * I_R_arr(i,j,k,n);
               }
             }
+
+            // Average I_R and put into the front NREACT entries
+            if (NUM_FIELD > 0) {
+              for (int n = 0; n < NREACT; ++n) {
+                I_R_mean_arr(i,j,k,n) += I_R_arr(i,j,k,n) / amrex::Real(NUM_FIELD);
+              }
+            }
           }
-        });
+        });        
       } //end fields loop
     } //end EB not covered block
 
