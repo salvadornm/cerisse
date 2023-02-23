@@ -112,9 +112,9 @@ void cns_dermagvort (const Box& bx, FArrayBox& derfab, int dcomp, int /*ncomp*/,
     // AMREX_D_TERM(const amrex::Real wi = get_weight(im, ip); ,
     //              const amrex::Real wj = get_weight(jm, jp); ,
     //              const amrex::Real wk = get_weight(km, kp);)
-    AMREX_D_TERM(int im = i-1; int ip = i+1; amrex::Real wi = 1.0; , 
-                 int jm = j-1; int jp = j-1; amrex::Real wj = 1.0; , 
-                 int km = k-1; int kp = k-1; amrex::Real wk = 1.0;)
+    AMREX_D_TERM(int im = i-1; int ip = i+1; amrex::Real wi = 0.5; , 
+                 int jm = j-1; int jp = j+1; amrex::Real wj = 0.5; , 
+                 int km = k-1; int kp = k+1; amrex::Real wk = 0.5;)
 
     AMREX_D_TERM(
       vort(i, j, k) = 0.0;
@@ -163,9 +163,9 @@ void cns_derdivu (const Box& bx, FArrayBox& derfab, int dcomp, int /*ncomp*/,
     // AMREX_D_TERM(const amrex::Real wi = get_weight(im, ip); ,
     //              const amrex::Real wj = get_weight(jm, jp); ,
     //              const amrex::Real wk = get_weight(km, kp);)
-    AMREX_D_TERM(int im = i-1; int ip = i+1; amrex::Real wi = 1.0; , 
-                 int jm = j-1; int jp = j-1; amrex::Real wj = 1.0; , 
-                 int km = k-1; int kp = k-1; amrex::Real wk = 1.0;)
+    AMREX_D_TERM(int im = i-1; int ip = i+1; amrex::Real wi = 0.5; , 
+                 int jm = j-1; int jp = j+1; amrex::Real wj = 0.5; , 
+                 int km = k-1; int kp = k+1; amrex::Real wk = 0.5;)
 
     AMREX_D_TERM(const amrex::Real uhi = dat(ip, j, k, UMX) / dat(ip, j, k, URHO);
                  const amrex::Real ulo = dat(im, j, k, UMX) / dat(im, j, k, URHO);
@@ -210,9 +210,9 @@ void cns_derdivrho (const Box& bx, FArrayBox& derfab, int dcomp, int /*ncomp*/,
     // AMREX_D_TERM(const amrex::Real wi = get_weight(im, ip); ,
     //              const amrex::Real wj = get_weight(jm, jp); ,
     //              const amrex::Real wk = get_weight(km, kp);)
-    AMREX_D_TERM(int im = i-1; int ip = i+1; amrex::Real wi = 1.0; , 
-                 int jm = j-1; int jp = j-1; amrex::Real wj = 1.0; , 
-                 int km = k-1; int kp = k-1; amrex::Real wk = 1.0;)
+    AMREX_D_TERM(int im = i-1; int ip = i+1; amrex::Real wi = 0.5; , 
+                 int jm = j-1; int jp = j+1; amrex::Real wj = 0.5; , 
+                 int km = k-1; int kp = k+1; amrex::Real wk = 0.5;)
 
     AMREX_D_TERM(const amrex::Real xhi = dat(ip, j, k, URHO);
                  const amrex::Real xlo = dat(im, j, k, URHO);
@@ -253,6 +253,18 @@ void cns_dermachnumber (const Box& bx, FArrayBox& derfab, int dcomp, int /*ncomp
     mach(i, j, k) = sqrt(AMREX_D_TERM(vxsq, +vysq, +vzsq)) / cs;
   });
 }
+
+// void cns_derextsrc (const Box& bx, FArrayBox& derfab, int dcomp, int /*ncomp*/,
+//                     const FArrayBox& datafab, const Geometry& geomdata,
+//                     Real time, const int* /*bcrec*/, int /*level*/)
+// {
+//   auto const dat = datafab.array();
+//   auto Sfab = derfab.array(dcomp);
+  
+//   amrex::ParallelFor(bx, [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept {
+//     CNS::fill_ext_src(i, j, k, time, geomdata, dat, Sfab, parm, prob_parm);
+//   });
+// }
 
 void cns_dercp (const Box& bx, FArrayBox& derfab, int dcomp, int /*ncomp*/,
                 const FArrayBox& datafab, const Geometry& /*geomdata*/,
@@ -360,11 +372,11 @@ void cns_dermassfrac (const Box& bx, FArrayBox& derfab, int dcomp, int /*ncomp*/
   auto const dat = datafab.const_array();
   auto massfrac = derfab.array(dcomp);
 
-  amrex::ParallelFor(bx, NUM_FIELD+1, [=] AMREX_GPU_DEVICE(int i, int j, int k, int nf) noexcept {
-    const amrex::Real rho = dat(i, j, k, nf*NVAR + URHO);
+  amrex::ParallelFor(bx, [=] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {
+    const amrex::Real rho = dat(i, j, k, URHO);
     const amrex::Real rhoinv = 1.0 / rho;
     for (int n = 0; n < NUM_SPECIES; ++n) {
-      massfrac(i, j, k, nf*NUM_SPECIES + n) = dat(i, j, k, nf*NVAR + UFS + n) * rhoinv;
+      massfrac(i, j, k, n) = dat(i, j, k, UFS + n) * rhoinv;
     }
   });
 }
@@ -376,17 +388,66 @@ void cns_dermolefrac (const Box& bx, FArrayBox& derfab, int dcomp, int /*ncomp*/
   auto const dat = datafab.const_array();
   auto molefrac = derfab.array(dcomp);
 
-  amrex::ParallelFor(bx, NUM_FIELD+1, [=] AMREX_GPU_DEVICE(int i, int j, int k, int nf) noexcept {
-    const amrex::Real rho = dat(i, j, k, nf*NVAR + URHO);
+  amrex::ParallelFor(bx, [=] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {
+    const amrex::Real rho = dat(i, j, k, URHO);
     const amrex::Real rhoinv = 1.0 / rho;
     amrex::Real mass[NUM_SPECIES], mole[NUM_SPECIES];
     for (int n = 0; n < NUM_SPECIES; ++n) {
-      mass[n] = dat(i, j, k, nf*NVAR + UFS + n) * rhoinv;
+      mass[n] = dat(i, j, k, UFS + n) * rhoinv;
     }
     auto eos = pele::physics::PhysicsType::eos();
     eos.Y2X(mass, mole);
     for (int n = 0; n < NUM_SPECIES; ++n) {
-      molefrac(i, j, k, nf*NUM_SPECIES + n) = mole[n];
+      molefrac(i, j, k, n) = mole[n];
+    }
+  });
+}
+
+void cns_dervaru (const Box& bx, FArrayBox& derfab, int dcomp, int /*ncomp*/,
+                  const FArrayBox& datafab, const Geometry& /*geomdata*/,
+                  Real /*time*/, const int* /*bcrec*/, int /*level*/)
+{
+  auto const dat = datafab.const_array();
+  auto rs = derfab.array(dcomp); //reynolds stresses
+
+  amrex::ParallelFor(bx, [=] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {
+    unsigned int ctr = 0; // counter
+    for (int dir1 = 0; dir1 < AMREX_SPACEDIM; ++dir1) {
+    for (int dir2 = 0; dir2 < AMREX_SPACEDIM; ++dir2) {
+      if (dir1 >= dir2) {
+        rs(i, j, k, ctr) = 0.0;
+        amrex::Real meanu = dat(i, j, k, UMX+dir1) / dat(i, j, k, URHO);
+        amrex::Real meanv = dat(i, j, k, UMX+dir2) / dat(i, j, k, URHO);
+        for (int nf = 1; nf < NUM_FIELD; ++nf) {
+          amrex::Real u = dat(i, j, k, nf*NVAR + UMX+dir1) / dat(i, j, k, nf*NVAR + URHO);
+          amrex::Real v = dat(i, j, k, nf*NVAR + UMX+dir2) / dat(i, j, k, nf*NVAR + URHO);
+          rs(i, j, k, ctr) += (u - meanu) * (v - meanv);
+        }
+        rs(i, j, k, ctr) /= (amrex::Real)(NUM_FIELD - 1); //over N-1 instead of N is more accurate
+
+        ctr++;
+      }
+    }
+    }
+  });
+}
+
+void cns_dervary (const Box& bx, FArrayBox& derfab, int dcomp, int /*ncomp*/,
+                  const FArrayBox& datafab, const Geometry& /*geomdata*/,
+                  Real /*time*/, const int* /*bcrec*/, int /*level*/)
+{
+  auto const dat = datafab.const_array();
+  auto vary = derfab.array(dcomp);
+
+  amrex::ParallelFor(bx, [=] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {
+    for (int n = 0; n < NUM_SPECIES; ++n) { 
+      vary(i, j, k, n) = 0.0;       
+      for (int nf = 1; nf < NUM_FIELD; ++nf) {
+        amrex::Real y = dat(i, j, k, nf*NVAR + UFS+n) / dat(i, j, k, nf*NVAR + URHO);
+        vary(i, j, k, n) += y * y;
+      }
+      amrex::Real meany = dat(i, j, k, UFS+n) / dat(i, j, k, URHO);
+      vary(i, j, k, n) = vary(i, j, k, n) / NUM_FIELD - meany * meany;
     }
   });
 }

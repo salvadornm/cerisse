@@ -165,8 +165,15 @@ CNS::variableSetUp ()
   }
 
   // Get AUX names
+  amrex::Vector<std::string> aux_name;
+  prob_get_aux_name(aux_name);
   for (int i = 0; i < NUM_AUX; ++i) {
-    set_scalar_bc(bc, phys_bc); bcs[cnt] = bc; name[cnt] = "aux_" + std::to_string(i);
+    set_scalar_bc(bc, phys_bc); bcs[cnt] = bc;
+    if (aux_name.size() == NUM_AUX) {
+      name[cnt] = aux_name[i];
+    } else {
+      name[cnt] = "aux_" + std::to_string(i);
+    }
     cnt++;
   }
 
@@ -324,6 +331,13 @@ CNS::variableSetUp ()
                  molefrac_names, cns_dermolefrac, DeriveRec::TheSameBox);
   derive_lst.addComponent("molefrac", desc_lst, State_Type, 0, LEN_STATE);
 
+#if NUM_FIELD > 0
+  // Derived variance of velocity, species, energy (turbulent stat??)
+  amrex::Vector<std::string> rs_names = {"R11", "R12", "R22", "R13", "R23", "R33"};
+  derive_lst.add("reynolds_stress", IndexType::TheCellType(), AMREX_D_PICK(1,3,6),
+                 rs_names, cns_dervaru, DeriveRec::TheSameBox);
+  derive_lst.addComponent("reynolds_stress", desc_lst, State_Type, 0, LEN_STATE);
+#endif
   // //
   // // Dynamically generated error tagging functions
   // //

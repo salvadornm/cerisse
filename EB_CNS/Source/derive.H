@@ -9,7 +9,7 @@
 
 #include "CNS.H"
 
-void cns_dertemp(
+void cns_dertemp (
   const amrex::Box& bx, 
   amrex::FArrayBox& derfab, 
   int dcomp, 
@@ -20,7 +20,7 @@ void cns_dertemp(
   const int* bcrec, 
   int level);
 
-void cns_derpres(
+void cns_derpres (
   const amrex::Box& bx, 
   amrex::FArrayBox& derfab, 
   int dcomp, 
@@ -31,7 +31,7 @@ void cns_derpres(
   const int* bcrec, 
   int level);
 
-void cns_dervel(
+void cns_dervel (
   const amrex::Box& bx, 
   amrex::FArrayBox& derfab, 
   int dcomp, 
@@ -42,7 +42,7 @@ void cns_dervel(
   const int* bcrec, 
   int level);
 
-void cns_dermagvort(
+void cns_dermagvort (
   const amrex::Box& bx, 
   amrex::FArrayBox& derfab, 
   int dcomp, 
@@ -53,7 +53,7 @@ void cns_dermagvort(
   const int* bcrec, 
   int level);
 
-void cns_dermachnumber(
+void cns_dermachnumber (
   const amrex::Box& bx, 
   amrex::FArrayBox& derfab, 
   int dcomp, 
@@ -64,7 +64,7 @@ void cns_dermachnumber(
   const int* bcrec, 
   int level);
 
-void cns_derdivu(
+void cns_derdivu (
   const amrex::Box& bx, 
   amrex::FArrayBox& derfab, 
   int dcomp, 
@@ -75,7 +75,7 @@ void cns_derdivu(
   const int* bcrec, 
   int level);
 
-void cns_derdivrho(
+void cns_derdivrho (
   const amrex::Box& bx, 
   amrex::FArrayBox& derfab, 
   int dcomp, 
@@ -86,7 +86,7 @@ void cns_derdivrho(
   const int* bcrec, 
   int level);
 
-void cns_dercp(
+void cns_dercp (
   const amrex::Box& bx, 
   amrex::FArrayBox& derfab, 
   int dcomp, 
@@ -97,7 +97,7 @@ void cns_dercp(
   const int* bcrec, 
   int level);
 
-void cns_dercv(
+void cns_dercv (
   const amrex::Box& bx, 
   amrex::FArrayBox& derfab, 
   int dcomp, 
@@ -108,7 +108,7 @@ void cns_dercv(
   const int* bcrec, 
   int level);
 
-void cns_dermassfrac(
+void cns_dermassfrac (
   const amrex::Box& bx, 
   amrex::FArrayBox& derfab, 
   int dcomp, 
@@ -119,7 +119,18 @@ void cns_dermassfrac(
   const int* bcrec, 
   int level);
 
-void cns_dermolefrac(
+void cns_dermolefrac (
+  const amrex::Box& bx, 
+  amrex::FArrayBox& derfab, 
+  int dcomp, 
+  int ncomp,
+  const amrex::FArrayBox& datafab, 
+  const amrex::Geometry& geomdata,
+  amrex::Real time, 
+  const int* bcrec, 
+  int level);
+
+void cns_dervaru (
   const amrex::Box& bx, 
   amrex::FArrayBox& derfab, 
   int dcomp, 
