@@ -41,18 +41,23 @@ struct CnsFillExtDir
         prob_lo[2] + static_cast<Real>(iv[2] + 0.5) * dx[2])};
 
     Real s_int[LEN_STATE] = {0.0};
+    Real s_refl[LEN_STATE] = {0.0};
     Real s_ext[LEN_STATE] = {0.0};
 
     // Fill internal state data then run bcnormal to fill external state data
     for (int idir = 0; idir < AMREX_SPACEDIM; ++idir) {
       if // lo
       ((bc.lo(idir) == BCType::ext_dir) && (iv[idir] < domlo[idir])) {
-        IntVect loc(iv);  loc[idir] = domlo[idir] + (domlo[idir] - iv[idir]) - 1;
-        for (int nc = 0; nc < numcomp; ++nc) {
-          s_int[dcomp + nc] = dest(loc, dcomp + nc); // Fill internal state data 
+        //  Ghost | Ghost | Ghost | Real | Real | Real  
+        //  ^cell to be filled      ^firs         ^refl
+        IntVect refl(iv);  refl[idir] = domlo[idir] + (domlo[idir] - iv[idir]) - 1; // reflection image of the ghost cell across boundary 
+        IntVect firs(iv);  firs[idir] = domlo[idir]; // interior first cell
+        for (int nc = 0; nc < numcomp; ++nc) { // Fill internal state data 
+          s_int[dcomp + nc] = dest(firs, dcomp + nc); 
+          s_refl[dcomp + nc] = dest(refl, dcomp + nc); 
         }
 
-        bcnormal(x, s_int, s_ext, idir, 1, time, geom, *lprobparm); // Call bcnormal from prob.H
+        bcnormal(x, s_int, s_refl, s_ext, idir, 1, time, geom, *lprobparm); // Call bcnormal from prob.H
 
         for (int nc = 0; nc < numcomp; ++nc) {
           dest(iv, dcomp + nc) = s_ext[dcomp + nc]; // Only take the wanted components
@@ -60,12 +65,14 @@ struct CnsFillExtDir
       }
       else if // hi
       ((bc.hi(idir) == BCType::ext_dir) && (iv[idir] > domhi[idir])) {
-        IntVect loc(iv);  loc[idir] = domhi[idir] + (domhi[idir] - iv[idir]) + 1;
+        IntVect refl(iv);  refl[idir] = domhi[idir] + (domhi[idir] - iv[idir]) + 1;
+        IntVect firs(iv);  firs[idir] = domhi[idir];
         for (int nc = 0; nc < numcomp; ++nc){ 
-          s_int[dcomp + nc] = dest(loc, dcomp + nc);
+          s_int[dcomp + nc] = dest(firs, dcomp + nc);
+          s_refl[dcomp + nc] = dest(refl, dcomp + nc); 
         }
     
-        bcnormal(x, s_int, s_ext, idir, -1, time, geom, *lprobparm);
+        bcnormal(x, s_int, s_refl, s_ext, idir, -1, time, geom, *lprobparm);
 
         for (int nc = 0; nc < numcomp; ++nc) {
           dest(iv, dcomp + nc) = s_ext[dcomp + nc]; 
