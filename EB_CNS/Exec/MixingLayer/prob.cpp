@@ -18,6 +18,7 @@ amrex_probinit(
     pp.query("u2", CNS::h_prob_parm->u2);
     pp.query("p", CNS::h_prob_parm->p);
     pp.query("vorticity_thickness", CNS::h_prob_parm->theta_w);
+    pp.query("record_statistics", CNS::h_prob_parm->record_statistics);
   }
 
   // Fuel stream
@@ -70,7 +71,7 @@ CNS::fill_ext_src (int i, int j, int k,
 
   if (rsq >= theta_sq) {
     for (int nf = 0; nf <= NUM_FIELD; ++nf) {
-      ext_src(i, j, k, nf*NVAR + UMY) += 0.01 * pp.uc * exp(-rsq / theta_sq) * cos(1e-6 * time /*+ M_PI*nf/NUM_FIELD*/); // add a phase shift of maximum pi
+      ext_src(i, j, k, nf*NVAR + UMY) += 0.01 * pp.uc * exp(-rsq / theta_sq) * cos(1e-6 * time); // Yuri says amplitude is 0.1*Uc ??
     }
   }
 }

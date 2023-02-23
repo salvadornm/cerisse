@@ -30,6 +30,7 @@ Chemistry_Model := Yetter
 
 # CNS
 NUM_FIELD = 8
+NUM_AUX = 12
 
 # GNU Make
 include ./Make.package
