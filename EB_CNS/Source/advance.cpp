@@ -13,6 +13,8 @@ CNS::advance(Real time, Real dt, int /*iteration*/, int /*ncycle*/)
 {
   BL_PROFILE("CNS::advance()");
 
+  // enforce_consistent_state(); // Enforce rho = sum(rhoY)
+
   // Prepare data fabs
   for (int i = 0; i < num_state_data_types; ++i) {
     if (!(i == Reactions_Type && do_react)) { // do not swap I_R (we only use new I_R data)
@@ -52,7 +54,7 @@ CNS::advance(Real time, Real dt, int /*iteration*/, int /*ncycle*/)
     fr_as_crse->reset();
   }
 
-  // Start time-stepping
+  // Start time-stepping  
   // RK2 stage 1: U^* = U^n + dt*dUdt^n + dt*I_R^n
   if (verbose > 0) amrex::Print() << " >> RK Step 1: Computing dSdt^{n}" << std::endl;
   FillPatch(*this, Sborder, NUM_GROW, time, State_Type, 0, LEN_STATE);
@@ -75,28 +77,28 @@ CNS::advance(Real time, Real dt, int /*iteration*/, int /*ncycle*/)
   MultiFab::LinComb(S_new, 0.5*dt, dSdt_new, 0, 0.5*dt, dSdt_old, 0, 0, LEN_STATE, 0);
   MultiFab::Add(S_new, S_old, 0, 0, LEN_STATE, 0);
   if (do_react) { // Compute I_R^{n+1}(U^**) and do U^{n+1} = U^** + dt*I_R^{n+1}
-    react_state(time, dt); 
+    react_state(time, dt);
   }
   enforce_consistent_state(); // Enforce rho = sum(rhoY)
   
-  // Iterate to couple chemistry
-  if (do_react && (rk_reaction_iter > 1)) {
-    for (int iter = 1; iter < rk_reaction_iter; ++iter) {
-      if (verbose > 0) {
-        amrex::Print() << " >> Re-computing dSdt^{n+1}" << std::endl;
-      }
-      FillPatch(*this, Sborder, NUM_GROW, time+dt, State_Type, 0, LEN_STATE);
-      compute_dSdt(Sborder, dSdt_new, 0.5*dt, fr_as_crse, fr_as_fine, (iter == rk_reaction_iter));
+  // Iterate to couple chemistry (haven't tested)
+  // if (do_react && (rk_reaction_iter > 1)) {
+  //   for (int iter = 1; iter < rk_reaction_iter; ++iter) {
+  //     if (verbose > 0) {
+  //       amrex::Print() << " >> Re-computing dSdt^{n+1}" << std::endl;
+  //     }
+  //     FillPatch(*this, Sborder, NUM_GROW, time+dt, State_Type, 0, LEN_STATE);
+  //     compute_dSdt(Sborder, dSdt_new, 0.5*dt, fr_as_crse, fr_as_fine, (iter == rk_reaction_iter));
       
-      MultiFab::LinComb(S_new, 0.5*dt, dSdt_new, 0, 0.5*dt, dSdt_old, 0, 0, LEN_STATE, 0);
-      MultiFab::Add(S_new, S_old, 0, 0, LEN_STATE, 0);      
-      react_state(time, dt);
-    }
-    enforce_consistent_state(); // Enforce rho = sum(rhoY)
-  }
+  //     MultiFab::LinComb(S_new, 0.5*dt, dSdt_new, 0, 0.5*dt, dSdt_old, 0, 0, LEN_STATE, 0);
+  //     MultiFab::Add(S_new, S_old, 0, 0, LEN_STATE, 0);      
+  //     react_state(time, dt);
+  //     enforce_consistent_state(); // Enforce rho = sum(rhoY)
+  //   }
+  // }
 
   if (NUM_FIELD > 0) {
-    // computeAvg(S_new);
+    computeAvg(S_new);
     FillPatch(*this, Sborder, 1, time+dt, State_Type, 0, LEN_STATE);
     compute_pdf_model(Sborder, dt);
     MultiFab::Copy(S_new, Sborder, 0, 0, LEN_STATE, 0);
@@ -248,9 +250,9 @@ CNS::enforce_consistent_state ()
 {
   BL_PROFILE("CNS::enforce_consistent_state()");
 
-  if (verbose > 0) {
-    amrex::Print() << " >> CNS::enforce_consistent_state()" << std::endl;
-  }
+  // if (verbose > 0) {
+  //   amrex::Print() << " >> CNS::enforce_consistent_state()" << std::endl;
+  // }
 
   MultiFab& S = get_new_data(State_Type);
   // auto const& rho = Array4<Real>(state, URHO, 1); //this is how to slice array4!!
@@ -299,25 +301,25 @@ CNS::enforce_consistent_state ()
           }
 
           // Calculate temperature (!) this adds energy to the point but without removing the excess ke
-          // rhoinv = 1.0 / rhoNew;
-          // Real Y[NUM_SPECIES];
-          // for (int n = 0; n < NUM_SPECIES; n++) {
-          //   Y[n] = s_arr(iv, UFS+n) * rhoinv;
-          // }
-          // Real ke = 0.5 * rhoinv * (AMREX_D_TERM(s_arr(iv, UMX)*s_arr(iv, UMX) ,
-          //                                       +s_arr(iv, UMY)*s_arr(iv, UMY) ,
-          //                                       +s_arr(iv, UMZ)*s_arr(iv, UMZ)));
-          // Real ei = rhoinv * (s_arr(iv, UEDEN) - ke);
-          // auto eos = pele::physics::PhysicsType::eos();
-          // Real T;
-          // eos.REY2T(rhoNew, ei, Y, T);
-          // if (T < 50.0) {
-          //   std::cout << "Energy added to cell (" << i << "," << j << "," << k << ")\n";
-          //   T = 50.0;
-          //   s_arr(iv, UEDEN) -= ei * rhoNew;
-          //   eos.RTY2E(rhoNew, T, Y, ei);
-          //   s_arr(iv, UEDEN) += ei * rhoNew;
-          // }
+          rhoinv = 1.0 / rhoNew;
+          Real Y[NUM_SPECIES];
+          for (int n = 0; n < NUM_SPECIES; n++) {
+            Y[n] = s_arr(iv, UFS+n) * rhoinv;
+          }
+          Real ke = 0.5 * rhoinv * (AMREX_D_TERM(s_arr(iv, UMX)*s_arr(iv, UMX) ,
+                                                +s_arr(iv, UMY)*s_arr(iv, UMY) ,
+                                                +s_arr(iv, UMZ)*s_arr(iv, UMZ)));
+          Real ei = rhoinv * (s_arr(iv, UEDEN) - ke);
+          auto eos = pele::physics::PhysicsType::eos();
+          Real T;
+          eos.REY2T(rhoNew, ei, Y, T);
+          if (T < clip_temp) {
+            std::cout << "Energy added to cell (" << i << "," << j << "," << k << "): T " << T << "->" << clip_temp << "\n";
+            T = clip_temp;
+            s_arr(iv, UEDEN) -= ei * rhoNew;
+            eos.RTY2E(rhoNew, T, Y, ei);
+            s_arr(iv, UEDEN) += ei * rhoNew;
+          }
         });
       } // loop through NUM_FIELD
     } // EB !covered

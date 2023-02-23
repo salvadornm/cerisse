@@ -1,29 +1,15 @@
 #ifndef CNS_RECON_H_
 #define CNS_RECON_H_
 
+// #include <cmath>
+
 #include <AMReX_FArrayBox.H>
 
 #include "index_macros.H"
 // #include "parm.H"
 // #include "PelePhysics.H"
 
-// #include <cmath>
-
-// AMREX_GPU_DEVICE AMREX_FORCE_INLINE
-// amrex::Real
-// limiter (amrex::Real dlft, amrex::Real drgt, amrex::Real plm_theta) noexcept
-// {
-//     using amrex::Real;
-
-//     Real dcen = Real(0.5)*(dlft+drgt);
-//     Real dsgn = amrex::Math::copysign(Real(1.0), dcen);
-//     Real slop = plm_theta * amrex::min(amrex::Math::abs(dlft),amrex::Math::abs(drgt));
-//     Real dlim = (dlft*drgt >= Real(0.0)) ? slop : Real(0.0);
-//     return dsgn * amrex::min(dlim,amrex::Math::abs(dcen));
-// }
-
-AMREX_GPU_DEVICE AMREX_FORCE_INLINE
-void
+AMREX_GPU_DEVICE AMREX_FORCE_INLINE void
 muscl (amrex::Real s[3], amrex::Real& sm, amrex::Real& sp, amrex::Real plm_theta) noexcept
 {
   using amrex::Real;
@@ -44,8 +30,53 @@ muscl (amrex::Real s[3], amrex::Real& sm, amrex::Real& sp, amrex::Real plm_theta
   sm = s[1] - 0.5*dq;
 }
 
-AMREX_GPU_DEVICE AMREX_FORCE_INLINE
-void
+AMREX_GPU_DEVICE AMREX_FORCE_INLINE void
+wenoz3 (const amrex::Real s[3], amrex::Real& sm, amrex::Real& sp) noexcept
+{
+  using amrex::Real;
+
+  constexpr Real eps = 1e-6;
+  Real vl[2];
+  Real vr[2];
+  Real beta[2];
+  Real alpha[2];
+
+  beta[1] = (s[0] - s[1]) * (s[0] - s[1]);
+  beta[0] = (s[1] - s[2]) * (s[1] - s[2]);
+
+  Real tau = amrex::Math::abs(beta[1] - beta[0]);
+
+  beta[1] = 1.0 + (tau / (eps + beta[1])) * (tau / (eps + beta[1]));
+  beta[0] = 1.0 + (tau / (eps + beta[0])) * (tau / (eps + beta[0]));
+
+  alpha[1] = 2.0 * beta[1];
+  alpha[0] = 1.0 * beta[0];
+  Real alpha1 = 1.0 / (alpha[1] + alpha[0]);
+
+  vl[1] = -s[0] + 3.0 * s[1];
+  vl[0] = s[1] + s[2];
+
+  sp = 0.5 * alpha1 * (alpha[1] * vl[1] + alpha[0] * vl[0]);
+
+  beta[1] = (s[2] - s[1]) * (s[2] - s[1]);
+  beta[0] = (s[1] - s[0]) * (s[1] - s[0]);
+
+  tau = amrex::Math::abs(beta[1] - beta[0]);
+
+  beta[1] = 1.0 + (tau / (eps + beta[1])) * (tau / (eps + beta[1]));
+  beta[0] = 1.0 + (tau / (eps + beta[0])) * (tau / (eps + beta[0]));
+
+  alpha[1] = 2.0 * beta[1];
+  alpha[0] = 1.0 * beta[0];
+  alpha1 = 1.0 / (alpha[1] + alpha[0]);
+
+  vr[1] = 3.0 * s[1] - s[2];
+  vr[0] = s[0] + s[1];
+
+  sm = 0.5 * alpha1 * (alpha[1] * vr[1] + alpha[0] * vr[0]);
+}
+
+AMREX_GPU_DEVICE AMREX_FORCE_INLINE void
 wenojs5 (amrex::Real s[5], amrex::Real& sm, amrex::Real& sp) noexcept
 {
   using amrex::Real;
@@ -104,8 +135,7 @@ wenojs5 (amrex::Real s[5], amrex::Real& sm, amrex::Real& sp) noexcept
         (alpha[2] * vr[2] + alpha[1] * vr[1] + alpha[0] * vr[0]);
 }
 
-AMREX_GPU_DEVICE AMREX_FORCE_INLINE
-void
+AMREX_GPU_DEVICE AMREX_FORCE_INLINE void
 wenoz5 (amrex::Real s[5], amrex::Real& sm, amrex::Real& sp) noexcept
 {
   using amrex::Real;
@@ -166,6 +196,69 @@ wenoz5 (amrex::Real s[5], amrex::Real& sm, amrex::Real& sp) noexcept
         (alpha[2] * vr[2] + alpha[1] * vr[1] + alpha[0] * vr[0]);
 }
 
+AMREX_GPU_DEVICE AMREX_FORCE_INLINE void
+pp_limiter_scalar (amrex::Real& ql, amrex::Real& qr, const amrex::Real& q, 
+                   const amrex::Real m, const amrex::Real M = 1e10)
+{
+  using amrex::Real;
+  Real min_q = amrex::min(ql, qr);
+  Real max_q = amrex::max(ql, qr);
+
+  if ((min_q < m) || (max_q > M)) {
+    std::cout << "PP Limiter Scalar activated: ql=" << ql << " qr=" << qr << " q=" << q << "\n";
+    
+    Real t = amrex::Math::abs(q - m) / amrex::Math::abs(q - min_q);
+    t = amrex::min(t, amrex::Math::abs(q - M) / amrex::Math::abs(q - max_q));
+    AMREX_ASSERT(t <= 1);
+
+    ql = t*ql + (1-t)*q;
+    qr = t*qr + (1-t)*q;
+    std::cout << "New ql=" << ql << " New qr=" << qr << "\n";
+  }
+}
+
+AMREX_GPU_DEVICE AMREX_FORCE_INLINE void
+pp_limiter_euler (const amrex::IntVect ivl, const amrex::IntVect iv, 
+                  amrex::Array4<amrex::Real> const& ql, 
+                  amrex::Array4<amrex::Real> const& qr, 
+                  amrex::Array4<const amrex::Real> const& q, 
+                  const amrex::Real mr, const amrex::Real mp)
+{
+  using amrex::Real;
+  
+  // Step 1: limit density as a scalar
+  pp_limiter_scalar(ql(ivl, QRHO), qr(iv, QRHO), q(iv, QRHO), mr, 100);
+
+  // Step 2: limit the whole state for positive pressure
+  if ((ql(ivl, QPRES) < mp) || (qr(iv, QPRES) < mp)) {
+    std::cout << iv << " PP Limiter Euler activated: pl=" << ql(ivl, QPRES) 
+                                                << " pr=" << qr(iv, QPRES)
+                                                << " p=" << q(iv, QPRES) << "\n";
+    Real min_p = amrex::min(ql(ivl, QPRES), qr(iv, QPRES));
+    Real t = amrex::Math::abs(q(iv, QPRES) - mp) / amrex::Math::abs(q(iv, QPRES) - min_p);
+    // Real min_p = amrex::min(ql(ivl, QPRES)/ql(ivl, QRHO), qr(iv, QPRES)/qr(iv, QRHO));
+    // Real t = amrex::Math::abs(q(iv, QPRES)/q(iv, QRHO) - mp/mr) 
+    //        / amrex::Math::abs(q(iv, QPRES)/q(iv, QRHO) - min_p);
+    AMREX_ASSERT(t <= 1);
+
+    for (int n = QRHO; n <= QPRES; ++n) {
+      std::cout << "Old ql=" << ql(ivl, n) << " Old qr=" << qr(iv, n);
+      ql(ivl, n) = t*ql(ivl, n) + (1-t)*q(iv, n);
+      qr(iv, n)  = t*qr(iv, n) + (1-t)*q(iv, n);
+      std::cout << "  New ql=" << ql(ivl, n) << " New qr=" << qr(iv, n) << "\n";
+    }
+
+    Real T, Y[NUM_SPECIES];
+    auto eos = pele::physics::PhysicsType::eos();
+    for (int n = 0; n < NUM_SPECIES; ++n) Y[n] = ql(ivl,QFS+n);
+    eos.RYP2T(ql(ivl,QRHO), Y, ql(ivl, QPRES), T);
+    std::cout << "New Tl=" << T;
+    for (int n = 0; n < NUM_SPECIES; ++n) Y[n] = qr(iv,QFS+n);
+    eos.RYP2T(qr(iv,QRHO), Y, qr(iv, QPRES), T);
+    std::cout << " New Tr=" << T << "\n";
+  }
+}
+
 /**
  * \brief Interpolate primitive variables to cell faces.
  * 
@@ -184,7 +277,7 @@ wenoz5 (amrex::Real s[5], amrex::Real& sm, amrex::Real& sp) noexcept
  * @param q    cell averaged primitive variable.
  * @param ql   left state at a face.
  * @param qr   right state at a face.
- * @param recon_scheme reconstruction scheme, 1:piecewise constant, 2:MUSCL, 3:WENO-JS5, 4:WENO-Z5.
+ * @param recon_scheme reconstruction scheme.
  * @param plt_theta a paramter in MUSCL limiter, between 1.0 and 2.0.
  */
 AMREX_GPU_DEVICE AMREX_FORCE_INLINE void
@@ -214,6 +307,15 @@ cns_recon (int i, int j, int k, int n, int dir,
     muscl(s, qr(iv,n), ql(iv+iv_dir,n), plm_theta);
 
   } else if (recon_scheme == 3) {
+    // MUSCL    
+    Real s[3];
+    s[0] = q(iv-iv_dir,n);
+    s[1] = q(iv,n);
+    s[2] = q(iv+iv_dir,n);
+
+    wenoz3(s, qr(iv,n), ql(iv+iv_dir,n));
+
+  } else if (recon_scheme == 4) {
     // WENO-JS5
     Real s[5];    
     s[0] = q(iv-2*iv_dir,n);
