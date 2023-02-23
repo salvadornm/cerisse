@@ -1,0 +1,5 @@
+/home/monal/code/cfd/amrsolver/lib/temp_play/CMakeFiles/heart.dir
+/home/monal/code/cfd/amrsolver/lib/temp_play/CMakeFiles/ALL_CGAL_TARGETS.dir
+/home/monal/code/cfd/amrsolver/lib/temp_play/CMakeFiles/cgal_check_build_system.dir
+/home/monal/code/cfd/amrsolver/lib/temp_play/CMakeFiles/edit_cache.dir
+/home/monal/code/cfd/amrsolver/lib/temp_play/CMakeFiles/rebuild_cache.dir
