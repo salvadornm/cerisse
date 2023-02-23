@@ -36,7 +36,7 @@ EB_CNS/Exec/Sod/tmp_build_dir
 
 /wrk
 /lib/cgal/build
-/lib/cgal/install/*
+/lib/install
 
 /lib/boost/install
 /lib/boost/doc
