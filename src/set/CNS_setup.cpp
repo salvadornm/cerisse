@@ -1,14 +1,14 @@
-
 #include <CNS.H>
-// #include <CNS_derive.H>
+#include <CNS_index_macros.H>
+#include "CNS_derive.H"
 
 using namespace amrex;
 
 int CNS::num_state_data_types = 0;
 Parm* CNS::parm = nullptr;
-// Parm* CNS::d_parm = nullptr;
+Parm* CNS::d_parm = nullptr;
 ProbParm* CNS::prob_parm = nullptr;
-// ProbParm* CNS::d_prob_parm = nullptr;
+ProbParm* CNS::d_prob_parm = nullptr;
 
 static Box the_same_box (const Box& b) { return b; }
 //static Box grow_box_by_one (const Box& b) { return amrex::grow(b,1); }
@@ -126,8 +126,8 @@ CNS::variableSetUp ()
 #if (AMREX_SPACEDIM == 3)
     cnt++; set_z_vel_bc(bc,phys_bc);  bcs[cnt] = bc; name[cnt] = "zmom";
 #endif
-    cnt++; set_scalar_bc(bc,phys_bc); bcs[cnt] = bc; name[cnt] = "rho_E";
-    cnt++; set_scalar_bc(bc,phys_bc); bcs[cnt] = bc; name[cnt] = "rho_e";
+    cnt++; set_scalar_bc(bc,phys_bc); bcs[cnt] = bc; name[cnt] = "rho_eint";
+    cnt++; set_scalar_bc(bc,phys_bc); bcs[cnt] = bc; name[cnt] = "rho_et";
     cnt++; set_scalar_bc(bc,phys_bc); bcs[cnt] = bc; name[cnt] = "Temp";
 
     StateDescriptor::BndryFunc bndryfunc(cns_bcfill);
@@ -147,37 +147,30 @@ CNS::variableSetUp ()
 
     StateDescriptor::setBndryFuncThreadSafety(true);
 
-//     // DEFINE DERIVED QUANTITIES
+    // DEFINE DERIVED QUANTITIES
+    // Pressure
+    derive_lst.add("pressure",IndexType::TheCellType(),1,
+                   cns_derpres,the_same_box);
+    derive_lst.addComponent("pressure",desc_lst,State_Type,Density,4);
 
-//     // Pressure
-//     derive_lst.add("pressure",IndexType::TheCellType(),1,
-//                    cns_derpres,the_same_box);
-//     derive_lst.addComponent("pressure",desc_lst,State_Type,UEINT,1);
+    // Velocities
+    derive_lst.add("x_velocity", amrex::IndexType::TheCellType(), 1, pc_dervelx, the_same_box);
+    derive_lst.addComponent("x_velocity",desc_lst,State_Type,Density,4);
 
-//     // Velocities
-//     derive_lst.add("x_velocity",IndexType::TheCellType(),1,
-//                    cns_dervel,the_same_box);
-//     derive_lst.addComponent("x_velocity",desc_lst,State_Type,URHO,1);
-//     derive_lst.addComponent("x_velocity",desc_lst,State_Type,UMX,1);
+    derive_lst.add("y_velocity", amrex::IndexType::TheCellType(), 1, pc_dervelx, the_same_box);
+    derive_lst.addComponent("y_velocity",desc_lst,State_Type,Density,4);
 
-//     derive_lst.add("y_velocity",IndexType::TheCellType(),1,
-//                    cns_dervel,the_same_box);
-//     derive_lst.addComponent("y_velocity",desc_lst,State_Type,URHO,1);
-//     derive_lst.addComponent("y_velocity",desc_lst,State_Type,UMY,1);
-
-// #if (AMREX_SPACEDIM == 3)
-//     derive_lst.add("z_velocity",IndexType::TheCellType(),1,
-//                    cns_dervel,the_same_box);
-//     derive_lst.addComponent("z_velocity",desc_lst,State_Type,URHO,1);
-//     derive_lst.addComponent("z_velocity",desc_lst,State_Type,UMZ,1);
-// #endif
+#if (AMREX_SPACEDIM == 3)
+    derive_lst.add("z_velocity", amrex::IndexType::TheCellType(), 1, pc_dervelx, the_same_box);
+    derive_lst.addComponent("z_velocity",desc_lst,State_Type,Density,4);
+#endif
 }
 
 void
 CNS::variableCleanUp ()
 {
-    delete parm;
-    delete prob_parm;
+    // delete parm;
+    // delete prob_parm;
     // The_Arena()->free(parm);
     // The_Arena()->free(prob_parm);
     desc_lst.clear();

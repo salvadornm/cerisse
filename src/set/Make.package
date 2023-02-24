@@ -7,3 +7,6 @@ CEXE_sources += CNS_parm.cpp
 CEXE_sources += CNS_bcfill.cpp
 
 CEXE_headers += CNS_index_macros.H
+
+CEXE_headers += CNS_derive.H
+CEXE_sources += CNS_derive.cpp

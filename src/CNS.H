@@ -136,9 +136,9 @@ public:
     static amrex::Real gravity;
 
     static Parm* parm;
-    // static Parm* d_parm;
+    static Parm* d_parm;
     static ProbParm* prob_parm;
-    // static ProbParm* d_prob_parm;
+    static ProbParm* d_prob_parm;
 };
 
 void cns_bcfill (amrex::Box const& bx, amrex::FArrayBox& data,
