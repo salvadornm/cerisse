@@ -40,3 +40,6 @@ EB_CNS/Exec/Sod/tmp_build_dir
 
 /lib/boost/install
 /lib/boost/doc
+/lib/boost/bin.v2
+/lib/boost/project-config.jam
+/lib/boost/tools
