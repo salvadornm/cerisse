@@ -118,6 +118,8 @@ CNS::variableSetUp ()
 
     Vector<BCRec>       bcs(NUM_STATE);
     Vector<std::string> name(NUM_STATE);
+
+    // Physical boundary conditions ////////////////////////////////////////////
     BCRec bc;
     int cnt = 0;
     set_scalar_bc(bc,phys_bc); bcs[cnt] = bc; name[cnt] = "density";
@@ -146,8 +148,9 @@ CNS::variableSetUp ()
     num_state_data_types = desc_lst.size();
 
     StateDescriptor::setBndryFuncThreadSafety(true);
+    ////////////////////////////////////////////////////////////////////////////
 
-    // DEFINE DERIVED QUANTITIES
+    // Define derived quantities ///////////////////////////////////////////////
     // Pressure
     derive_lst.add("pressure",IndexType::TheCellType(),1,
                    derpres,the_same_box);
@@ -164,6 +167,8 @@ CNS::variableSetUp ()
     derive_lst.add("z_velocity", amrex::IndexType::TheCellType(), 1, dervelz, the_same_box);
     derive_lst.addComponent("z_velocity",desc_lst,State_Type,Density,4);
 #endif
+
+    ////////////////////////////////////////////////////////////////////////////
 }
 
 void

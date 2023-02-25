@@ -89,6 +89,7 @@ public:
     virtual void post_regrid (int lbase, int new_finest) override;
 
     // Error estimation for regridding.
+    // virtual void errorEst (int lev, TagBoxArray& tags, Real time, int ngrow);
     virtual void errorEst (amrex::TagBoxArray& tb,
                            int                 clearval,
                            int                 tagval,
