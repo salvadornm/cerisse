@@ -29,10 +29,9 @@ IB::IB (const Vector<BoxArray>& bxs,
 
         max_lev = max_level;
         // create IBMultiFabs at each level and store pointers to it
-        mfa->resize(max_level);
-        for (int lev=0; lev<=max_level; lev++) {
-          IBMultiFab temp(bxs[lev],dm[lev],nvar,nghost);
-          mfa->at(lev) = &temp;
+        mfa->resize(max_level+1);
+        for (int lev=0; lev<max_level+1; lev++) {
+          mfa->at(lev) = new IBMultiFab(bxs[lev],dm[lev],nvar,nghost);
         }
 
 
@@ -43,7 +42,7 @@ IB::IB (const Vector<BoxArray>& bxs,
 IB::~IB () { 
   // https://stackoverflow.com/questions/6353149/does-vectorerase-on-a-vector-of-object-pointers-destroy-the-object-itself 
   // For a vector of pointers, we must delete each pointer to object individually.
- for (int lev=0; lev<=max_lev; lev++) {
+ for (int lev=0; lev<=mfa->size(); lev++) {
           delete[] mfa->at(lev);
         }
 }
