@@ -1,71 +1,92 @@
 #include <IBM.H>
 
-
 using namespace amrex;
 using namespace IBM;
 
-// constructor
 IBFab::IBFab (const Box& b, int ncomp, bool alloc, bool shared, Arena* ar)    
-              : BaseFab<bool>(b,ncomp,alloc,shared,ar) {
-              }
-
-// move constructor
+              : BaseFab<bool>(b,ncomp,alloc,shared,ar) {}
 IBFab::IBFab (const IBFab& rhs, MakeType make_type, int scomp, int ncomp) 
-              : BaseFab<bool>(rhs,make_type,scomp,ncomp) {
-              }
-
-// no copy constructor
-
-// destructor
-IBFab::~IBFab () {
-  delete[] gpArray;
-}
+              : BaseFab<bool>(rhs,make_type,scomp,ncomp) {}
+IBFab::~IBFab () { delete[] gpArray; }
 
 void IBFab::allocateGPs(int numGPs) {
+  delete[] gpArray;
   gpArray = new gp[numGPs]; 
   ngps = numGPs;
 }
 
-
-// constructor
 IBMultiFab::IBMultiFab ( const BoxArray& bxs, const DistributionMapping& dm, 
-                        int nvar, int ngrow, const MFInfo& info, 
+                        const int nvar, const int ngrow, const MFInfo& info, 
                         const FabFactory<IBFab>& factory )  :
                         FabArray<IBFab>(bxs,dm,nvar,ngrow,info,factory) {}
-
-// destructor
 IBMultiFab::~IBMultiFab () {}
 
 
-  // void IBMinit() {
-  //   // Create geometry   (TODO: or read geometry)
-  //   sphere::Surface_mesh* sm;
-  //   sm=sphere::create();
+// constructor without geometry init
+IB::IB (const Vector<BoxArray>& bxs, 
+        const Vector<DistributionMapping>& dm, 
+        const int nvar, const int nghost, const int max_level) {
 
-  //   const BoxArray& bxs = amrex::AmrLevel::get_new_data(CNS::State_Type).boxArray();
-  //   // const DistributionMapping& dm = get_new_data(CNS::State_Type).DistributionMap();
-
-  //   // IBMultiFab ibmf(amrex::AmrLevel::get_new_data(CNS::State_Type).boxArray(),
-  //   //                 amrex::AmrLevel::get_new_data(State_Type).DistributionMap(),CNS::NUM_STATE,0);
-
-  //   exit(-1);
-
-
-  //   // IBMultifab define
-  //   // int ncomp = 3;
-  //   // int ngrow = 0;
-  //   // MultiFab mf(ba, dm, ncomp, ngrow);
-
-  //   // Compute_solidmarkers 
-  //   test_point_in_body();
-
-  // };
+        max_lev = max_level;
+        // create IBMultiFabs at each level and store pointers to it
+        mfa->resize(max_level);
+        for (int lev=0; lev<=max_level; lev++) {
+          IBMultiFab temp(bxs[lev],dm[lev],nvar,nghost);
+          mfa->at(lev) = &temp;
+        }
 
 
+    // Compute_solidmarkers 
 
+  }
 
+IB::~IB () { 
+  // https://stackoverflow.com/questions/6353149/does-vectorerase-on-a-vector-of-object-pointers-destroy-the-object-itself 
+  // For a vector of pointers, we must delete each pointer to object individually.
+ for (int lev=0; lev<=max_lev; lev++) {
+          delete[] mfa->at(lev);
+        }
+}
 
+///////////////////////////////CHECK IBMULTIFABS///////////////////
+// int temp=0 ;
+// for (MFIter mfi(*mfa[0],false); mfi.isValid(); ++mfi) // without tiling
+// {
+//     IBM::IBFab &fab = (*mfa[0])[mfi];
+//     const int *lo = fab.loVect();
+//     const int* hi = fab.hiVect();
 
+//     amrex::Print() << "Level " << max_level << std::endl;
+//     amrex::Print() << lo[0] << " " << lo[1] << " " << lo[2] << std::endl;
+//     amrex::Print() << hi[0] << " " << hi[1] << " " << hi[2] << std::endl;
+
+    
+//     amrex::Print() << "fab allocated " << fab.isAllocated() << std::endl;
+//     fab.allocateGPs(temp);
+//     amrex::Print() << "fab ngps = " << fab.ngps << std::endl;
+
+//     amrex::Print() << "------------------- " << std::endl;
+//     temp += 1;
+// }
+
+///////////////////////////////////////////NORMAL MultiFab//////////////////////
+  // MultiFab data( get_new_data(State_Type).boxArray(), get_new_data(State_Type).DistributionMap(), NUM_STATE, 1, MFInfo(), Factory());
+
+  // const amrex::Real cur_time = state[State_Type].curTime();
+  // FillPatch(*this, data, data.nGrow(), cur_time, State_Type, Density, NUM_STATE, 0);
+
+  //   for (MFIter mfi(data,TilingIfNotGPU()); mfi.isValid(); ++mfi)
+  //   {
+  //       FArrayBox& fab = data[mfi];
+  //       const int *lo = fab.loVect();
+  //       const int* hi = fab.hiVect();
+
+  //       amrex::Print() << "Level " << level << std::endl;
+  //       amrex::Print() << lo[0] << " " << lo[1] << " " << lo[2] << std::endl;
+  //       amrex::Print() << hi[0] << " " << hi[1] << " " << hi[2] << std::endl;
+        
+  //   }
+////////////////////////////////////////////////////////////////////////////////
 
 
 
@@ -84,11 +105,6 @@ IBMultiFab::~IBMultiFab () {}
 
   //   exit(0);
 
-
-  //   // IBMultifab define
-  //   // int ncomp = 4;
-  //   // int ngrow = 1;
-  //   // MultiFab mf(ba, dm, ncomp, ngrow);
 
   //   // Compute_solidmarkers 
   //   test_point_in_body();
