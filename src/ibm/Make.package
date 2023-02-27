@@ -1,4 +1,4 @@
-CEXE_headers += geometry.H
+CEXE_headers += IBgeom.H
 CEXE_headers += cgal_test.H
 
 CEXE_headers += IBM.H

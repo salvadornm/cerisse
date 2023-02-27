@@ -147,67 +147,7 @@ void CNS::post_init (Real) {
     // if (verbose >= 2) {
         printTotal();
     // }
-
-
-    /////////// IBM Init ///////////////////////
-    amrex::Print() << "CNS::post_init" << std::endl;
-
-    // // Create geometry   (TODO: or read geometry)
-    // sphere::Surface_mesh* sm;
-    // sm=sphere::create();
-
-    IBM::IBMultiFab ibmf(get_new_data(State_Type).boxArray(), get_new_data(State_Type).DistributionMap(),2,0);
-
-    int temp=0 ;
-    for (MFIter mfi(ibmf,false); mfi.isValid(); ++mfi) // without tiling
-    {
-        IBM::IBFab &fab = ibmf[mfi];
-        const int *lo = fab.loVect();
-        const int* hi = fab.hiVect();
-
-        amrex::Print() << "Level " << level << std::endl;
-        amrex::Print() << lo[0] << " " << lo[1] << " " << lo[2] << std::endl;
-        amrex::Print() << hi[0] << " " << hi[1] << " " << hi[2] << std::endl;
-
-        
-        amrex::Print() << "fab allocated " << fab.isAllocated() << std::endl;
-        fab.allocateGPs(temp);
-        amrex::Print() << "fab ngps = " << fab.ngps << std::endl;
-
-        amrex::Print() << "------------------- " << std::endl;
-        temp += 1;
-    }
-
-
-///////////////////////////////////////////NORMAL MultiFab//////////////////////
-  // MultiFab data( get_new_data(State_Type).boxArray(), get_new_data(State_Type).DistributionMap(), NUM_STATE, 1, MFInfo(), Factory());
-
-  // const amrex::Real cur_time = state[State_Type].curTime();
-  // FillPatch(*this, data, data.nGrow(), cur_time, State_Type, Density, NUM_STATE, 0);
-
-  //   for (MFIter mfi(data,TilingIfNotGPU()); mfi.isValid(); ++mfi)
-  //   {
-  //       FArrayBox& fab = data[mfi];
-  //       const int *lo = fab.loVect();
-  //       const int* hi = fab.hiVect();
-
-  //       amrex::Print() << "Level " << level << std::endl;
-  //       amrex::Print() << lo[0] << " " << lo[1] << " " << lo[2] << std::endl;
-  //       amrex::Print() << hi[0] << " " << hi[1] << " " << hi[2] << std::endl;
-        
-  //   }
-////////////////////////////////////////////////////////////////////////////////
-
-
-
-
-    // Compute_solidmarkers 
-    // test_point_in_body();
-
-    exit(0);
-
 }
-
 // -----------------------------------------------------------------------------
 
 
