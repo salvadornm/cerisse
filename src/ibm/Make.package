@@ -1,1 +1,5 @@
-CEXE_sources += ibm.cpp
+CEXE_headers += geometry.H
+CEXE_headers += cgal_test.H
+
+CEXE_headers += IBM.H
+CEXE_sources += IBM.cpp
