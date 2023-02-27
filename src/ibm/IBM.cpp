@@ -12,8 +12,7 @@ IBFab::~IBFab () { delete[] gpArray; }
 void IBFab::allocateGPs(int numGPs) {
   delete[] gpArray;
   gpArray = new gp[numGPs]; 
-  ngps = numGPs;
-}
+  ngps = numGPs; }
 
 IBMultiFab::IBMultiFab ( const BoxArray& bxs, const DistributionMapping& dm, 
                         const int nvar, const int ngrow, const MFInfo& info, 
@@ -21,30 +20,48 @@ IBMultiFab::IBMultiFab ( const BoxArray& bxs, const DistributionMapping& dm,
                         FabArray<IBFab>(bxs,dm,nvar,ngrow,info,factory) {}
 IBMultiFab::~IBMultiFab () {}
 
-
 // constructor without geometry init
 IB::IB (const Vector<BoxArray>& bxs, 
         const Vector<DistributionMapping>& dm, 
         const int nvar, const int nghost, const int max_level) {
-
         max_lev = max_level;
         // create IBMultiFabs at each level and store pointers to it
         mfa->resize(max_level+1);
         for (int lev=0; lev<max_level+1; lev++) {
           mfa->at(lev) = new IBMultiFab(bxs[lev],dm[lev],nvar,nghost);
-        }
-
-
-    // Compute_solidmarkers 
-
-  }
+        } }
 
 IB::~IB () { 
-  // https://stackoverflow.com/questions/6353149/does-vectorerase-on-a-vector-of-object-pointers-destroy-the-object-itself 
-  // For a vector of pointers, we must delete each pointer to object individually.
+  // For a vector of pointers, we must delete each pointer to object individually. https://shorturl.at/dHPXZ 
  for (int lev=0; lev<=mfa->size(); lev++) {
           delete[] mfa->at(lev);
         }
+}
+
+void IB::compute_markers () {
+
+  // for (int lev=0; lev<mfa->size(); lev++) {
+  //   IBMultiFab *mfab = mfa->at(lev);
+  //   int temp=0;
+  //   for (MFIter mfi(*mfab,false); mfi.isValid(); ++mfi) {
+  //       IBM::IBFab &fab = (*mfab)[mfi];
+  //       const int *lo = fab.loVect();
+  //       const int *hi = fab.hiVect();
+
+  //       amrex::Print() << "Level " << lev << std::endl;
+  //       amrex::Print() << lo[0] << " " << lo[1] << " " << lo[2] << std::endl;
+  //       amrex::Print() << hi[0] << " " << hi[1] << " " << hi[2] << std::endl;
+        
+  //       amrex::Print() << "fab allocated " << fab.isAllocated() << std::endl;
+  //       fab.allocateGPs(temp);
+  //       amrex::Print() << "fab ngps = " << fab.ngps << std::endl;
+
+  //       amrex::Print() << "------------------- " << std::endl;
+  //       temp += 1;
+  //   }
+  // }
+  // exit(0);
+
 }
 
 ///////////////////////////////CHECK IBMULTIFABS///////////////////

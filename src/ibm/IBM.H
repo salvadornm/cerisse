@@ -77,9 +77,13 @@ namespace IBM {
       explicit IB ( const Vector<BoxArray>& bxs, 
                     const Vector<DistributionMapping>& dm, 
                     const int nvar, const int nghost, const int max_level);
-      // explicit IB (const Amr amr_data, const int nvar, const int nghost,
-      //   const int max_level);
       ~IB ();
+
+      // methods
+      void compute_markers ();
+
+      //compute
+
   };
 
 }

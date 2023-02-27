@@ -46,7 +46,10 @@ int main (int argc, char* argv[]) {
         double timer_init = amrex::second();
         Amr amr(getLevelBld());
         amr.init(strt_time,stop_time);
+
         IBM::IB ib(amr.boxArray(),amr.DistributionMap(),2,2,max_level);
+        ib.compute_markers();
+
         timer_init = amrex::second() - timer_init;
         exit(0);
     // -------------------------------------------------------------------------
