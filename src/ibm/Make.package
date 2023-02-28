@@ -1,5 +1,2 @@
-CEXE_headers += IBgeom.H
-CEXE_headers += cgal_test.H
-
 CEXE_headers += IBM.H
 CEXE_sources += IBM.cpp

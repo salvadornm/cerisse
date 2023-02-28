@@ -28,7 +28,7 @@ int main (int argc, char* argv[]) {
     Real stop_time = Real(-1.0);
     {
         ParmParse pp;
-        pp.query("max_level",max_level);
+        pp.query("amr.max_level",max_level);
         pp.query("max_step",max_step);
         pp.query("strt_time",strt_time);
         pp.query("time_step",CNS::dt_glob);
@@ -47,9 +47,14 @@ int main (int argc, char* argv[]) {
         Amr amr(getLevelBld());
         amr.init(strt_time,stop_time);
 
-        IBM::IB ib(amr.boxArray(),amr.DistributionMap(),2,2,max_level);
+        Vector<GpuArray<Real,AMREX_SPACEDIM>> cellSize;
+        cellSize.resize(max_level+1);
+        for (int i=0;i<=max_level;i++) {
+          cellSize[i] = amr.getLevel(i).Geom().CellSizeArray();
+        }
+        IBM::IB ib(&amr,2,2,max_level,cellSize);
+        ib.read_geom("sphere.off");
         ib.compute_markers();
-
         timer_init = amrex::second() - timer_init;
         exit(0);
     // -------------------------------------------------------------------------

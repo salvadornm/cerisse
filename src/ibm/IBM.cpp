@@ -1,4 +1,5 @@
 #include <IBM.H>
+#include <CGAL/Side_of_triangle_mesh.h>
 
 using namespace amrex;
 using namespace IBM;
@@ -21,14 +22,24 @@ IBMultiFab::IBMultiFab ( const BoxArray& bxs, const DistributionMapping& dm,
 IBMultiFab::~IBMultiFab () {}
 
 // constructor without geometry init
-IB::IB (const Vector<BoxArray>& bxs, 
-        const Vector<DistributionMapping>& dm, 
-        const int nvar, const int nghost, const int max_level) {
+// IB::IB (const Vector<BoxArray>& bxs, 
+//         const Vector<DistributionMapping>& dm, 
+//         const int nvar, const int nghost, const int max_level) {
+IB::IB (Amr* pointer_amr, const int nvar, const int nghost, const int max_level, const Vector<GpuArray<Real,AMREX_SPACEDIM>> dx) {
+        
+        // store pointer to main Amr class object's instance
+        IB::pamr = pointer_amr ;
+
+        // Since AmrInfo class is protected! I believe this prevents access to its members here, like max_level,etc. So store basic AmrInfo for later easy access.
         max_lev = max_level;
+        ref_ratio = pamr->refRatio();
+        cellSizes.resize(max_level+1);
+        cellSizes = dx;
+
         // create IBMultiFabs at each level and store pointers to it
         mfa->resize(max_level+1);
-        for (int lev=0; lev<max_level+1; lev++) {
-          mfa->at(lev) = new IBMultiFab(bxs[lev],dm[lev],nvar,nghost);
+        for (int lev=0; lev<=max_level; lev++) {
+          mfa->at(lev) = new IBMultiFab(pamr->boxArray(lev),pamr->DistributionMap(lev),nvar,nghost);
         } }
 
 IB::~IB () { 
@@ -40,29 +51,96 @@ IB::~IB () {
 
 void IB::compute_markers () {
 
-  // for (int lev=0; lev<mfa->size(); lev++) {
-  //   IBMultiFab *mfab = mfa->at(lev);
-  //   int temp=0;
-  //   for (MFIter mfi(*mfab,false); mfi.isValid(); ++mfi) {
-  //       IBM::IBFab &fab = (*mfab)[mfi];
-  //       const int *lo = fab.loVect();
-  //       const int *hi = fab.hiVect();
-
-  //       amrex::Print() << "Level " << lev << std::endl;
-  //       amrex::Print() << lo[0] << " " << lo[1] << " " << lo[2] << std::endl;
-  //       amrex::Print() << hi[0] << " " << hi[1] << " " << hi[2] << std::endl;
-        
-  //       amrex::Print() << "fab allocated " << fab.isAllocated() << std::endl;
-  //       fab.allocateGPs(temp);
-  //       amrex::Print() << "fab ngps = " << fab.ngps << std::endl;
-
-  //       amrex::Print() << "------------------- " << std::endl;
-  //       temp += 1;
-  //   }
+  // int nb_inside = 0;
+  // int nb_boundary = 0;
+  // CGAL::Side_of_triangle_mesh<Polyhedron, K> inside(IB::geom);
+  // // std::vector<Point> points;
+  // for (std::size_t i = 0; i < nb_points; ++i)
+  // {
+  //   CGAL::Bounded_side res = inside(points[i]);
+  //   if (res == CGAL::ON_BOUNDED_SIDE) { ++nb_inside; }
+  //   if (res == CGAL::ON_BOUNDARY) { ++nb_boundary; }
   // }
-  // exit(0);
 
+  // std::cerr << "Total query size: " << points.size() << std::endl;
+  // std::cerr << "  " << nb_inside << " points inside " << std::endl;
+  // std::cerr << "  " << nb_boundary << " points on boundary " << std::endl;
+  // std::cerr << "  " << points.size() - nb_inside - nb_boundary << " points outside " << std::endl;
+
+        // pamr.max_grid_size()
+
+  for (int lev=0; lev<mfa->size(); lev++) {
+    IBMultiFab *mfab = mfa->at(lev);
+    for (MFIter mfi(*mfab,false); mfi.isValid(); ++mfi) {
+        // IBM::IBFab &fab = (*mfab).[mfi];
+        IBM::IBFab &fab = mfab->get(mfi);
+        const int *lo = fab.loVect();
+        const int *hi = fab.hiVect();
+        amrex::Print() << "Current level/Max level = " << lev  << "/" << mfa->size()-1 << std::endl;
+        amrex::Print() << lo[0] << " " << lo[1] << " " << lo[2] << std::endl;
+        amrex::Print() << hi[0] << " " << hi[1] << " " << hi[2] << std::endl;
+
+
+        fab.setVal(false); // initialise
+        const Box& bx = mfi.fabbox(); // box with ghost points
+        auto const bool_array = fab.array(); // boolean array
+
+        // amrex::ParallelFor(bx,
+        // [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept
+        // {
+        //   amrex::Print() << i << " "<< j << " " << k << " " << std::endl;
+        //   amrex::Print() << bool_array(i,j,k,1) << " " << std::endl;
+        //   fab.
+        // });
+        
+        // const Box& bx = mfi.validbox(); // box without ghost points
+        // auto const& sfab = (*mfab).array(mfi);
+          // bool_array.begin
+          // bool_array.ncomp 
+
+
+        amrex::Print() << "fab ngps = " << fab.ngps << std::endl;
+        amrex::Print() << "------------------- " << std::endl;
+    }
+  }
 }
+
+
+void IB::read_geom(const std::string filename) {
+  namespace PMP = CGAL::Polygon_mesh_processing;
+
+  if(!PMP::IO::read_polygon_mesh(filename, IB::geom) || CGAL::is_empty(IB::geom) || !CGAL::is_triangle_mesh(IB::geom))
+  {
+    std::cerr << "Invalid input." << std::endl;
+    exit(1);
+  }
+    amrex::Print() << "----------------------------------" << std::endl;
+    amrex::Print() << "Geometry " << filename << " read"<< std::endl;
+    amrex::Print() << "----------------------------------" << std::endl;
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 ///////////////////////////////CHECK IBMULTIFABS///////////////////
 // int temp=0 ;
@@ -103,67 +181,6 @@ void IB::compute_markers () {
         
   //   }
 ////////////////////////////////////////////////////////////////////////////////
-
-
-
-
- // 1. Read/Create and save geometry
-  // void IBMinit() {
-  //   // Create geometry   (TODO: or read geometry)
-  //   sphere::Surface_mesh* sm;
-  //   sm=sphere::create();
-
-  //   const BoxArray& bxs = amrex::AmrLevel::get_new_data(CNS::State_Type).boxArray();
-  //   // const DistributionMapping& dm = get_new_data(CNS::State_Type).DistributionMap();
-
-  //   // IBMultiFab ibmf(amrex::AmrLevel::get_new_data(CNS::State_Type).boxArray(),
-  //   //                 amrex::AmrLevel::get_new_data(State_Type).DistributionMap(),CNS::NUM_STATE,1);
-
-  //   exit(0);
-
-
-  //   // Compute_solidmarkers 
-  //   test_point_in_body();
-
-  // };
-
-
-
-//   !initialise solid per lev
-//   do lev=1,max_levs
-//     ! create logical fabs sld(1) and ghs(2)
-//     call lmultifab_build(solido(lev)%lfab,mla%la(lev),2,nhalo)
-//     ! number of fabs
-//     nf = nfabs(solido(lev)%lfab)
-//     ! ghost points
-//     ng_p = solido(lev)%lfab%ng
-
-//     if (nf >= 1) then
-//       ! allocate ibms per fab
-//       allocate(solido(lev)%ibm(nf))
-
-//       do ii = 1,nf
-//         ! assign and initialise auxiliar real and logical pointers  
-//         log_p            => dataptr(solido(lev)%lfab,ii)
-//         log_p (:,:,:,:)  = .false.
-
-//         ! array limits  
-//         lo = lwb(get_box(solido(lev)%lfab,ii))
-//         hi = upb(get_box(solido(lev)%lfab,ii))
-//         call amr_nxnynz(lo,hi,ng_p)
-        
-//         ! loop over bodies in solid and update markers
-
-// #if gts   
-//       do nb = 1, max_bodies_lev
-//           call compute_solidmarkergts(nb,log_p(:,:,:,1),dx(lev))
-//       end do
-// #else
-//           call compute_solidmarker(log_p(:,:,:,1),dx(lev),ii,lev)
-// #endif
-//       end do
-//     endif
-//   enddo
 
 
 // 2. compute and save solid and ghost point field

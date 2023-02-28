@@ -1,9 +1,13 @@
 #ifndef IBM_H_
 #define IBM_H_
 
+#include <AMReX_Amr.H>
 #include <AMReX_FabArray.H>
-#include <IBgeom.H>
-#include <cgal_test.H>
+#include <AMReX_IntVect.H>
+
+#include <CGAL/Exact_predicates_inexact_constructions_kernel.h>
+#include <CGAL/Polyhedron_3.h>
+#include <CGAL/Polygon_mesh_processing/IO/polygon_mesh_io.h>
 
 using namespace amrex;
 
@@ -68,21 +72,41 @@ namespace IBM {
   class IB {
     public:
       // attributes //
-      int max_lev=0;
+
+      int max_lev=0; // need to save this as Amr protects this
+
+      // pointer to Amr class instance
+      Amr*pamr;
+
+      // vector of refinement ratio per level in each direction
+      Vector<IntVect> ref_ratio;
+
+      //vector of cell sizes per level in each direction
+      Vector<GpuArray<Real,AMREX_SPACEDIM>> cellSizes;
+
       // IBMultiFab array
       Vector<IBMultiFab*> mfa[2]; 
+
       // geometry class
+      typedef CGAL::Exact_predicates_inexact_constructions_kernel    K;
+      typedef K::Point_3                                             Point;
+      typedef CGAL::Polyhedron_3<K>                                  Polyhedron;
+
+      Polyhedron geom;
 
       // constructors and destructors //
-      explicit IB ( const Vector<BoxArray>& bxs, 
-                    const Vector<DistributionMapping>& dm, 
-                    const int nvar, const int nghost, const int max_level);
+      // explicit IB ( const Vector<BoxArray>& bxs, 
+      //               const Vector<DistributionMapping>& dm, 
+      //               const int nvar, const int nghost, const int max_level);
+      explicit IB (Amr* pointer_amr, const int nvar, const int nghost, const int max_level, const Vector<GpuArray<Real,AMREX_SPACEDIM>> dx);
       ~IB ();
 
-      // methods
+      // methods //
+      // compute IB field markers
       void compute_markers ();
 
-      //compute
+      // read geometry
+      void read_geom(const std::string filename);
 
   };
 
