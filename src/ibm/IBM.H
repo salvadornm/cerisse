@@ -2,8 +2,11 @@
 #define IBM_H_
 
 #include <AMReX_Amr.H>
+#include <AMReX_AmrLevel.H>
 #include <AMReX_FabArray.H>
 #include <AMReX_IntVect.H>
+#include <AMReX_Derive.H>
+#include <AMReX_StateDescriptor.H>
 
 #include <CGAL/Exact_predicates_inexact_constructions_kernel.h>
 #include <CGAL/Polyhedron_3.h>

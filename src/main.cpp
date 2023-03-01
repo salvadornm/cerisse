@@ -56,7 +56,6 @@ int main (int argc, char* argv[]) {
         ib.read_geom("sphere.off");
         ib.compute_markers();
         timer_init = amrex::second() - timer_init;
-        exit(0);
     // -------------------------------------------------------------------------
 
 

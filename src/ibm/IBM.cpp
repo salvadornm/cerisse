@@ -22,9 +22,6 @@ IBMultiFab::IBMultiFab ( const BoxArray& bxs, const DistributionMapping& dm,
 IBMultiFab::~IBMultiFab () {}
 
 // constructor without geometry init
-// IB::IB (const Vector<BoxArray>& bxs, 
-//         const Vector<DistributionMapping>& dm, 
-//         const int nvar, const int nghost, const int max_level) {
 IB::IB (Amr* pointer_amr, const int nvar, const int nghost, const int max_level, const Vector<GpuArray<Real,AMREX_SPACEDIM>> dx) {
         
         // store pointer to main Amr class object's instance
@@ -43,14 +40,28 @@ IB::IB (Amr* pointer_amr, const int nvar, const int nghost, const int max_level,
         } }
 
 IB::~IB () { 
+  // (01/03/2023) The lines below cause segmentation fault once the time loop is complete and before finalisation! They are not terribly important as IB is only destroyed when the simulation finishes.
   // For a vector of pointers, we must delete each pointer to object individually. https://shorturl.at/dHPXZ 
- for (int lev=0; lev<=mfa->size(); lev++) {
-          delete[] mfa->at(lev);
-        }
+//  for (int lev=0; lev<=mfa->size(); lev++) {
+//           delete[] mfa->at(lev);
+//         }
 }
 
 void IB::compute_markers () {
 
+    AmrLevel *lev = &(pamr->getLevel(0));
+
+    // // accessing derived variable list
+    // DeriveList *derive = &(lev->get_derive_lst());
+    // std::list<DeriveRec> list = derive->dlist();
+    // amrex::Print() << list.front().name() << std::endl;
+ 
+    // // accessing descriptor list
+    // DescriptorList const *desList= &lev->get_desc_lst();
+    // StateDescriptor const *state_var = &desList->operator[](0);
+    // amrex::Print() << state_var->name(0) << std::endl;
+
+    
   // int nb_inside = 0;
   // int nb_boundary = 0;
   // CGAL::Side_of_triangle_mesh<Polyhedron, K> inside(IB::geom);
@@ -95,8 +106,8 @@ void IB::compute_markers () {
         
         // const Box& bx = mfi.validbox(); // box without ghost points
         // auto const& sfab = (*mfab).array(mfi);
-          // bool_array.begin
-          // bool_array.ncomp 
+        // bool_array.begin
+        // bool_array.ncomp 
 
 
         amrex::Print() << "fab ngps = " << fab.ngps << std::endl;
@@ -190,3 +201,16 @@ void IB::read_geom(const std::string filename) {
 
 
 // 4. compute surface data
+
+
+
+
+
+
+
+
+// Confirm that all faces are triangles.
+  // for(boost::graph_traits<Surface_mesh>::face_descriptor f : faces(mesh))
+  //   if(!CGAL::is_triangle(halfedge(f, mesh), mesh))
+  //     std::cerr << "Error: non-triangular face left in mesh." << std::endl;
+  //https://doc.cgal.org/latest/Polygon_mesh_processing/index.html#title13
