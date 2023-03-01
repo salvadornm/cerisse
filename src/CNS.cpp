@@ -357,11 +357,14 @@ void CNS::printTotal () const {
 #endif
 }
 
+// Plotting
+//------------------------------------------------------------------------------
 void CNS::writePlotFile (const std::string& dir,
                          std::ostream&      os,
                          VisMF::How         how)
+// void CNS::writePlotFile ()
 {
-    exit(0);
+    amrex::Print() << "custom plot " << dir << std::endl;
     int i, n;
     //
     // The list of indices of State to write to plotfile.
