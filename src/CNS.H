@@ -118,6 +118,10 @@ public:
 
     void printTotal () const;
 
+    void writePlotFile (const std::string& dir,
+                        std::ostream&      os,
+                        VisMF::How         how = VisMF::NFiles);
+
     // Parameters
     static int num_state_data_types;
     static constexpr int NUM_GROW = 2;
@@ -147,5 +151,6 @@ void cns_bcfill (amrex::Box const& bx, amrex::FArrayBox& data,
                  amrex::Geometry const& geom, const amrex::Real time,
                  const amrex::Vector<amrex::BCRec>& bcr, const int bcomp,
                  const int scomp);
+
 
 #endif

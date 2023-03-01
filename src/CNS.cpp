@@ -357,3 +357,229 @@ void CNS::printTotal () const {
 #endif
 }
 
+void CNS::writePlotFile (const std::string& dir,
+                         std::ostream&      os,
+                         VisMF::How         how)
+{
+    exit(0);
+    int i, n;
+    //
+    // The list of indices of State to write to plotfile.
+    // first component of pair is state_type,
+    // second component of pair is component # within the state_type
+    //
+    std::vector<std::pair<int,int> > plot_var_map;
+    for (int typ = 0; typ < desc_lst.size(); typ++)
+    {
+        for (int comp = 0; comp < desc_lst[typ].nComp();comp++)
+        {
+            if (parent->isStatePlotVar(desc_lst[typ].name(comp)) &&
+                desc_lst[typ].getType() == IndexType::TheCellType())
+            {
+                plot_var_map.push_back(std::pair<int,int>(typ,comp));
+            }
+        }
+    }
+
+    int num_derive = 0;
+    std::vector<std::string> derive_names;
+    const std::list<DeriveRec>& dlist = derive_lst.dlist();
+    for (auto const& d : dlist)
+    {
+        if (parent->isDerivePlotVar(d.name()))
+        {
+            derive_names.push_back(d.name());
+            num_derive += d.numDerive();
+        }
+    }
+
+    int n_data_items = plot_var_map.size() + num_derive;
+
+#ifdef AMREX_USE_EB
+    if (EB2::TopIndexSpaceIfPresent()) {
+        n_data_items += 1;
+    }
+#endif
+
+    // get the time from the first State_Type
+    // if the State_Type is ::Interval, this will get t^{n+1/2} instead of t^n
+    Real cur_time = state[0].curTime();
+
+    if (level == 0 && ParallelDescriptor::IOProcessor())
+    {
+        //
+        // The first thing we write out is the plotfile type.
+        //
+        os << thePlotFileType() << '\n';
+
+        if (n_data_items == 0)
+            amrex::Error("Must specify at least one valid data item to plot");
+
+        os << n_data_items << '\n';
+
+        //
+        // Names of variables
+        //
+        for (i =0; i < static_cast<int>(plot_var_map.size()); i++)
+        {
+            int typ = plot_var_map[i].first;
+            int comp = plot_var_map[i].second;
+            os << desc_lst[typ].name(comp) << '\n';
+        }
+
+        // derived
+        for (auto const& dname : derive_names) {
+            const DeriveRec* rec = derive_lst.get(dname);
+            for (i = 0; i < rec->numDerive(); ++i) {
+                os << rec->variableName(i) << '\n';
+            }
+        }
+
+#ifdef AMREX_USE_EB
+        if (EB2::TopIndexSpaceIfPresent()) {
+            os << "vfrac\n";
+        }
+#endif
+
+        os << AMREX_SPACEDIM << '\n';
+        os << parent->cumTime() << '\n';
+        int f_lev = parent->finestLevel();
+        os << f_lev << '\n';
+        for (i = 0; i < AMREX_SPACEDIM; i++)
+            os << Geom().ProbLo(i) << ' ';
+        os << '\n';
+        for (i = 0; i < AMREX_SPACEDIM; i++)
+            os << Geom().ProbHi(i) << ' ';
+        os << '\n';
+        for (i = 0; i < f_lev; i++)
+            os << parent->refRatio(i)[0] << ' ';
+        os << '\n';
+        for (i = 0; i <= f_lev; i++)
+            os << parent->Geom(i).Domain() << ' ';
+        os << '\n';
+        for (i = 0; i <= f_lev; i++)
+            os << parent->levelSteps(i) << ' ';
+        os << '\n';
+        for (i = 0; i <= f_lev; i++)
+        {
+            for (int k = 0; k < AMREX_SPACEDIM; k++)
+                os << parent->Geom(i).CellSize()[k] << ' ';
+            os << '\n';
+        }
+        os << (int) Geom().Coord() << '\n';
+        os << "0\n"; // Write bndry data.
+
+    }
+    // Build the directory to hold the MultiFab at this level.
+    // The name is relative to the directory containing the Header file.
+    //
+    static const std::string BaseName = "/Cell";
+    char buf[64];
+    snprintf(buf, sizeof buf, "Level_%d", level);
+    std::string sLevel = buf;
+    //
+    // Now for the full pathname of that directory.
+    //
+    std::string FullPath = dir;
+    if ( ! FullPath.empty() && FullPath[FullPath.size()-1] != '/')
+    {
+        FullPath += '/';
+    }
+    FullPath += sLevel;
+    //
+    // Only the I/O processor makes the directory if it doesn't already exist.
+    //
+    if ( ! levelDirectoryCreated) {
+        if (ParallelDescriptor::IOProcessor()) {
+            if ( ! amrex::UtilCreateDirectory(FullPath, 0755)) {
+                amrex::CreateDirectoryFailed(FullPath);
+            }
+        }
+        // Force other processors to wait until directory is built.
+        ParallelDescriptor::Barrier();
+    }
+
+    if (ParallelDescriptor::IOProcessor())
+    {
+        os << level << ' ' << grids.size() << ' ' << cur_time << '\n';
+        os << parent->levelSteps(level) << '\n';
+
+        for (i = 0; i < grids.size(); ++i)
+        {
+            RealBox gridloc = RealBox(grids[i],geom.CellSize(),geom.ProbLo());
+            for (n = 0; n < AMREX_SPACEDIM; n++)
+                os << gridloc.lo(n) << ' ' << gridloc.hi(n) << '\n';
+        }
+        //
+        // The full relative pathname of the MultiFabs at this level.
+        // The name is relative to the Header file containing this name.
+        // It's the name that gets written into the Header.
+        //
+        if (n_data_items > 0)
+        {
+            std::string PathNameInHeader = sLevel;
+            PathNameInHeader += BaseName;
+            os << PathNameInHeader << '\n';
+        }
+
+#ifdef AMREX_USE_EB
+        if (EB2::TopIndexSpaceIfPresent()) {
+            // volfrac threshold for amrvis
+            if (level == parent->finestLevel()) {
+                for (int lev = 0; lev <= parent->finestLevel(); ++lev) {
+                    os << "1.0e-6\n";
+                }
+            }
+        }
+#endif
+    }
+    //
+    // We combine all of the multifabs -- state, derived, etc -- into one
+    // multifab -- plotMF.
+    int       cnt   = 0;
+    const int nGrow = 0;
+    MultiFab  plotMF(grids,dmap,n_data_items,nGrow,MFInfo(),Factory());
+    MultiFab* this_dat = 0;
+    //
+    // Cull data from state variables -- use no ghost cells.
+    //
+    for (i = 0; i < static_cast<int>(plot_var_map.size()); i++)
+    {
+        int typ  = plot_var_map[i].first;
+        int comp = plot_var_map[i].second;
+        this_dat = &state[typ].newData();
+        MultiFab::Copy(plotMF,*this_dat,comp,cnt,1,nGrow);
+        cnt++;
+    }
+
+    // derived
+    if (derive_names.size() > 0)
+    {
+        for (auto const& dname : derive_names)
+        {
+            derive(dname, cur_time, plotMF, cnt);
+            cnt += derive_lst.get(dname)->numDerive();
+        }
+    }
+
+#ifdef AMREX_USE_EB
+    if (EB2::TopIndexSpaceIfPresent()) {
+        plotMF.setVal(0.0, cnt, 1, nGrow);
+        auto factory = static_cast<EBFArrayBoxFactory*>(m_factory.get());
+        MultiFab::Copy(plotMF,factory->getVolFrac(),0,cnt,1,nGrow);
+    }
+#endif
+
+    //
+    // Use the Full pathname when naming the MultiFab.
+    //
+    std::string TheFullPath = FullPath;
+    TheFullPath += BaseName;
+    if (AsyncOut::UseAsyncOut()) {
+        VisMF::AsyncWrite(plotMF,TheFullPath);
+    } else {
+        VisMF::Write(plotMF,TheFullPath,how,true);
+    }
+
+    levelDirectoryCreated = false;  // ---- now that the plotfile is finished
+}
