@@ -52,9 +52,11 @@ int main (int argc, char* argv[]) {
         for (int i=0;i<=max_level;i++) {
           cellSize[i] = amr.getLevel(i).Geom().CellSizeArray();
         }
-        IBM::IB ib(&amr,2,2,max_level,cellSize);
-        ib.read_geom("sphere.off");
-        ib.compute_markers();
+
+        IBM::ib.initialise(&amr,2,2,max_level,cellSize);
+        IBM::ib.read_geom("sphere.off");
+        IBM::ib.compute_markers();
+
         timer_init = amrex::second() - timer_init;
     // -------------------------------------------------------------------------
 

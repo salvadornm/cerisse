@@ -38,6 +38,7 @@ AmrLevel* CNSBld::operator() () {
     return new CNS;
 }
 
+// This function overwrites a virtual function in LevelBld
 AmrLevel* CNSBld::operator() (Amr&            papa,
                     int             lev,
                     const Geometry& level_geom,

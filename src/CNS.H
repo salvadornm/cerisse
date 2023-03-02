@@ -121,7 +121,6 @@ public:
     void writePlotFile (const std::string& dir,
                         std::ostream&      os,
                         VisMF::How         how = VisMF::NFiles);
-    // void writePlotFile ();
 
     // Parameters
     static int num_state_data_types;

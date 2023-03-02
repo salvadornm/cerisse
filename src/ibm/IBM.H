@@ -14,6 +14,7 @@
 
 using namespace amrex;
 
+
 namespace IBM {
 
   // TODO: make it a linked list!
@@ -101,10 +102,12 @@ namespace IBM {
       // explicit IB ( const Vector<BoxArray>& bxs, 
       //               const Vector<DistributionMapping>& dm, 
       //               const int nvar, const int nghost, const int max_level);
-      explicit IB (Amr* pointer_amr, const int nvar, const int nghost, const int max_level, const Vector<GpuArray<Real,AMREX_SPACEDIM>> dx);
+      explicit IB ();
       ~IB ();
+      
 
       // methods //
+      void initialise (Amr* pointer_amr, const int nvar, const int nghost, const int max_level, const Vector<GpuArray<Real,AMREX_SPACEDIM>> dx);
       // compute IB field markers
       void compute_markers ();
 
@@ -112,6 +115,9 @@ namespace IBM {
       void read_geom(const std::string filename);
 
   };
+
+  // declare main IB class instance
+  inline IB ib;
 
 }
 #endif

@@ -21,8 +21,18 @@ IBMultiFab::IBMultiFab ( const BoxArray& bxs, const DistributionMapping& dm,
                         FabArray<IBFab>(bxs,dm,nvar,ngrow,info,factory) {}
 IBMultiFab::~IBMultiFab () {}
 
-// constructor without geometry init
-IB::IB (Amr* pointer_amr, const int nvar, const int nghost, const int max_level, const Vector<GpuArray<Real,AMREX_SPACEDIM>> dx) {
+// constructor and destructor
+IB::IB (){}
+IB::~IB () { 
+  // (01/03/2023) The lines below cause segmentation fault once the time loop is complete and before finalisation! They are not terribly important as IB is only destroyed when the simulation finishes.
+  // For a vector of pointers, we must delete each pointer to object individually. https://shorturl.at/dHPXZ 
+//  for (int lev=0; lev<=mfa->size(); lev++) {
+//           delete[] mfa->at(lev);
+//         }
+}
+
+// initialise IB
+void IB::initialise(Amr* pointer_amr, const int nvar, const int nghost, const int max_level, const Vector<GpuArray<Real,AMREX_SPACEDIM>> dx) {
         
         // store pointer to main Amr class object's instance
         IB::pamr = pointer_amr ;
@@ -38,14 +48,6 @@ IB::IB (Amr* pointer_amr, const int nvar, const int nghost, const int max_level,
         for (int lev=0; lev<=max_level; lev++) {
           mfa->at(lev) = new IBMultiFab(pamr->boxArray(lev),pamr->DistributionMap(lev),nvar,nghost);
         } }
-
-IB::~IB () { 
-  // (01/03/2023) The lines below cause segmentation fault once the time loop is complete and before finalisation! They are not terribly important as IB is only destroyed when the simulation finishes.
-  // For a vector of pointers, we must delete each pointer to object individually. https://shorturl.at/dHPXZ 
-//  for (int lev=0; lev<=mfa->size(); lev++) {
-//           delete[] mfa->at(lev);
-//         }
-}
 
 void IB::compute_markers () {
 
