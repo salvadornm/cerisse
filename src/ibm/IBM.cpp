@@ -21,6 +21,40 @@ IBMultiFab::IBMultiFab ( const BoxArray& bxs, const DistributionMapping& dm,
                         FabArray<IBFab>(bxs,dm,nvar,ngrow,info,factory) {}
 IBMultiFab::~IBMultiFab () {}
 
+// for a single level
+// void IBMultiFab::copytoRealMF(IBMultiFab &ibmf, MultiFab &mf, int ibcomp, int mfcomp) {
+void IBMultiFab::copytoRealMF(MultiFab &mf, int ibcomp, int mfcomp) {
+
+    for (MFIter mfi(*this,false); mfi.isValid(); ++mfi) {
+
+        // const Box& ibbox = mfi.fabbox(); // box with ghost points
+        const Box& ibbox = mfi.validbox(); // box with ghost points
+
+        IBM::IBFab &ibfab = this->get(mfi);
+        FArrayBox &realfab = mf.get(mfi);
+        Array4<bool> ibMarkers = ibfab.array(); // boolean array
+        Array4<Real> realfield = realfab.array(); // real array
+
+        // assert that box sizes is same - TODO
+
+        // const int *lo = fab.loVect();
+        // const int *hi = fab.hiVect();
+        // amrex::Print() << lo[0] << " " << lo[1] << " " << lo[2] << std::endl;
+        // amrex::Print() << hi[0] << " " << hi[1] << " " << hi[2] << std::endl;
+
+        amrex::ParallelFor(ibbox,
+        [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept
+        {
+          if (ibMarkers(i,j,k,ibcomp)){
+            realfield(i,j,k,mfcomp) = 1.0; }
+          else {
+            realfield(i,j,k,mfcomp) = 0.0; }
+          });
+
+        }
+
+    }
+
 // constructor and destructor
 IB::IB (){}
 IB::~IB () { 
@@ -51,69 +85,53 @@ void IB::initialise(Amr* pointer_amr, const int nvar, const int nghost, const in
 
 void IB::compute_markers () {
 
-    AmrLevel *lev = &(pamr->getLevel(0));
-
-    // // accessing derived variable list
-    // DeriveList *derive = &(lev->get_derive_lst());
-    // std::list<DeriveRec> list = derive->dlist();
-    // amrex::Print() << list.front().name() << std::endl;
- 
-    // // accessing descriptor list
-    // DescriptorList const *desList= &lev->get_desc_lst();
-    // StateDescriptor const *state_var = &desList->operator[](0);
-    // amrex::Print() << state_var->name(0) << std::endl;
-
-    
-  // int nb_inside = 0;
-  // int nb_boundary = 0;
-  // CGAL::Side_of_triangle_mesh<Polyhedron, K> inside(IB::geom);
-  // // std::vector<Point> points;
-  // for (std::size_t i = 0; i < nb_points; ++i)
-  // {
-  //   CGAL::Bounded_side res = inside(points[i]);
-  //   if (res == CGAL::ON_BOUNDED_SIDE) { ++nb_inside; }
-  //   if (res == CGAL::ON_BOUNDARY) { ++nb_boundary; }
-  // }
-
-  // std::cerr << "Total query size: " << points.size() << std::endl;
-  // std::cerr << "  " << nb_inside << " points inside " << std::endl;
-  // std::cerr << "  " << nb_boundary << " points on boundary " << std::endl;
-  // std::cerr << "  " << points.size() - nb_inside - nb_boundary << " points outside " << std::endl;
-
-        // pamr.max_grid_size()
+  CGAL::Side_of_triangle_mesh<Polyhedron, K> inside(IB::geom);
+  AmrLevel *lev = &(pamr->getLevel(0));
 
   for (int lev=0; lev<mfa->size(); lev++) {
     IBMultiFab *mfab = mfa->at(lev);
     for (MFIter mfi(*mfab,false); mfi.isValid(); ++mfi) {
-        // IBM::IBFab &fab = (*mfab).[mfi];
         IBM::IBFab &fab = mfab->get(mfi);
         const int *lo = fab.loVect();
         const int *hi = fab.hiVect();
-        amrex::Print() << "Current level/Max level = " << lev  << "/" << mfa->size()-1 << std::endl;
-        amrex::Print() << lo[0] << " " << lo[1] << " " << lo[2] << std::endl;
-        amrex::Print() << hi[0] << " " << hi[1] << " " << hi[2] << std::endl;
+        // amrex::Print() << "Current level/Max level = " << lev  << "/" << mfa->size()-1 << std::endl;
+        // amrex::Print() << lo[0] << " " << lo[1] << " " << lo[2] << std::endl;
+        // amrex::Print() << hi[0] << " " << hi[1] << " " << hi[2] << std::endl;
 
-
-        fab.setVal(false); // initialise
-        const Box& bx = mfi.fabbox(); // box with ghost points
-        auto const bool_array = fab.array(); // boolean array
+        fab.setVal(false); // initialise sld and ghs to false
+        // const Box& bx = mfi.fabbox(); // box with ghost points
+        Array4<bool> ibMarkers = fab.array(); // boolean array
 
         // amrex::ParallelFor(bx,
         // [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept
-        // {
-        //   amrex::Print() << i << " "<< j << " " << k << " " << std::endl;
-        //   amrex::Print() << bool_array(i,j,k,1) << " " << std::endl;
-        //   fab.
-        // });
+        // }
+        // for some reason CGAL::Bounded_side res=... line does not allow the use of ParallelFor.
         
-        // const Box& bx = mfi.validbox(); // box without ghost points
-        // auto const& sfab = (*mfab).array(mfi);
-        // bool_array.begin
-        // bool_array.ncomp 
+        for (int k = lo[2]; k <= hi[2]; ++k) {
+        for (int j = lo[1]; j <= hi[1]; ++j) {
+        for (int i = lo[0]; i <= hi[0]; ++i) {
 
+            Real x=(0.5 + i)*cellSizes[lev][0];
+            Real y=(0.5 + j)*cellSizes[lev][1];
+            Real z=(0.5 + k)*cellSizes[lev][2];
+            
+            Point gridpoint(x,y,z);
+            CGAL::Bounded_side res = inside(gridpoint);
 
-        amrex::Print() << "fab ngps = " << fab.ngps << std::endl;
-        amrex::Print() << "------------------- " << std::endl;
+            if (res == CGAL::ON_BOUNDED_SIDE) { 
+                // soild marker
+                ibMarkers(i,j,k,0) = true;}
+            else if (res == CGAL::ON_BOUNDARY) { 
+              amrex::Print() << "Grid point on IB surface" << " " << std::endl;
+              exit(0);
+            }
+            // amrex::Print() << i << " "<< j << " " << k << " " << std::endl;
+            // amrex::Print() << ibMarkers(i,j,k,0)  << " " << std::endl;
+        
+        }}};
+
+        // amrex::Print() << "fab ngps = " << fab.ngps << std::endl;
+        // amrex::Print() << "------------------- " << std::endl;
     }
   }
 }
@@ -148,6 +166,33 @@ void IB::read_geom(const std::string filename) {
 
 
 
+    
+  // int nb_inside = 0;
+  // int nb_boundary = 0;
+  // CGAL::Side_of_triangle_mesh<Polyhedron, K> inside(IB::geom);
+  // // std::vector<Point> points;
+  // for (std::size_t i = 0; i < nb_points; ++i)
+  // {
+  //   CGAL::Bounded_side res = inside(points[i]);
+  //   if (res == CGAL::ON_BOUNDED_SIDE) { ++nb_inside; }
+  //   if (res == CGAL::ON_BOUNDARY) { ++nb_boundary; }
+  // }
+
+  // std::cerr << "Total query size: " << points.size() << std::endl;
+  // std::cerr << "  " << nb_inside << " points inside " << std::endl;
+  // std::cerr << "  " << nb_boundary << " points on boundary " << std::endl;
+  // std::cerr << "  " << points.size() - nb_inside - nb_boundary << " points outside " << std::endl;
+
+
+    // // accessing derived variable list
+    // DeriveList *derive = &(lev->get_derive_lst());
+    // std::list<DeriveRec> list = derive->dlist();
+    // amrex::Print() << list.front().name() << std::endl;
+ 
+    // // accessing descriptor list
+    // DescriptorList const *desList= &lev->get_desc_lst();
+    // StateDescriptor const *state_var = &desList->operator[](0);
+    // amrex::Print() << state_var->name(0) << std::endl;
 
 
 

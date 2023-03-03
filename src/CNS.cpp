@@ -362,9 +362,9 @@ void CNS::printTotal () const {
 void CNS::writePlotFile (const std::string& dir,
                          std::ostream&      os,
                          VisMF::How         how)
-// void CNS::writePlotFile ()
 {
-    amrex::Print() << "custom plot " << dir << std::endl;
+    // amrex::Print() << "custom plot " << " (level" << level << ") "<< dir << std::endl;
+    // amrex::Print() << parent->levelSteps(level) << std::endl;
     int i, n;
     //
     // The list of indices of State to write to plotfile.
@@ -398,11 +398,13 @@ void CNS::writePlotFile (const std::string& dir,
 
     int n_data_items = plot_var_map.size() + num_derive;
 
-#ifdef AMREX_USE_EB
-    if (EB2::TopIndexSpaceIfPresent()) {
+//----------------------------------------------------------------------modified
+// #ifdef AMREX_USE_EB
+    // if (EB2::TopIndexSpaceIfPresent()) {
         n_data_items += 1;
-    }
-#endif
+    // }
+// #endif
+//------------------------------------------------------------------------------
 
     // get the time from the first State_Type
     // if the State_Type is ::Interval, this will get t^{n+1/2} instead of t^n
@@ -438,11 +440,13 @@ void CNS::writePlotFile (const std::string& dir,
             }
         }
 
-#ifdef AMREX_USE_EB
-        if (EB2::TopIndexSpaceIfPresent()) {
-            os << "vfrac\n";
-        }
-#endif
+//----------------------------------------------------------------------modified
+// #ifdef AMREX_USE_EB
+        // if (EB2::TopIndexSpaceIfPresent()) {
+            os << "sld\n";
+        // }
+// #endif
+//------------------------------------------------------------------------------
 
         os << AMREX_SPACEDIM << '\n';
         os << parent->cumTime() << '\n';
@@ -525,16 +529,18 @@ void CNS::writePlotFile (const std::string& dir,
             os << PathNameInHeader << '\n';
         }
 
-#ifdef AMREX_USE_EB
-        if (EB2::TopIndexSpaceIfPresent()) {
-            // volfrac threshold for amrvis
-            if (level == parent->finestLevel()) {
-                for (int lev = 0; lev <= parent->finestLevel(); ++lev) {
-                    os << "1.0e-6\n";
-                }
-            }
-        }
-#endif
+//----------------------------------------------------------------------modified
+// #ifdef AMREX_USE_EB
+        // if (EB2::TopIndexSpaceIfPresent()) {
+        //     volfrac threshold for amrvis
+        //     if (level == parent->finestLevel()) {
+        //         for (int lev = 0; lev <= parent->finestLevel(); ++lev) {
+        //             os << "1.0e-6\n";
+        //         }
+        //     }
+        // }
+// #endif
+//------------------------------------------------------------------------------
     }
     //
     // We combine all of the multifabs -- state, derived, etc -- into one
@@ -565,13 +571,19 @@ void CNS::writePlotFile (const std::string& dir,
         }
     }
 
-#ifdef AMREX_USE_EB
-    if (EB2::TopIndexSpaceIfPresent()) {
+//----------------------------------------------------------------------modified
+// #ifdef AMREX_USE_EB
+    // if (EB2::TopIndexSpaceIfPresent()) {
         plotMF.setVal(0.0, cnt, 1, nGrow);
-        auto factory = static_cast<EBFArrayBoxFactory*>(m_factory.get());
-        MultiFab::Copy(plotMF,factory->getVolFrac(),0,cnt,1,nGrow);
-    }
-#endif
+        // auto factory = static_cast<EBFArrayBoxFactory*>(m_factory.get());
+
+if (parent->levelSteps(level)>0) {
+        IBM::IBMultiFab* ibmf = IBM::ib.mfa->at(level);
+        ibmf->copytoRealMF(plotMF,0,cnt);}
+        // MultiFab::Copy(plotMF,IB,0,cnt,1,nGrow);
+    // }
+// #endif
+//------------------------------------------------------------------------------
 
     //
     // Use the Full pathname when naming the MultiFab.

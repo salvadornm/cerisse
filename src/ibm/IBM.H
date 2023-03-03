@@ -14,7 +14,6 @@
 
 using namespace amrex;
 
-
 namespace IBM {
 
   // TODO: make it a linked list!
@@ -68,6 +67,9 @@ namespace IBM {
                             const FabFactory<IBFab>& factory = DefaultFabFactory<IBFab>());
       // destructor
       ~IBMultiFab ();
+
+      // void copytoRealMF(IBMultiFab &ibmf, MultiFab &mf, int ibcomp, int mfcomp);
+      void copytoRealMF(MultiFab &mf, int ibcomp, int mfcomp);
     protected:
 
   };
