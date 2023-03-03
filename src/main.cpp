@@ -26,12 +26,14 @@ int main (int argc, char* argv[]) {
     int  max_step = -1;
     Real strt_time = Real( 0.0);
     Real stop_time = Real(-1.0);
+    std::string IBfilename;
     {
         ParmParse pp;
         pp.query("amr.max_level",max_level);
         pp.query("max_step",max_step);
         pp.query("strt_time",strt_time);
         pp.query("time_step",CNS::dt_glob);
+        pp.get("ib.filename",IBfilename);
         stop_time = max_step*CNS::dt_glob;
     }
 
@@ -54,7 +56,7 @@ int main (int argc, char* argv[]) {
         }
 
         IBM::ib.initialise(&amr,2,2,max_level,cellSize);
-        IBM::ib.read_geom("sphere.off");
+        IBM::ib.read_geom(IBfilename);
         IBM::ib.compute_markers();
 
         timer_init = amrex::second() - timer_init;

@@ -16,7 +16,7 @@ using namespace amrex;
 
 namespace IBM {
 
-  // TODO: make it a linked list!
+  // TODO: make it a linked list or vector to manage the memory more easily.
   // https://stackoverflow.com/questions/21482700/how-to-delete-this-linked-list-from-memory
 
   // GP holds the relevant data for each ghost point.
