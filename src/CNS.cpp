@@ -278,42 +278,33 @@ void CNS::post_regrid (int /*lbase*/, int /*new_finest*/) { }
 
 
 void CNS::errorEst (TagBoxArray& tags, int /*clearval*/, int /*tagval*/,
-  amrex::Real time, int /*n_error_buf*/, int /*ngrow*/) {
+  Real time, int /*n_error_buf*/, int /*ngrow*/) {
 
-  // get state MF
-
-  // Without Ghost points
-  // const amrex::MultiFab& data = get_new_data(State_Type);
-
-  // With Ghost points -------copied from PeleC. Can we avoid the Fillpatch?
+  // MF without ghost points filled (why?)
   MultiFab data( get_new_data(State_Type).boxArray(), get_new_data(State_Type).DistributionMap(), NUM_STATE, 1, MFInfo(), Factory());
 
-  const amrex::Real cur_time = state[State_Type].curTime();
-  FillPatch(*this, data, data.nGrow(), cur_time, State_Type, Density, NUM_STATE, 0);
+  // filling ghost points (copied from PeleC)
+  const Real cur_time = state[State_Type].curTime();
+  FillPatch(*this, data, data.nGrow(), cur_time, State_Type, 0, NUM_STATE, 0);
 
-#ifdef AMREX_USE_OMP
-#pragma omp parallel if (Gpu::notInLaunchRegion())
-#endif
-    for (MFIter mfi(tags,TilingIfNotGPU()); mfi.isValid(); ++mfi)
-    {
-        const Box& bx = mfi.tilebox();
-        auto const& tagfab = tags.array(mfi);
-        auto const& datafab = data.array(mfi);
+  // IBM::IBMultiFab *ibmf = IBM::ib.mfa->at(level); TODO - pass ibmf reference to tagging
 
-        amrex::ParallelFor(bx,
-        [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept
-        {
-          // Temporary tagging on density in x only
-          Real drhox = amrex::Math::abs(datafab(i+1,j,k,0) - datafab(i-1,j,k,0))/datafab(i,j,k,0);
-          tagfab(i,j,k) = drhox > 0.5f;
+  // call function from cns_prob
+  tagging(tags, data, level);
 
-          // amrex::Print() << "i,j,k         " << i << " " << j << " " << k << " "<< std::endl;
-          // amrex::Print() << "tag(i,j,k)    " << int(tagfab(i,j,k)) << std::endl;
-          // amrex::Print() << "data(i,j,k,0) " << datafab(i,j,k,0) << std::endl;
-          // amrex::Print() << "drhox         " << drhox << std::endl;
-          // amrex::Print() << "------------- " << std::endl;
-        });
-    }
+  // -------------------------------- Monal 03/03/23
+  // amrex::Print() << state[0].descriptor()->name(0) << std::endl;
+  //
+  // In tagging(...) retrieving data MultiFabs seem to have ghost points not filled - atleast straight after initialisation.
+  // I have tried the following:
+  // MultiFab &data=get_new_data(0); 
+  // MultiFab& data = state.at(0).newData();
+  // both give erroneous computation error.
+  //
+  // PeleC creates a local copy of the MultiFab rather than passing through the master data with:
+  // MultiFab data( get_new_data(State_Type).boxArray(), get_new_data(State_Type).DistributionMap(), NUM_STATE, 1, MFInfo(), Factory());
+  // However, this is not necessary.
+  //---------------------------------
 }
 // -----------------------------------------------------------------------------
 
