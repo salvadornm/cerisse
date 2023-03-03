@@ -54,7 +54,7 @@ void cns_initdata (int i, int j, int k, amrex::Array4<amrex::Real> const& state,
 }
 
 
-void tagging(amrex::TagBoxArray& tags, amrex::MultiFab& data, int level){
+void tagging(amrex::TagBoxArray& tags, amrex::MultiFab& sdata, int level, IBM::IBMultiFab* ibdata){
 
 #ifdef AMREX_USE_OMP
 #pragma omp parallel if (Gpu::notInLaunchRegion())
@@ -63,20 +63,33 @@ void tagging(amrex::TagBoxArray& tags, amrex::MultiFab& data, int level){
     {
         const amrex::Box& bx = mfi.tilebox();
         auto const& tagfab = tags.array(mfi);
-        auto const& datafab = data.array(mfi);
+        auto const& sdatafab = sdata.array(mfi);
 
-        amrex::ParallelFor(bx,
-        [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept
-        {
+        if (ibdata!=nullptr) {
+          auto const& ibdatafab = ibdata->array(mfi);
+          amrex::ParallelFor(bx,
+          [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept
+          {
+            // tagging on ghs
+            tagfab(i,j,k) = ibdatafab(i,j,k,1);
+          });}
+
+        else  {
           // Temporary tagging on density in x only
-          amrex::Real drhox = amrex::Math::abs(datafab(i+1,j,k,0) - datafab(i-1,j,k,0))/datafab(i,j,k,0);
+          amrex::ParallelFor(bx,
+          [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept
+          {
+          amrex::Real drhox = amrex::Math::abs(sdatafab(i+1,j,k,0) - sdatafab(i-1,j,k,0))/sdatafab(i,j,k,0);
           tagfab(i,j,k) = drhox > 0.5f;
+          });
+        };
+        };
 
-          // amrex::Print() << "i,j,k         " << i << " " << j << " " << k << " "<< std::endl;
-          // amrex::Print() << "tag(i,j,k)    " << int(tagfab(i,j,k)) << std::endl;
-          // amrex::Print() << "data(i,j,k,0) " << datafab(i,j,k,0) << std::endl;
-          // amrex::Print() << "drhox         " << drhox << std::endl;
-          // amrex::Print() << "------------- " << std::endl;
-        });
+
+            // amrex::Print() << "i,j,k         " << i << " " << j << " " << k << " "<< std::endl;
+            // amrex::Print() << "tag(i,j,k)    " << int(tagfab(i,j,k)) << std::endl;
+            // amrex::Print() << "data(i,j,k,0) " << datafab(i,j,k,0) << std::endl;
+            // amrex::Print() << "drhox         " << drhox << std::endl;
+            // amrex::Print() << "------------- " << std::endl;
+
     }
-}

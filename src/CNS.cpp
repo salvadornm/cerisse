@@ -281,16 +281,20 @@ void CNS::errorEst (TagBoxArray& tags, int /*clearval*/, int /*tagval*/,
   Real time, int /*n_error_buf*/, int /*ngrow*/) {
 
   // MF without ghost points filled (why?)
-  MultiFab data( get_new_data(State_Type).boxArray(), get_new_data(State_Type).DistributionMap(), NUM_STATE, 1, MFInfo(), Factory());
+  MultiFab sdata( get_new_data(State_Type).boxArray(), get_new_data(State_Type).DistributionMap(), NUM_STATE, 1, MFInfo(), Factory());
 
   // filling ghost points (copied from PeleC)
   const Real cur_time = state[State_Type].curTime();
-  FillPatch(*this, data, data.nGrow(), cur_time, State_Type, 0, NUM_STATE, 0);
-
-  // IBM::IBMultiFab *ibmf = IBM::ib.mfa->at(level); TODO - pass ibmf reference to tagging
+  FillPatch(*this, sdata, sdata.nGrow(), cur_time, State_Type, 0, NUM_STATE, 0);
 
   // call function from cns_prob
-  tagging(tags, data, level);
+  if (parent->levelSteps(level) > 0) { 
+    IBM::IBMultiFab *ibdata = IBM::ib.mfa->at(level);
+    tagging(tags, sdata, level, ibdata);}
+  else {
+    tagging(tags, sdata, level);
+  };
+
 
   // -------------------------------- Monal 03/03/23
   // amrex::Print() << state[0].descriptor()->name(0) << std::endl;
@@ -392,7 +396,7 @@ void CNS::writePlotFile (const std::string& dir,
 //----------------------------------------------------------------------modified
 // #ifdef AMREX_USE_EB
     // if (EB2::TopIndexSpaceIfPresent()) {
-        n_data_items += 1;
+        n_data_items += 2;
     // }
 // #endif
 //------------------------------------------------------------------------------
@@ -435,6 +439,7 @@ void CNS::writePlotFile (const std::string& dir,
 // #ifdef AMREX_USE_EB
         // if (EB2::TopIndexSpaceIfPresent()) {
             os << "sld\n";
+            os << "ghs\n";
         // }
 // #endif
 //------------------------------------------------------------------------------
@@ -566,11 +571,14 @@ void CNS::writePlotFile (const std::string& dir,
 // #ifdef AMREX_USE_EB
     // if (EB2::TopIndexSpaceIfPresent()) {
         plotMF.setVal(0.0, cnt, 1, nGrow);
+        plotMF.setVal(0.0, cnt+1, 1, nGrow);
         // auto factory = static_cast<EBFArrayBoxFactory*>(m_factory.get());
 
+//TEMP if nt>0, To improve 03/03/23 --------------------------------------------
 if (parent->levelSteps(level)>0) {
         IBM::IBMultiFab* ibmf = IBM::ib.mfa->at(level);
         ibmf->copytoRealMF(plotMF,0,cnt);}
+//------------------------------------------------------------------------------
         // MultiFab::Copy(plotMF,IB,0,cnt,1,nGrow);
     // }
 // #endif

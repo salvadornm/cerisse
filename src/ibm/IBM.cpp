@@ -49,6 +49,12 @@ void IBMultiFab::copytoRealMF(MultiFab &mf, int ibcomp, int mfcomp) {
             realfield(i,j,k,mfcomp) = 1.0; }
           else {
             realfield(i,j,k,mfcomp) = 0.0; }
+
+          if (ibMarkers(i,j,k,ibcomp+1)){
+            realfield(i,j,k,mfcomp+1) = 1.0; }
+          else {
+            realfield(i,j,k,mfcomp+1) = 0.0; }
+
           });
 
         }
@@ -90,6 +96,7 @@ void IB::compute_markers () {
 
   for (int lev=0; lev<mfa->size(); lev++) {
     IBMultiFab *mfab = mfa->at(lev);
+    int nghost = mfab->nGrow(0);
     for (MFIter mfi(*mfab,false); mfi.isValid(); ++mfi) {
         IBM::IBFab &fab = mfab->get(mfi);
         const int *lo = fab.loVect();
@@ -99,22 +106,15 @@ void IB::compute_markers () {
         // amrex::Print() << hi[0] << " " << hi[1] << " " << hi[2] << std::endl;
 
         fab.setVal(false); // initialise sld and ghs to false
-        // const Box& bx = mfi.fabbox(); // box with ghost points
         Array4<bool> ibMarkers = fab.array(); // boolean array
 
-        // amrex::ParallelFor(bx,
-        // [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept
-        // }
-        // for some reason CGAL::Bounded_side res=... line does not allow the use of ParallelFor.
-        
+        // compute sld markers (including at ghost points)
         for (int k = lo[2]; k <= hi[2]; ++k) {
         for (int j = lo[1]; j <= hi[1]; ++j) {
         for (int i = lo[0]; i <= hi[0]; ++i) {
-
             Real x=(0.5 + i)*cellSizes[lev][0];
             Real y=(0.5 + j)*cellSizes[lev][1];
             Real z=(0.5 + k)*cellSizes[lev][2];
-            
             Point gridpoint(x,y,z);
             CGAL::Bounded_side res = inside(gridpoint);
 
@@ -125,11 +125,28 @@ void IB::compute_markers () {
               amrex::Print() << "Grid point on IB surface" << " " << std::endl;
               exit(0);
             }
-            // amrex::Print() << i << " "<< j << " " << k << " " << std::endl;
-            // amrex::Print() << ibMarkers(i,j,k,0)  << " " << std::endl;
-        
         }}};
 
+        // compute ghs markers
+        for (int k = lo[2]+nghost; k <= hi[2]-nghost; ++k) {
+        for (int j = lo[1]+nghost; j <= hi[1]-nghost; ++j) {
+        for (int i = lo[0]+nghost; i <= hi[0]-nghost; ++i) {
+
+        bool fluidneigh = false;
+        if (ibMarkers(i,j,k,0)) {
+        for (int l = -1; l<=1; ++l) {
+          fluidneigh = fluidneigh || (!ibMarkers(i+l,j,k,0));
+          fluidneigh = fluidneigh || (!ibMarkers(i,j+l,k,0));
+          fluidneigh = fluidneigh || (!ibMarkers(i,j,k+l,0));
+        }
+        ibMarkers(i,j,k,1) = fluidneigh; 
+
+        //save ghs index
+
+        };
+
+
+        }}};
         // amrex::Print() << "fab ngps = " << fab.ngps << std::endl;
         // amrex::Print() << "------------------- " << std::endl;
     }
