@@ -79,7 +79,7 @@ namespace IBM {
     public:
       // attributes //
 
-      int max_lev=0; // need to save this as Amr protects this
+      int max_level=0; // need to save this as Amr protects this
 
       // pointer to Amr class instance
       Amr*pamr;
@@ -109,7 +109,7 @@ namespace IBM {
       
 
       // methods //
-      void initialise (Amr* pointer_amr, const int nvar, const int nghost, const int max_level, const Vector<GpuArray<Real,AMREX_SPACEDIM>> dx);
+      void initialise (Amr* pointer_amr, const int nvar, const int nghost);
       // compute IB field markers
       void compute_markers ();
 

@@ -72,22 +72,26 @@ IB::~IB () {
 }
 
 // initialise IB
-void IB::initialise(Amr* pointer_amr, const int nvar, const int nghost, const int max_level, const Vector<GpuArray<Real,AMREX_SPACEDIM>> dx) {
-        
+void IB::initialise(Amr* pointer_amr, const int nvar, const int nghost) {
         // store pointer to main Amr class object's instance
         IB::pamr = pointer_amr ;
 
-        // Since AmrInfo class is protected! I believe this prevents access to its members here, like max_level,etc. So store basic AmrInfo for later easy access.
-        max_lev = max_level;
+        max_level = pamr->maxLevel();
         ref_ratio = pamr->refRatio();
+
         cellSizes.resize(max_level+1);
-        cellSizes = dx;
+        cellSizes[0] = pamr->getLevel(0).Geom().CellSizeArray();
+        for (int i=1;i<=max_level;i++) {
+        for (int j=0;j<=AMREX_SPACEDIM-1;j++) {
+          cellSizes[i][j] = cellSizes[0][j]/ref_ratio[0][j];
+        }}
 
         // create IBMultiFabs at each level and store pointers to it
         mfa->resize(max_level+1);
         for (int lev=0; lev<=max_level; lev++) {
           mfa->at(lev) = new IBMultiFab(pamr->boxArray(lev),pamr->DistributionMap(lev),nvar,nghost);
-        } }
+        }}
+
 
 void IB::compute_markers () {
 

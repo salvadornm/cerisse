@@ -49,13 +49,7 @@ int main (int argc, char* argv[]) {
         Amr amr(getLevelBld());
         amr.init(strt_time,stop_time);
 
-        Vector<GpuArray<Real,AMREX_SPACEDIM>> cellSize;
-        cellSize.resize(max_level+1);
-        for (int i=0;i<=max_level;i++) {
-          cellSize[i] = amr.getLevel(i).Geom().CellSizeArray();
-        }
-
-        IBM::ib.initialise(&amr,2,2,max_level,cellSize);
+        IBM::ib.initialise(&amr,2,2);
         IBM::ib.read_geom(IBfilename);
         IBM::ib.compute_markers();
 
