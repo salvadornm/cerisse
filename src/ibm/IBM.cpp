@@ -82,94 +82,81 @@ void IB::initialise(Amr* pointer_amr, const int nvar, const int nghost) {
   // pamr->max_level() is a protected member of AmrInfo
 
   cellSizes.resize(IB::max_level+1);
-  cellSizes[0] = pamr->getLevel(0).Geom().CellSizeArray();
+  cellSizes[0] = pamr->Geom(0).CellSizeArray();
   for (int i=1;i<=IB::max_level;i++) {
   for (int j=0;j<=AMREX_SPACEDIM-1;j++) {
     cellSizes[i][j] = cellSizes[0][j]/ref_ratio[i-1][j];
   }}
-
-  // for (int i=0; i<=IB::max_level; i++) {
-  //   buildIBMultiFab(pamr->boxArray(i),pamr->DistributionMap(i),i,nvar,nghost);
-  // }
 }
+
 // create IBMultiFabs at a level and store pointers to it
 void IB::buildIBMultiFab (const BoxArray& bxa, const DistributionMapping& dm, int lev ,int nvar,int nghost) {
   mfa->at(lev) = new IBMultiFab(bxa,dm,nvar,nghost);
 }
-  // if(!mfa->empty()) {Print() << "buildIBMultiFab mfa not empty" << std::endl; exit(0);}
 
 void IB::destroyIBMultiFab (int lev) {
   if (!mfa->empty()) {
-      Print() << "not empty" << std::endl;
       delete mfa->at(lev);
-      Print() << "after delete" << std::endl;
-      // Print() << "mfa size after destroyIBMultiFab " << mfa->size() << std::endl;
       // mfa->erase(lev); Do not use, shortens vector by one
   }
 }
 
 
-void IB::compute_markers () {
+void IB::compute_markers (int lev) {
 
   CGAL::Side_of_triangle_mesh<Polyhedron, K> inside(IB::geom);
-  AmrLevel *lev = &(pamr->getLevel(0));
 
-  for (int lev=0; lev<mfa->size(); lev++) {
-    IBMultiFab *mfab = mfa->at(lev);
-    int nghost = mfab->nGrow(0);
-    for (MFIter mfi(*mfab,false); mfi.isValid(); ++mfi) {
-        IBM::IBFab &fab = mfab->get(mfi);
-        const int *lo = fab.loVect();
-        const int *hi = fab.hiVect();
-        // amrex::Print() << "Current level/Max level = " << lev  << "/" << mfa->size()-1 << std::endl;
-        // amrex::Print() << lo[0] << " " << lo[1] << " " << lo[2] << std::endl;
-        // amrex::Print() << hi[0] << " " << hi[1] << " " << hi[2] << std::endl;
+  IBMultiFab *mfab = mfa->at(lev);
+  int nghost = mfab->nGrow(0); // assuming same number of ghost points in all directions
+  for (MFIter mfi(*mfab,false); mfi.isValid(); ++mfi) {
+      IBM::IBFab &fab = mfab->get(mfi);
+      const int *lo = fab.loVect();
+      const int *hi = fab.hiVect();
 
-        fab.setVal(false); // initialise sld and ghs to false
-        Array4<bool> ibMarkers = fab.array(); // boolean array
+      fab.setVal(false); // initialise sld and ghs to false
+      Array4<bool> ibMarkers = fab.array(); // boolean array
 
-        // compute sld markers (including at ghost points)
-        for (int k = lo[2]; k <= hi[2]; ++k) {
-        for (int j = lo[1]; j <= hi[1]; ++j) {
-        for (int i = lo[0]; i <= hi[0]; ++i) {
-            Real x=(0.5 + i)*cellSizes[lev][0];
-            Real y=(0.5 + j)*cellSizes[lev][1];
-            Real z=(0.5 + k)*cellSizes[lev][2];
-            Point gridpoint(x,y,z);
-            CGAL::Bounded_side res = inside(gridpoint);
+      // compute sld markers (including at ghost points)
+      for (int k = lo[2]; k <= hi[2]; ++k) {
+      for (int j = lo[1]; j <= hi[1]; ++j) {
+      for (int i = lo[0]; i <= hi[0]; ++i) {
+          Real x=(0.5 + i)*cellSizes[lev][0];
+          Real y=(0.5 + j)*cellSizes[lev][1];
+          Real z=(0.5 + k)*cellSizes[lev][2];
+          Point gridpoint(x,y,z);
+          CGAL::Bounded_side res = inside(gridpoint);
 
-            if (res == CGAL::ON_BOUNDED_SIDE) { 
-                // soild marker
-                ibMarkers(i,j,k,0) = true;}
-            else if (res == CGAL::ON_BOUNDARY) { 
-              amrex::Print() << "Grid point on IB surface" << " " << std::endl;
-              exit(0);
-            }
-        }}};
+          if (res == CGAL::ON_BOUNDED_SIDE) { 
+              // soild marker
+              ibMarkers(i,j,k,0) = true;}
+          else if (res == CGAL::ON_BOUNDARY) { 
+            amrex::Print() << "Grid point on IB surface" << " " << std::endl;
+            exit(0);
+          }
+      }}};
 
-        // compute ghs markers
-        for (int k = lo[2]+nghost; k <= hi[2]-nghost; ++k) {
-        for (int j = lo[1]+nghost; j <= hi[1]-nghost; ++j) {
-        for (int i = lo[0]+nghost; i <= hi[0]-nghost; ++i) {
+      // compute ghs markers
+      for (int k = lo[2]+nghost; k <= hi[2]-nghost; ++k) {
+      for (int j = lo[1]+nghost; j <= hi[1]-nghost; ++j) {
+      for (int i = lo[0]+nghost; i <= hi[0]-nghost; ++i) {
 
-        bool fluidneigh = false;
-        if (ibMarkers(i,j,k,0)) {
-        for (int l = -1; l<=1; ++l) {
-          fluidneigh = fluidneigh || (!ibMarkers(i+l,j,k,0));
-          fluidneigh = fluidneigh || (!ibMarkers(i,j+l,k,0));
-          fluidneigh = fluidneigh || (!ibMarkers(i,j,k+l,0));
-        }
-        ibMarkers(i,j,k,1) = fluidneigh; 
+      bool fluidneigh = false;
+      if (ibMarkers(i,j,k,0)) {
+      for (int l = -1; l<=1; ++l) {
+        fluidneigh = fluidneigh || (!ibMarkers(i+l,j,k,0));
+        fluidneigh = fluidneigh || (!ibMarkers(i,j+l,k,0));
+        fluidneigh = fluidneigh || (!ibMarkers(i,j,k+l,0));
+      }
+      ibMarkers(i,j,k,1) = fluidneigh; 
 
-        //save ghs index
+      //save ghs index
 
-        };
+      };
 
 
-        }}};
-        // amrex::Print() << "fab ngps = " << fab.ngps << std::endl;
-        // amrex::Print() << "------------------- " << std::endl;
-    }
+      }}};
+      // amrex::Print() << "fab ngps = " << fab.ngps << std::endl;
+      // amrex::Print() << "------------------- " << std::endl;
   }
 }
 
@@ -202,23 +189,6 @@ void IB::read_geom(const std::string filename) {
 
 
 
-
-    
-  // int nb_inside = 0;
-  // int nb_boundary = 0;
-  // CGAL::Side_of_triangle_mesh<Polyhedron, K> inside(IB::geom);
-  // // std::vector<Point> points;
-  // for (std::size_t i = 0; i < nb_points; ++i)
-  // {
-  //   CGAL::Bounded_side res = inside(points[i]);
-  //   if (res == CGAL::ON_BOUNDED_SIDE) { ++nb_inside; }
-  //   if (res == CGAL::ON_BOUNDARY) { ++nb_boundary; }
-  // }
-
-  // std::cerr << "Total query size: " << points.size() << std::endl;
-  // std::cerr << "  " << nb_inside << " points inside " << std::endl;
-  // std::cerr << "  " << nb_boundary << " points on boundary " << std::endl;
-  // std::cerr << "  " << points.size() - nb_inside - nb_boundary << " points outside " << std::endl;
 
 
     // // accessing derived variable list
@@ -276,25 +246,3 @@ void IB::read_geom(const std::string filename) {
         
   //   }
 ////////////////////////////////////////////////////////////////////////////////
-
-
-// 2. compute and save solid and ghost point field
-
-
-// 3. compute ghost point state
-
-
-// 4. compute surface data
-
-
-
-
-
-
-
-
-// Confirm that all faces are triangles.
-  // for(boost::graph_traits<Surface_mesh>::face_descriptor f : faces(mesh))
-  //   if(!CGAL::is_triangle(halfedge(f, mesh), mesh))
-  //     std::cerr << "Error: non-triangular face left in mesh." << std::endl;
-  //https://doc.cgal.org/latest/Polygon_mesh_processing/index.html#title13

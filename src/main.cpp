@@ -47,12 +47,11 @@ int main (int argc, char* argv[]) {
     {
         double timer_init = amrex::second();
         IBM::ib.setMaxLevel(max_level);
-        Amr amr(getLevelBld());
-        amr.init(strt_time,stop_time);
-
-        IBM::ib.initialise(&amr,2,2);
         IBM::ib.read_geom(IBfilename);
-        IBM::ib.compute_markers();
+
+        Amr amr(getLevelBld());
+        IBM::ib.initialise(&amr,2,2);
+        amr.init(strt_time,stop_time);
 
         timer_init = amrex::second() - timer_init;
     // -------------------------------------------------------------------------

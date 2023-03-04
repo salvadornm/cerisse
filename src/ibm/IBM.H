@@ -118,7 +118,7 @@ namespace IBM {
       void destroyIBMultiFab (int lev);
 
       // compute IB field markers
-      void compute_markers ();
+      void compute_markers (int lev);
 
       // read geometry
       void read_geom(const std::string filename);

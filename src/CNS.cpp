@@ -122,10 +122,10 @@ void CNS::initData ()
     });
 
     // Compute the initial temperature (will override what was set in initdata)
-    // computeTemp(S_new,0);
+    computeTemp(S_new,0);
 
-    MultiFab& C_new = get_new_data(Cost_Type);
-    C_new.setVal(1.0);
+    // MultiFab& C_new = get_new_data(Cost_Type);
+    // C_new.setVal(1.0);
 }
 
 void CNS::buildMetrics ()
@@ -275,14 +275,9 @@ void CNS::post_timestep (int /*iteration*/) {
 // Gridding -------------------------------------------------------------------
 void CNS::post_regrid (int lbase, int new_finest) { 
 
-    // Print() << "Refilling IBMultiFab - lbase, new_finest " << lbase << new_finest << std::endl;
-    // for (int lev=lbase; lev<=new_finest ; lev++) {
-      // Print() << "destroy " << level << std::endl;
       IBM::ib.destroyIBMultiFab(level);
-      // Print() << "build " << level << std::endl;
       IBM::ib.buildIBMultiFab(this->boxArray(),this->DistributionMap(),level,2,2);
-      // IBM::ib.compute_markers();
-    // }
+      IBM::ib.compute_markers(level);
 }
 
 
@@ -297,12 +292,8 @@ void CNS::errorEst (TagBoxArray& tags, int /*clearval*/, int /*tagval*/,
   FillPatch(*this, sdata, sdata.nGrow(), cur_time, State_Type, 0, NUM_STATE, 0);
 
   // call function from cns_prob
-  if (parent->levelSteps(level) > 0) { 
-    IBM::IBMultiFab *ibdata = IBM::ib.mfa->at(level);
-    tagging(tags, sdata, level, ibdata);}
-  else {
-    tagging(tags, sdata, level);
-  };
+  IBM::IBMultiFab *ibdata = IBM::ib.mfa->at(level);
+  tagging(tags, sdata, level, ibdata);
 
 
   // -------------------------------- Monal 03/03/23
@@ -337,8 +328,7 @@ void CNS::avgDown () {
                         0, S_fine.nComp(), parent->refRatio(level));
 
     const int nghost = 0;
-    /////////////////////////TODO///////////////////////////
-    // computeTemp(S_crse, nghost);
+    computeTemp(S_crse, nghost);
 }
 
 void CNS::printTotal () const {
@@ -403,11 +393,7 @@ void CNS::writePlotFile (const std::string& dir,
     int n_data_items = plot_var_map.size() + num_derive;
 
 //----------------------------------------------------------------------modified
-// #ifdef AMREX_USE_EB
-    // if (EB2::TopIndexSpaceIfPresent()) {
-        n_data_items += 2;
-    // }
-// #endif
+    n_data_items += 2;
 //------------------------------------------------------------------------------
 
     // get the time from the first State_Type
@@ -445,12 +431,8 @@ void CNS::writePlotFile (const std::string& dir,
         }
 
 //----------------------------------------------------------------------modified
-// #ifdef AMREX_USE_EB
-        // if (EB2::TopIndexSpaceIfPresent()) {
-            os << "sld\n";
-            os << "ghs\n";
-        // }
-// #endif
+        os << "sld\n";
+        os << "ghs\n";
 //------------------------------------------------------------------------------
 
         os << AMREX_SPACEDIM << '\n';
@@ -577,20 +559,8 @@ void CNS::writePlotFile (const std::string& dir,
     }
 
 //----------------------------------------------------------------------modified
-// #ifdef AMREX_USE_EB
-    // if (EB2::TopIndexSpaceIfPresent()) {
-        plotMF.setVal(0.0, cnt, 1, nGrow);
-        plotMF.setVal(0.0, cnt+1, 1, nGrow);
-        // auto factory = static_cast<EBFArrayBoxFactory*>(m_factory.get());
-
-//TEMP if nt>0, To improve 03/03/23 --------------------------------------------
-if (parent->levelSteps(level)>0) {
-        IBM::IBMultiFab* ibmf = IBM::ib.mfa->at(level);
-        ibmf->copytoRealMF(plotMF,0,cnt);}
-//------------------------------------------------------------------------------
-        // MultiFab::Copy(plotMF,IB,0,cnt,1,nGrow);
-    // }
-// #endif
+    plotMF.setVal(0.0, cnt, 2, nGrow);
+    IBM::ib.mfa->at(level)->copytoRealMF(plotMF,0,cnt);
 //------------------------------------------------------------------------------
 
     //

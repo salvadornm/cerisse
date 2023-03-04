@@ -141,9 +141,9 @@ CNS::variableSetUp ()
                           bcs,
                           bndryfunc);
 
-    desc_lst.addDescriptor(Cost_Type, IndexType::TheCellType(), StateDescriptor::Point,
-                           0,1, &pc_interp);
-    desc_lst.setComponent(Cost_Type, 0, "Cost", bc, bndryfunc);
+    // desc_lst.addDescriptor(Cost_Type, IndexType::TheCellType(), StateDescriptor::Point,
+    //                        0,1, &pc_interp);
+    // desc_lst.setComponent(Cost_Type, 0, "Cost", bc, bndryfunc);
 
     num_state_data_types = desc_lst.size();
 
@@ -157,16 +157,16 @@ CNS::variableSetUp ()
     derive_lst.addComponent("pressure",desc_lst,State_Type,Density,4);
 
     // Velocities
-    derive_lst.add("x_velocity", amrex::IndexType::TheCellType(), 1, dervelx, the_same_box);
-    derive_lst.addComponent("x_velocity",desc_lst,State_Type,Density,4);
+//     derive_lst.add("x_velocity", amrex::IndexType::TheCellType(), 1, dervelx, the_same_box);
+//     derive_lst.addComponent("x_velocity",desc_lst,State_Type,Density,4);
 
-    derive_lst.add("y_velocity", amrex::IndexType::TheCellType(), 1, dervely, the_same_box);
-    derive_lst.addComponent("y_velocity",desc_lst,State_Type,Density,4);
+//     derive_lst.add("y_velocity", amrex::IndexType::TheCellType(), 1, dervely, the_same_box);
+//     derive_lst.addComponent("y_velocity",desc_lst,State_Type,Density,4);
 
-#if (AMREX_SPACEDIM == 3)
-    derive_lst.add("z_velocity", amrex::IndexType::TheCellType(), 1, dervelz, the_same_box);
-    derive_lst.addComponent("z_velocity",desc_lst,State_Type,Density,4);
-#endif
+// #if (AMREX_SPACEDIM == 3)
+//     derive_lst.add("z_velocity", amrex::IndexType::TheCellType(), 1, dervelz, the_same_box);
+//     derive_lst.addComponent("z_velocity",desc_lst,State_Type,Density,4);
+// #endif
 
     ////////////////////////////////////////////////////////////////////////////
 }
