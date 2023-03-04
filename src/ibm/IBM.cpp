@@ -8,7 +8,8 @@ IBFab::IBFab (const Box& b, int ncomp, bool alloc, bool shared, Arena* ar)
               : BaseFab<bool>(b,ncomp,alloc,shared,ar) {}
 IBFab::IBFab (const IBFab& rhs, MakeType make_type, int scomp, int ncomp) 
               : BaseFab<bool>(rhs,make_type,scomp,ncomp) {}
-IBFab::~IBFab () { delete[] gpArray; }
+IBFab::~IBFab () { }
+// delete[] gpArray; TODO 04/03/2023
 
 void IBFab::allocateGPs(int numGPs) {
   delete[] gpArray;
@@ -63,34 +64,49 @@ void IBMultiFab::copytoRealMF(MultiFab &mf, int ibcomp, int mfcomp) {
 
 // constructor and destructor
 IB::IB (){}
-IB::~IB () { 
-  // (01/03/2023) The lines below cause segmentation fault once the time loop is complete and before finalisation! They are not terribly important as IB is only destroyed when the simulation finishes.
-  // For a vector of pointers, we must delete each pointer to object individually. https://shorturl.at/dHPXZ 
-//  for (int lev=0; lev<=mfa->size(); lev++) {
-//           delete[] mfa->at(lev);
-//         }
-}
+IB::~IB () {}
+
+void IB::setMaxLevel(int max_lev) {
+  IB::max_level = max_lev;
+  IB::mfa->resize(max_lev + 1);
+  };
 
 // initialise IB
 void IB::initialise(Amr* pointer_amr, const int nvar, const int nghost) {
-        // store pointer to main Amr class object's instance
-        IB::pamr = pointer_amr ;
 
-        max_level = pamr->maxLevel();
-        ref_ratio = pamr->refRatio();
+  // store pointer to main Amr class object's instance
+  IB::pamr = pointer_amr ;
 
-        cellSizes.resize(max_level+1);
-        cellSizes[0] = pamr->getLevel(0).Geom().CellSizeArray();
-        for (int i=1;i<=max_level;i++) {
-        for (int j=0;j<=AMREX_SPACEDIM-1;j++) {
-          cellSizes[i][j] = cellSizes[0][j]/ref_ratio[0][j];
-        }}
+  ref_ratio = pamr->refRatio();
+  max_level = pamr->maxLevel();
+  // pamr->max_level() is a protected member of AmrInfo
 
-        // create IBMultiFabs at each level and store pointers to it
-        mfa->resize(max_level+1);
-        for (int lev=0; lev<=max_level; lev++) {
-          mfa->at(lev) = new IBMultiFab(pamr->boxArray(lev),pamr->DistributionMap(lev),nvar,nghost);
-        }}
+  cellSizes.resize(IB::max_level+1);
+  cellSizes[0] = pamr->getLevel(0).Geom().CellSizeArray();
+  for (int i=1;i<=IB::max_level;i++) {
+  for (int j=0;j<=AMREX_SPACEDIM-1;j++) {
+    cellSizes[i][j] = cellSizes[0][j]/ref_ratio[i-1][j];
+  }}
+
+  // for (int i=0; i<=IB::max_level; i++) {
+  //   buildIBMultiFab(pamr->boxArray(i),pamr->DistributionMap(i),i,nvar,nghost);
+  // }
+}
+// create IBMultiFabs at a level and store pointers to it
+void IB::buildIBMultiFab (const BoxArray& bxa, const DistributionMapping& dm, int lev ,int nvar,int nghost) {
+  mfa->at(lev) = new IBMultiFab(bxa,dm,nvar,nghost);
+}
+  // if(!mfa->empty()) {Print() << "buildIBMultiFab mfa not empty" << std::endl; exit(0);}
+
+void IB::destroyIBMultiFab (int lev) {
+  if (!mfa->empty()) {
+      Print() << "not empty" << std::endl;
+      delete mfa->at(lev);
+      Print() << "after delete" << std::endl;
+      // Print() << "mfa size after destroyIBMultiFab " << mfa->size() << std::endl;
+      // mfa->erase(lev); Do not use, shortens vector by one
+  }
+}
 
 
 void IB::compute_markers () {

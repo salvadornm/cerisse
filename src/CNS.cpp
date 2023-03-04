@@ -273,8 +273,17 @@ void CNS::post_timestep (int /*iteration*/) {
 // -----------------------------------------------------------------------------
 
 // Gridding -------------------------------------------------------------------
+void CNS::post_regrid (int lbase, int new_finest) { 
 
-void CNS::post_regrid (int /*lbase*/, int /*new_finest*/) { }
+    // Print() << "Refilling IBMultiFab - lbase, new_finest " << lbase << new_finest << std::endl;
+    // for (int lev=lbase; lev<=new_finest ; lev++) {
+      // Print() << "destroy " << level << std::endl;
+      IBM::ib.destroyIBMultiFab(level);
+      // Print() << "build " << level << std::endl;
+      IBM::ib.buildIBMultiFab(this->boxArray(),this->DistributionMap(),level,2,2);
+      // IBM::ib.compute_markers();
+    // }
+}
 
 
 void CNS::errorEst (TagBoxArray& tags, int /*clearval*/, int /*tagval*/,

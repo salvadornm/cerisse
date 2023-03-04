@@ -46,6 +46,7 @@ int main (int argc, char* argv[]) {
     // Read input and setup ----------------------------------------------------
     {
         double timer_init = amrex::second();
+        IBM::ib.setMaxLevel(max_level);
         Amr amr(getLevelBld());
         amr.init(strt_time,stop_time);
 

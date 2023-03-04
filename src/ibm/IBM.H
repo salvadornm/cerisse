@@ -109,7 +109,14 @@ namespace IBM {
       
 
       // methods //
+      void setMaxLevel(int max_lev);
+
       void initialise (Amr* pointer_amr, const int nvar, const int nghost);
+
+      void buildIBMultiFab (const BoxArray& bxa, const DistributionMapping& dm, int lev ,int nvar,int nghost);
+
+      void destroyIBMultiFab (int lev);
+
       // compute IB field markers
       void compute_markers ();
 
