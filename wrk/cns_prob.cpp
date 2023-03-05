@@ -72,6 +72,15 @@ void tagging(amrex::TagBoxArray& tags, amrex::MultiFab& sdata, int level, IBM::I
           {
             // tagging on ghs
             tagfab(i,j,k) = ibdatafab(i,j,k,1);
+            // or fluid neighbour
+            bool condition = false; 
+            for (int l=-1; l<=1 ; l+=2) {
+              condition = condition || ibdatafab(i+l,j,k,0);
+              condition = condition || ibdatafab(i,j+l,k,0);
+              condition = condition || ibdatafab(i,j,k+l,0);
+            }
+            condition = condition && !ibdatafab(i,j,k,0);
+            tagfab(i,j,k) = tagfab(i,j,k) || condition   ;
           });}
 
         else  {
@@ -79,8 +88,8 @@ void tagging(amrex::TagBoxArray& tags, amrex::MultiFab& sdata, int level, IBM::I
           amrex::ParallelFor(bx,
           [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept
           {
-          amrex::Real drhox = amrex::Math::abs(sdatafab(i+1,j,k,0) - sdatafab(i-1,j,k,0))/sdatafab(i,j,k,0);
-          tagfab(i,j,k) = drhox > 0.5f;
+          // amrex::Real drhox = amrex::Math::abs(sdatafab(i+1,j,k,0) - sdatafab(i-1,j,k,0))/sdatafab(i,j,k,0);
+          // tagfab(i,j,k) = drhox > 0.5f;
           });
         };
         };
