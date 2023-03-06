@@ -85,7 +85,7 @@ void IB::initialise(Amr* pointer_amr, const int nvar, const int nghost) {
   cellSizes[0] = pamr->Geom(0).CellSizeArray();
   for (int i=1;i<=IB::max_level;i++) {
   for (int j=0;j<=AMREX_SPACEDIM-1;j++) {
-    cellSizes[i][j] = cellSizes[0][j]/ref_ratio[i-1][j];
+    cellSizes[i][j] = cellSizes[i-1][j]/ref_ratio[i-1][j];
   }}
 }
 
