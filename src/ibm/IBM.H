@@ -8,22 +8,34 @@
 #include <AMReX_Derive.H>
 #include <AMReX_StateDescriptor.H>
 
+// basic CGAL headers
 #include <CGAL/Exact_predicates_inexact_constructions_kernel.h>
 #include <CGAL/Polyhedron_3.h>
 #include <CGAL/Polygon_mesh_processing/IO/polygon_mesh_io.h>
+
+
+// CGAL headers for AABB tree for closest point
+#include <CGAL/Simple_cartesian.h>
+#include <CGAL/AABB_tree.h>
+#include <CGAL/AABB_traits.h>
+#include <CGAL/AABB_face_graph_triangle_primitive.h>
+
+
+// CGAL headers for AABB tree for surface data
+#include <CGAL/Polygon_mesh_processing/compute_normal.h>
+// #include <CGAL/Unique_hash_map.h>
+// #include <boost/unordered_map.hpp>
+#include <boost/property_map/property_map.hpp>
 
 using namespace amrex;
 
 namespace IBM {
 
-  // TODO: make it a linked list or vector to manage the memory more easily.
-  // https://stackoverflow.com/questions/21482700/how-to-delete-this-linked-list-from-memory
-
   // GP holds the relevant data for each ghost point.
   struct gp {
 
       // attributes
-      int idx[3]={0}; // GP index
+      Array<int , AMREX_SPACEDIM> idx;
       int norm[3]={0}; // closest element's normal
       // Immersed boundary point data
       /////////////////////////////////////////////
@@ -35,7 +47,7 @@ namespace IBM {
   {
     public:
       // attributes //
-      gp* gpArray;
+      Vector<gp> gpArray;
       int ngps = 0;
       ///////////////
 
@@ -50,8 +62,6 @@ namespace IBM {
      ///////////////////////////////////////////////////////////////////////////
 
       // methods //
-      // allocate space for gpArray
-      void allocateGPs(int numGPs);
       /////////////////////////////
   };
 
@@ -68,7 +78,6 @@ namespace IBM {
       // destructor
       ~IBMultiFab ();
 
-      // void copytoRealMF(IBMultiFab &ibmf, MultiFab &mf, int ibcomp, int mfcomp);
       void copytoRealMF(MultiFab &mf, int ibcomp, int mfcomp);
     protected:
 
@@ -87,18 +96,35 @@ namespace IBM {
       // vector of refinement ratio per level in each direction
       Vector<IntVect> ref_ratio;
 
-      //vector of cell sizes per level in each direction
+      // vector of cell sizes per level in each direction
       Vector<GpuArray<Real,AMREX_SPACEDIM>> cellSizes;
 
       // IBMultiFab array
-      Vector<IBMultiFab*> mfa[2]; 
+      Vector<IBMultiFab*> mfa; 
 
-      // geometry class
-      typedef CGAL::Exact_predicates_inexact_constructions_kernel    K;
-      typedef K::Point_3                                             Point;
-      typedef CGAL::Polyhedron_3<K>                                  Polyhedron;
 
-      Polyhedron geom;
+      // CGAL types
+      // typedef CGAL::Exact_predicates_inexact_constructions_kernel    K;
+      typedef CGAL::Simple_cartesian<double> K2;
+      typedef K2::Point_3 Point;
+      typedef CGAL::Polyhedron_3<K2>                                  Polyhedron;
+      Polyhedron geom; // IB geometry 
+
+      // typedef CGAL::Simple_cartesian<double> K2;
+      typedef K2::FT FT;
+      typedef K2::Segment_3 Segment;
+      typedef CGAL::AABB_face_graph_triangle_primitive<Polyhedron> Primitive;
+      typedef CGAL::AABB_traits<K2, Primitive> Traits;
+      typedef CGAL::AABB_tree<Traits> Tree;
+      typedef Tree::Point_and_primitive_id Point_and_primitive_id;
+      Tree* treePtr;
+
+      typedef K2::Vector_3 Vector_CGAL;
+      // typedef boost::graph_traits<Polyhedron>::vertex_descriptor    vertex_descriptor;
+      typedef boost::graph_traits<Polyhedron>::face_descriptor      face_descriptor;
+
+      std::map<face_descriptor,Vector_CGAL> fnormals;
+      // can use this map to create surfdata
 
       // constructors and destructors //
       // explicit IB ( const Vector<BoxArray>& bxs, 
@@ -113,15 +139,17 @@ namespace IBM {
 
       void initialise (Amr* pointer_amr, const int nvar, const int nghost);
 
+      void closestElem(Point& query);
+
       void buildIBMultiFab (const BoxArray& bxa, const DistributionMapping& dm, int lev ,int nvar,int nghost);
 
       void destroyIBMultiFab (int lev);
 
-      // compute IB field markers
-      void compute_markers (int lev);
+      void computeMarkers (int lev);
 
-      // read geometry
-      void read_geom(const std::string filename);
+      void initialiseGPs(int lev);
+
+      void readGeom(const std::string filename);
 
   };
 

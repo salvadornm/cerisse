@@ -277,7 +277,8 @@ void CNS::post_regrid (int lbase, int new_finest) {
 
       IBM::ib.destroyIBMultiFab(level);
       IBM::ib.buildIBMultiFab(this->boxArray(),this->DistributionMap(),level,2,2);
-      IBM::ib.compute_markers(level);
+      IBM::ib.computeMarkers(level);
+      IBM::ib.initialiseGPs(level);
 }
 
 
@@ -292,7 +293,7 @@ void CNS::errorEst (TagBoxArray& tags, int /*clearval*/, int /*tagval*/,
   FillPatch(*this, sdata, sdata.nGrow(), cur_time, State_Type, 0, NUM_STATE, 0);
 
   // call function from cns_prob
-  IBM::IBMultiFab *ibdata = IBM::ib.mfa->at(level);
+  IBM::IBMultiFab *ibdata = IBM::ib.mfa[level];
   tagging(tags, sdata, level, ibdata);
 
 
@@ -560,7 +561,7 @@ void CNS::writePlotFile (const std::string& dir,
 
 //----------------------------------------------------------------------modified
     plotMF.setVal(0.0, cnt, 2, nGrow);
-    IBM::ib.mfa->at(level)->copytoRealMF(plotMF,0,cnt);
+    IBM::ib.mfa.at(level)->copytoRealMF(plotMF,0,cnt);
 //------------------------------------------------------------------------------
 
     //
