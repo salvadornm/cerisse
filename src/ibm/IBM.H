@@ -30,15 +30,34 @@
 using namespace amrex;
 
 namespace IBM {
+  // CGAL types
+  // typedef CGAL::Exact_predicates_inexact_constructions_kernel    K;
+  typedef CGAL::Simple_cartesian<double> K2;
+  typedef K2::Point_3 Point;
+  typedef CGAL::Polyhedron_3<K2> Polyhedron;
+
+
+  // typedef CGAL::Simple_cartesian<double> K2;
+  typedef K2::FT FT;
+  typedef K2::Segment_3 Segment;
+  typedef CGAL::AABB_face_graph_triangle_primitive<Polyhedron> Primitive;
+  typedef CGAL::AABB_traits<K2, Primitive> Traits;
+  typedef CGAL::AABB_tree<Traits> Tree;
+  typedef Tree::Point_and_primitive_id Point_and_primitive_id;
+
+
+  typedef K2::Vector_3 Vector_CGAL;
+  // typedef boost::graph_traits<Polyhedron>::vertex_descriptor    vertex_descriptor;
+  typedef boost::graph_traits<Polyhedron>::face_descriptor  face_descriptor;
 
   // GP holds the relevant data for each ghost point.
   struct gp {
 
       // attributes
-      Array<int , AMREX_SPACEDIM> idx;
-      int norm[3]={0}; // closest element's normal
-      // Immersed boundary point data
-      /////////////////////////////////////////////
+      Array<int , AMREX_SPACEDIM> idx={0};
+      // Array<double , AMREX_SPACEDIM> cvertex={0.0};
+      Point_and_primitive_id closest; // closest vertex and face
+      // int norm[3]={0}; // closest element's normal
 
   };
 
@@ -103,26 +122,13 @@ namespace IBM {
       Vector<IBMultiFab*> mfa; 
 
 
-      // CGAL types
-      // typedef CGAL::Exact_predicates_inexact_constructions_kernel    K;
-      typedef CGAL::Simple_cartesian<double> K2;
-      typedef K2::Point_3 Point;
-      typedef CGAL::Polyhedron_3<K2>                                  Polyhedron;
-      Polyhedron geom; // IB geometry 
+      // IB geometry
+      Polyhedron geom;  
 
-      // typedef CGAL::Simple_cartesian<double> K2;
-      typedef K2::FT FT;
-      typedef K2::Segment_3 Segment;
-      typedef CGAL::AABB_face_graph_triangle_primitive<Polyhedron> Primitive;
-      typedef CGAL::AABB_traits<K2, Primitive> Traits;
-      typedef CGAL::AABB_tree<Traits> Tree;
-      typedef Tree::Point_and_primitive_id Point_and_primitive_id;
+      // AABB tree
       Tree* treePtr;
 
-      typedef K2::Vector_3 Vector_CGAL;
-      // typedef boost::graph_traits<Polyhedron>::vertex_descriptor    vertex_descriptor;
-      typedef boost::graph_traits<Polyhedron>::face_descriptor      face_descriptor;
-
+      // surface element normals
       std::map<face_descriptor,Vector_CGAL> fnormals;
       // can use this map to create surfdata
 
@@ -139,7 +145,7 @@ namespace IBM {
 
       void initialise (Amr* pointer_amr, const int nvar, const int nghost);
 
-      void closestElem(Point& query);
+      // void closestElem(Point& query);
 
       void buildIBMultiFab (const BoxArray& bxa, const DistributionMapping& dm, int lev ,int nvar,int nghost);
 

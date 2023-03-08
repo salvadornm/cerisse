@@ -4,24 +4,24 @@
 
 amrex.fpe_trap_invalid=1
 
-max_step  = 4
+max_step  = 12
 stop_time = 0.2
 time_step = 0.1e-3
 
 cns.cfl = 0.8  # cfl number for hyperbolic system
 
-cns.v = 2
 amr.v = 1
 
 #-------------------------------- IMMERSED BOUNDARY ---------------------------#
-ib.filename = sphere_1m_12k.stl
+#ib.filename = sphere_1m_12k.stl
+ib.filename = square_0.5m_12.stl
 
 #-------------------------------- COMPUTATIONAL DOMAIN ------------------------#
 geometry.is_periodic = 0 1 1
 geometry.coord_sys   = 0  # 0 => cart, 1 => RZ  2=>spherical
 geometry.prob_lo     =   0.0     0.0     0.0
 geometry.prob_hi     =   2.0     2.0     2.0
-amr.n_cell           =    32      32      32
+amr.n_cell           =    16      16      16
 
 #--------------------------------- BOUNDARY CONDITIONS ------------------------#
 # 0 = Interior           3 = Symmetry
@@ -32,11 +32,11 @@ cns.hi_bc       =  2   0   0
 
 #-------------------------------- REFINEMENT / REGRIDDING ---------------------#
 amr.max_level       = 1       # maximum level number allowed
-amr.ref_ratio       = 2 8 8 8 # refinement ratio
-amr.regrid_int      = 2 6 6 6 # how often to regrid
-amr.blocking_factor = 2 4 8
-amr.max_grid_size   = 16
-amr.n_error_buf     = 0 0 0 0 # number of buffer cells in error est
+amr.ref_ratio       = 2 4 2 2 # refinement ratio
+amr.regrid_int      = 2 4 8 2 # how often to regrid
+amr.blocking_factor = 2 2 2 4
+amr.max_grid_size   = 8
+amr.n_error_buf     = 1 1 1 1 # number of buffer cells in error est
 amr.grid_eff        = 0.99     # what constitutes an efficient grid
 
 # CHECKPOINT FILES

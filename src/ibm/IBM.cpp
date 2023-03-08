@@ -19,41 +19,42 @@ IBMultiFab::~IBMultiFab () {}
 // for a single level
 void IBMultiFab::copytoRealMF(MultiFab &mf, int ibcomp, int mfcomp) {
 
-    for (MFIter mfi(*this,false); mfi.isValid(); ++mfi) {
+  for (MFIter mfi(*this,false); mfi.isValid(); ++mfi) {
 
-        // const Box& ibbox = mfi.fabbox(); // box with ghost points
-        const Box& ibbox = mfi.validbox(); // box without ghost points
+    // const Box& ibbox = mfi.fabbox(); // box with ghost points
+    const Box& ibbox = mfi.validbox(); // box without ghost points
 
-        IBM::IBFab &ibfab = this->get(mfi);
-        FArrayBox &realfab = mf.get(mfi);
-        Array4<bool> ibMarkers = ibfab.array(); // boolean array
-        Array4<Real> realfield = realfab.array(); // real array
+    IBM::IBFab &ibfab = this->get(mfi);
+    FArrayBox &realfab = mf.get(mfi);
+    Array4<bool> ibMarkers = ibfab.array(); // boolean array
+    Array4<Real> realfield = realfab.array(); // real array
 
-        // assert that box sizes is same - TODO
+    // assert that box sizes is same - TODO
 
-        // const int *lo = fab.loVect();
-        // const int *hi = fab.hiVect();
-        // amrex::Print() << lo[0] << " " << lo[1] << " " << lo[2] << std::endl;
-        // amrex::Print() << hi[0] << " " << hi[1] << " " << hi[2] << std::endl;
+    // const int *lo = fab.loVect();
+    // const int *hi = fab.hiVect();
+    // amrex::Print() << lo[0] << " " << lo[1] << " " << lo[2] << std::endl;
+    // amrex::Print() << hi[0] << " " << hi[1] << " " << hi[2] << std::endl;
 
-        amrex::ParallelFor(ibbox,
-        [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept
-        {
-          if (ibMarkers(i,j,k,ibcomp)){
-            realfield(i,j,k,mfcomp) = 1.0; }
-          else {
-            realfield(i,j,k,mfcomp) = 0.0; }
+    amrex::ParallelFor(ibbox,
+    [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept
+    {
+      // TODO simplify using implicit conversion from bool to real
+      if (ibMarkers(i,j,k,ibcomp)){
+        realfield(i,j,k,mfcomp) = 1.0; }
+      else {
+        realfield(i,j,k,mfcomp) = 0.0; }
 
-          if (ibMarkers(i,j,k,ibcomp+1)){
-            realfield(i,j,k,mfcomp+1) = 1.0; }
-          else {
-            realfield(i,j,k,mfcomp+1) = 0.0; }
+      if (ibMarkers(i,j,k,ibcomp+1)){
+        realfield(i,j,k,mfcomp+1) = 1.0; }
+      else {
+        realfield(i,j,k,mfcomp+1) = 0.0; }
 
-          });
+    });
 
-        }
+  }
 
-    }
+}
 
 // constructor and destructor
 IB::IB (){}
@@ -81,36 +82,6 @@ void IB::initialise(Amr* pointer_amr, const int nvar, const int nghost) {
 
 }
 
-void IB::closestElem(Point& query) {
-
-  // computes squared distance from query
-  FT sqd = treePtr->squared_distance(query);
-  std::cout << "squared distance: " << sqd << std::endl;
-  // computes closest point
-  Point closest = treePtr->closest_point(query);
-  std::cout << "closest point: " << closest << std::endl;
-  // computes closest point and primitive id
-  Point_and_primitive_id pp = treePtr->closest_point_and_primitive(query);
-  Point closest_point = pp.first;
-  Polyhedron::Face_handle f = pp.second; // closest primitive id
-  std::cout << "closest point: " << closest_point << std::endl;
-  std::cout << "closest triangle: ( "
-            << f->halfedge()->vertex()->point() << " , "
-            << f->halfedge()->next()->vertex()->point() << " , "
-            << f->halfedge()->next()->next()->vertex()->point()
-            << " )" 
-            << std::endl; 
-  std::cout << "Is element triangle? " << f->is_triangle() << std::endl;
-  std::cout << "Normal " << f->plane().orthogonal_direction().to_vector() << std::endl;
-  std::cout << f->plane().a() << " " << f->plane().b() << " " << f->plane().c() << " " << f->plane().d() << std::endl;
-  // std::cout << amrex::ioproc
-  // faces(geom)
-
-  // faces(geom).first
-  // face_descriptor fd
-  // fnormals.
-}
-
 
 // create IBMultiFabs at a level and store pointers to it
 void IB::buildIBMultiFab (const BoxArray& bxa, const DistributionMapping& dm, int lev ,int nvar,int nghost) {
@@ -123,7 +94,6 @@ void IB::destroyIBMultiFab (int lev) {
   }
 }
 
-
 void IB::computeMarkers (int lev) {
 
   CGAL::Side_of_triangle_mesh<Polyhedron, K2> inside(IB::geom);
@@ -131,91 +101,103 @@ void IB::computeMarkers (int lev) {
   IBMultiFab *mfab = mfa.at(lev);
   int nhalo = mfab->nGrow(0); // assuming same number of ghost points in all directions
   for (MFIter mfi(*mfab,false); mfi.isValid(); ++mfi) {
-      IBM::IBFab &fab = mfab->get(mfi);
-      const int *lo = fab.loVect();
-      const int *hi = fab.hiVect();
+    IBM::IBFab &fab = mfab->get(mfi);
+    const int *lo = fab.loVect();
+    const int *hi = fab.hiVect();
 
-      fab.setVal(false); // initialise sld and ghs to false
-      Array4<bool> ibMarkers = fab.array(); // boolean array
+    fab.setVal(false); // initialise sld and ghs to false
+    Array4<bool> ibMarkers = fab.array(); // boolean array
 
-      // compute sld markers (including at ghost points) - cannot use ParallelFor - CGAL call causes problems
-      for (int k = lo[2]; k <= hi[2]; ++k) {
-      for (int j = lo[1]; j <= hi[1]; ++j) {
-      for (int i = lo[0]; i <= hi[0]; ++i) {
-          Real x=(0.5 + i)*cellSizes[lev][0];
-          Real y=(0.5 + j)*cellSizes[lev][1];
-          Real z=(0.5 + k)*cellSizes[lev][2];
-          Point gridpoint(x,y,z);
-          CGAL::Bounded_side res = inside(gridpoint);
+    // compute sld markers (including at ghost points) - cannot use ParallelFor - CGAL call causes problems
+    for (int k = lo[2]; k <= hi[2]; ++k) {
+    for (int j = lo[1]; j <= hi[1]; ++j) {
+    for (int i = lo[0]; i <= hi[0]; ++i) {
+      Real x=(0.5 + i)*cellSizes[lev][0];
+      Real y=(0.5 + j)*cellSizes[lev][1];
+      Real z=(0.5 + k)*cellSizes[lev][2];
+      Point gridpoint(x,y,z);
+      CGAL::Bounded_side res = inside(gridpoint);
 
-          if (res == CGAL::ON_BOUNDED_SIDE) { 
-              // soild marker
-              ibMarkers(i,j,k,0) = true;}
-          else if (res == CGAL::ON_BOUNDARY) { 
-            amrex::Print() << "Grid point on IB surface" << " " << std::endl;
-            exit(0);
-          }
-      }}};
+      if (res == CGAL::ON_BOUNDED_SIDE) { 
+          // soild marker
+          ibMarkers(i,j,k,0) = true;}
+      else if (res == CGAL::ON_BOUNDARY) { 
+        amrex::Print() << "Grid point on IB surface" << " " << std::endl;
+        exit(0);
+      }
+    }}};
 
-      // compute ghs markers ------------------------------
-      fab.ngps =0;
-      for (int k = lo[2]+nhalo; k <= hi[2]-nhalo; ++k) {
-      for (int j = lo[1]+nhalo; j <= hi[1]-nhalo; ++j) {
-      for (int i = lo[0]+nhalo; i <= hi[0]-nhalo; ++i) {
-
+    // compute ghs markers ------------------------------
+    fab.ngps =0;
+    for (int k = lo[2]+nhalo; k <= hi[2]-nhalo; ++k) {
+    for (int j = lo[1]+nhalo; j <= hi[1]-nhalo; ++j) {
+    for (int i = lo[0]+nhalo; i <= hi[0]-nhalo; ++i) {
       bool ghost = false;
       if (ibMarkers(i,j,k,0)) {
         for (int l = -1; l<=1; ++l) {
           ghost = ghost || (!ibMarkers(i+l,j,k,0));
           ghost = ghost || (!ibMarkers(i,j+l,k,0));
-          ghost = ghost || (!ibMarkers(i,j,k+l,0));}
+          ghost = ghost || (!ibMarkers(i,j,k+l,0));
+        }
         ibMarkers(i,j,k,1) = ghost; 
-        fab.ngps = fab.ngps + ghost;}
-      }}};
+        fab.ngps = fab.ngps + ghost;
+      }
+    }}};
 
-      // index gps ----------------------------------------
-      // allocating space before preferred than using insert
-      fab.gpArray.resize(fab.ngps); // create space for gps
-      int ii=0;
-      for (int k = lo[2]+nhalo; k <= hi[2]-nhalo; ++k) {
-      for (int j = lo[1]+nhalo; j <= hi[1]-nhalo; ++j) {
-      for (int i = lo[0]+nhalo; i <= hi[0]-nhalo; ++i) {
-
+    // index gps ----------------------------------------
+    // allocating space before preferred than using insert
+    fab.gpArray.resize(fab.ngps); // create space for gps
+    int ii=0;
+    for (int k = lo[2]+nhalo; k <= hi[2]-nhalo; ++k) {
+    for (int j = lo[1]+nhalo; j <= hi[1]-nhalo; ++j) {
+    for (int i = lo[0]+nhalo; i <= hi[0]-nhalo; ++i) {
       if(ibMarkers(i,j,k,1)) {
         fab.gpArray[ii].idx[0] = i;
         fab.gpArray[ii].idx[1] = j;
         fab.gpArray[ii].idx[2] = k;
-        ii += 1;}
-      }}};
-      // Print() <<ii << " " << fab.ngps <<std::endl;
+        ii += 1;
+      }
+    }}};
+    // Print() <<ii << " " << fab.ngps <<std::endl;
   }
 }
 
 
 void IB::initialiseGPs (int lev) {
 
-  IBMultiFab *mfab = mfa.at(lev);
+  IBMultiFab *mfab = mfa[lev];
   int nhalo = mfab->nGrow(0); // assuming same number of ghost points in all directions
   for (MFIter mfi(*mfab,false); mfi.isValid(); ++mfi) {
     IBM::IBFab &fab = mfab->get(mfi);
 
-    // closest element
     for (int ii=0;ii<fab.ngps;ii++) {
       IntArray& idx = fab.gpArray[ii].idx;
       Real x=(0.5 + idx[0])*cellSizes[lev][0];
       Real y=(0.5 + idx[1])*cellSizes[lev][1];
       Real z=(0.5 + idx[2])*cellSizes[lev][2];
       Point gridpoint(x,y,z);
-      closestElem(gridpoint);
+
+      // closest vertex and face -----------------------------------------------
+      fab.gpArray[ii].closest = treePtr->closest_point_and_primitive(gridpoint);
+
+      Point closest_point = fab.gpArray[ii].closest.first;
+      Polyhedron::Face_handle f = fab.gpArray[ii].closest.second; // closest primitive id
+      std::cout << "closest vertex: " << closest_point << std::endl;
+      std::cout << "closest triangle: ( "
+                << f->halfedge()->vertex()->point() << " , "
+                << f->halfedge()->next()->vertex()->point() << " , "
+                << f->halfedge()->next()->next()->vertex()->point()
+                << " )" 
+                << std::endl; 
+      std::cout << "Normal " << fnormals[f] <<std::endl;
       amrex::Print() << "------------------- " << std::endl;
+
+    // IB point --------------------------------------------------------------- 
+    // intersection of normal passing through ghost point with face.
+    exit(0);
     }
 
-    exit(0);
-    // IB point
-
-
     // IP and IM points
-
 
   }
 
@@ -227,7 +209,7 @@ void IB::readGeom(const std::string filename) {
 
   if(!PMP::IO::read_polygon_mesh(filename, IB::geom) || CGAL::is_empty(IB::geom) || !CGAL::is_triangle_mesh(IB::geom))
   {
-    std::cerr << "Invalid input." << std::endl;
+    std::cerr << "Invalid geometry filename" << std::endl;
     exit(1);
   }
   Print() << "----------------------------------" << std::endl;
@@ -248,6 +230,4 @@ void IB::readGeom(const std::string filename) {
   // boost::unordered_map<vertex_descriptor,Vector> vnormals;
   PMP::compute_face_normals(geom, boost::make_assoc_property_map(fnormals));
   Print() << "Face normals computed" << std::endl;
-  // for(face_descriptor fd: faces(geom))
-  //   std::cout << fnormals[fd] << std::endl;
 }
