@@ -30,14 +30,11 @@
 using namespace amrex;
 
 namespace IBM {
-  // CGAL types
-  // typedef CGAL::Exact_predicates_inexact_constructions_kernel    K;
-  typedef CGAL::Simple_cartesian<double> K2;
+  // CGAL types -------------------------------------------
+  typedef CGAL::Simple_cartesian<Real> K2;
   typedef K2::Point_3 Point;
   typedef CGAL::Polyhedron_3<K2> Polyhedron;
 
-
-  // typedef CGAL::Simple_cartesian<double> K2;
   typedef K2::FT FT;
   typedef K2::Segment_3 Segment;
   typedef CGAL::AABB_face_graph_triangle_primitive<Polyhedron> Primitive;
@@ -45,19 +42,21 @@ namespace IBM {
   typedef CGAL::AABB_tree<Traits> Tree;
   typedef Tree::Point_and_primitive_id Point_and_primitive_id;
 
-
   typedef K2::Vector_3 Vector_CGAL;
-  // typedef boost::graph_traits<Polyhedron>::vertex_descriptor    vertex_descriptor;
   typedef boost::graph_traits<Polyhedron>::face_descriptor  face_descriptor;
+  // CGAL types -------------------------------------------
 
   // GP holds the relevant data for each ghost point.
   struct gp {
 
       // attributes
       Array<int , AMREX_SPACEDIM> idx={0};
-      // Array<double , AMREX_SPACEDIM> cvertex={0.0};
-      Point_and_primitive_id closest; // closest vertex and face
-      // int norm[3]={0}; // closest element's normal
+      Point_and_primitive_id closest; // closest surface point (ib point) and face
+      Array<Real,AMREX_SPACEDIM> ip1={0}; 
+      Array<Real,AMREX_SPACEDIM> ip2={0}; 
+
+      Array<int , AMREX_SPACEDIM> ip1cell={0};
+      Array<int , AMREX_SPACEDIM> ip2cell={0};
 
   };
 
@@ -146,6 +145,7 @@ namespace IBM {
       void initialise (Amr* pointer_amr, const int nvar, const int nghost);
 
       // void closestElem(Point& query);
+      void static compute_plane_equations( Polyhedron::Facet& f);
 
       void buildIBMultiFab (const BoxArray& bxa, const DistributionMapping& dm, int lev ,int nvar,int nghost);
 

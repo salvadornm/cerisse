@@ -39,17 +39,8 @@ void IBMultiFab::copytoRealMF(MultiFab &mf, int ibcomp, int mfcomp) {
     amrex::ParallelFor(ibbox,
     [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept
     {
-      // TODO simplify using implicit conversion from bool to real
-      if (ibMarkers(i,j,k,ibcomp)){
-        realfield(i,j,k,mfcomp) = 1.0; }
-      else {
-        realfield(i,j,k,mfcomp) = 0.0; }
-
-      if (ibMarkers(i,j,k,ibcomp+1)){
-        realfield(i,j,k,mfcomp+1) = 1.0; }
-      else {
-        realfield(i,j,k,mfcomp+1) = 0.0; }
-
+      realfield(i,j,k,mfcomp)   = ibMarkers(i,j,k,ibcomp);
+      realfield(i,j,k,mfcomp+1) = ibMarkers(i,j,k,ibcomp+1);
     });
 
   }
@@ -63,7 +54,7 @@ IB::~IB () { delete treePtr;}
 void IB::setMaxLevel(int max_lev) {
   IB::max_level = max_lev;
   IB::mfa.resize(max_lev + 1);
-  };
+};
 
 // initialise IB
 void IB::initialise(Amr* pointer_amr, const int nvar, const int nghost) {
@@ -81,8 +72,6 @@ void IB::initialise(Amr* pointer_amr, const int nvar, const int nghost) {
   }}
 
 }
-
-
 // create IBMultiFabs at a level and store pointers to it
 void IB::buildIBMultiFab (const BoxArray& bxa, const DistributionMapping& dm, int lev ,int nvar,int nghost) {
   mfa.at(lev) = new IBMultiFab(bxa,dm,nvar,nghost);
@@ -167,41 +156,74 @@ void IB::initialiseGPs (int lev) {
 
   IBMultiFab *mfab = mfa[lev];
   int nhalo = mfab->nGrow(0); // assuming same number of ghost points in all directions
+  Real dip = 0.6_rt*sqrt(cellSizes[lev][0]*cellSizes[lev][0] + cellSizes[lev][1]*cellSizes[lev][1] + cellSizes[lev][2]*cellSizes[lev][2]);
+
   for (MFIter mfi(*mfab,false); mfi.isValid(); ++mfi) {
     IBM::IBFab &fab = mfab->get(mfi);
 
     for (int ii=0;ii<fab.ngps;ii++) {
       IntArray& idx = fab.gpArray[ii].idx;
-      Real x=(0.5 + idx[0])*cellSizes[lev][0];
-      Real y=(0.5 + idx[1])*cellSizes[lev][1];
-      Real z=(0.5 + idx[2])*cellSizes[lev][2];
-      Point gridpoint(x,y,z);
+      Real x=(0.5_rt + idx[0])*cellSizes[lev][0];
+      Real y=(0.5_rt + idx[1])*cellSizes[lev][1];
+      Real z=(0.5_rt + idx[2])*cellSizes[lev][2];
+      Point gp(x,y,z);
 
-      // closest vertex and face -----------------------------------------------
-      fab.gpArray[ii].closest = treePtr->closest_point_and_primitive(gridpoint);
+      // closest surface point and face --------------------------
+      fab.gpArray[ii].closest = treePtr->closest_point_and_primitive(gp);
 
-      Point closest_point = fab.gpArray[ii].closest.first;
-      Polyhedron::Face_handle f = fab.gpArray[ii].closest.second; // closest primitive id
-      std::cout << "closest vertex: " << closest_point << std::endl;
-      std::cout << "closest triangle: ( "
-                << f->halfedge()->vertex()->point() << " , "
-                << f->halfedge()->next()->vertex()->point() << " , "
-                << f->halfedge()->next()->next()->vertex()->point()
-                << " )" 
-                << std::endl; 
-      std::cout << "Normal " << fnormals[f] <<std::endl;
-      amrex::Print() << "------------------- " << std::endl;
+      Point cp = fab.gpArray[ii].closest.first;
+      Polyhedron::Face_handle face = fab.gpArray[ii].closest.second; // closest primitive id
+      // Print() << "closest surface point: " << cp << std::endl;
+      // Print() << "closest triangle: ( "
+      //           << face->halfedge()->vertex()->point() << " , "
+      //           << face->halfedge()->next()->vertex()->point() << " , "
+      //           << face->halfedge()->next()->next()->vertex()->point()
+      //           << " )" 
+      //           << std::endl; 
+      // Print() << "Normal " << fnormals[face] <<std::endl;
+      // Print() << "cp-gp " << cp - gp << std::endl; // should be in the direction of normal
+      // Print() << "Plane " << face->plane().a() << " " << face->plane().b() << " "  << face->plane().c() << " " << face->plane().d() << std::endl;
+      // amrex::Print() << "------------------- " << std::endl;
 
-    // IB point --------------------------------------------------------------- 
-    // intersection of normal passing through ghost point with face.
-    exit(0);
+      // IB point -------------------------------------------
+      Vector_CGAL ip_gp(gp,cp);
+      Real dib = sqrt(ip_gp.squared_length());
+
+      // IP point -------------------------------------------
+      fab.gpArray[ii].ip1[0] = cp[0] + dip*fnormals[face][0];
+      fab.gpArray[ii].ip1[1] = cp[1] + dip*fnormals[face][1];
+      fab.gpArray[ii].ip1[2] = cp[2] + dip*fnormals[face][2];
+
+      fab.gpArray[ii].ip2[0] = cp[0] + 2*dip*fnormals[face][0];
+      fab.gpArray[ii].ip2[1] = cp[1] + 2*dip*fnormals[face][1];
+      fab.gpArray[ii].ip2[2] = cp[2] + 2*dip*fnormals[face][2];
+
+      fab.gpArray[ii].ip1cell[0] = floor(fab.gpArray[ii].ip1[0]/cellSizes[lev][0] - 0.5_rt);
+      fab.gpArray[ii].ip1cell[1] = floor(fab.gpArray[ii].ip1[1]/cellSizes[lev][1] - 0.5_rt);
+      fab.gpArray[ii].ip1cell[2] = floor(fab.gpArray[ii].ip1[2]/cellSizes[lev][2] - 0.5_rt);
+
+
+      fab.gpArray[ii].ip2cell[0] = floor(fab.gpArray[ii].ip2[0]/cellSizes[lev][0] - 0.5_rt);
+      fab.gpArray[ii].ip2cell[1] = floor(fab.gpArray[ii].ip2[1]/cellSizes[lev][1] - 0.5_rt);
+      fab.gpArray[ii].ip2cell[2] = floor(fab.gpArray[ii].ip2[2]/cellSizes[lev][2] - 0.5_rt);
+
+      // Print() << "dib, dip (from gp) " << dib << " " << dip << std::endl;
+      // Print() << "ip1" << fab.gpArray[ii].ip1 << std::endl;
+      // Print() << "ip1 cell" << fab.gpArray[ii].ip1cell << std::endl;
+      // Print() << "ip2" << fab.gpArray[ii].ip2 << std::endl;
+      // Print() << "ip2 cell" << fab.gpArray[ii].ip2cell << std::endl;
+      // exit(0);
     }
-
-    // IP and IM points
-
   }
-
 }
+
+
+void IB::compute_plane_equations( Polyhedron::Facet& f) {
+    Polyhedron::Halfedge_handle h = f.halfedge();
+    f.plane() = Polyhedron::Plane_3( h->opposite()->vertex()->point(), 
+		       h->vertex()->point(),
+		       h->next()->vertex()->point());
+};
 
 void IB::readGeom(const std::string filename) {
 
@@ -230,4 +252,7 @@ void IB::readGeom(const std::string filename) {
   // boost::unordered_map<vertex_descriptor,Vector> vnormals;
   PMP::compute_face_normals(geom, boost::make_assoc_property_map(fnormals));
   Print() << "Face normals computed" << std::endl;
+
+  std::for_each( geom.facets_begin(), geom.facets_end(), compute_plane_equations);
+  // plane class also computes orthogonal direction to the face. However, the orthogonal vector is not normalised.
 }
