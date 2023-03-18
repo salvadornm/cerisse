@@ -30,6 +30,8 @@
 using namespace amrex;
 
 namespace IBM {
+  static constexpr int NUM_IMPS = 2;
+
   // CGAL types -------------------------------------------
   typedef CGAL::Simple_cartesian<Real> K2;
   typedef K2::Point_3 Point;
@@ -52,11 +54,11 @@ namespace IBM {
       // attributes
       Array<int , AMREX_SPACEDIM> idx={0};
       Point_and_primitive_id closest; // closest surface point (ib point) and face
-      Array<Real,AMREX_SPACEDIM> ip1={0}; 
-      Array<Real,AMREX_SPACEDIM> ip2={0}; 
-
-      Array<int , AMREX_SPACEDIM> ip1cell={0};
-      Array<int , AMREX_SPACEDIM> ip2cell={0};
+      Vector<Array<Real,AMREX_SPACEDIM>> imps; 
+      Vector<Array<Real,AMREX_SPACEDIM>> impscell; 
+      Vector<Array<Real,8>> ipweights; 
+      // for imp1 [(i,j,k), (i+1,j,k), (i,j+1,k), (i,j,k+1)],
+      //  ... ]
 
   };
 
@@ -105,6 +107,7 @@ namespace IBM {
   class IB {
     public:
       // attributes //
+      Vector<Real> dimp; //image point distance
 
       int max_level=0; // need to save this as Amr protects this
 
@@ -151,11 +154,16 @@ namespace IBM {
 
       void destroyIBMultiFab (int lev);
 
+      void readGeom(const std::string filename);
+
       void computeMarkers (int lev);
 
       void initialiseGPs(int lev);
 
-      void readGeom(const std::string filename);
+      void computeGPs( int lev, MultiFab& S_new);
+
+    private:
+      Array<Real,8> computeIPweights();
 
   };
 

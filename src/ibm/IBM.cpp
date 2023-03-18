@@ -42,9 +42,7 @@ void IBMultiFab::copytoRealMF(MultiFab &mf, int ibcomp, int mfcomp) {
       realfield(i,j,k,mfcomp)   = ibMarkers(i,j,k,ibcomp);
       realfield(i,j,k,mfcomp+1) = ibMarkers(i,j,k,ibcomp+1);
     });
-
   }
-
 }
 
 // constructor and destructor
@@ -65,12 +63,18 @@ void IB::initialise(Amr* pointer_amr, const int nvar, const int nghost) {
   // pamr->max_level() is a protected member of AmrInfo
 
   IB::cellSizes.resize(IB::max_level+1);
+  IB::dimp.resize(IB::max_level+1);
   cellSizes[0] = pamr->Geom(0).CellSizeArray();
   for (int i=1;i<=IB::max_level;i++) {
-  for (int j=0;j<=AMREX_SPACEDIM-1;j++) {
-    cellSizes[i][j] = cellSizes[i-1][j]/ref_ratio[i-1][j];
-  }}
+    for (int j=0;j<=AMREX_SPACEDIM-1;j++) {
+      cellSizes[i][j] = cellSizes[i-1][j]/ref_ratio[i-1][j];
+    }
+  }
 
+  for (int i=0;i<=IB::max_level;i++) {
+    IB::dimp[i] = 0.6_rt*sqrt(cellSizes[i][0]*cellSizes[i][0] 
+    + cellSizes[i][1]*cellSizes[i][1] + cellSizes[i][2]*cellSizes[i][2]);
+  }
 }
 // create IBMultiFabs at a level and store pointers to it
 void IB::buildIBMultiFab (const BoxArray& bxa, const DistributionMapping& dm, int lev ,int nvar,int nghost) {
@@ -156,7 +160,6 @@ void IB::initialiseGPs (int lev) {
 
   IBMultiFab *mfab = mfa[lev];
   int nhalo = mfab->nGrow(0); // assuming same number of ghost points in all directions
-  Real dip = 0.6_rt*sqrt(cellSizes[lev][0]*cellSizes[lev][0] + cellSizes[lev][1]*cellSizes[lev][1] + cellSizes[lev][2]*cellSizes[lev][2]);
 
   for (MFIter mfi(*mfab,false); mfi.isValid(); ++mfi) {
     IBM::IBFab &fab = mfab->get(mfi);
@@ -186,35 +189,84 @@ void IB::initialiseGPs (int lev) {
       // amrex::Print() << "------------------- " << std::endl;
 
       // IB point -------------------------------------------
-      Vector_CGAL ip_gp(gp,cp);
-      Real dib = sqrt(ip_gp.squared_length());
+      Vector_CGAL imp_gp(gp,cp);
+      Real dibp = sqrt(imp_gp.squared_length());
 
-      // IP point -------------------------------------------
-      fab.gpArray[ii].ip1[0] = cp[0] + dip*fnormals[face][0];
-      fab.gpArray[ii].ip1[1] = cp[1] + dip*fnormals[face][1];
-      fab.gpArray[ii].ip1[2] = cp[2] + dip*fnormals[face][2];
+      // IM point -------------------------------------------
+      Vector<Array<Real,AMREX_SPACEDIM>>& imps = fab.gpArray[ii].imps; 
+      Vector<Array<Real,AMREX_SPACEDIM>>& impscell = fab.gpArray[ii].impscell; 
+      imps.resize(NUM_IMPS);
+      impscell.resize(NUM_IMPS);
+      impscell.resize(NUM_IMPS);
 
-      fab.gpArray[ii].ip2[0] = cp[0] + 2*dip*fnormals[face][0];
-      fab.gpArray[ii].ip2[1] = cp[1] + 2*dip*fnormals[face][1];
-      fab.gpArray[ii].ip2[2] = cp[2] + 2*dip*fnormals[face][2];
+      for (int jj=0; jj<NUM_IMPS; jj++) {
+        for (int kk=0; kk<AMREX_SPACEDIM; kk++) {
+          imps[jj][kk] = cp[kk] + (jj+1)*IB::dimp[lev]*fnormals[face][kk];
+          impscell[jj][kk] = floor(imps[jj][kk]/cellSizes[lev][kk] - 0.5_rt);
+        }
+      }
 
-      fab.gpArray[ii].ip1cell[0] = floor(fab.gpArray[ii].ip1[0]/cellSizes[lev][0] - 0.5_rt);
-      fab.gpArray[ii].ip1cell[1] = floor(fab.gpArray[ii].ip1[1]/cellSizes[lev][1] - 0.5_rt);
-      fab.gpArray[ii].ip1cell[2] = floor(fab.gpArray[ii].ip1[2]/cellSizes[lev][2] - 0.5_rt);
+      Print() << "dibp, dimp (from gp) " << dibp << " " << IB::dimp[lev] << std::endl;
+      for (int jj=0; jj<NUM_IMPS; jj++) {
+        Print() << "imp" << jj+1 << " "<< fab.gpArray[ii].imps[jj] << std::endl;
+        Print() << "impCell" << jj+1 << " "<< fab.gpArray[ii].impscell[jj] << std::endl;
+      }
+      
+      // Interpolation points' weights
+      Vector<Array<Real,8>>& ipweights = fab.gpArray[ii].ipweights; 
 
+      for (int jj=0; jj<NUM_IMPS; jj++) {
+        ipweights[jj] = computeIPweights();
+      }
 
-      fab.gpArray[ii].ip2cell[0] = floor(fab.gpArray[ii].ip2[0]/cellSizes[lev][0] - 0.5_rt);
-      fab.gpArray[ii].ip2cell[1] = floor(fab.gpArray[ii].ip2[1]/cellSizes[lev][1] - 0.5_rt);
-      fab.gpArray[ii].ip2cell[2] = floor(fab.gpArray[ii].ip2[2]/cellSizes[lev][2] - 0.5_rt);
-
-      // Print() << "dib, dip (from gp) " << dib << " " << dip << std::endl;
-      // Print() << "ip1" << fab.gpArray[ii].ip1 << std::endl;
-      // Print() << "ip1 cell" << fab.gpArray[ii].ip1cell << std::endl;
-      // Print() << "ip2" << fab.gpArray[ii].ip2 << std::endl;
-      // Print() << "ip2 cell" << fab.gpArray[ii].ip2cell << std::endl;
-      // exit(0);
+      exit(0);
     }
   }
+}
+
+Array<Real,8> IB::computeIPweights() {
+  // ! tri-linear interpolation
+  // xd =  (p1(1) - xl )/(xr-xl)
+  // yd =  (p1(2) - yl )/(yr-yl)
+  // zd =  (p1(3) - zl )/(zr-zl)
+
+  // zd = 0
+  // eta(1) = (1.0_wp - xd) *(1.0_wp - yd)*(1.0_wp-zd)
+  // eta(2) = (1.0_wp - xd) *yd*(1.0_wp-zd)
+  // eta(3) = xd*yd*(1.0_wp-zd)
+  // eta(4) = xd*(1.0_wp - yd)*(1.0_wp-zd)
+
+  // zd = 2
+  // eta(5) = (1.0_wp - xd) *(1.0_wp - yd)*zd
+  // eta(6) = (1.0_wp - xd) *yd*zd
+  // eta(7) = xd*yd*zd
+  // eta(8) = xd*(1.0_wp - yd)*zd
+  Array<Real,8> weights;
+  return weights;
+}
+
+
+void IB::computeGPs( int lev, MultiFab& S_new) {
+
+  IBMultiFab *mfab = mfa[lev];
+  int nhalo = mfab->nGrow(0); // assuming same number of ghost points in all directions
+
+  for (MFIter mfi(*mfab,false); mfi.isValid(); ++mfi) {
+    IBM::IBFab &fab = mfab->get(mfi);
+    for (int ii=0;ii<fab.ngps;ii++) {
+      IntArray& idx = fab.gpArray[ii].idx;
+
+    // interpolate IM
+
+
+
+    // interpolate IB
+
+
+    // extrapolate
+    }
+  }
+
 }
 
 

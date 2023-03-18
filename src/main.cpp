@@ -49,7 +49,7 @@ int main (int argc, char* argv[]) {
         IBM::ib.setMaxLevel(max_level);
         IBM::ib.readGeom(IBfilename);
         Amr amr(getLevelBld());
-        IBM::ib.initialise(&amr,2,2);
+        IBM::ib.initialise(&amr,2,CNS::NUM_GROW);
         amr.init(strt_time,stop_time);
         timer_init = amrex::second() - timer_init;
     // -------------------------------------------------------------------------

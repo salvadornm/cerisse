@@ -1,6 +1,7 @@
 #include <CNS.H>
 #include <AMReX_FluxRegister.H>
-#include "CNS_hydro_K.H"
+#include <CNS_hydro_K.H>
+#include <IBM.H>
 
 using namespace amrex;
 
@@ -35,8 +36,15 @@ CNS::advance (Real time, Real dt, int /*iteration*/, int /*ncycle*/)
         fr_as_crse->setVal(Real(0.0));
     }
 
+
     // RK2 stage 1
+    // After fillpatch Sborder = U^n
     FillPatch(*this, Sborder, NUM_GROW, time, State_Type, 0, NUM_STATE);
+    // fillpatch copies data from leveldata to sborder
+
+    IBM::ib.computeGPs(level,Sborder);
+    exit(0);
+
     compute_dSdt(Sborder, dSdt, Real(0.5)*dt, fr_as_crse, fr_as_fine);
     // U^* = U^n + dt*dUdt^n
     MultiFab::LinComb(S_new, Real(1.0), Sborder, 0, dt, dSdt, 0, 0, NUM_STATE, 0);
@@ -45,6 +53,9 @@ CNS::advance (Real time, Real dt, int /*iteration*/, int /*ncycle*/)
     // RK2 stage 2
     // After fillpatch Sborder = U^n+dt*dUdt^n
     FillPatch(*this, Sborder, NUM_GROW, time+dt, State_Type, 0, NUM_STATE);
+
+    IBM::ib.computeGPs(level,Sborder);
+
     compute_dSdt(Sborder, dSdt, Real(0.5)*dt, fr_as_crse, fr_as_fine);
     // S_new = 0.5*(Sborder+S_old) = U^n + 0.5*dt*dUdt^n
     MultiFab::LinComb(S_new, Real(0.5), Sborder, 0, Real(0.5), S_old, 0, 0, NUM_STATE, 0);
