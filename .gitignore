@@ -49,3 +49,4 @@ EB_CNS/Exec/Sod/tmp_build_dir
 /lib/boost/bin.v2
 /lib/boost/project-config.jam
 /lib/boost/tools
+/lib/boost/b2
