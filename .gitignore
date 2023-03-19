@@ -36,7 +36,6 @@ EB_CNS/Exec/Sod/tmp_build_dir
 
 /wrk/plt*
 /wrk/tmp_build_dir
-/wrk/clean
 /wrk/*.ex
 /wrk/*.off
 /wrk/Backtrace.*
