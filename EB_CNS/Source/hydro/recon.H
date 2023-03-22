@@ -197,6 +197,78 @@ wenoz5 (amrex::Real s[5], amrex::Real& sm, amrex::Real& sp) noexcept
 }
 
 AMREX_GPU_DEVICE AMREX_FORCE_INLINE void
+teno5 (amrex::Real s[5], amrex::Real& sm, amrex::Real& sp) noexcept
+{
+  using amrex::Real;
+
+  const Real eps = 1e-40;
+  Real vl[3];
+  Real vr[3];
+  Real beta[3];
+  Real alpha[3];
+  Real beta1, alpha1, tau;
+  Real CT = 1e-4; //sharp cutoff smoothness indicator
+
+  beta[2] = Real(13./12.) * pow(s[0] - 2.0 * s[1] + s[2], 2) +
+              0.25 * pow(s[0] - 4.0 * s[1] + 3.0 * s[2], 2);
+  beta[1] = Real(13./12.) * pow(s[1] - 2.0 * s[2] + s[3], 2) +
+              0.25 * (s[1] - s[3]) * (s[1] - s[3]);
+  beta[0] = Real(13./12.) * pow(s[2] - 2.0 * s[3] + s[4], 2) +
+              0.25 * pow(3.0 * s[2] - 4.0 * s[3] + s[4], 2);
+
+  tau = amrex::Math::abs(beta[2] - beta[0]);
+  tau = amrex::Math::abs(tau - (1.0/6.0)*(beta[2] + 4*beta[1] + beta[0]));
+  beta[2] = pow(1.0 + tau / (eps + beta[2]), 6);
+  beta[1] = pow(1.0 + tau / (eps + beta[1]), 6);
+  beta[0] = pow(1.0 + tau / (eps + beta[0]), 6);
+  // beta[2] = pow(eps + beta[2], -6);
+  // beta[1] = pow(eps + beta[1], -6);
+  // beta[0] = pow(eps + beta[0], -6);
+  beta1 = 1.0 / (beta[2] + beta[1] + beta[0]);
+
+  alpha[2] = beta[2] * beta1 < CT ? 0.0 : 1.0;
+  alpha[1] = beta[1] * beta1 < CT ? 0.0 : 6.0;
+  alpha[0] = beta[0] * beta1 < CT ? 0.0 : 3.0;
+  alpha1 = 1.0 / (alpha[2] + alpha[1] + alpha[0]);
+
+  vl[2] = 2.0 * s[0] - 7.0 * s[1] + 11.0 * s[2];
+  vl[1] = -s[1] + 5.0 * s[2] + 2.0 * s[3];
+  vl[0] = 2.0 * s[2] + 5.0 * s[3] - s[4];
+
+  sp = Real(1./6.) * alpha1 *
+        (alpha[2] * vl[2] + alpha[1] * vl[1] + alpha[0] * vl[0]);
+
+  beta[2] = Real(13./12.) * pow(s[4] - 2.0 * s[3] + s[2], 2) +
+              0.25 * pow(s[4] - 4.0 * s[3] + 3.0 * s[2], 2);
+  beta[1] = Real(13./12.) * pow(s[3] - 2.0 * s[2] + s[1], 2) +
+              0.25 * (s[3] - s[1]) * (s[3] - s[1]);
+  beta[0] = Real(13./12.) * pow(s[2] - 2.0 * s[1] + s[0], 2) +
+              0.25 * pow(3.0 * s[2] - 4.0 * s[1] + s[0], 2);
+
+  tau = amrex::Math::abs(beta[2] - beta[0]);
+  tau = amrex::Math::abs(tau - (1.0/6.0)*(beta[2] + 4*beta[1] + beta[0]));
+  beta[2] = pow(1.0 + (tau / (eps + beta[2])), 6);
+  beta[1] = pow(1.0 + (tau / (eps + beta[1])), 6);
+  beta[0] = pow(1.0 + (tau / (eps + beta[0])), 6);
+  // beta[2] = pow(eps + beta[2], -6);
+  // beta[1] = pow(eps + beta[1], -6);
+  // beta[0] = pow(eps + beta[0], -6);
+  beta1 = 1.0 / (beta[2] + beta[1] + beta[0]);
+
+  alpha[2] = beta[2] * beta1 < CT ? 0.0 : 1.0;
+  alpha[1] = beta[1] * beta1 < CT ? 0.0 : 6.0;
+  alpha[0] = beta[0] * beta1 < CT ? 0.0 : 3.0;
+  alpha1 = 1.0 / (alpha[2] + alpha[1] + alpha[0]);
+
+  vr[2] = 11.0 * s[2] - 7.0 * s[3] + 2.0 * s[4];
+  vr[1] = -s[3] + 5.0 * s[2] + 2.0 * s[1];
+  vr[0] = 2.0 * s[2] + 5.0 * s[1] - s[0];
+
+  sm = Real(1./6.) * alpha1 *
+        (alpha[2] * vr[2] + alpha[1] * vr[1] + alpha[0] * vr[0]);
+}
+
+AMREX_GPU_DEVICE AMREX_FORCE_INLINE void
 pp_limiter_scalar (amrex::Real& ql, amrex::Real& qr, const amrex::Real& q, 
                    const amrex::Real m, const amrex::Real M = 1e10)
 {
@@ -326,6 +398,17 @@ cns_recon (int i, int j, int k, int n, int dir,
 
     wenojs5(s, qr(iv,n), ql(iv+iv_dir,n));
   
+  } else if (recon_scheme == 6) {
+    // TENO-5
+    Real s[5];    
+    s[0] = q(iv-2*iv_dir,n);
+    s[1] = q(iv-iv_dir,n);
+    s[2] = q(iv,n);
+    s[3] = q(iv+iv_dir,n);
+    s[4] = q(iv+2*iv_dir,n);
+
+    teno5(s, qr(iv,n), ql(iv+iv_dir,n));
+    
   } else {
     // Default: WENO-Z5
     Real s[5];    
