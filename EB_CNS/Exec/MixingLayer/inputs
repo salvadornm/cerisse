@@ -7,10 +7,10 @@ stop_time = 0.1
 # ================ COMPUTATIONAL DOMAIN ================ #
 geometry.is_periodic = 0 0 0
 geometry.coord_sys   = 0  # 0: cart, 1: RZ, 2:spherical
-geometry.prob_lo     = 0.   -1.2  -0.6
-geometry.prob_hi     = 6.4   1.2   0.6
-amr.n_cell           = 64    24    12
-#amr.n_cell           = 128   48    24
+geometry.prob_lo     = 0.   -1.2  -0.4
+geometry.prob_hi     = 6.4   1.2   0.4
+amr.n_cell           = 64    24    8
+#amr.n_cell           = 512   192   64
 eb2.geom_type = all_regular
 
 # ================ BOUNDARY CONDITIONS ================= #
@@ -27,9 +27,10 @@ cns.do_visc  = 1
 # ==================== WHAT NUMERICS =================== #
 cns.cfl = 0.3
 cns.dt_cutoff = 5.e-20
-cns.recon_scheme = 5   # 1: Godunov, 2: MUSCL, 
-                       # 3: WENO-Z3, 4: WENO-JS5, 5: WENO-Z5
-cns.do_vpdf      = 1   # enable Lagevin model and p_sgs correction
+cns.recon_scheme = 6   # 1: Godunov,  2: MUSCL,   3: WENO-Z3, 
+                       # 4: WENO-JS5, 5: WENO-Z5, 6: TENO-5
+cns.do_psgs      = 1   # enable p_sgs correction
+cns.do_vpdf      = 1   # enable Lagevin model
 cns.do_spdf      = 1   # enable IEM model
 cns.clip_temp    = 50  # clip minimum temperature [K]
 
@@ -46,7 +47,7 @@ cns.update_heat_release = 1
 cns.rk_reaction_iter = 0
 
 # ================ VERBOSITY & DIAGNOSIS =============== #
-cns.v = 2 # 0/1/2
+cns.v = 1 # 0/1/2
 amr.v = 1
 ode.verbose = 0
 
@@ -58,18 +59,21 @@ amr.loadbalance_with_workestimates = 1 # for multi-level run, loadbalance_int = 
 # =============== REFINEMENT / REGRIDDING ============== #
 amr.max_level       = 3     # maximum level number allowed
 amr.ref_ratio       = 2 2 2 # refinement ratio
-amr.regrid_int      = 5     # how often to regrid
+amr.regrid_int      = 100   # how often to regrid
 amr.blocking_factor = 8
 amr.max_grid_size   = 64
-amr.n_error_buf     = 2 2 4 # number of buffer cells in error est
+amr.n_error_buf     = 2 2 2 # number of buffer cells in error est
 amr.grid_eff        = 0.7
 
 # ================== TAGGING CRITERIA ================== #
 cns.refine_dengrad = 2e-4 2e-4 3e-4
-cns.refine_dengrad_max_lev = 4
+cns.refine_dengrad_max_lev = 3
 
 cns.refine_magvort = 1e5
-cns.refine_magvort_max_lev = 4
+cns.refine_magvort_max_lev = 3
+
+#cns.refine_tke = 1e6
+#cns.refine_tke_max_lev = 3
 
 # cns.refine_box_lo_0 = 0.0  -0.75 -0.75
 # cns.refine_box_hi_0 = 12.0 -0.65  0.75
@@ -95,12 +99,12 @@ cns.refine_magvort_max_lev = 4
 
 # ==================== OUTPUT FILES ==================== #
 amr.checkpoint_files_output = 1
-amr.check_file      = vspdf10/chk    # root name of checkpoint file
-amr.check_int       = 500   # number of timesteps between checkpoints
+amr.check_file      = vspdf23/chk    # root name of checkpoint file
+amr.check_int       = 1000   # number of timesteps between checkpoints
 #amr.check_per # interval physical time between checkpoints
 
 amr.plot_files_output = 1
-amr.plot_file         = vspdf10/plt  # root name of plotfile
+amr.plot_file         = vspdf23/plt  # root name of plotfile
 amr.plot_int          = 100  # number of timesteps between plotfiles
 #amr.plot_per # interval physical time between plotfiles
 amr.derive_plot_vars  = temp pressure x_velocity y_velocity z_velocity MachNumber divrho divu magvort cv cp transport_coef reynolds_stress
@@ -118,4 +122,5 @@ prob.p = 942322.5
 prob.vorticity_thickness = 0.0198
 prob.record_statistics = 1
 
-amr.restart = vspdf10/chk01000
+amr.restart = vspdf21/chk01000
+#amr.plotfile_on_restart = 1

@@ -71,7 +71,7 @@ CNS::fill_ext_src (int i, int j, int k,
 
   if (rsq >= theta_sq) {
     for (int nf = 0; nf <= NUM_FIELD; ++nf) {
-      ext_src(i, j, k, nf*NVAR + UMY) += 0.01 * pp.uc * exp(-rsq / theta_sq) * cos(1e-6 * time); // Yuri says amplitude is 0.1*Uc ??
+      ext_src(i, j, k, nf*NVAR + UMY) += 0.01 * pp.uc * exp(-rsq / theta_sq) * sin(1e-6 * time); // Yuri says amplitude is 0.1*Uc ??
     }
   }
 }

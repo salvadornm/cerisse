@@ -62,45 +62,50 @@ bcnormal (
   amrex::Real s_ext[NVAR],
   const int /*idir*/,
   const int /*sgn*/,
-  const amrex::Real /*time*/,
+  const amrex::Real time,
   amrex::GeometryData const& geomdata,
   ProbParm const& pp)
 {
   amrex::Real y = x[1];
   amrex::Real dy = geomdata.CellSize(1);
-  amrex::Real ua = 0.5*(pp.u1 + pp.u2) + 0.5*(pp.u1 - pp.u2)*tanh(2*(y - dy/2)/pp.theta_w);
-  amrex::Real ub = 0.5*(pp.u1 + pp.u2) + 0.5*(pp.u1 - pp.u2)*tanh(2*(y + dy/2)/pp.theta_w);
   // amrex::Real meanu = 0.5*(ua+ub);
   amrex::Real meanu = 0.5*(pp.u1 + pp.u2) + 0.5*(pp.u1 - pp.u2)*tanh(2*y/pp.theta_w);
-  amrex::Real stdu = sqrt((ua-ub)*(ua-ub)/12.0);  
-  amrex::Real randnum;
-  amrex::Real cf = (NUM_FIELD % 2 == 0) ? 1.0 : sqrt((amrex::Real)(NUM_FIELD)/(amrex::Real)(NUM_FIELD - 1)); // correct variance if odd num of fields
+  // amrex::Real ua = 0.5*(pp.u1 + pp.u2) + 0.5*(pp.u1 - pp.u2)*tanh(2*(y - dy/2)/pp.theta_w);
+  // amrex::Real ub = 0.5*(pp.u1 + pp.u2) + 0.5*(pp.u1 - pp.u2)*tanh(2*(y + dy/2)/pp.theta_w);
+  // amrex::Real stdu = sqrt((ua-ub)*(ua-ub)/12.0);  
+  // amrex::Real randnum;
+  // amrex::Real cf = (NUM_FIELD % 2 == 0) ? 1.0 : sqrt((amrex::Real)(NUM_FIELD)/(amrex::Real)(NUM_FIELD - 1)); // correct variance if odd num of fields
+  // amrex::Real rndseed = 1.0; //(((int)(time * 1e7) % 10) % 2 == 0) ? 1.0 : -1.0; // get the 10th decimal place, give 1 if divisible by 2
+                                                                          // so that the inflow is pesudo-random (change in about every 2 coarsest steps)
 
   for (int nf = 0; nf <= NUM_FIELD; ++nf) {
-    if (nf == 0) {
-      randnum = 0.0;
-    } else if (nf == NUM_FIELD) {
-      randnum = (NUM_FIELD % 2 == 0) ? -1.0 : 0.0;
-    } else {
-      // randnum = 2*(nf % 2) - 1;
-      randnum = (2*(nf % 2) - 1) * cf; 
-    }
+    // if (nf == 0) {
+    //   randnum = 0.0;
+    // } else if (nf == NUM_FIELD) {
+    //   randnum = (NUM_FIELD % 2 == 0) ? -1.0 : 0.0;
+    // } else {
+    //   // randnum = 2*(nf % 2) - 1;
+    //   randnum = (2*(nf % 2) - 1) * cf; 
+    // }
+    // } else {
+    //   randnum = 2.0417 * (2*(nf-1)/(NUM_FIELD-1) - 1.0); //scaling for 8 fields
+    // }
 
     if (y > 0.0) {
       s_ext[nf*NVAR + URHO] = pp.rho1;
-      s_ext[nf*NVAR + UMX] = pp.rho1 * (meanu + stdu * randnum);
+      s_ext[nf*NVAR + UMX] = pp.rho1 * (meanu /*+ stdu * rndseed * randnum*/);
       s_ext[nf*NVAR + UMY] = 0.0;
       s_ext[nf*NVAR + UMZ] = 0.0;
-      s_ext[nf*NVAR + UEDEN] = pp.rho1 * pp.ei1 + 0.5 * s_ext[nf*NVAR + UMX] * s_ext[nf*NVAR + UMX] / s_ext[nf*NVAR + URHO];
+      s_ext[nf*NVAR + UEDEN] = pp.rho1 * pp.ei1 + 0.5 * /* pp.rho1 * meanu * meanu;*/s_ext[nf*NVAR + UMX] * s_ext[nf*NVAR + UMX] / s_ext[nf*NVAR + URHO];
       for (int n = 0; n < NUM_SPECIES; ++n) {
         s_ext[nf*NVAR + UFS+n] = pp.rho1 * pp.massfrac1[n];
       }
     } else {
       s_ext[nf*NVAR + URHO] = pp.rho2;
-      s_ext[nf*NVAR + UMX] = pp.rho2 * (meanu + stdu * randnum);
+      s_ext[nf*NVAR + UMX] = pp.rho2 * (meanu /*+ stdu * rndseed * randnum*/);
       s_ext[nf*NVAR + UMY] = 0.0;
       s_ext[nf*NVAR + UMZ] = 0.0;
-      s_ext[nf*NVAR + UEDEN] = pp.rho2 * pp.ei2 + 0.5 * s_ext[nf*NVAR + UMX] * s_ext[nf*NVAR + UMX] / s_ext[nf*NVAR + URHO];
+      s_ext[nf*NVAR + UEDEN] = pp.rho2 * pp.ei2 + 0.5 * /*pp.rho2 * meanu * meanu;*/s_ext[nf*NVAR + UMX] * s_ext[nf*NVAR + UMX] / s_ext[nf*NVAR + URHO];
       for (int n = 0; n < NUM_SPECIES; ++n) {
         s_ext[nf*NVAR + UFS+n] = pp.rho2 * pp.massfrac2[n];
       }
