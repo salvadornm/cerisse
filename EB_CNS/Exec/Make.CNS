@@ -1,11 +1,14 @@
-AMREX_HOME = ../../../Submodules/amrex
-PELE_PHYSICS_HOME = ../../../Submodules/PelePhysics
-TOP =  ../..
+CERISSE_HOME ?= ../../..
+AMREX_HOME = $(CERISSE_HOME)/Submodules/amrex
+PELE_PHYSICS_HOME = $(CERISSE_HOME)/Submodules/PelePhysics
+TOP ?=  ../..
 
 EBASE = Cerisse
 
-ifneq ($(DIM), 1)
-   USE_EB = TRUE
+ifeq ($(USE_EB), TRUE)
+   DEFINES += -DCNS_USE_EB=1
+else
+   USE_EB := FALSE
 endif
 USE_SUNDIALS = TRUE
 USE_SUNDIALS_PP = TRUE
@@ -43,7 +46,7 @@ Apack	+= $(foreach dir, $(Adirs), $(AMREX_HOME)/Src/$(dir)/Make.package)
 
 include $(Apack)
 
-ifneq ($(DIM), 1)
+ifeq ($(USE_EB), TRUE)
    include $(AMREX_HOME)/Src/EB/Make.package
 endif
 
