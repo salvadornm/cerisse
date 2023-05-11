@@ -1,6 +1,6 @@
 CEXE_headers += CNS_hydro_K.H hyperbolics.H recon.H
 
-ifneq ($(DIM), 1)
+ifeq ($(USE_EB), TRUE)
   CEXE_headers += CNS_divop_K.H
   CEXE_headers += CNS_hydro_eb_K.H
   CEXE_sources += CNS_flux_redistribute.cpp

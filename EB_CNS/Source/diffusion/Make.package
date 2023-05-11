@@ -1,5 +1,5 @@
 CEXE_headers += CNS_diffusion_K.H
 
-ifneq ($(DIM), 1)
+ifeq ($(USE_EB), TRUE)
   CEXE_headers += CNS_diffusion_eb_K.H
 endif

@@ -48,9 +48,9 @@ struct CnsFillExtDir
     for (int idir = 0; idir < AMREX_SPACEDIM; ++idir) {
       if // lo
       ((bc.lo(idir) == BCType::ext_dir) && (iv[idir] < domlo[idir])) {
-        //  Ghost | Ghost | Ghost | Real | Real | Real  
-        //  ^cell to be filled      ^firs         ^refl
-        IntVect refl(iv);  refl[idir] = domlo[idir] + (domlo[idir] - iv[idir]) - 1; // reflection image of the ghost cell across boundary 
+        //  Ghost | Ghost | Ghost || Real | Real | Real  
+        //  ^cell to be filled       ^firs         ^refl
+        IntVect refl(iv);  refl[idir] = 2*domlo[idir] - iv[idir] - 1; // reflection image of the ghost cell across boundary 
         IntVect firs(iv);  firs[idir] = domlo[idir]; // interior first cell
         for (int nc = 0; nc < numcomp; ++nc) { // Fill internal state data 
           s_int[dcomp + nc] = dest(firs, dcomp + nc); 
@@ -65,7 +65,7 @@ struct CnsFillExtDir
       }
       else if // hi
       ((bc.hi(idir) == BCType::ext_dir) && (iv[idir] > domhi[idir])) {
-        IntVect refl(iv);  refl[idir] = domhi[idir] + (domhi[idir] - iv[idir]) + 1;
+        IntVect refl(iv);  refl[idir] = 2*domhi[idir] - iv[idir] + 1;
         IntVect firs(iv);  firs[idir] = domhi[idir];
         for (int nc = 0; nc < numcomp; ++nc){ 
           s_int[dcomp + nc] = dest(firs, dcomp + nc);

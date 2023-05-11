@@ -101,10 +101,20 @@ CNS::variableSetUp ()
 
   read_params();
 
-#if (AMREX_SPACEDIM > 1) //1D cannot have EB
+// pc_interp            : Piecewise constant interpolation for cell-centered data
+// cell_bilinear_interp : Linear interpolation for cell-centered data. 3D not implemented
+// quadratic_interp     : Quadratic polynomial interpolation for cell-centered data. 1D version not implemented
+// lincc_interp         : Dimension-by-dimension linear interpolation with MC limiter for cell-centered data. 
+// (PeleC default)        For multi-component data, the strictest limiter is used for all components. 
+//                        The interpolation is conservative in finite-volume sense for both Cartesian and curvilinear coordinates.
+// cell_cons_interp     : Similar to lincc_interp. There are two differences. 1) the interpolations for each component are independent of each other. 
+// (CNS default)          2) after the dimension-by-dimension linear interpolation with limiting, there is a further limiting to ensure no new min or max are created in fine cells.
+// pretected_interp     : Similar to lincc_interp. Additionally, it has a protect function one can call to ensure no values are negative.
+// quartic_interp       : Quartic polynomial conservative interpolation for cell-centered data
+#if CNS_USE_EB
   EBMFCellConsLinInterp* interp = &eb_mf_cell_cons_interp;
 #else
-  Interpolater* interp = &cell_cons_interp; //or pc_interp, lincc_interp
+  Interpolater* interp = &quadratic_interp; //what is the difference between cell_cons_interp and mf_cell_cons_interp?
 #endif
 
   // Setup State_Type
@@ -164,6 +174,7 @@ CNS::variableSetUp ()
     }
   }
 
+#if NUM_AUX > 0
   // Get AUX names
   amrex::Vector<std::string> aux_name;
   prob_get_aux_name(aux_name);
@@ -176,6 +187,7 @@ CNS::variableSetUp ()
     }
     cnt++;
   }
+#endif
 
   StateDescriptor::BndryFunc bndryfunc(cns_bcfill);
   bndryfunc.setRunOnGPU(true);

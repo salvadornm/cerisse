@@ -2,7 +2,7 @@
 
 #include <AMReX_ParmParse.H>
 // #include <AMReX_ErrorList.H>
-#if (AMREX_SPACEDIM > 1) //1D cannot have EB
+#if CNS_USE_EB
 #include <AMReX_EBMultiFabUtil.H>
 #include <AMReX_EBFArrayBox.H>
 #include <AMReX_EBAmrUtil.H>
@@ -21,6 +21,8 @@ using namespace amrex;
 ////////////////////////////////////////////////////////////////////////////
 
 #include "default_parm.H"
+
+amrex::Vector<amrex::Real> UniqueRand::_data;
 
 ////////////////////////////////////////////////////////////////////////////
 //    Overriding AmrLevel virtual functions                               //
@@ -53,6 +55,13 @@ CNS::CNS (Amr&            papa,
     reactor = pele::physics::reactions::ReactorBase::create(chem_integrator);
     reactor->init(1, 1); //init reactor to constant volume type
   }
+
+  // Initialise random number
+  Vector<IntVect> ref_ratio;
+  for (int lv = 0; lv < parent->maxLevel(); ++lv) {
+    ref_ratio.push_back(parent->refRatio(lv));
+  }
+  WienerProcess.init(AMREX_SPACEDIM, level, ref_ratio);
 }
 
 CNS::~CNS () 
@@ -65,28 +74,28 @@ CNS::~CNS ()
 void
 CNS::init (AmrLevel& old)
 {
-    BL_PROFILE("CNS::init(old)");
+  BL_PROFILE("CNS::init(old)");
 
-    auto& oldlev = dynamic_cast<CNS&>(old);
+  auto& oldlev = dynamic_cast<CNS&>(old);
 
-    Real dt_new    = parent->dtLevel(level);
-    Real cur_time  = oldlev.state[State_Type].curTime();
-    Real prev_time = oldlev.state[State_Type].prevTime();
-    Real dt_old    = cur_time - prev_time;
-    setTimeLevel(cur_time,dt_old,dt_new);
+  Real dt_new    = parent->dtLevel(level);
+  Real cur_time  = oldlev.state[State_Type].curTime();
+  Real prev_time = oldlev.state[State_Type].prevTime();
+  Real dt_old    = cur_time - prev_time;
+  setTimeLevel(cur_time,dt_old,dt_new);
 
-    MultiFab& S_new = get_new_data(State_Type);
-    FillPatch(old, S_new, 0, cur_time, State_Type, 0, LEN_STATE);
+  MultiFab& S_new = get_new_data(State_Type);
+  FillPatch(old, S_new, 0, cur_time, State_Type, 0, LEN_STATE);
 
-    amrex::MultiFab& React_new = get_new_data(Reactions_Type);
-    if (do_react) {
-      FillPatch(old, React_new, 0, cur_time, Reactions_Type, 0, React_new.nComp());
-    } else {
-      React_new.setVal(0);
-    }
+  amrex::MultiFab& React_new = get_new_data(Reactions_Type);
+  if (do_react) {
+    FillPatch(old, React_new, 0, cur_time, Reactions_Type, 0, React_new.nComp());
+  } else {
+    React_new.setVal(0);
+  }
 
-    MultiFab& C_new = get_new_data(Cost_Type);
-    FillPatch(old, C_new, 0, cur_time, Cost_Type, 0, 1);
+  MultiFab& C_new = get_new_data(Cost_Type);
+  FillPatch(old, C_new, 0, cur_time, Cost_Type, 0, 1);
 }
 
 void
@@ -256,7 +265,7 @@ CNS::post_timestep (int /*iteration*/)
     CNS& fine_level = getLevel(level+1);
     MultiFab& S_crse = get_new_data(State_Type);
     MultiFab& S_fine = fine_level.get_new_data(State_Type);
-#if (AMREX_SPACEDIM > 1) //1D cannot have EB
+#if CNS_USE_EB
     fine_level.flux_reg.Reflux(S_crse, *volfrac, S_fine, *fine_level.volfrac);
 #else
     fine_level.flux_reg.Reflux(S_crse);
@@ -349,6 +358,13 @@ CNS::post_restart ()
     }
   }
   
+  // Initialise random number
+  Vector<IntVect> ref_ratio;
+  for (int lv = 0; lv < parent->maxLevel(); ++lv) {
+    ref_ratio.push_back(parent->refRatio(lv));
+  }
+  WienerProcess.init(AMREX_SPACEDIM, level, ref_ratio);
+  
   MultiFab& S_new = get_new_data(State_Type);
 
   // Populate fields (when restarting from a different number of fields)
@@ -388,11 +404,11 @@ CNS::post_restart ()
 
 void
 CNS::errorEst (TagBoxArray& tags, int /*clearval*/, int tagval, 
-               Real /*time*/, int /*n_error_buf = 0*/, int /*ngrow*/)
+               Real time, int /*n_error_buf = 0*/, int /*ngrow*/)
 {
   BL_PROFILE("CNS::errorEst()");
 
-#if (AMREX_SPACEDIM > 1) //1D cannot have EB (and hence cut-cells)
+#if CNS_USE_EB
   if (refine_cutcells && (level < refine_cutcells_max_lev)) {
     const MultiFab& S_new = get_new_data(State_Type);
     TagCutCells(tags, S_new);
@@ -426,10 +442,10 @@ CNS::errorEst (TagBoxArray& tags, int /*clearval*/, int tagval,
         }
       }
     });
-    Gpu::streamSynchronize();
+    // Gpu::streamSynchronize();
   }
 
-  // const MultiFab& S_new = get_new_data(State_Type);
+  const MultiFab& S_new = get_new_data(State_Type);
   MultiFab Sborder(grids, dmap, NVAR, 1, MFInfo(), Factory());
   const Real cur_time = state[State_Type].curTime();
   FillPatch(*this, Sborder, Sborder.nGrow(), cur_time, State_Type, URHO, NVAR, 0);  
@@ -447,7 +463,7 @@ CNS::errorEst (TagBoxArray& tags, int /*clearval*/, int tagval,
     [=] AMREX_GPU_DEVICE (int box_no, int i, int j, int k) noexcept {
       cns_tag_grad(i, j, k, tagma[box_no], rhoma[box_no], dxinv, dengrad_threshold, tagval);
     });
-    Gpu::streamSynchronize();
+    // Gpu::streamSynchronize();
   }
 
   if (level < refine_magvort_max_lev) {
@@ -457,7 +473,7 @@ CNS::errorEst (TagBoxArray& tags, int /*clearval*/, int tagval,
       const Box& bx = mfi.tilebox();
       
       FArrayBox magvort(bx, 1);
-      const int* bc = 0;
+      const int* bc = 0; //dummy
       cns_dermagvort(bx, magvort, 0, 1, Sborder[mfi], geom, cur_time, bc, level);
     
       auto tagarr = tags.array(mfi);
@@ -467,37 +483,70 @@ CNS::errorEst (TagBoxArray& tags, int /*clearval*/, int tagval,
         cns_tag_error(i, j, k, tagarr, mvarr, magvort_threshold, tagval);
       });
     }
-    Gpu::streamSynchronize();
+    // Gpu::streamSynchronize();
   }
 
-    // // Tagging flame tracer
-    // if (!flame_trac_name.empty()) {
-    //     auto it = std::find(spec_names.begin(), spec_names.end(), flame_trac_name);
+#if (NUM_FIELD > 0) // cannot calculate tke if no SF
+  if (level < refine_tke_max_lev) {
+    const Real threshold = refine_tke[level];
 
-    //     if (it != spec_names.end()) {
-    //         const auto idx = std::distance(spec_names.begin(), it);
+    for (MFIter mfi(tags, TilingIfNotGPU()); mfi.isValid(); ++mfi) {
+      const Box& bx = mfi.tilebox();
+      
+      FArrayBox tke(bx, 1);
+      const int* bc = 0; //dummy
+      cns_dertke(bx, tke, 0, 1, S_new[mfi], geom, cur_time, bc, level);
+    
+      auto tagarr = tags.array(mfi);
+      auto karr = tke.const_array();
+      ParallelFor(bx,
+      [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept {
+        cns_tag_error(i, j, k, tagarr, karr, threshold, tagval);
+      });
+    }
+    // Gpu::streamSynchronize();
+  }
+#endif
 
-    //         if (level < max_ftracer_lev) {
-    //         const amrex::Real captured_ftracerr = tagging_parm->ftracerr;
-    //         amrex::ParallelFor(
-    //             tilebox, [=] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {
-    //             tag_error(
-    //                 i, j, k, tag_arr, S_derarr, captured_ftracerr, tagval);
-    //             });
-    //         }
-    //         if (level < tagging_parm->max_ftracgrad_lev) {
-    //         const amrex::Real captured_ftracgrad = tagging_parm->ftracgrad;
-    //         amrex::ParallelFor(
-    //             tilebox, [=] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {
-    //             tag_graderror(
-    //                 i, j, k, tag_arr, S_derarr, captured_ftracgrad, tagval);
-    //             });
-    //         }
+  // // Tagging flame tracer
+  // if (!flame_trac_name.empty()) {
+  //     auto it = std::find(spec_names.begin(), spec_names.end(), flame_trac_name);
 
-    //     } else {
-    //         amrex::Abort("Unknown species identified as flame_trac_name");
-    //     }
-    // }
+  //     if (it != spec_names.end()) {
+  //         const auto idx = std::distance(spec_names.begin(), it);
+
+  //         if (level < max_ftracer_lev) {
+  //         const amrex::Real captured_ftracerr = tagging_parm->ftracerr;
+  //         amrex::ParallelFor(
+  //             tilebox, [=] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {
+  //             tag_error(
+  //                 i, j, k, tag_arr, S_derarr, captured_ftracerr, tagval);
+  //             });
+  //         }
+  //         if (level < tagging_parm->max_ftracgrad_lev) {
+  //         const amrex::Real captured_ftracgrad = tagging_parm->ftracgrad;
+  //         amrex::ParallelFor(
+  //             tilebox, [=] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {
+  //             tag_graderror(
+  //                 i, j, k, tag_arr, S_derarr, captured_ftracgrad, tagval);
+  //             });
+  //         }
+
+  //     } else {
+  //         amrex::Abort("Unknown species identified as flame_trac_name");
+  //     }
+  // }
+
+  // Problem specific taggings
+  Parm const* lparm = d_parm;
+  ProbParm const* lprobparm = d_prob_parm;
+  const auto geomdata = geom.data();
+  auto tagarr = tags.arrays();
+  auto const& sarrs = S_new.arrays();
+  amrex::ParallelFor(tags,
+  [=] AMREX_GPU_DEVICE (int box_no, int i, int j, int k) noexcept {
+    prob_tag_error(i, j, k, tagarr[box_no], sarrs[box_no], level, tagval, time, geomdata, *lparm, *lprobparm);
+  });
 }
 
 ////////////////////////////////////////////////////////////////////////////
@@ -517,7 +566,7 @@ CNS::printTotalandCheckNan () const
   std::array<Real, 6> tot;
   for (int comp = 0; comp < 6; ++comp) {
     MultiFab::Copy(mf, S_new, comp, 0, 1, 0);
-#if (AMREX_SPACEDIM > 1) //1D cannot have EB
+#if CNS_USE_EB
     MultiFab::Multiply(mf, *volfrac, 0, 0, 1, 0);
 #endif
     tot[comp] = mf.sum(0, true) * geom.ProbSize();
@@ -700,6 +749,27 @@ CNS::read_params ()
     } 
   }
 
+#if (NUM_FIELD > 0) // cannot calculate tke if no SF
+  pp.query("refine_tke_max_lev", refine_tke_max_lev);
+  numvals = pp.countval("refine_tke");
+  if (numvals > 0) {
+    if (numvals == max_level) {
+      pp.queryarr("refine_tke", refine_tke);
+    } else if (max_level > 0) {
+      refine_tke.resize(max_level);
+      Vector<Real> refine_tmp;
+      pp.queryarr("refine_tke", refine_tmp);
+      int lev = 0;
+      for (; lev < std::min<int>(numvals, max_level); ++lev) {
+        refine_tke[lev] = refine_tmp[lev];
+      }
+      for (; lev < max_level; ++lev) {
+        refine_tke[lev] = refine_tmp[numvals-1];
+      }
+    } 
+  }
+#endif
+
   int irefbox = 0;
   Vector<Real> refboxlo, refboxhi;
   int refbox_maxlev;
@@ -722,6 +792,7 @@ CNS::read_params ()
   }
 
   pp.query("do_visc", do_visc);
+  pp.query("do_ext_src", do_ext_src);
 
   pp.query("do_react", do_react);
   pp.query("chem_integrator", chem_integrator);
@@ -733,10 +804,11 @@ CNS::read_params ()
   pp.query("update_heat_release", update_heat_release);
 
   pp.query("do_restart_fields", do_restart_fields);
+  pp.query("do_psgs", do_psgs);
   pp.query("do_vpdf", do_vpdf);
   pp.query("do_spdf", do_spdf);
 
-#if (AMREX_SPACEDIM > 1) //1D cannot have EB  
+#if CNS_USE_EB  
   // eb_weights_type:
   //   0 -- weights = 1
   //   1 -- use_int_energy_as_eb_weights
@@ -772,7 +844,7 @@ CNS::avgDown ()
   MultiFab volume(S_fine.boxArray(), S_fine.DistributionMap(), 1, 0);
   geom.GetVolume(volume);
 
-#if (AMREX_SPACEDIM > 1) //1D cannot have EB
+#if CNS_USE_EB
   amrex::EB_average_down(S_fine, S_crse, volume, fine_lev.volFrac(),
                          0, S_fine.nComp(), fine_ratio);
 #else
@@ -785,7 +857,7 @@ CNS::avgDown ()
   if (do_react) {
             MultiFab& R_crse =          get_new_data(Reactions_Type);
       const MultiFab& R_fine = fine_lev.get_new_data(Reactions_Type);
-#if (AMREX_SPACEDIM > 1) //1D cannot have EB
+#if CNS_USE_EB
       amrex::EB_average_down(R_fine, R_crse, volume, fine_lev.volFrac(),
                               0, R_fine.nComp(), fine_ratio);
 #else
@@ -800,13 +872,17 @@ CNS::buildMetrics ()
 {
   BL_PROFILE("CNS::buildMetrics()");
   
-#if (AMREX_SPACEDIM > 1) //1D cannot have EB    
+#if CNS_USE_EB    
   // make sure dx == dy == dz if use EB
   const Real* dx = geom.CellSize();
 
   if (AMREX_D_TERM(, std::abs(dx[0]-dx[1]) > 1.e-12*dx[0], 
                   || std::abs(dx[0]-dx[2]) > 1.e-12*dx[0])) {
     amrex::Abort("EB must have dx == dy == dz (for cut surface fluxes)\n");
+  }
+
+  if ((AMREX_SPACEDIM == 1) && (CNS_USE_EB)) {
+    amrex::Abort("1D cannot do EB\n");
   }
 
   const auto& ebfactory = dynamic_cast<EBFArrayBoxFactory const&>(Factory());
@@ -836,7 +912,7 @@ CNS::estTimeStep ()
   const MultiFab& S = get_new_data(State_Type);
   Parm const* lparm = d_parm;
 
-#if (AMREX_SPACEDIM > 1) //1D cannot have EB
+#if CNS_USE_EB
   auto const& fact = dynamic_cast<EBFArrayBoxFactory const&>(S.Factory());
   auto const& flags = fact.getMultiEBCellFlagFab();
 #endif
@@ -855,7 +931,7 @@ CNS::estTimeStep ()
   {
     const Box& bx = mfi.tilebox();
     auto const& s_arr = S.array(mfi);
-#if (AMREX_SPACEDIM > 1) //1D cannot have EB
+#if CNS_USE_EB
     const auto& flag = flags[mfi];
     if (flag.getType(bx) != FabType::covered)
 #endif

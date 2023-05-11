@@ -432,6 +432,28 @@ void cns_dervaru (const Box& bx, FArrayBox& derfab, int dcomp, int /*ncomp*/,
   });
 }
 
+void cns_dertke (const Box& bx, FArrayBox& derfab, int dcomp, int /*ncomp*/,
+                 const FArrayBox& datafab, const Geometry& /*geomdata*/,
+                 Real /*time*/, const int* /*bcrec*/, int /*level*/)
+{
+  auto const dat = datafab.const_array();
+  auto tke = derfab.array(dcomp); //trace of reynolds stresses
+
+  amrex::ParallelFor(bx, [=] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {
+    tke(i, j, k) = 0.0;
+    for (int dir = 0; dir < AMREX_SPACEDIM; ++dir) {
+      amrex::Real meanu = dat(i, j, k, UMX+dir) / dat(i, j, k, URHO);
+      amrex::Real u;
+      for (int nf = 1; nf < NUM_FIELD; ++nf) {
+        u = dat(i, j, k, nf*NVAR + UMX+dir) / dat(i, j, k, nf*NVAR + URHO);
+        tke(i, j, k) += (u - meanu) * (u - meanu);
+      }
+    }
+    tke(i, j, k) /= amrex::Real(NUM_FIELD - 1); //over N-1 instead of N is more accurate    
+    tke(i, j, k) *= 0.5;
+  });
+}
+
 void cns_dervary (const Box& bx, FArrayBox& derfab, int dcomp, int /*ncomp*/,
                   const FArrayBox& datafab, const Geometry& /*geomdata*/,
                   Real /*time*/, const int* /*bcrec*/, int /*level*/)

@@ -2,7 +2,7 @@
 #define CNS_DERIVE_H
 
 #include <AMReX_FArrayBox.H>
-// #if (AMREX_SPACEDIM > 1) //1D cannot have EB
+// #if CNS_USE_EB
 // #include <AMReX_EBFArrayBox.H>
 // #endif
 #include <AMReX_Geometry.H>
@@ -131,6 +131,17 @@ void cns_dermolefrac (
   int level);
 
 void cns_dervaru (
+  const amrex::Box& bx, 
+  amrex::FArrayBox& derfab, 
+  int dcomp, 
+  int ncomp,
+  const amrex::FArrayBox& datafab, 
+  const amrex::Geometry& geomdata,
+  amrex::Real time, 
+  const int* bcrec, 
+  int level);
+  
+void cns_dertke (
   const amrex::Box& bx, 
   amrex::FArrayBox& derfab, 
   int dcomp, 

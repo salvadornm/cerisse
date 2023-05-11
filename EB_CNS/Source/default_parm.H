@@ -18,6 +18,8 @@ int             CNS::refine_dengrad_max_lev = -1;
 Vector<Real>    CNS::refine_dengrad;
 int             CNS::refine_magvort_max_lev = -1;
 Vector<Real>    CNS::refine_magvort;
+int             CNS::refine_tke_max_lev = -1;
+Vector<Real>    CNS::refine_tke;
 // TaggingParm* CNS::tag_parm;
 // Vector<AMRErrorTag> CNS::errtagger;
 
@@ -40,10 +42,11 @@ int      CNS::recon_scheme   = 5;   // 1: basic Godunov; 2: MUSCL; 3: WENO-Z3; 4
 Real     CNS::plm_theta      = 2.0; // [1,2] 1: minmod; 2: van Leer's MC (higher sharper)
 
 bool     CNS::do_restart_fields = false;
+bool     CNS::do_psgs = false;
 bool     CNS::do_vpdf = false;
 bool     CNS::do_spdf = false;
 
-#if (AMREX_SPACEDIM > 1) //1D cannot have EB
+#if CNS_USE_EB
 int      CNS::eb_weights_type     = 0; // [0,1,2,3] 0: weights are all 1; 1: eint; 2: cell mass; 3: volfrac
 int      CNS::do_reredistribution = 1;
 #endif

@@ -3,7 +3,7 @@
 
 #include <AMReX_AmrLevel.H>
 
-#if (AMREX_SPACEDIM > 1) //1D cannot have EB
+#if CNS_USE_EB
 #include <AMReX_EBCellFlag.H>
 #include <AMReX_EBFluxRegister.H>
 #else
@@ -17,6 +17,7 @@
 #include "prob_parm.H"
 #include "index_macros.H"
 #include "parm.H"
+#include "random.H"
 
 using namespace amrex;
 
@@ -140,7 +141,7 @@ public:
                          amrex::Array4<amrex::Real      >& dSdtfab,
                          const std::array<FArrayBox*, AMREX_SPACEDIM>& flux);
 
-#if (AMREX_SPACEDIM > 1) //1D cannot have EB
+#if CNS_USE_EB
   void compute_dSdt_box_eb (const amrex::Box& bx,
                             amrex::Array4<amrex::Real       const> const& Sfab,
                             amrex::Array4<amrex::Real            > const& dSdtfab,
@@ -184,7 +185,7 @@ public:
 
   void computeAvg (amrex::MultiFab& State);
 
-  void compute_pdf_model (amrex::MultiFab& S, amrex::Real dt);
+  void compute_pdf_model (amrex::MultiFab& S, amrex::Real dt, int iteration);
   
   // Estimate timestep size based on CFL number
   amrex::Real estTimeStep ();
@@ -224,7 +225,7 @@ protected:
   void buildMetrics ();
 
   void compute_dSdt (const amrex::MultiFab& S, amrex::MultiFab& dSdt, amrex::Real dt,
-#if (AMREX_SPACEDIM > 1) //1D cannot have EB
+#if CNS_USE_EB
                       amrex::EBFluxRegister* fr_as_crse, amrex::EBFluxRegister* fr_as_fine,
 #else
                       amrex::YAFluxRegister* fr_as_crse, amrex::YAFluxRegister* fr_as_fine,
@@ -251,7 +252,7 @@ protected:
 
   void set_typical_values_chem ();
 
-#if (AMREX_SPACEDIM > 1) //1D cannot have EB
+#if CNS_USE_EB
   const amrex::MultiFab& volFrac () const { return *volfrac; }
 #endif
 
@@ -262,7 +263,7 @@ protected:
   //
   // EB related
 
-#if (AMREX_SPACEDIM > 1) //1D cannot have EB
+#if CNS_USE_EB
   const amrex::MultiFab* volfrac;
   const amrex::MultiCutFab* bndrycent;
   std::array<const amrex::MultiCutFab*,AMREX_SPACEDIM> areafrac;
@@ -270,7 +271,7 @@ protected:
   amrex::iMultiFab level_mask;
 #endif
 
-#if (AMREX_SPACEDIM > 1) //1D cannot have EB
+#if CNS_USE_EB
   amrex::EBFluxRegister flux_reg;
 #else
   amrex::YAFluxRegister flux_reg;
@@ -285,10 +286,13 @@ protected:
   // PelePhysics related
 
   static amrex::Vector<std::string> spec_names;
-
   static std::string chem_integrator;
-
   std::unique_ptr<pele::physics::reactions::ReactorBase> reactor;
+
+  //
+  // PDF related
+
+  UniqueRand WienerProcess;
 
   // 
   // Control parameters
@@ -314,10 +318,11 @@ protected:
   static int recon_scheme;
 
   static bool do_restart_fields;
+  static bool do_psgs;
   static bool do_vpdf;
   static bool do_spdf;
 
-#if (AMREX_SPACEDIM > 1) //1D cannot have EB
+#if CNS_USE_EB
   static int eb_weights_type;
   static int do_reredistribution;
 #endif
@@ -331,6 +336,8 @@ protected:
   static int refine_dengrad_max_lev;
   static amrex::Vector<amrex::Real> refine_magvort;
   static int refine_magvort_max_lev;
+  static amrex::Vector<amrex::Real> refine_tke;
+  static int refine_tke_max_lev;
   // static amrex::Vector<amrex::AMRErrorTag> errtagger;
 
   static Parm* h_parm;

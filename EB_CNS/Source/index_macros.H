@@ -1,6 +1,11 @@
 #ifndef CNS_INDEX_MACROS_H
 #define CNS_INDEX_MACROS_H
 
+// Do EB?
+#ifndef CNS_USE_EB
+#define CNS_USE_EB 0
+#endif
+
 // Grow cell number
 #define NUM_GROW 5
 

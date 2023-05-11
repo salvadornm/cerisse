@@ -1,4 +1,4 @@
-#if (AMREX_SPACEDIM > 1) //1D cannot have EB
+#if CNS_USE_EB
 #include <AMReX_EBFArrayBox.H>
 #include <AMReX_MultiCutFab.H>
 #endif
@@ -8,8 +8,17 @@
 
 using namespace amrex;
 
+/** @brief The main driver for a single level implementing the time advance.
+ *  @param time the current simulation time
+ *  @param dt the timestep to advance (e.g., go from time to time + dt)
+ *  @param iteration where we are in the current AMR subcycle. Each
+                     level will take a number of steps to reach the
+                     final time of the coarser level below it. This
+                     counter starts at 1
+ *  @param ncycle  the number of subcycles at this level
+ * */
 Real
-CNS::advance(Real time, Real dt, int /*iteration*/, int /*ncycle*/)
+CNS::advance(Real time, Real dt, int iteration, int ncycle)
 {
   BL_PROFILE("CNS::advance()");
 
@@ -36,7 +45,7 @@ CNS::advance(Real time, Real dt, int /*iteration*/, int /*ncycle*/)
   get_new_data(Cost_Type).setVal(0.0);
 
   // Prepare flux register
-#if (AMREX_SPACEDIM > 1) //1D cannot have EB
+#if CNS_USE_EB
   EBFluxRegister* fr_as_crse = nullptr;
   EBFluxRegister* fr_as_fine = nullptr;
 #else
@@ -56,6 +65,7 @@ CNS::advance(Real time, Real dt, int /*iteration*/, int /*ncycle*/)
 
   // Start time-stepping  
   // RK2 stage 1: U^* = U^n + dt*dUdt^n + dt*I_R^n
+  if (verbose > 1) amrex::Print() << " >> AMR Cycle " << iteration << " of " << ncycle << std::endl;
   if (verbose > 0) amrex::Print() << " >> RK Step 1: Computing dSdt^{n}" << std::endl;
   FillPatch(*this, Sborder, NUM_GROW, time, State_Type, 0, LEN_STATE);
   compute_dSdt(Sborder, dSdt_old, 0.5*dt, fr_as_crse, fr_as_fine, true);
@@ -65,9 +75,9 @@ CNS::advance(Real time, Real dt, int /*iteration*/, int /*ncycle*/)
       MultiFab::Saxpy(S_new, dt, I_R, nf*NREACT, nf*NVAR+UFS, NUM_SPECIES, 0);
     }
   }
-  if (NUM_FIELD > 0) {
-    // do something
-  }
+  // if (NUM_FIELD > 0) {
+  //   do something
+  // }
   enforce_consistent_state(); // Enforce rho = sum(rhoY)
 
   // RK2 stage 2: U^{n+1} = U^n + 0.5*dt*(dUdt^n + dUdt^{n+1}) + dt*I_R^{n+1}
@@ -76,12 +86,22 @@ CNS::advance(Real time, Real dt, int /*iteration*/, int /*ncycle*/)
   compute_dSdt(Sborder, dSdt_new, 0.5*dt, fr_as_crse, fr_as_fine, (rk_reaction_iter < 1));
   MultiFab::LinComb(S_new, 0.5*dt, dSdt_new, 0, 0.5*dt, dSdt_old, 0, 0, LEN_STATE, 0);
   MultiFab::Add(S_new, S_old, 0, 0, LEN_STATE, 0);
+
+  if (NUM_FIELD > 0) {
+    computeAvg(S_new);
+    FillPatch(*this, Sborder, 1, time+dt, State_Type, 0, LEN_STATE);
+    compute_pdf_model(Sborder, dt, iteration);
+    MultiFab::Copy(S_new, Sborder, 0, 0, LEN_STATE, 0);
+    // computeAvg(S_new);
+    // enforce_consistent_state(); // Enforce rho = sum(rhoY)
+  }
+
   if (do_react) { // Compute I_R^{n+1}(U^**) and do U^{n+1} = U^** + dt*I_R^{n+1}
     react_state(time, dt);
   }
   enforce_consistent_state(); // Enforce rho = sum(rhoY)
   
-  // Iterate to couple chemistry (haven't tested)
+  // Iterate to couple chemistry (not tested)
   // if (do_react && (rk_reaction_iter > 1)) {
   //   for (int iter = 1; iter < rk_reaction_iter; ++iter) {
   //     if (verbose > 0) {
@@ -97,21 +117,21 @@ CNS::advance(Real time, Real dt, int /*iteration*/, int /*ncycle*/)
   //   }
   // }
 
-  if (NUM_FIELD > 0) {
-    computeAvg(S_new);
-    FillPatch(*this, Sborder, 1, time+dt, State_Type, 0, LEN_STATE);
-    compute_pdf_model(Sborder, dt);
-    MultiFab::Copy(S_new, Sborder, 0, 0, LEN_STATE, 0);
-    computeAvg(S_new);
-    enforce_consistent_state(); // Enforce rho = sum(rhoY)
-  }
+  // if (NUM_FIELD > 0) {
+  //   computeAvg(S_new);
+  //   FillPatch(*this, Sborder, 1, time+dt, State_Type, 0, LEN_STATE);
+  //   compute_pdf_model(Sborder, dt);
+  //   MultiFab::Copy(S_new, Sborder, 0, 0, LEN_STATE, 0);
+  //   computeAvg(S_new);
+  //   enforce_consistent_state(); // Enforce rho = sum(rhoY)
+  // }
 
   return dt;
 }
 
 void
 CNS::compute_dSdt (const MultiFab& S, MultiFab& dSdt, Real dt,
-#if (AMREX_SPACEDIM > 1) //1D cannot have EB
+#if CNS_USE_EB
                    EBFluxRegister* fr_as_crse, EBFluxRegister* fr_as_fine,
 #else
                    YAFluxRegister* fr_as_crse, YAFluxRegister* fr_as_fine,
@@ -128,7 +148,7 @@ CNS::compute_dSdt (const MultiFab& S, MultiFab& dSdt, Real dt,
 
   MultiFab& cost = get_new_data(Cost_Type);
 
-#if (AMREX_SPACEDIM > 1) //1D cannot have EB
+#if CNS_USE_EB
   auto const& fact = dynamic_cast<EBFArrayBoxFactory const&>(S.Factory());
   auto const& flags = fact.getMultiEBCellFlagFab();
 #endif
@@ -146,7 +166,7 @@ CNS::compute_dSdt (const MultiFab& S, MultiFab& dSdt, Real dt,
     const Box& bx = mfi.tilebox();
     amrex::Real wt = amrex::second();
       
-#if (AMREX_SPACEDIM > 1) //1D cannot have EB
+#if CNS_USE_EB
     const auto& flag = flags[mfi];
     if (flag.getType(bx) == FabType::covered) {
       dSdt[mfi].setVal<RunOn::Device>(0.0, bx, 0, ncomp);
@@ -160,7 +180,7 @@ CNS::compute_dSdt (const MultiFab& S, MultiFab& dSdt, Real dt,
         flux[idim].setVal<RunOn::Device>(0.);
       }
 
-#if (AMREX_SPACEDIM > 1) //1D cannot have EB
+#if CNS_USE_EB
       if (flag.getType(amrex::grow(bx,1)) == FabType::regular) {
 #endif
         Array4<Real const>    s_arr =    S.array(mfi);
@@ -177,7 +197,7 @@ CNS::compute_dSdt (const MultiFab& S, MultiFab& dSdt, Real dt,
             fr_as_fine->FineAdd(mfi, {AMREX_D_DECL(&flux[0], &flux[1], &flux[2])}, dx, dt, RunOn::Device);
           }
         }
-#if (AMREX_SPACEDIM > 1) //1D cannot have EB
+#if CNS_USE_EB
       } else {
         FArrayBox* p_drho_as_crse = (fr_as_crse) ?
             fr_as_crse->getCrseData(mfi) : &fab_drho_as_crse;
@@ -260,7 +280,7 @@ CNS::enforce_consistent_state ()
   // auto const& rhoY = Array4<Real>(state, UFS, NUM_SPECIES);
   // auto const& rhoE = Array4<Real>(state, UEDEN, 1);
 
-#if (AMREX_SPACEDIM > 1) //1D cannot have EB
+#if CNS_USE_EB
   auto const& fact = dynamic_cast<EBFArrayBoxFactory const&>(S.Factory());
   auto const& flags = fact.getMultiEBCellFlagFab();
 #endif
@@ -272,7 +292,7 @@ CNS::enforce_consistent_state ()
   for (MFIter mfi(S, TilingIfNotGPU()); mfi.isValid(); ++mfi) {
     const Box& bx = mfi.tilebox();
       
-#if (AMREX_SPACEDIM > 1) //1D cannot have EB
+#if CNS_USE_EB
     const auto& flag = flags[mfi];
     if (flag.getType(bx) != FabType::covered)
 #endif

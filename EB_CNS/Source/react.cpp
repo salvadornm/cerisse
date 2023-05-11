@@ -55,7 +55,7 @@ CNS::react_state (amrex::Real /*time*/,
   amrex::iMultiFab maskFab(grids, dmap, 1, 0); //= 1: do reaction, = -1: don't do reaction
   amrex::MultiFab  fctCount(grids, dmap, 1, 0); //number of RHS evaluations in reactor
 
-#if (AMREX_SPACEDIM > 1) //1D cannot have EB
+#if CNS_USE_EB
   auto const& fact = dynamic_cast<amrex::EBFArrayBoxFactory const&>(Snew.Factory());
   auto const& flags = fact.getMultiEBCellFlagFab();
 #endif
@@ -68,7 +68,7 @@ CNS::react_state (amrex::Real /*time*/,
     const amrex::Box bx = mfi.tilebox();
     amrex::Real wt = amrex::ParallelDescriptor::second(); // timing for each fab
     
-#if (AMREX_SPACEDIM > 1) //1D cannot have EB
+#if CNS_USE_EB
     const auto& flag_fab = flags[mfi];
     amrex::FabType typ = flag_fab.getType(bx);
     if ((typ == amrex::FabType::singlevalued) || (typ == amrex::FabType::regular)) 
