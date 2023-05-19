@@ -9,40 +9,6 @@
 
 #include "index_macros.H"
 
-// /**
-//  * @brief A wrapper for 3D std::vector
-//  */
-// template <typename T>
-// class Vector3 {
-//   public:
-//     Vector3() = default;
-
-//     void resize(size_t d1, size_t d2, size_t d3) {
-//       _d1 = d1;
-//       _d2 = d2;
-//       _d3 = d3;
-//       _data.resize(d1*d2*d3);
-//     }
-
-//     T & operator()(size_t i, size_t j, size_t k) {
-//       assert(i>=0 && i<_d1 && j>=0 && j<_d2 && k>=0 && k<_d3);
-//       return _data[i*_d2*_d3 + j*_d3 + k];
-//     }
-
-//     T const & operator()(size_t i, size_t j, size_t k) const {
-//       assert(i>=0 && i<_d1 && j>=0 && j<_d2 && k>=0 && k<_d3);
-//       return _data[i*_d2*_d3 + j*_d3 + k];
-//     }
-
-//     T & raw_data() { 
-//       return _data.data();
-//     }
-
-//   private:
-//     size_t _d1, _d2, _d3;
-//     std::vector<T> _data;
-// };
-
 /**
  * @brief A class for generating, broadcasting, and storing random numbers across levels
  */
@@ -85,7 +51,7 @@ class UniqueRand {
      * @param rand_mode 0: unmodified random normal; 1: normalised randn; 2: [1,-1]
      * @param sync_mode 0: randomise at finest level, sum up to coarser levels; 1: randomise at coarsest level, divide to finer levels
      */
-    void generate_new(amrex::Real sqrtdt_coarse, int rand_mode=0, int sync_mode=0) 
+    void generate_new(amrex::Real sqrtdt_coarse, int rand_mode=2, int sync_mode=0) 
     { 
       if (_lev == 0) { // only do this at the beginning of a coarse timestep      
         if (amrex::ParallelDescriptor::IOProcessor()) {
@@ -162,8 +128,6 @@ class UniqueRand {
      */
     void get_rand(int step, amrex::Real (&out)[][NUM_FIELD]) {      
       int cycle = step % _num_per_coarse_step;
-
-      // amrex::Print() << "** Level " << _lev << " cycle " << cycle << " step " << step << std::endl;
       
       int start_sum = cycle * _num_sum;
       

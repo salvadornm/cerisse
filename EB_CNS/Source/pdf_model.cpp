@@ -54,7 +54,7 @@ CNS::compute_pdf_model (amrex::MultiFab& S, amrex::Real dt, int iteration)
 
   // Prepare Wiener process for vpdf. It is constant over space.
   amrex::Real dW[AMREX_SPACEDIM][NUM_FIELD]; 
-  WienerProcess.generate_new(sqrt(dt), 2, 0);
+  WienerProcess.generate_new(sqrt(dt), 0, 0);
   WienerProcess.get_rand(nStep(), dW);
 
   /////////////////////////////////////////////////
