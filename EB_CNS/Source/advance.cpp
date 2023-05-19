@@ -63,7 +63,7 @@ CNS::advance(Real time, Real dt, int iteration, int ncycle)
     fr_as_crse->reset();
   }
 
-  // Start time-stepping  
+  // Start time-stepping
   // RK2 stage 1: U^* = U^n + dt*dUdt^n + dt*I_R^n
   if (verbose > 1) amrex::Print() << " >> AMR Cycle " << iteration << " of " << ncycle << std::endl;
   if (verbose > 0) amrex::Print() << " >> RK Step 1: Computing dSdt^{n}" << std::endl;
@@ -87,14 +87,14 @@ CNS::advance(Real time, Real dt, int iteration, int ncycle)
   MultiFab::LinComb(S_new, 0.5*dt, dSdt_new, 0, 0.5*dt, dSdt_old, 0, 0, LEN_STATE, 0);
   MultiFab::Add(S_new, S_old, 0, 0, LEN_STATE, 0);
 
-  if (NUM_FIELD > 0) {
-    computeAvg(S_new);
-    FillPatch(*this, Sborder, 1, time+dt, State_Type, 0, LEN_STATE);
-    compute_pdf_model(Sborder, dt, iteration);
-    MultiFab::Copy(S_new, Sborder, 0, 0, LEN_STATE, 0);
-    // computeAvg(S_new);
-    // enforce_consistent_state(); // Enforce rho = sum(rhoY)
-  }
+#if (NUM_FIELD > 0) 
+  computeAvg(S_new);
+  FillPatch(*this, Sborder, 1, time+dt, State_Type, 0, LEN_STATE);
+  compute_pdf_model(Sborder, dt, iteration);
+  MultiFab::Copy(S_new, Sborder, 0, 0, LEN_STATE, 0);
+  // computeAvg(S_new);
+  // enforce_consistent_state(); // Enforce rho = sum(rhoY)
+#endif
 
   if (do_react) { // Compute I_R^{n+1}(U^**) and do U^{n+1} = U^** + dt*I_R^{n+1}
     react_state(time, dt);
@@ -208,24 +208,23 @@ CNS::compute_dSdt (const MultiFab& S, MultiFab& dSdt, Real dt,
           dm_as_fine.resize(amrex::grow(bx,1),ncomp);
         }
 
-        Array4<Real const> vf_arr = (*volfrac).array(mfi);
-        Array4<Real const> bcent_arr = (*bndrycent).array(mfi);
+        Array4<const Real> vf_arr = (*volfrac).array(mfi);
+        Array4<const Real> bcent_arr = (*bndrycent).array(mfi);
 
-        AMREX_D_TERM(Array4<Real const> const& apx = areafrac[0]->const_array(mfi);,
-                     Array4<Real const> const& apy = areafrac[1]->const_array(mfi);,
-                     Array4<Real const> const& apz = areafrac[2]->const_array(mfi));
-        AMREX_D_TERM(Array4<Real const> const& fcx = facecent[0]->const_array(mfi);,
-                     Array4<Real const> const& fcy = facecent[1]->const_array(mfi);,
-                     Array4<Real const> const& fcz = facecent[2]->const_array(mfi));
+        AMREX_D_TERM(Array4<const Real> const& apx = areafrac[0]->const_array(mfi);,
+                     Array4<const Real> const& apy = areafrac[1]->const_array(mfi);,
+                     Array4<const Real> const& apz = areafrac[2]->const_array(mfi));
+        AMREX_D_TERM(Array4<const Real> const& fcx = facecent[0]->const_array(mfi);,
+                     Array4<const Real> const& fcy = facecent[1]->const_array(mfi);,
+                     Array4<const Real> const& fcz = facecent[2]->const_array(mfi));
         
-        Array4<Real const> const&    s_arr =    S.array(mfi);
-        Array4<Real      > const& dsdt_arr = dSdt.array(mfi);
-        AMREX_D_TERM(Array4<Real> xflx_arr = flux[0].array(); ,
-                     Array4<Real> yflx_arr = flux[1].array(); ,
-                     Array4<Real> zflx_arr = flux[2].array();)
+        Array4<const Real> const&    s_arr =    S.array(mfi);
+        Array4<      Real> const& dsdt_arr = dSdt.array(mfi);
+        // AMREX_D_TERM(Array4<Real> xflx_arr = flux[0].array(); ,
+        //              Array4<Real> yflx_arr = flux[1].array(); ,
+        //              Array4<Real> zflx_arr = flux[2].array();)
         
-        compute_dSdt_box_eb(bx, s_arr, dsdt_arr,
-                            AMREX_D_DECL(xflx_arr, yflx_arr, zflx_arr),
+        compute_dSdt_box_eb(bx, s_arr, dsdt_arr, {AMREX_D_DECL(&flux[0],&flux[1],&flux[2])}, //AMREX_D_DECL(xflx_arr, yflx_arr, zflx_arr),
                             flags.const_array(mfi), vf_arr,
                             AMREX_D_DECL(apx, apy, apz), AMREX_D_DECL(fcx, fcy, fcz), bcent_arr,
                             as_crse, p_drho_as_crse->array(), p_rrflag_as_crse->const_array(),

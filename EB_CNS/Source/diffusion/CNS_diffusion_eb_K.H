@@ -18,209 +18,375 @@ cns_diff_eb_x (int i, int j, int k,
                amrex::GpuArray<const amrex::Real,3> const& weights,
                amrex::Array4<amrex::Real> const& fx) noexcept
 {
+  using amrex::Real;
 
-     using amrex::Real;
+  Real dTdx = (q(i,j,k,QTEMP)-q(i-1,j,k,QTEMP))*dxinv[0];
+  AMREX_D_TERM(Real dudx = (q(i,j,k,QU)-q(i-1,j,k,QU))*dxinv[0];,
+               Real dvdx = (q(i,j,k,QV)-q(i-1,j,k,QV))*dxinv[0];,
+               Real dwdx = (q(i,j,k,QW)-q(i-1,j,k,QW))*dxinv[0];);
 
-     Real dTdx = (q(i,j,k,QTEMP)-q(i-1,j,k,QTEMP))*dxinv[0];
-     AMREX_D_TERM(Real  dudx = (q(i,j,k,QU)-q(i-1,j,k,QU))*dxinv[0];,
-                    Real  dvdx = (q(i,j,k,QV)-q(i-1,j,k,QV))*dxinv[0];,
-                    Real  dwdx = (q(i,j,k,QW)-q(i-1,j,k,QW))*dxinv[0];);
+  int jhip = j + (flag(i  ,j,k).isConnected(0, 1,0) ? 1 : 0 );
+  int jhim = j - (flag(i  ,j,k).isConnected(0,-1,0) ? 1 : 0 );
+  int jlop = j + (flag(i-1,j,k).isConnected(0, 1,0) ? 1 : 0 );
+  int jlom = j - (flag(i-1,j,k).isConnected(0,-1,0) ? 1 : 0 );
 
-     int jhip = j + (flag(i  ,j,k).isConnected(0, 1,0) ? 1 : 0 );
-     int jhim = j - (flag(i  ,j,k).isConnected(0,-1,0) ? 1 : 0 );
-     int jlop = j + (flag(i-1,j,k).isConnected(0, 1,0) ? 1 : 0 );
-     int jlom = j - (flag(i-1,j,k).isConnected(0,-1,0) ? 1 : 0 );
+  Real whi = weights[jhip-jhim];
+  Real wlo = weights[jlop-jlom];
+  Real dudy = (0.5*dxinv[1]) * ((q(i  ,jhip,k,QU)-q(i  ,jhim,k,QU))*whi
+                               +(q(i-1,jlop,k,QU)-q(i-1,jlom,k,QU))*wlo);
+  Real dvdy = (0.5*dxinv[1]) * ((q(i  ,jhip,k,QV)-q(i  ,jhim,k,QV))*whi
+                               +(q(i-1,jlop,k,QV)-q(i-1,jlom,k,QV))*wlo);
+#if (AMREX_SPACEDIM == 3)
+  int khip = k + (flag(i  ,j,k).isConnected(0,0, 1) ? 1 : 0 );
+  int khim = k - (flag(i  ,j,k).isConnected(0,0,-1) ? 1 : 0 );
+  int klop = k + (flag(i-1,j,k).isConnected(0,0, 1) ? 1 : 0 );
+  int klom = k - (flag(i-1,j,k).isConnected(0,0,-1) ? 1 : 0 );
 
-     Real whi = weights[jhip-jhim];
-     Real wlo = weights[jlop-jlom];
-     Real dudy = (0.5*dxinv[1]) * ((q(i  ,jhip,k,QU)-q(i  ,jhim,k,QU))*whi
-                                   +(q(i-1,jlop,k,QU)-q(i-1,jlom,k,QU))*wlo);
-     Real dvdy = (0.5*dxinv[1]) * ((q(i  ,jhip,k,QV)-q(i  ,jhim,k,QV))*whi
-                                   +(q(i-1,jlop,k,QV)-q(i-1,jlom,k,QV))*wlo);
+  whi = weights[khip-khim];
+  wlo = weights[klop-klom];
+  Real dudz = (0.5*dxinv[2]) * ((q(i  ,j,khip,QU)-q(i  ,j,khim,QU))*whi
+                               +(q(i-1,j,klop,QU)-q(i-1,j,klom,QU))*wlo);
+  Real dwdz = (0.5*dxinv[2]) * ((q(i  ,j,khip,QW)-q(i  ,j,khim,QW))*whi
+                               +(q(i-1,j,klop,QW)-q(i-1,j,klom,QW))*wlo);
+#endif
 
-     #if (AMREX_SPACEDIM == 3)
-     int  khip = k + (flag(i  ,j,k).isConnected(0,0, 1) ? 1 : 0 );
-     int  khim = k - (flag(i  ,j,k).isConnected(0,0,-1) ? 1 : 0 );
-     int  klop = k + (flag(i-1,j,k).isConnected(0,0, 1) ? 1 : 0 );
-     int  klom = k - (flag(i-1,j,k).isConnected(0,0,-1) ? 1 : 0 );
+#if (AMREX_SPACEDIM == 2)
+  Real  divu = dudx + dvdy;
+  Real  etaf = 0.5*(coeffs(i,j,k,CMU)+coeffs(i-1,j,k,CMU));
+  Real  xif  = 0.5*(coeffs(i,j,k,CXI)+coeffs(i-1,j,k,CXI));
+  Real  tauxx = etaf*(2.0*dudx-(2.0/3.0)*divu) + xif*divu;
+  Real  tauxy = etaf*(dudy+dvdx);
 
-          whi = weights[khip-khim];
-          wlo = weights[klop-klom];
-     Real  dudz = (0.5*dxinv[2]) * ((q(i  ,j,khip,QU)-q(i  ,j,khim,QU))*whi
-                                   +(q(i-1,j,klop,QU)-q(i-1,j,klom,QU))*wlo);
-     Real  dwdz = (0.5*dxinv[2]) * ((q(i  ,j,khip,QW)-q(i  ,j,khim,QW))*whi
-                                   +(q(i-1,j,klop,QW)-q(i-1,j,klom,QW))*wlo);
-     #endif
+  fx(i,j,k,UMX)   += -tauxx;
+  fx(i,j,k,UMY)   += -tauxy;
+  fx(i,j,k,UEDEN) += -0.5*( (q(i,j,k,QU)+q(i-1,j,k,QU))*tauxx+
+                            (q(i,j,k,QV)+q(i-1,j,k,QV))*tauxy+
+                            (coeffs(i,j,k,CLAM) +coeffs(i-1,j,k,CLAM))*dTdx );
+#else
+  Real  divu = dudx + dvdy + dwdz;
+  Real  etaf = 0.5*(coeffs(i,j,k,CMU)+coeffs(i-1,j,k,CMU));
+  Real  xif  = 0.5*(coeffs(i,j,k,CXI)+coeffs(i-1,j,k,CXI));
+  Real  tauxx = etaf*(2.0*dudx-(2.0/3.0)*divu) + xif*divu;
+  Real  tauxy = etaf*(dudy+dvdx);
+  Real  tauxz = etaf*(dudz+dwdx);
 
-     #if (AMREX_SPACEDIM == 2)
-     Real  divu = dudx + dvdy;
-     Real  etaf = 0.5*(coeffs(i,j,k,CMU)+coeffs(i-1,j,k,CMU));
-     Real  xif  = 0.5*(coeffs(i,j,k,CXI)+coeffs(i-1,j,k,CXI));
-     Real  tauxx = etaf*(2.0*dudx-(2.0/3.0)*divu) + xif*divu;
-     Real  tauxy = etaf*(dudy+dvdx);
+  fx(i,j,k,UMX)   += -tauxx;
+  fx(i,j,k,UMY)   += -tauxy;
+  fx(i,j,k,UMZ)   += -tauxz;
+  fx(i,j,k,UEDEN) += -0.5*( (q(i,j,k,QU)+q(i-1,j,k,QU))*tauxx+
+                            (q(i,j,k,QV)+q(i-1,j,k,QV))*tauxy+
+                            (q(i,j,k,QW)+q(i-1,j,k,QW))*tauxz+
+                            (coeffs(i,j,k,CLAM) +coeffs(i-1,j,k,CLAM))*dTdx );
+#endif
 
-     fx(i,j,k,UMX)   += -tauxx;
-     fx(i,j,k,UMY)   += -tauxy;
-     fx(i,j,k,UEDEN) += -0.5*( (q(i,j,k,QU)+q(i-1,j,k,QU))*tauxx+
-                                   (q(i,j,k,QV)+q(i-1,j,k,QV))*tauxy+
-                                   (coeffs(i,j,k,CLAM) +coeffs(i-1,j,k,CLAM))*dTdx );
-     #else
-     Real  divu = dudx + dvdy + dwdz;
-     Real  etaf = 0.5*(coeffs(i,j,k,CMU)+coeffs(i-1,j,k,CMU));
-     Real  xif  = 0.5*(coeffs(i,j,k,CXI)+coeffs(i-1,j,k,CXI));
-     Real  tauxx = etaf*(2.0*dudx-(2.0/3.0)*divu) + xif*divu;
-     Real  tauxy = etaf*(dudy+dvdx);
-     Real  tauxz = etaf*(dudz+dwdx);
+  // Species transport
+  const amrex::IntVect iv{AMREX_D_DECL(i, j, k)};
+  const amrex::IntVect ivm(iv - amrex::IntVect::TheDimensionVector(0));
 
-     fx(i,j,k,UMX)   += -tauxx;
-     fx(i,j,k,UMY)   += -tauxy;
-     fx(i,j,k,UMZ)   += -tauxz;
-     fx(i,j,k,UEDEN) += -0.5*( (q(i,j,k,QU)+q(i-1,j,k,QU))*tauxx+
-                                   (q(i,j,k,QV)+q(i-1,j,k,QV))*tauxy+
-                                   (q(i,j,k,QW)+q(i-1,j,k,QW))*tauxz+
-                                   (coeffs(i,j,k,CLAM) +coeffs(i-1,j,k,CLAM))*dTdx );
-     #endif
-     }
+  // Get massfrac, molefrac, enthalpy  
+  Real mass1[NUM_SPECIES], mass2[NUM_SPECIES];
+  Real mole1[NUM_SPECIES], mole2[NUM_SPECIES];
+  Real hi1[NUM_SPECIES], hi2[NUM_SPECIES];
+  for (int n = 0; n < NUM_SPECIES; ++n) {
+    mass1[n] = q(iv,QFS+n);
+    mass2[n] = q(ivm,QFS+n);
+  }
+  auto eos = pele::physics::PhysicsType::eos();
+  eos.Y2X(mass1, mole1);
+  eos.Y2X(mass2, mole2);
 
-     AMREX_GPU_DEVICE AMREX_FORCE_INLINE
-     void
-     cns_diff_eb_y (int i, int j, int k, 
-                    amrex::Array4<const amrex::Real> const& q,
-                    amrex::Array4<const amrex::Real> const& coeffs,
-                    amrex::Array4<const amrex::EBCellFlag> const& flag,
-                    amrex::GpuArray<amrex::Real,AMREX_SPACEDIM> const& dxinv,
-                    amrex::GpuArray<const amrex::Real,3> const& weights,
-                    amrex::Array4<amrex::Real> const& fy) noexcept
-     {
-     using amrex::Real;
+  // Compute species and enthalpy fluxes for ideal EOS
+  // Get species/enthalpy diffusion, compute correction vel
+  Real T = q(iv,QTEMP);
+  eos.T2Hi(T, hi1);
+  T = q(ivm,QTEMP);
+  eos.T2Hi(T, hi2);
 
-     Real  dTdy = (q(i,j,k,QTEMP)-q(i,j-1,k,QTEMP))*dxinv[1];
-     AMREX_D_TERM(Real  dudy = (q(i,j,k,QU)-q(i,j-1,k,QU))*dxinv[1];,
-                    Real  dvdy = (q(i,j,k,QV)-q(i,j-1,k,QV))*dxinv[1];,
-                    Real  dwdy = (q(i,j,k,QW)-q(i,j-1,k,QW))*dxinv[1];);
+  Real Vc = 0.0;
+  const amrex::Real dpdx = (q(iv,QPRES)-q(ivm,QPRES))*dxinv[0];
+  const amrex::Real dlnp = dpdx / (0.5*(q(iv,QPRES)+q(ivm,QPRES)));
+  for (int n = 0; n < NUM_SPECIES; ++n) {
+    const amrex::Real Xface = 0.5*(mole1[n]+mole2[n]);
+    const amrex::Real Yface = 0.5*(mass1[n]+mass2[n]);
+    const amrex::Real hface = 0.5*(hi1[n]+hi2[n]);
+    const amrex::Real dXdx = (mole1[n]-mole2[n])*dxinv[0];
+    const amrex::Real Vd = -0.5*(coeffs(iv,CRHOD+n)+coeffs(ivm,CRHOD+n))*(dXdx+(Xface-Yface)*dlnp);
+    Vc += Vd;
+    fx(iv,UFS+n) += Vd;
+    fx(iv,UEDEN) += Vd*hface;
+  }
+  // Add correction velocity to fluxes so sum(Vd) = 0
+  for (int ns = 0; ns < NUM_SPECIES; ++ns) {
+    const amrex::Real Yface = 0.5*(mass1[ns]+mass2[ns]);
+    const amrex::Real hface = 0.5*(hi1[ns]+hi2[ns]);
+    fx(iv,UFS+ns) -= Yface*Vc;
+    fx(iv,UEDEN) -= Yface*hface*Vc;
+  }
+}
 
-     int  ihip = i + (flag(i,j  ,k).isConnected( 1,0,0) ? 1 : 0 );
-     int  ihim = i - (flag(i,j  ,k).isConnected(-1,0,0) ? 1 : 0 );
-     int  ilop = i + (flag(i,j-1,k).isConnected( 1,0,0) ? 1 : 0 );
-     int  ilom = i - (flag(i,j-1,k).isConnected(-1,0,0) ? 1 : 0 );
+AMREX_GPU_DEVICE AMREX_FORCE_INLINE
+void
+cns_diff_eb_y (int i, int j, int k, 
+               amrex::Array4<const amrex::Real> const& q,
+               amrex::Array4<const amrex::Real> const& coeffs,
+               amrex::Array4<const amrex::EBCellFlag> const& flag,
+               amrex::GpuArray<amrex::Real,AMREX_SPACEDIM> const& dxinv,
+               amrex::GpuArray<const amrex::Real,3> const& weights,
+               amrex::Array4<amrex::Real> const& fy) noexcept
+{
+  using amrex::Real;
 
-     Real  whi = weights[ihip-ihim];
-     Real  wlo = weights[ilop-ilom];
-     Real  dudx = (0.5*dxinv[0]) * ((q(ihip,j  ,k,QU)-q(ihim,j  ,k,QU))*whi
-                                   +(q(ilop,j-1,k,QU)-q(ilom,j-1,k,QU))*wlo);
-     Real  dvdx = (0.5*dxinv[0]) * ((q(ihip,j  ,k,QV)-q(ihim,j  ,k,QV))*whi
-                                   +(q(ilop,j-1,k,QV)-q(ilom,j-1,k,QV))*wlo);
+  Real dTdy = (q(i,j,k,QTEMP)-q(i,j-1,k,QTEMP))*dxinv[1];
+  AMREX_D_TERM(Real dudy = (q(i,j,k,QU)-q(i,j-1,k,QU))*dxinv[1];,
+               Real dvdy = (q(i,j,k,QV)-q(i,j-1,k,QV))*dxinv[1];,
+               Real dwdy = (q(i,j,k,QW)-q(i,j-1,k,QW))*dxinv[1];);
 
-     #if (AMREX_SPACEDIM == 3)
-     int  khip = k + (flag(i,j  ,k).isConnected(0,0, 1) ? 1 : 0 );
-     int  khim = k - (flag(i,j  ,k).isConnected(0,0,-1) ? 1 : 0 );
-     int  klop = k + (flag(i,j-1,k).isConnected(0,0, 1) ? 1 : 0 );
-     int  klom = k - (flag(i,j-1,k).isConnected(0,0,-1) ? 1 : 0 );
+  int ihip = i + (flag(i,j  ,k).isConnected( 1,0,0) ? 1 : 0 );
+  int ihim = i - (flag(i,j  ,k).isConnected(-1,0,0) ? 1 : 0 );
+  int ilop = i + (flag(i,j-1,k).isConnected( 1,0,0) ? 1 : 0 );
+  int ilom = i - (flag(i,j-1,k).isConnected(-1,0,0) ? 1 : 0 );
 
-               whi = weights[khip-khim];
-               wlo = weights[klop-klom];
-     Real  dvdz = (0.5*dxinv[2]) * ((q(i,j  ,khip,QV)-q(i,j  ,khim,QV))*whi
-                                   +(q(i,j-1,klop,QV)-q(i,j-1,klom,QV))*wlo);
-     Real  dwdz = (0.5*dxinv[2]) * ((q(i,j  ,khip,QW)-q(i,j  ,khim,QW))*whi
-                                   +(q(i,j-1,klop,QW)-q(i,j-1,klom,QW))*wlo) ;
-     #endif
+  Real whi = weights[ihip-ihim];
+  Real wlo = weights[ilop-ilom];
+  Real dudx = (0.5*dxinv[0]) * ((q(ihip,j  ,k,QU)-q(ihim,j  ,k,QU))*whi
+                               +(q(ilop,j-1,k,QU)-q(ilom,j-1,k,QU))*wlo);
+  Real dvdx = (0.5*dxinv[0]) * ((q(ihip,j  ,k,QV)-q(ihim,j  ,k,QV))*whi
+                               +(q(ilop,j-1,k,QV)-q(ilom,j-1,k,QV))*wlo);
 
-     #if (AMREX_SPACEDIM == 2)
-     Real  divu = dudx + dvdy;
-     Real  etaf = 0.5*(coeffs(i,j,k,CMU)+coeffs(i,j-1,k,CMU));
-     Real  xif  = 0.5*(coeffs(i,j,k,CXI)+coeffs(i,j-1,k,CXI));
-     Real  tauyy = etaf*(2.0*dvdy-(2.0/3.0)*divu) + xif*divu;
-     Real  tauxy = etaf*(dudy+dvdx);
+#if (AMREX_SPACEDIM == 3)
+  int khip = k + (flag(i,j  ,k).isConnected(0,0, 1) ? 1 : 0 );
+  int khim = k - (flag(i,j  ,k).isConnected(0,0,-1) ? 1 : 0 );
+  int klop = k + (flag(i,j-1,k).isConnected(0,0, 1) ? 1 : 0 );
+  int klom = k - (flag(i,j-1,k).isConnected(0,0,-1) ? 1 : 0 );
 
-     fy(i,j,k,UMX)   += -tauxy;
-     fy(i,j,k,UMY)   += -tauyy;
-     fy(i,j,k,UEDEN) += -0.5*( (q(i,j,k,QU)+q(i,j-1,k,QU))*tauxy
-                              +(q(i,j,k,QV)+q(i,j-1,k,QV))*tauyy
-                              +(coeffs(i,j,k,CLAM) +coeffs(i,j-1,k,CLAM))*dTdy );
-     #else
-     Real  divu = dudx + dvdy + dwdz;
-     Real  etaf = 0.5*(coeffs(i,j,k,CMU)+coeffs(i,j-1,k,CMU));
-     Real  xif  = 0.5*(coeffs(i,j,k,CXI)+coeffs(i,j-1,k,CXI));
-     Real  tauyy = etaf*(2.0*dvdy-(2.0/3.0)*divu) + xif*divu;
-     Real  tauxy = etaf*(dudy+dvdx);
-     Real  tauyz = etaf*(dwdy+dvdz);
+  whi = weights[khip-khim];
+  wlo = weights[klop-klom];
+  Real dvdz = (0.5*dxinv[2]) * ((q(i,j  ,khip,QV)-q(i,j  ,khim,QV))*whi
+                               +(q(i,j-1,klop,QV)-q(i,j-1,klom,QV))*wlo);
+  Real dwdz = (0.5*dxinv[2]) * ((q(i,j  ,khip,QW)-q(i,j  ,khim,QW))*whi
+                               +(q(i,j-1,klop,QW)-q(i,j-1,klom,QW))*wlo) ;
+#endif
 
-     fy(i,j,k,UMX)   += -tauxy;
-     fy(i,j,k,UMY)   += -tauyy;
-     fy(i,j,k,UMZ)   += -tauyz;
-     fy(i,j,k,UEDEN) += -0.5*( (q(i,j,k,QU)+q(i,j-1,k,QU))*tauxy
-                              +(q(i,j,k,QV)+q(i,j-1,k,QV))*tauyy
-                              +(q(i,j,k,QW)+q(i,j-1,k,QW))*tauyz
-                              +(coeffs(i,j,k,CLAM) +coeffs(i,j-1,k,CLAM))*dTdy );
-     #endif
-     }
+#if (AMREX_SPACEDIM == 2)
+  Real divu = dudx + dvdy;
+  Real etaf = 0.5*(coeffs(i,j,k,CMU)+coeffs(i,j-1,k,CMU));
+  Real xif  = 0.5*(coeffs(i,j,k,CXI)+coeffs(i,j-1,k,CXI));
+  Real tauyy = etaf*(2.0*dvdy-(2.0/3.0)*divu) + xif*divu;
+  Real tauxy = etaf*(dudy+dvdx);
 
-     #if (AMREX_SPACEDIM == 3)
-     AMREX_GPU_DEVICE AMREX_FORCE_INLINE
-     void
-     cns_diff_eb_z (int i, int j, int k,
-                    amrex::Array4<const amrex::Real> const& q,
-                    amrex::Array4<const amrex::Real> const& coeffs,
-                    amrex::Array4<const amrex::EBCellFlag> const& flag,
-                    amrex::GpuArray<amrex::Real,AMREX_SPACEDIM> const& dxinv,
-                    amrex::GpuArray<const amrex::Real,3> const& weights,
-                    amrex::Array4<amrex::Real> const& fz) noexcept
-     {
-     using amrex::Real;
+  fy(i,j,k,UMX)   += -tauxy;
+  fy(i,j,k,UMY)   += -tauyy;
+  fy(i,j,k,UEDEN) += -0.5*( (q(i,j,k,QU)+q(i,j-1,k,QU))*tauxy
+                           +(q(i,j,k,QV)+q(i,j-1,k,QV))*tauyy
+                           +(coeffs(i,j,k,CLAM) +coeffs(i,j-1,k,CLAM))*dTdy );
+#else
+  Real divu = dudx + dvdy + dwdz;
+  Real etaf = 0.5*(coeffs(i,j,k,CMU)+coeffs(i,j-1,k,CMU));
+  Real xif  = 0.5*(coeffs(i,j,k,CXI)+coeffs(i,j-1,k,CXI));
+  Real tauyy = etaf*(2.0*dvdy-(2.0/3.0)*divu) + xif*divu;
+  Real tauxy = etaf*(dudy+dvdx);
+  Real tauyz = etaf*(dwdy+dvdz);
 
-     Real  dTdz = (q(i,j,k,QTEMP)-q(i,j,k-1,QTEMP))*dxinv[2];
-     Real  dudz = (q(i,j,k,QU)-q(i,j,k-1,QU))*dxinv[2];
-     Real  dvdz = (q(i,j,k,QV)-q(i,j,k-1,QV))*dxinv[2];
-     Real  dwdz = (q(i,j,k,QW)-q(i,j,k-1,QW))*dxinv[2];
+  fy(i,j,k,UMX)   += -tauxy;
+  fy(i,j,k,UMY)   += -tauyy;
+  fy(i,j,k,UMZ)   += -tauyz;
+  fy(i,j,k,UEDEN) += -0.5*( (q(i,j,k,QU)+q(i,j-1,k,QU))*tauxy
+                           +(q(i,j,k,QV)+q(i,j-1,k,QV))*tauyy
+                           +(q(i,j,k,QW)+q(i,j-1,k,QW))*tauyz
+                           +(coeffs(i,j,k,CLAM) +coeffs(i,j-1,k,CLAM))*dTdy );
+#endif
 
-     int  ihip = i + (flag(i,j,k  ).isConnected( 1,0,0) ? 1 : 0 );
-     int  ihim = i - (flag(i,j,k  ).isConnected(-1,0,0) ? 1 : 0 );
-     int  ilop = i + (flag(i,j,k-1).isConnected( 1,0,0) ? 1 : 0 );
-     int  ilom = i - (flag(i,j,k-1).isConnected(-1,0,0) ? 1 : 0 );
+  // Species transport
+  const amrex::IntVect iv{AMREX_D_DECL(i, j, k)};
+  const amrex::IntVect ivm(iv - amrex::IntVect::TheDimensionVector(1));
 
-     Real   whi = weights[ihip-ihim];
-     Real   wlo = weights[ilop-ilom];
-     Real   dudx = (0.5*dxinv[0]) * ((q(ihip,j,k  ,QU)-q(ihim,j,k  ,QU))*whi
-                                        +(q(ilop,j,k-1,QU)-q(ilom,j,k-1,QU))*wlo) ;
-          Real  dwdx = (0.5*dxinv[0]) * ((q(ihip,j,k  ,QW)-q(ihim,j,k  ,QW))*whi
-                                        +(q(ilop,j,k-1,QW)-q(ilom,j,k-1,QW))*wlo) ;
+  // Get massfrac, molefrac, enthalpy  
+  Real mass1[NUM_SPECIES], mass2[NUM_SPECIES];
+  Real mole1[NUM_SPECIES], mole2[NUM_SPECIES];
+  Real hi1[NUM_SPECIES], hi2[NUM_SPECIES];
+  for (int n = 0; n < NUM_SPECIES; ++n) {
+    mass1[n] = q(iv,QFS+n);
+    mass2[n] = q(ivm,QFS+n);
+  }
+  auto eos = pele::physics::PhysicsType::eos();
+  eos.Y2X(mass1, mole1);
+  eos.Y2X(mass2, mole2);
 
+  // Compute species and enthalpy fluxes for ideal EOS
+  // Get species/enthalpy diffusion, compute correction vel
+  Real T = q(iv,QTEMP);
+  eos.T2Hi(T, hi1);
+  T = q(ivm,QTEMP);
+  eos.T2Hi(T, hi2);
 
-     int  jhip = j + (flag(i,j,k  ).isConnected(0, 1,0) ? 1 : 0 );
-     int  jhim = j - (flag(i,j,k  ).isConnected(0,-1,0) ? 1 : 0 );
-     int  jlop = j + (flag(i,j,k-1).isConnected(0, 1,0) ? 1 : 0 );
-     int  jlom = j - (flag(i,j,k-1).isConnected(0,-1,0) ? 1 : 0 );
+  Real Vc = 0.0;
+  const amrex::Real dpdx = (q(iv,QPRES)-q(ivm,QPRES))*dxinv[1];
+  const amrex::Real dlnp = dpdx / (0.5*(q(iv,QPRES)+q(ivm,QPRES)));
+  for (int n = 0; n < NUM_SPECIES; ++n) {
+    const amrex::Real Xface = 0.5*(mole1[n]+mole2[n]);
+    const amrex::Real Yface = 0.5*(mass1[n]+mass2[n]);
+    const amrex::Real hface = 0.5*(hi1[n]+hi2[n]);
+    const amrex::Real dXdx = (mole1[n]-mole2[n])*dxinv[1];
+    const amrex::Real Vd = -0.5*(coeffs(iv,CRHOD+n)+coeffs(ivm,CRHOD+n))*(dXdx+(Xface-Yface)*dlnp);
+    Vc += Vd;
+    fy(iv,UFS+n) += Vd;
+    fy(iv,UEDEN) += Vd*hface;
+  }
+  // Add correction velocity to fluxes so sum(Vd) = 0
+  for (int ns = 0; ns < NUM_SPECIES; ++ns) {
+    const amrex::Real Yface = 0.5*(mass1[ns]+mass2[ns]);
+    const amrex::Real hface = 0.5*(hi1[ns]+hi2[ns]);
+    fy(iv,UFS+ns) -= Yface*Vc;
+    fy(iv,UEDEN) -= Yface*hface*Vc;
+  }
+}
 
-               whi = weights[jhip-jhim];
-               wlo = weights[jlop-jlom];
-     Real   dvdy = (0.5*dxinv[1]) * ((q(i,jhip,k  ,QV)-q(i,jhim,k  ,QV))*whi
-                                        +(q(i,jlop,k-1,QV)-q(i,jlom,k-1,QV))*wlo);
-     Real  dwdy = (0.5*dxinv[1]) *  ((q(i,jhip,k  ,QW)-q(i,jhim,k  ,QW))*whi
-                                        +(q(i,jlop,k-1,QW)-q(i,jlom,k-1,QW))*wlo);
+#if (AMREX_SPACEDIM == 3)
+AMREX_GPU_DEVICE AMREX_FORCE_INLINE
+void
+cns_diff_eb_z (int i, int j, int k,
+               amrex::Array4<const amrex::Real> const& q,
+               amrex::Array4<const amrex::Real> const& coeffs,
+               amrex::Array4<const amrex::EBCellFlag> const& flag,
+               amrex::GpuArray<amrex::Real,AMREX_SPACEDIM> const& dxinv,
+               amrex::GpuArray<const amrex::Real,3> const& weights,
+               amrex::Array4<amrex::Real> const& fz) noexcept
+{
+  using amrex::Real;
 
-     Real  divu = dudx + dvdy + dwdz;
-     Real  etaf = 0.5*(coeffs(i,j,k,CMU)+coeffs(i,j,k-1,CMU));
-     Real  xif  = 0.5*(coeffs(i,j,k,CXI)+coeffs(i,j,k-1,CXI));
-     Real  tauxz = etaf*(dudz+dwdx);
-     Real  tauyz = etaf*(dvdz+dwdy);
-     Real  tauzz = etaf*(2.0*dwdz-(2.0/3.0)*divu) + xif*divu;
+  Real dTdz = (q(i,j,k,QTEMP)-q(i,j,k-1,QTEMP))*dxinv[2];
+  Real dudz = (q(i,j,k,QU)-q(i,j,k-1,QU))*dxinv[2];
+  Real dvdz = (q(i,j,k,QV)-q(i,j,k-1,QV))*dxinv[2];
+  Real dwdz = (q(i,j,k,QW)-q(i,j,k-1,QW))*dxinv[2];
 
-     fz(i,j,k,UMX)   += -tauxz;
-     fz(i,j,k,UMY)   += -tauyz;
-     fz(i,j,k,UMZ)   += -tauzz;
-     fz(i,j,k,UEDEN) += -0.5*( (q(i,j,k,QU)+q(i,j,k-1,QU))*tauxz
-                              +(q(i,j,k,QV)+q(i,j,k-1,QV))*tauyz
-                              +(q(i,j,k,QW)+q(i,j,k-1,QW))*tauzz
-                              +(coeffs(i,j,k,CLAM) +coeffs(i,j,k-1,CLAM))*dTdz );
+  int ihip = i + (flag(i,j,k  ).isConnected( 1,0,0) ? 1 : 0 );
+  int ihim = i - (flag(i,j,k  ).isConnected(-1,0,0) ? 1 : 0 );
+  int ilop = i + (flag(i,j,k-1).isConnected( 1,0,0) ? 1 : 0 );
+  int ilom = i - (flag(i,j,k-1).isConnected(-1,0,0) ? 1 : 0 );
+
+  Real whi = weights[ihip-ihim];
+  Real wlo = weights[ilop-ilom];
+  Real dudx = (0.5*dxinv[0]) * ((q(ihip,j,k  ,QU)-q(ihim,j,k  ,QU))*whi
+                               +(q(ilop,j,k-1,QU)-q(ilom,j,k-1,QU))*wlo) ;
+  Real dwdx = (0.5*dxinv[0]) * ((q(ihip,j,k  ,QW)-q(ihim,j,k  ,QW))*whi
+                               +(q(ilop,j,k-1,QW)-q(ilom,j,k-1,QW))*wlo) ;
+
+  int jhip = j + (flag(i,j,k  ).isConnected(0, 1,0) ? 1 : 0 );
+  int jhim = j - (flag(i,j,k  ).isConnected(0,-1,0) ? 1 : 0 );
+  int jlop = j + (flag(i,j,k-1).isConnected(0, 1,0) ? 1 : 0 );
+  int jlom = j - (flag(i,j,k-1).isConnected(0,-1,0) ? 1 : 0 );
+
+  whi = weights[jhip-jhim];
+  wlo = weights[jlop-jlom];
+  Real dvdy = (0.5*dxinv[1]) * ((q(i,jhip,k  ,QV)-q(i,jhim,k  ,QV))*whi
+                               +(q(i,jlop,k-1,QV)-q(i,jlom,k-1,QV))*wlo);
+  Real dwdy = (0.5*dxinv[1]) *  ((q(i,jhip,k  ,QW)-q(i,jhim,k  ,QW))*whi
+                                +(q(i,jlop,k-1,QW)-q(i,jlom,k-1,QW))*wlo);
+
+  Real divu = dudx + dvdy + dwdz;
+  Real etaf = 0.5*(coeffs(i,j,k,CMU)+coeffs(i,j,k-1,CMU));
+  Real xif  = 0.5*(coeffs(i,j,k,CXI)+coeffs(i,j,k-1,CXI));
+  Real tauxz = etaf*(dudz+dwdx);
+  Real tauyz = etaf*(dvdz+dwdy);
+  Real tauzz = etaf*(2.0*dwdz-(2.0/3.0)*divu) + xif*divu;
+
+  fz(i,j,k,UMX)   += -tauxz;
+  fz(i,j,k,UMY)   += -tauyz;
+  fz(i,j,k,UMZ)   += -tauzz;
+  fz(i,j,k,UEDEN) += -0.5*( (q(i,j,k,QU)+q(i,j,k-1,QU))*tauxz
+                           +(q(i,j,k,QV)+q(i,j,k-1,QV))*tauyz
+                           +(q(i,j,k,QW)+q(i,j,k-1,QW))*tauzz
+                           +(coeffs(i,j,k,CLAM) +coeffs(i,j,k-1,CLAM))*dTdz );
+  
+  // Species transport
+  const amrex::IntVect iv{AMREX_D_DECL(i, j, k)};
+  const amrex::IntVect ivm(iv - amrex::IntVect::TheDimensionVector(2));
+
+  // Get massfrac, molefrac, enthalpy  
+  Real mass1[NUM_SPECIES], mass2[NUM_SPECIES];
+  Real mole1[NUM_SPECIES], mole2[NUM_SPECIES];
+  Real hi1[NUM_SPECIES], hi2[NUM_SPECIES];
+  for (int n = 0; n < NUM_SPECIES; ++n) {
+    mass1[n] = q(iv,QFS+n);
+    mass2[n] = q(ivm,QFS+n);
+  }
+  auto eos = pele::physics::PhysicsType::eos();
+  eos.Y2X(mass1, mole1);
+  eos.Y2X(mass2, mole2);
+
+  // Compute species and enthalpy fluxes for ideal EOS
+  // Get species/enthalpy diffusion, compute correction vel
+  Real T = q(iv,QTEMP);
+  eos.T2Hi(T, hi1);
+  T = q(ivm,QTEMP);
+  eos.T2Hi(T, hi2);
+
+  Real Vc = 0.0;
+  const amrex::Real dpdx = (q(iv,QPRES)-q(ivm,QPRES))*dxinv[2];
+  const amrex::Real dlnp = dpdx / (0.5*(q(iv,QPRES)+q(ivm,QPRES)));
+  for (int n = 0; n < NUM_SPECIES; ++n) {
+    const amrex::Real Xface = 0.5*(mole1[n]+mole2[n]);
+    const amrex::Real Yface = 0.5*(mass1[n]+mass2[n]);
+    const amrex::Real hface = 0.5*(hi1[n]+hi2[n]);
+    const amrex::Real dXdx = (mole1[n]-mole2[n])*dxinv[2];
+    const amrex::Real Vd = -0.5*(coeffs(iv,CRHOD+n)+coeffs(ivm,CRHOD+n))*(dXdx+(Xface-Yface)*dlnp);
+    Vc += Vd;
+    fz(iv,UFS+n) += Vd;
+    fz(iv,UEDEN) += Vd*hface;
+  }
+  // Add correction velocity to fluxes so sum(Vd) = 0
+  for (int ns = 0; ns < NUM_SPECIES; ++ns) {
+    const amrex::Real Yface = 0.5*(mass1[ns]+mass2[ns]);
+    const amrex::Real hface = 0.5*(hi1[ns]+hi2[ns]);
+    fz(iv,UFS+ns) -= Yface*Vc;
+    fz(iv,UEDEN) -= Yface*hface*Vc;
+  }
 }
 #endif
+
+AMREX_GPU_DEVICE AMREX_FORCE_INLINE 
+void
+cns_diff_eb (int i, int j, int k, int dir,
+             amrex::Array4<const amrex::Real> const& q,
+             amrex::Array4<const amrex::Real> const& coeffs,
+             amrex::Array4<const amrex::EBCellFlag> const& flag,
+             amrex::GpuArray<amrex::Real,AMREX_SPACEDIM> const& dxinv,
+             amrex::GpuArray<const amrex::Real, 3> const& weights,
+             amrex::Array4<amrex::Real> const& flx_arr) noexcept
+{
+  const amrex::IntVect iv{AMREX_D_DECL(i, j, k)};
+  const amrex::IntVect ivm(iv - amrex::IntVect::TheDimensionVector(dir));
+  if (flag(iv).isCovered() || flag(ivm).isCovered()) return;
+
+  if (dir == 0) {
+    cns_diff_eb_x(i, j, k, q, coeffs, flag, dxinv, weights, flx_arr);
+  }
+#if AMREX_SPACEDIM > 1
+  else if (dir == 1) {
+    cns_diff_eb_y(i, j, k, q, coeffs, flag, dxinv, weights, flx_arr);
+  }
+#endif
+#if AMREX_SPACEDIM > 2
+  else if (dir == 2) {
+    cns_diff_eb_z(i, j, k, q, coeffs, flag, dxinv, weights, flx_arr);
+  }
+#endif
+
+  // if (isnan(flx_arr(i,j,k,UEDEN))) {    
+  //   amrex::Print() << "cns_diff_eb: flx_arr(i,j,k,UEDEN) is nan. " 
+  //                  << flag(i,j,k).isCovered() << " " << flag(i,j,k).isRegular() << " "
+  //                  << q(i,j,k,QRHO) << " " << q(i,j,k,QTEMP) << " " << q(i,j,k,QFS) << " " << q(i,j,k,QFS+1) << " "
+  //                  << q(ivm,QRHO) << " " << q(ivm,QTEMP) << " " << q(ivm,QFS) << " " << q(ivm,QFS+1) << std::endl;
+  //   amrex::Abort();
+  // }
+}
 
 AMREX_GPU_DEVICE AMREX_FORCE_INLINE
 Real
 compute_interp1d (amrex::Real cym,amrex::Real cy0,amrex::Real cyp, Array1D<Real, 1,3>& v)
 {
-     Real x = cym*v(1) + cy0*v(2) + cyp*v(3);
-     return x;
+  Real x = cym*v(1) + cy0*v(2) + cyp*v(3);
+  return x;
 }
 
 AMREX_GPU_DEVICE AMREX_FORCE_INLINE
@@ -228,21 +394,21 @@ Real
 compute_interp2d(amrex::Real cym,amrex::Real cy0,amrex::Real cyp,
                amrex::Real czm,amrex::Real cz0,amrex::Real czp, Array2D<Real, 1,3,1,3>& v)
 {
-     Real x = czm*(cym*v(1,1) + cy0*v(2,1) + cyp*v(3,1)) + cz0*(cym*v(1,2) + cy0*v(2,2) + cyp*v(3,2))
-               +czp*(cym*v(1,3) + cy0*v(2,3) + cyp*v(3,3));
-     return x;
+  Real x = czm*(cym*v(1,1) + cy0*v(2,1) + cyp*v(3,1)) + cz0*(cym*v(1,2) + cy0*v(2,2) + cyp*v(3,2))
+          +czp*(cym*v(1,3) + cy0*v(2,3) + cyp*v(3,3));
+  return x;
 }
 
 #if (AMREX_SPACEDIM == 2)
 AMREX_GPU_DEVICE AMREX_FORCE_INLINE
 void
 compute_diff_wallflux(int i, int j, int k,
-                    amrex::Array4<amrex::Real const> const& q,
-                    amrex::Array4<amrex::Real const> const& coefs,
-                    amrex::Array4<amrex::Real const> const& bcent,
-                    const amrex::Real axm, const amrex::Real axp,
-                    const amrex::Real aym, const amrex::Real ayp,
-                    amrex::GpuArray<amrex::Real,NVAR>& viscw) noexcept
+                      amrex::Array4<amrex::Real const> const& q,
+                      amrex::Array4<amrex::Real const> const& coefs,
+                      amrex::Array4<amrex::Real const> const& bcent,
+                      const amrex::Real axm, const amrex::Real axp,
+                      const amrex::Real aym, const amrex::Real ayp,
+                      amrex::GpuArray<amrex::Real,NVAR>& viscw) noexcept
 {
      //  This implementation assumes adiabatic walls
 
@@ -426,41 +592,36 @@ compute_diff_wallflux(int i, int j, int k,
 AMREX_GPU_DEVICE AMREX_FORCE_INLINE
 void
 compute_diff_wallflux(int i, int j, int k,
-                    amrex::Array4<amrex::Real const> const& q,
-                    amrex::Array4<amrex::Real const> const& coefs,
-                    amrex::Array4<amrex::Real const> const& bcent,
-                    const amrex::Real axm, const amrex::Real axp,
-                    const amrex::Real aym, const amrex::Real ayp,
-                    const amrex::Real azm, const amrex::Real azp,
-                    amrex::GpuArray<amrex::Real,NVAR>& viscw) noexcept
+                      amrex::Array4<amrex::Real const> const& q,
+                      amrex::Array4<amrex::Real const> const& coefs,
+                      amrex::Array4<amrex::Real const> const& bcent,
+                      const amrex::Real axm, const amrex::Real axp,
+                      const amrex::Real aym, const amrex::Real ayp,
+                      const amrex::Real azm, const amrex::Real azp,
+                      amrex::GpuArray<amrex::Real,NVAR>& viscw) noexcept
 {
-     //  This implementation assumes adiabatic walls
+  //  This implementation assumes adiabatic walls
 
-     using amrex::Real;
+  using amrex::Real;
 
-     for (int n = 0; n < NVAR; n++) viscw[n]=0.;
+  AMREX_D_TERM(Real dapx = axp - axm;,
+               Real dapy = ayp - aym;,
+               Real dapz = azp - azm;);
 
-     AMREX_D_TERM(Real dapx = axp - axm;,
-                    Real dapy = ayp - aym;,
-                    Real dapz = azp - azm;);
+  Real apnorm = std::sqrt(dapx*dapx+dapy*dapy+dapz*dapz);
+  if (apnorm == 0.0) amrex::Abort("compute_diff_wallflux: we are in trouble.");
 
-     Real apnorm = std::sqrt(dapx*dapx+dapy*dapy+dapz*dapz);
+  Real apnorminv = 1.0/apnorm;
+  AMREX_D_TERM(Real anrmx = -dapx * apnorminv;, // unit vector pointing toward the wall
+               Real anrmy = -dapy * apnorminv;,
+               Real anrmz = -dapz * apnorminv;);
 
-     if (apnorm == 0.0) {
-          amrex::Abort("compute_diff_wallflux: we are in trouble.");
-     }
+  amrex::GpuArray<amrex::Real, AMREX_SPACEDIM> bct;
 
-     Real apnorminv = 1.0/apnorm;
-     AMREX_D_TERM(Real anrmx = -dapx * apnorminv;, // unit vector pointing toward the wall
-                    Real anrmy = -dapy * apnorminv;,
-                    Real anrmz = -dapz * apnorminv;);
-
-     amrex::GpuArray<amrex::Real, AMREX_SPACEDIM> bct;
-
-     // The center of the wall
-     AMREX_D_TERM(bct[0] = bcent(i,j,k,0);,
-                    bct[1] = bcent(i,j,k,1);,
-                    bct[2] = bcent(i,j,k,2););
+  // The center of the wall
+  AMREX_D_TERM(bct[0] = bcent(i,j,k,0);,
+               bct[1] = bcent(i,j,k,1);,
+               bct[2] = bcent(i,j,k,2););
 
      Real u1,v1,w1,u2,v2,w2,d1,d2;
 

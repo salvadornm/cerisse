@@ -145,10 +145,11 @@ public:
   void compute_dSdt_box_eb (const amrex::Box& bx,
                             amrex::Array4<amrex::Real       const> const& Sfab,
                             amrex::Array4<amrex::Real            > const& dSdtfab,
-                            AMREX_D_DECL(
-                              amrex::Array4<amrex::Real          > const& fx_out_arr,
-                              amrex::Array4<amrex::Real          > const& fy_out_arr,
-                              amrex::Array4<amrex::Real          > const& fz_out_arr),
+                            const std::array<FArrayBox*, AMREX_SPACEDIM>& flux,
+                            // AMREX_D_DECL(
+                            //   amrex::Array4<amrex::Real          > const& fx_out_arr,
+                            //   amrex::Array4<amrex::Real          > const& fy_out_arr,
+                            //   amrex::Array4<amrex::Real          > const& fz_out_arr),
                             amrex::Array4<amrex::EBCellFlag const> const& flag,
                             amrex::Array4<amrex::Real       const> const& vfrac,
                             AMREX_D_DECL(
@@ -170,8 +171,8 @@ public:
 
   void cns_flux_redistribute (const amrex::Box& bx,
                               amrex::Array4<amrex::Real            > const& dqdt,
-                              amrex::Array4<amrex::Real            > const& divc,
-                              amrex::Array4<amrex::Real       const> const& redistwgt,
+                              amrex::Array4<amrex::Real       const> const& divc,
+                              amrex::Array4<amrex::Real       const> const& q,
                               amrex::Array4<amrex::Real       const> const& vfrac,
                               amrex::Array4<amrex::EBCellFlag const> const& flag,
                               int as_crse,
@@ -325,6 +326,7 @@ protected:
 #if CNS_USE_EB
   static int eb_weights_type;
   static int do_reredistribution;
+  static bool eb_no_slip;
 #endif
   
   static int refine_cutcells;  

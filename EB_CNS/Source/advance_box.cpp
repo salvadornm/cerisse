@@ -2,14 +2,15 @@
 // #include "CNS_hydro_K.H"
 #include "CNS_diffusion_K.H"
 #include "hyperbolics.H"
+#include "recon.H"
 
 using namespace amrex;
 
 void
-CNS::compute_dSdt_box (const Box& bx,
-                       Array4<Real const>& sarr,
-                       Array4<Real      >& dsdtarr,
-                       const std::array<FArrayBox*, AMREX_SPACEDIM>& flxfab)
+CNS::compute_dSdt_box (Box const& bx,
+                       Array4<const Real>& sarr,
+                       Array4<      Real>& dsdtarr,
+                       std::array<FArrayBox*, AMREX_SPACEDIM> const& flxfab)
 {
   BL_PROFILE("CNS::compute_dSdt_box()");
   
@@ -29,7 +30,7 @@ CNS::compute_dSdt_box (const Box& bx,
     });
   }
   
-  // // Arrays for characteristic reconstruction
+  // Arrays for characteristic reconstruction
   FArrayBox wtmp(bxg3, NCHAR);
   FArrayBox wl_tmp(bxg2, NPRIM);
   FArrayBox wr_tmp(bxg2, NPRIM);
@@ -63,7 +64,7 @@ CNS::compute_dSdt_box (const Box& bx,
   }
 
   // A fab to store the viscous fluxes in VPDF or VSPDF
-  FArrayBox vflux_fab, pflux_fab;    
+  FArrayBox vflux_fab, pflux_fab;
   
   for (int cdir = 0; cdir < AMREX_SPACEDIM; ++cdir) { // Loop through space direction
     const Box& flxbx = amrex::surroundingNodes(bx,cdir);
@@ -187,7 +188,8 @@ CNS::compute_dSdt_box (const Box& bx,
       // });
     // }
 
-    if ((NUM_FIELD > 0) && (do_visc)) {
+#if NUM_FIELD > 0
+    if (do_visc) {
       auto const& flx_arr = flxfab[cdir]->array();
       amrex::ParallelFor(flxbx,
       [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept {
@@ -232,7 +234,7 @@ CNS::compute_dSdt_box (const Box& bx,
         }
       });
     }
-
+#endif
   } //for dir
 
   // Compute flux divergence

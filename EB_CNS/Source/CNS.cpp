@@ -56,12 +56,26 @@ CNS::CNS (Amr&            papa,
     reactor->init(1, 1); //init reactor to constant volume type
   }
 
+#if (NUM_FIELD > 0)
   // Initialise random number
   Vector<IntVect> ref_ratio;
   for (int lv = 0; lv < parent->maxLevel(); ++lv) {
     ref_ratio.push_back(parent->refRatio(lv));
   }
   WienerProcess.init(AMREX_SPACEDIM, level, ref_ratio);
+#endif
+
+#if CNS_USE_EB
+  // make sure dx = dy = dz
+  const amrex::GpuArray<amrex::Real, AMREX_SPACEDIM> dx = geom.CellSizeArray();
+  const amrex::Real small = 1.e-13;
+  if (amrex::max<amrex::Real>(AMREX_D_DECL(
+      static_cast<amrex::Real>(0.0),
+      static_cast<amrex::Real>(std::abs(dx[0] - dx[1])),
+      static_cast<amrex::Real>(std::abs(dx[0] - dx[2])))) > small * dx[0]) {
+    amrex::Abort("EB formulation assumes dx == dy == dz");
+  }
+#endif
 }
 
 CNS::~CNS () 
@@ -340,8 +354,14 @@ void
 CNS::post_restart ()
 {
   // Copy problem parameter structs to device
-  amrex::Gpu::copy(amrex::Gpu::hostToDevice, h_prob_parm, 
-                    h_prob_parm+1, d_prob_parm);
+  // amrex::Gpu::copy(amrex::Gpu::hostToDevice, h_prob_parm, 
+  //                  h_prob_parm+1, d_prob_parm);
+  #ifdef AMREX_USE_GPU
+    // Cannot use Gpu::copy because ProbParm is not trivailly copyable.
+    Gpu::htod_memcpy_async(CNS::d_prob_parm, CNS::h_prob_parm, sizeof(ProbParm));
+  #else
+    std::memcpy(CNS::d_prob_parm, CNS::h_prob_parm, sizeof(ProbParm));
+  #endif
 
   // Initialize reactor
   if (do_react) {
@@ -358,13 +378,15 @@ CNS::post_restart ()
     }
   }
   
+#if (NUM_FIELD > 0)
   // Initialise random number
   Vector<IntVect> ref_ratio;
   for (int lv = 0; lv < parent->maxLevel(); ++lv) {
     ref_ratio.push_back(parent->refRatio(lv));
   }
   WienerProcess.init(AMREX_SPACEDIM, level, ref_ratio);
-  
+#endif
+
   MultiFab& S_new = get_new_data(State_Type);
 
   // Populate fields (when restarting from a different number of fields)
@@ -823,6 +845,8 @@ CNS::read_params ()
   if (do_reredistribution != 0 && do_reredistribution != 1) {
     amrex::Abort("CNS: do_reredistibution must be 0 or 1");
   }
+
+  pp.query("eb_no_slip", eb_no_slip);
 #endif
 
   amrex::Gpu::copyAsync(amrex::Gpu::hostToDevice, h_parm, h_parm+1, d_parm);

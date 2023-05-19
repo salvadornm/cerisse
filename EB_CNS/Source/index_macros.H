@@ -7,7 +7,11 @@
 #endif
 
 // Grow cell number
-#define NUM_GROW 5
+#if CNS_USE_EB
+#define NUM_GROW 6 // add 3 for redistribution
+#else
+#define NUM_GROW 3
+#endif
 
 // Number of stochastic fields
 #ifndef NUM_FIELD

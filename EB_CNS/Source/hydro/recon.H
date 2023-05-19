@@ -332,7 +332,7 @@ pp_limiter_euler (const amrex::IntVect ivl, const amrex::IntVect iv,
 }
 
 /**
- * \brief Interpolate primitive variables to cell faces.
+ * \brief Interpolate variables to cell faces.
  * 
  * For numerical stability, we need to convert primitive variables into characteristic variables,
  * then convert back to primitive variables after reconstruction.
@@ -345,8 +345,9 @@ pp_limiter_euler (const amrex::IntVect ivl, const amrex::IntVect iv,
  * @param i    x index.
  * @param j    y index.
  * @param k    z index.
+ * @param n    the n-th variable in the array.
  * @param dir  direction, 0:x, 1:y, 2:z.
- * @param q    cell averaged primitive variable.
+ * @param q    cell averaged variable.
  * @param ql   left state at a face.
  * @param qr   right state at a face.
  * @param recon_scheme reconstruction scheme.
@@ -379,7 +380,7 @@ cns_recon (int i, int j, int k, int n, int dir,
     muscl(s, qr(iv,n), ql(iv+iv_dir,n), plm_theta);
 
   } else if (recon_scheme == 3) {
-    // MUSCL    
+    // WENO-Z3     
     Real s[3];
     s[0] = q(iv-iv_dir,n);
     s[1] = q(iv,n);
