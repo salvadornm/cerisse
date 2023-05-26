@@ -15,14 +15,14 @@ struct ProbParm
     amrex::Real v_l = 0.0;
     amrex::Real rho_l = 8.0;
     amrex::Real rhoe_l;
-    amrex::Real T_l;
+    // amrex::Real T_l;
 
     amrex::Real p_r = 1.0;   // undisturbed
     amrex::Real u_r = 0.0;
     amrex::Real v_r = 0.0;
     amrex::Real rho_r = 1.4;
     amrex::Real rhoe_r;
-    amrex::Real T_r;
+    // amrex::Real T_r;
     amrex::Real c_r;
 };
 

@@ -30,27 +30,31 @@ prob_initdata (int i, int j, int k,
     const amrex::Real* prob_lo = geomdata.ProbLo();
     const amrex::Real* dx = geomdata.CellSize();
     const amrex::Real x = prob_lo[0] + (i + 0.5) * dx[0];
+    // const amrex::Real y = prob_lo[1] + (j + 0.5) * dx[1];
 
     // Set the states
-    if (x < 0.263) {
+    // if ((x < 1.0 /*&& y > 0.2/**/) /*|| (x <= 0.5-y && y <= 0.2)*/) {
         state(i, j, k, URHO) = prob_parm.rho_l;
         state(i, j, k, UMX) = prob_parm.rho_l * prob_parm.u_l;
         state(i, j, k, UMY) = 0.0;
         state(i, j, k, UMZ) = 0.0;
         state(i, j, k, UEDEN) = prob_parm.rhoe_l + 0.5 * prob_parm.rho_l * prob_parm.u_l * prob_parm.u_l;
-        // state(i, j, k, UEINT) = prob_parm.rhoe_l;
-        // state(i, j, k, UTEMP) = prob_parm.T_l;
         state(i, j, k, UFS) = prob_parm.rho_l;
-    } else {
-        state(i, j, k, URHO) = prob_parm.rho_r;
+    /*} else if (x > 0.5-y && y <= 0.2) {
+        state(i, j, k, URHO) = prob_parm.rho_l;
         state(i, j, k, UMX) = 0.0;
-        state(i, j, k, UMY) = 0.0;
+        state(i, j, k, UMY) = 0.25 * prob_parm.rho_l * prob_parm.u_l;
         state(i, j, k, UMZ) = 0.0;
-        state(i, j, k, UEDEN) = prob_parm.rhoe_r;
-        // state(i, j, k, UEINT) = prob_parm.rhoe_r;
-        // state(i, j, k, UTEMP) = prob_parm.T_r;
-        state(i, j, k, UFS) = prob_parm.rho_r;
-    }
+        state(i, j, k, UEDEN) = prob_parm.rhoe_l + 0.5 * 0.125 * prob_parm.rho_l * prob_parm.u_l * prob_parm.u_l;
+        state(i, j, k, UFS) = prob_parm.rho_l;*/
+    // } else {
+    //     state(i, j, k, URHO) = prob_parm.rho_r;
+    //     state(i, j, k, UMX) = 0.0;
+    //     state(i, j, k, UMY) = 0.0;
+    //     state(i, j, k, UMZ) = 0.0;
+    //     state(i, j, k, UEDEN) = prob_parm.rhoe_r;
+    //     state(i, j, k, UFS) = prob_parm.rho_r;
+    // }
 }
 
 /**
@@ -79,39 +83,23 @@ bcnormal (const amrex::Real x[AMREX_SPACEDIM],
           ProbParm const& prob_parm)
 {
     if (idir == 0 && sgn == 1) { //xlo
-        // post shock conditions
+    // if (x[1] > 0.5) {
+        // inlet: post shock conditions
         s_ext[URHO] = prob_parm.rho_l;
         s_ext[UMX] = prob_parm.rho_l * prob_parm.u_l;
-        s_ext[UMY] = prob_parm.rho_l * prob_parm.v_l;
+        s_ext[UMY] = 0.0;
         s_ext[UMZ] = 0.0;
         s_ext[UEDEN] = prob_parm.rhoe_l + 0.5 * prob_parm.rho_l * prob_parm.u_l * prob_parm.u_l;
-        // s_ext[UEINT] = prob_parm.rhoe_l;
-        // s_ext[UTEMP] = prob_parm.T_l;
         s_ext[UFS] = prob_parm.rho_l;
-    } 
-    // else if (idir == 1 && sgn == -1) { //yhi
-    //     moving shock conditions
-    //     amrex::Real us = 10. * prob_parm.c_r; //shock speed
-    //     if (x[0] - us*time < 0.5) {
-    //         s_ext[URHO] = prob_parm.rho_l;
-    //         s_ext[UMX] = prob_parm.rho_l * prob_parm.u_l;
-    //         s_ext[UMY] = 0.0;
-    //         s_ext[UMZ] = 0.0;
-    //         s_ext[UEDEN] = prob_parm.rhoe_l + 0.5 * prob_parm.rho_l * prob_parm.u_l * prob_parm.u_l;
-    //         // s_ext[UEINT] = prob_parm.rhoe_l;
-    //         // s_ext[UTEMP] = prob_parm.T_l;
-    //         s_ext[UFS] = prob_parm.rho_l;
-    //     } else {
-    //         s_ext[URHO] = prob_parm.rho_r;
-    //         s_ext[UMX] = 0.0;
-    //         s_ext[UMY] = 0.0;
-    //         s_ext[UMZ] = 0.0;
-    //         s_ext[UEDEN] = prob_parm.rhoe_r;
-    //         // s_ext[UEINT] = prob_parm.rhoe_r;
-    //         // s_ext[UTEMP] = prob_parm.T_r;
-    //         s_ext[UFS] = prob_parm.rho_r;
-    //     }  
+    // } else {
+    //     s_ext[URHO] = prob_parm.rho_r;
+    //     s_ext[UMX] = 0.0;
+    //     s_ext[UMY] = 0.0;
+    //     s_ext[UMZ] = 0.0;
+    //     s_ext[UEDEN] = prob_parm.rhoe_r;
+    //     s_ext[UFS] = prob_parm.rho_r;
     // }
+    }
 }
 
 /**
