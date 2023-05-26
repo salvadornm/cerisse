@@ -98,7 +98,7 @@ Combustor::build (const Geometry& geom, const int max_coarsening_level)
   auto pr = EB2::translate(EB2::lathe(polys), {lenx*0.5, leny*0.5, 0.});
 
   auto gshop = EB2::makeShop(pr);
-  EB2::Build(gshop, geom, max_coarsening_level, max_coarsening_level, 4, true);
+  EB2::Build(gshop, geom, max_coarsening_level, max_coarsening_level, 6, true);
 }
 
 void
@@ -137,7 +137,7 @@ ConvergingNozzle::build (const Geometry& geom, const int max_coarsening_level)
   auto polys = amrex::EB2::makeUnion(main, nozzle_exit);
   auto gshop = amrex::EB2::makeShop(polys);
   amrex::EB2::Build(
-    gshop, geom, max_coarsening_level, max_coarsening_level, 4, false);
+    gshop, geom, max_coarsening_level, max_coarsening_level, 6, false);
 }
 #endif
 
@@ -267,7 +267,7 @@ Triangles::build (const Geometry& geom, const int max_coarsening_level)
   auto alltri_extrude_IF = amrex::EB2::extrude(alltri_IF, 2); // along z
 
   auto gshop = amrex::EB2::makeShop(alltri_extrude_IF);
-  amrex::EB2::Build(gshop, geom, max_coarsening_level, max_coarsening_level);
+  amrex::EB2::Build(gshop, geom, max_coarsening_level, max_coarsening_level, 6, true);
 }
 
 #endif

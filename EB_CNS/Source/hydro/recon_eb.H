@@ -117,4 +117,71 @@ cns_recon_eb (int i, int j, int k, int n, int dir,
   }
 }
 
+// AMREX_GPU_DEVICE AMREX_FORCE_INLINE bool
+// is_valid_cell (amrex::IntVect const& iv, 
+//                amrex::IntVect const& blo, 
+//                amrex::IntVect const& bhi) 
+// {
+//   return AMREX_D_TERM( (blo[0] <= iv[0]) && (iv[0] <= bhi[0]),
+//                     && (blo[1] <= iv[1]) && (iv[1] <= bhi[1]),
+//                     && (blo[2] <= iv[2]) && (iv[2] <= bhi[2]) );
+// }
+
+// AMREX_GPU_DEVICE AMREX_FORCE_INLINE void
+// cns_fill_eb_q (int i, int j, int k, int dir,
+//               amrex::Array4<amrex::Real> const& q,
+//               amrex::Array4<amrex::EBCellFlag const> const& flag,
+//               amrex::IntVect const& blo, amrex::IntVect const& bhi,
+//               bool no_slip) //noexcept
+// {
+//   const amrex::IntVect iv(AMREX_D_DECL(i, j, k));
+//   const amrex::IntVect idir = amrex::IntVect::TheDimensionVector(dir);
+
+//   if ( !flag(iv).isCovered() ) return;
+
+//   // Find the nearest non-covered cell
+//   const bool cm2 = is_valid_cell(iv-2*idir, blo, bhi) ? !flag(iv-2*idir).isCovered() : false;
+//   const bool cm1 = is_valid_cell(iv-  idir, blo, bhi) ? !flag(iv-  idir).isCovered() : false;
+//   const bool cp2 = is_valid_cell(iv+2*idir, blo, bhi) ? !flag(iv+2*idir).isCovered() : false;
+//   const bool cp1 = is_valid_cell(iv+  idir, blo, bhi) ? !flag(iv+  idir).isCovered() : false;
+
+//   // const bool cm2 = !flag(iv-2*idir).isCovered();
+//   // const bool cm1 = !flag(iv-  idir).isCovered();
+//   // const bool cp2 = !flag(iv+2*idir).isCovered();
+//   // const bool cp1 = !flag(iv+  idir).isCovered();
+
+//   // Position to copy from (the nearest non-covered cell)
+//   amrex::IntVect iv_cpy;
+//   if (cp1) {
+//     iv_cpy = iv + idir;
+//   } else if (cm1) {
+//     iv_cpy = iv - idir;
+//   } else if (cp2) {
+//     iv_cpy = iv + 2*idir;
+//   } else if (cm2) {
+//     iv_cpy = iv - 2*idir;
+//   } else {
+//     return;
+//   }
+
+//   q(iv,QRHO) = q(iv_cpy,QRHO);
+//   AMREX_D_TERM(
+//   q(iv,QU) = ((no_slip || dir == 0) ? -1 : 1) * q(iv_cpy,QU);,
+//   q(iv,QV) = ((no_slip || dir == 1) ? -1 : 1) * q(iv_cpy,QV);,
+//   q(iv,QW) = ((no_slip || dir == 2) ? -1 : 1) * q(iv_cpy,QW);)
+//   // AMREX_D_TERM(
+//   // q(iv,QU) = q(iv_cpy,QU);,
+//   // q(iv,QV) = q(iv_cpy,QV);,
+//   // q(iv,QW) = q(iv_cpy,QW);)
+//   q(iv,QPRES) = q(iv_cpy,QPRES);
+//   q(iv,QC) = q(iv_cpy,QC);
+//   q(iv,QG) = q(iv_cpy,QG);
+//   q(iv,QEINT) = q(iv_cpy,QEINT);
+//   q(iv,QTEMP) = q(iv_cpy,QTEMP);
+//   for (int n = 0; n < NUM_SPECIES; ++n)
+//     q(iv,QFS+n) = q(iv_cpy,QFS+n);
+// }
+
+
+
 #endif

@@ -15,6 +15,8 @@
 #include "CNS_divop_K.H"
 #include "CNS_diffusion_eb_K.H"
 
+#include "characteristic_reconstruction.H"
+
 using namespace amrex;
 
 void
@@ -46,7 +48,7 @@ CNS::compute_dSdt_box_eb (const Box& bx,
   const Box& bxg1 = amrex::grow(bx,1);
   const Box& bxg2 = amrex::grow(bx,2);
   const Box& bxg3 = amrex::grow(bx,3);
-  // const Box& bxg4 = amrex::grow(bx,4);
+  const Box& bxg4 = amrex::grow(bx,4);
   const Box& bxg5 = amrex::grow(bx,5);
   const Box& bxg6 = amrex::grow(bx,6);
 
@@ -81,7 +83,7 @@ CNS::compute_dSdt_box_eb (const Box& bx,
   // Transport coef
   FArrayBox diff_coeff;
   if (do_visc == 1) {
-    diff_coeff.resize(bxg5, LEN_COEF);
+    diff_coeff.resize(bxg4, LEN_COEF);
 
     for (int nf = 0; nf <= NUM_FIELD; ++nf){
       auto const& qar_yin   = qtmp.array(nf*NPRIM + QFS);
@@ -95,7 +97,7 @@ CNS::compute_dSdt_box_eb (const Box& bx,
       // Get Transport coefs on GPU
       BL_PROFILE("PelePhysics::get_transport_coeffs()");      
       auto const* ltransparm = trans_parms.device_trans_parm();
-      amrex::launch(bxg5, [=] AMREX_GPU_DEVICE(amrex::Box const& tbx) {
+      amrex::launch(bxg4, [=] AMREX_GPU_DEVICE(amrex::Box const& tbx) {
         auto trans = pele::physics::PhysicsType::transport();
         trans.get_transport_coeffs(
             tbx, qar_yin, qar_Tin, qar_rhoin, rhoD, mu, xi, lambda, ltransparm);
@@ -140,24 +142,36 @@ CNS::compute_dSdt_box_eb (const Box& bx,
     for (int nf = 0; nf <= NUM_FIELD; ++nf) { // Loop through fields
       // Convert primitive to characteristic
       auto const& q = qtmp.array(nf*NPRIM);
+      // const auto domlo = geom.Domain().smallEnd();
+      // const auto domhi = geom.Domain().bigEnd();
+      // auto const& blo = bxg6.smallEnd();
+      // auto const& bhi = bxg6.bigEnd();
       amrex::ParallelFor(bxg6,
       [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept {
+        // cns_fill_eb_q(i, j, k, cdir, q, flag, blo, bhi, (do_visc && eb_no_slip)); // Type 2 EB
         cns_ctochar(i, j, k, cdir, q, w, 0);
       });
 
       // Reconstruction            
       amrex::ParallelFor(reconbox, NCHAR,
       [=] AMREX_GPU_DEVICE (int i, int j, int k, int n) noexcept {
-        // cns_recon(i, j, k, n, cdir, w, wl, wr, recon_scheme, plm_theta);
-        cns_recon_eb(i, j, k, n, cdir, w, wl, wr, recon_scheme, plm_theta, flag, 0);
+        // cns_recon(i, j, k, n, cdir, w, wl, wr, recon_scheme, plm_theta); // Type 2 EB
+        cns_recon_eb(i, j, k, n, cdir, w, wl, wr, recon_scheme, plm_theta, flag, 0); // Type 1 EB
       });
+
+      // amrex::ParallelFor(reconbox, 
+      // [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept {
+      //   char_recon(i, j, k, cdir, q, wl, wr, recon_scheme, plm_theta, 2, *lparm, &flag);
+      // });
 
       // Solve Riemann problem, store advection and pressure fluxes to flx_arr
       auto const& flx_arr = flux_tmp[cdir].array(nf*NVAR);      
       amrex::ParallelFor(flxbx,
       [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept {
-        // cns_riemann(i, j, k, cdir, flx_arr, p_arr, q, wl, wr, 0, *lparm);
-        cns_riemann_eb(i, j, k, cdir, flx_arr, p_arr, q, wl, wr, flag, *lparm);
+        if ( !flag(amrex::IntVect(AMREX_D_DECL(i,j,k))).isCovered() && 
+             !flag(amrex::IntVect(AMREX_D_DECL(i,j,k))-amrex::IntVect::TheDimensionVector(cdir)).isCovered() )
+          cns_riemann(i, j, k, cdir, flx_arr, p_arr, q, wl, wr, 0, *lparm);
+          // pure_riemann(i, j, k, cdir, flx_arr, p_arr, wl, wr, *lparm);
       });
 
       // Store viscous fluxes separately

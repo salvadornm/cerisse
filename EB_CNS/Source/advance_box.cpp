@@ -4,6 +4,8 @@
 #include "hyperbolics.H"
 #include "recon.H"
 
+#include "characteristic_reconstruction.H"
+
 using namespace amrex;
 
 void
@@ -95,6 +97,10 @@ CNS::compute_dSdt_box (Box const& bx,
       // [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept {
       //   new_recons(i, j, k, cdir, q, wl, wr, recon_scheme, 0, true, plm_theta, *lparm);
       // });
+      // amrex::ParallelFor(reconbox, 
+      // [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept {
+      //   char_recon(i, j, k, cdir, q, wl, wr, recon_scheme, plm_theta, 2, *lparm);
+      // });
 
       // Solve Riemann problem, store advection and pressure fluxes to flx_arr
       auto const& flx_arr = flxfab[cdir]->array(nf*NVAR);
@@ -102,7 +108,7 @@ CNS::compute_dSdt_box (Box const& bx,
       amrex::ParallelFor(flxbx,
       [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept {
         cns_riemann(i, j, k, cdir, flx_arr, /*nf > 1 ? vflx_arr : flx_arr*/ p_arr, q, wl, wr, 0, *lparm);
-        // new_riemann(i, j, k, cdir, flx_arr, p_arr, wl, wr, *lparm);
+        // pure_riemann(i, j, k, cdir, flx_arr, p_arr, wl, wr, *lparm);
       });
 
       // auto const& q = qtmp.array(nf*NPRIM);

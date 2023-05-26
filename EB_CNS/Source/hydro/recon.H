@@ -268,68 +268,68 @@ teno5 (amrex::Real s[5], amrex::Real& sm, amrex::Real& sp) noexcept
         (alpha[2] * vr[2] + alpha[1] * vr[1] + alpha[0] * vr[0]);
 }
 
-AMREX_GPU_DEVICE AMREX_FORCE_INLINE void
-pp_limiter_scalar (amrex::Real& ql, amrex::Real& qr, const amrex::Real& q, 
-                   const amrex::Real m, const amrex::Real M = 1e10)
-{
-  using amrex::Real;
-  Real min_q = amrex::min(ql, qr);
-  Real max_q = amrex::max(ql, qr);
+// AMREX_GPU_DEVICE AMREX_FORCE_INLINE void
+// pp_limiter_scalar (amrex::Real& ql, amrex::Real& qr, const amrex::Real& q, 
+//                    const amrex::Real m, const amrex::Real M = 1e10)
+// {
+//   using amrex::Real;
+//   Real min_q = amrex::min(ql, qr);
+//   Real max_q = amrex::max(ql, qr);
 
-  if ((min_q < m) || (max_q > M)) {
-    std::cout << "PP Limiter Scalar activated: ql=" << ql << " qr=" << qr << " q=" << q << "\n";
+//   if ((min_q < m) || (max_q > M)) {
+//     std::cout << "PP Limiter Scalar activated: ql=" << ql << " qr=" << qr << " q=" << q << "\n";
     
-    Real t = amrex::Math::abs(q - m) / amrex::Math::abs(q - min_q);
-    t = amrex::min(t, amrex::Math::abs(q - M) / amrex::Math::abs(q - max_q));
-    AMREX_ASSERT(t <= 1);
+//     Real t = amrex::Math::abs(q - m) / amrex::Math::abs(q - min_q);
+//     t = amrex::min(t, amrex::Math::abs(q - M) / amrex::Math::abs(q - max_q));
+//     AMREX_ASSERT(t <= 1);
 
-    ql = t*ql + (1-t)*q;
-    qr = t*qr + (1-t)*q;
-    std::cout << "New ql=" << ql << " New qr=" << qr << "\n";
-  }
-}
+//     ql = t*ql + (1-t)*q;
+//     qr = t*qr + (1-t)*q;
+//     std::cout << "New ql=" << ql << " New qr=" << qr << "\n";
+//   }
+// }
 
-AMREX_GPU_DEVICE AMREX_FORCE_INLINE void
-pp_limiter_euler (const amrex::IntVect ivl, const amrex::IntVect iv, 
-                  amrex::Array4<amrex::Real> const& ql, 
-                  amrex::Array4<amrex::Real> const& qr, 
-                  amrex::Array4<const amrex::Real> const& q, 
-                  const amrex::Real mr, const amrex::Real mp)
-{
-  using amrex::Real;
+// AMREX_GPU_DEVICE AMREX_FORCE_INLINE void
+// pp_limiter_euler (const amrex::IntVect ivl, const amrex::IntVect iv, 
+//                   amrex::Array4<amrex::Real> const& ql, 
+//                   amrex::Array4<amrex::Real> const& qr, 
+//                   amrex::Array4<const amrex::Real> const& q, 
+//                   const amrex::Real mr, const amrex::Real mp)
+// {
+//   using amrex::Real;
   
-  // Step 1: limit density as a scalar
-  pp_limiter_scalar(ql(ivl, QRHO), qr(iv, QRHO), q(iv, QRHO), mr, 100);
+//   // Step 1: limit density as a scalar
+//   pp_limiter_scalar(ql(ivl, QRHO), qr(iv, QRHO), q(iv, QRHO), mr, 100);
 
-  // Step 2: limit the whole state for positive pressure
-  if ((ql(ivl, QPRES) < mp) || (qr(iv, QPRES) < mp)) {
-    std::cout << iv << " PP Limiter Euler activated: pl=" << ql(ivl, QPRES) 
-                                                << " pr=" << qr(iv, QPRES)
-                                                << " p=" << q(iv, QPRES) << "\n";
-    Real min_p = amrex::min(ql(ivl, QPRES), qr(iv, QPRES));
-    Real t = amrex::Math::abs(q(iv, QPRES) - mp) / amrex::Math::abs(q(iv, QPRES) - min_p);
-    // Real min_p = amrex::min(ql(ivl, QPRES)/ql(ivl, QRHO), qr(iv, QPRES)/qr(iv, QRHO));
-    // Real t = amrex::Math::abs(q(iv, QPRES)/q(iv, QRHO) - mp/mr) 
-    //        / amrex::Math::abs(q(iv, QPRES)/q(iv, QRHO) - min_p);
-    AMREX_ASSERT(t <= 1);
+//   // Step 2: limit the whole state for positive pressure
+//   if ((ql(ivl, QPRES) < mp) || (qr(iv, QPRES) < mp)) {
+//     std::cout << iv << " PP Limiter Euler activated: pl=" << ql(ivl, QPRES) 
+//                                                 << " pr=" << qr(iv, QPRES)
+//                                                 << " p=" << q(iv, QPRES) << "\n";
+//     Real min_p = amrex::min(ql(ivl, QPRES), qr(iv, QPRES));
+//     Real t = amrex::Math::abs(q(iv, QPRES) - mp) / amrex::Math::abs(q(iv, QPRES) - min_p);
+//     // Real min_p = amrex::min(ql(ivl, QPRES)/ql(ivl, QRHO), qr(iv, QPRES)/qr(iv, QRHO));
+//     // Real t = amrex::Math::abs(q(iv, QPRES)/q(iv, QRHO) - mp/mr) 
+//     //        / amrex::Math::abs(q(iv, QPRES)/q(iv, QRHO) - min_p);
+//     AMREX_ASSERT(t <= 1);
 
-    for (int n = QRHO; n <= QPRES; ++n) {
-      std::cout << "Old ql=" << ql(ivl, n) << " Old qr=" << qr(iv, n);
-      ql(ivl, n) = t*ql(ivl, n) + (1-t)*q(iv, n);
-      qr(iv, n)  = t*qr(iv, n) + (1-t)*q(iv, n);
-      std::cout << "  New ql=" << ql(ivl, n) << " New qr=" << qr(iv, n) << "\n";
-    }
+//     for (int n = QRHO; n <= QPRES; ++n) {
+//       std::cout << "Old ql=" << ql(ivl, n) << " Old qr=" << qr(iv, n);
+//       ql(ivl, n) = t*ql(ivl, n) + (1-t)*q(iv, n);
+//       qr(iv, n)  = t*qr(iv, n) + (1-t)*q(iv, n);
+//       std::cout << "  New ql=" << ql(ivl, n) << " New qr=" << qr(iv, n) << "\n";
+//     }
 
-    Real T, Y[NUM_SPECIES];
-    auto eos = pele::physics::PhysicsType::eos();
-    for (int n = 0; n < NUM_SPECIES; ++n) Y[n] = ql(ivl,QFS+n);
-    eos.RYP2T(ql(ivl,QRHO), Y, ql(ivl, QPRES), T);
-    std::cout << "New Tl=" << T;
-    for (int n = 0; n < NUM_SPECIES; ++n) Y[n] = qr(iv,QFS+n);
-    eos.RYP2T(qr(iv,QRHO), Y, qr(iv, QPRES), T);
-    std::cout << " New Tr=" << T << "\n";
-  }
-}
+//     Real T, Y[NUM_SPECIES];
+//     auto eos = pele::physics::PhysicsType::eos();
+//     for (int n = 0; n < NUM_SPECIES; ++n) Y[n] = ql(ivl,QFS+n);
+//     eos.RYP2T(ql(ivl,QRHO), Y, ql(ivl, QPRES), T);
+//     std::cout << "New Tl=" << T;
+//     for (int n = 0; n < NUM_SPECIES; ++n) Y[n] = qr(iv,QFS+n);
+//     eos.RYP2T(qr(iv,QRHO), Y, qr(iv, QPRES), T);
+//     std::cout << " New Tr=" << T << "\n";
+//   }
+// }
 
 /**
  * \brief Interpolate variables to cell faces.

@@ -27,7 +27,8 @@ cns_ctoprim (int i, int j, int k, int ns,
              Parm const& parm) noexcept
 {
     amrex::Real rho = u(i,j,k,ns+URHO);
-    // rho = amrex::max(rho, parm.smallr); //preserve positivity of mass
+    // if (rho <= 0.0) amrex::Print() << "rho corrected \n";
+    // rho = amrex::max<amrex::Real>(rho, parm.smallr); //preserve positivity of mass
     amrex::Real rhoinv = amrex::Real(1.0) / rho;
     AMREX_D_TERM(amrex::Real ux = u(i,j,k,ns+UMX)*rhoinv; ,
                  amrex::Real uy = u(i,j,k,ns+UMY)*rhoinv; ,
@@ -61,6 +62,7 @@ cns_ctoprim (int i, int j, int k, int ns,
     // eos.Y2WBAR(massfrac, wbar);
     eos.REY2T(rho, ei, massfrac, T);
     eos.RTY2P(rho, T, massfrac, p);
+    // if (T <= 0.0) amrex::Print() << "T corrected \n";
     // T = amrex::max<amrex::Real>(T, 1e-10); //clip temperature
     eos.RTY2Cs(rho, T, massfrac, cs);
     eos.RTY2G(rho, T, massfrac, gamma);
@@ -80,7 +82,7 @@ cns_ctoprim (int i, int j, int k, int ns,
     // if (T < 50.0) std::cout << "i=" << i << " j=" << j << " k=" << k <<
     //   " r=" << rho << " T=" << T << " p=" << p << " c=" << cs << std::endl;
     
-    if (amrex::isnan(cs) || amrex::isnan(ux)) {
+    if (amrex::isnan(cs) || amrex::isnan(ux) || (rho < 0.0) || (p < 0.0)) {
         std::cout << "i=" << i << " j=" << j << " k=" << k << " ns=" << ns << ": rho=" << rho << " T=" << T << " p=" << p;// << "\n";
         std::cout << " rhoE=" << u(i,j,k,ns+UEDEN) << " ei=" << ei << "\n";
         for (int n = 0; n < NUM_SPECIES; n++) {
@@ -174,8 +176,8 @@ cns_unpackchar (const amrex::Real w1, const amrex::Real w2, const amrex::Real w3
         u = (w2 - w3) / std::sqrt(gamma*rho*p);
     }
 
-    rho = amrex::max(rho, parm.smallr); //enforce positive density
-    p = amrex::max(p, parm.smallp); //enforce positive pressure
+    // rho = amrex::max(rho, parm.smallr); //enforce positive density
+    // p = amrex::max(p, parm.smallp); //enforce positive pressure
 }
 
 /**
@@ -200,6 +202,8 @@ cns_div (int i, int j, int k, int n,
     dsdt(i,j,k,n) = AMREX_D_TERM(dxinv[0] * (fx(i,j,k,n) - fx(i+1,j,k,n)),
                                + dxinv[1] * (fy(i,j,k,n) - fy(i,j+1,k,n)),
                                + dxinv[2] * (fz(i,j,k,n) - fz(i,j,k+1,n)));
+                               
+    if (isnan(dsdt(i,j,k,n))) amrex::Print() << "div(" << i << "," << j << "," << k << ") is nan \n";
 }
 
 /**
@@ -654,9 +658,9 @@ cns_riemann (int i, int j, int k, int dir,
     // Unpack wl to ql (rl, ul, utl, pl, cl, el, yl)
     // Real g = q(iv-iv_dir,QG);
     Real r = q(iv-iv_dir,QRHO);
-    if (wl(iv,WC) < 0.0) std::cout << "cl < 0 = " << wl(iv,WC) << std::endl;
-    Real cl = amrex::max(1e-10, wl(iv,WC));
-    // Real cl = q(iv-iv_dir,QC);
+    // if (wl(iv,WC) < 0.0) std::cout << "cl < 0 = " << wl(iv,WC) << std::endl;
+    // Real cl = amrex::max(1e-10, wl(iv,WC));
+    Real cl = q(iv-iv_dir,QC);
     Real yl[NUM_SPECIES];
     Real rl, AMREX_D_DECL(ul, ut1l, ut2l), pl, el;
     
@@ -664,10 +668,9 @@ cns_riemann (int i, int j, int k, int dir,
     for (int n = 0; n < NUM_SPECIES; ++n) {
         yl[n] = amrex::max<amrex::Real>(0.0, wl(iv,WY+n));
         sumY += yl[n];
-    }
-    Real invsumY;
+    }    
     if (std::abs(sumY - 1.0) > parm.smally) {
-        invsumY = 1.0 / sumY;
+        Real invsumY = 1.0 / sumY;
         for (int n = 0; n < NUM_SPECIES; ++n) {
             yl[n] *= invsumY;
         }
@@ -709,9 +712,9 @@ cns_riemann (int i, int j, int k, int dir,
     // Convert wr to qr
     // g = q(iv,QG);
     r = q(iv,QRHO);
-    if (wr(iv,WC) < 0.0) std::cout << "cr < 0 = " << wr(iv,WC) << std::endl;
-    Real cr = amrex::max(1e-10, wr(iv,WC));
-    // Real cr = q(iv,QC);
+    // if (wr(iv,WC) < 0.0) std::cout << "cr < 0 = " << wr(iv,WC) << std::endl;
+    // Real cr = amrex::max(1e-10, wr(iv,WC));
+    Real cr = q(iv,QC);
     Real yr[NUM_SPECIES];
     Real rr, AMREX_D_DECL(ur, ut1r, ut2r), pr, er;
 
@@ -721,7 +724,7 @@ cns_riemann (int i, int j, int k, int dir,
         sumY += yr[n];
     }
     if (std::abs(sumY - 1.0) > parm.smally) {
-        invsumY = 1.0 / sumY;
+        Real invsumY = 1.0 / sumY;
         for (int n = 0; n < NUM_SPECIES; ++n) {
             yr[n] *= invsumY;
         }
@@ -785,13 +788,21 @@ cns_riemann (int i, int j, int k, int dir,
 
     amrex::Real ry_flx[NUM_SPECIES] = {0.0};
 
+    // This's wrong DONT USE!!!!!!!!
+    // hllc(rl, AMREX_D_DECL(ul, ut1l, ut2l), pl, cl, el, yl,
+    //      rr, AMREX_D_DECL(ur, ut1r, ut2r), pr, cr, er, yr,
+    //      adv_flx(i,j,k,URHO), 
+    //      AMREX_D_DECL(adv_flx(i,j,k,UMN), adv_flx(i,j,k,UMT), adv_flx(i,j,k,UMTT)), 
+    //      p_flx(i,j,k,UMN), p_flx(i,j,k,UEDEN),
+    //      adv_flx(i,j,k,UEDEN),
+    //      ry_flx, //&adv_flx(i,j,k,UFS),
+    //      parm);
+
     hllc(rl, AMREX_D_DECL(ul, ut1l, ut2l), pl, cl, el, yl,
          rr, AMREX_D_DECL(ur, ut1r, ut2r), pr, cr, er, yr,
          adv_flx(i,j,k,URHO), 
          AMREX_D_DECL(adv_flx(i,j,k,UMN), adv_flx(i,j,k,UMT), adv_flx(i,j,k,UMTT)), 
-         p_flx(i,j,k,UMN), p_flx(i,j,k,UEDEN),
-         adv_flx(i,j,k,UEDEN),
-         ry_flx, //&adv_flx(i,j,k,UFS),
+         adv_flx(i,j,k,UEDEN), ry_flx, //&adv_flx(i,j,k,UFS),
          parm);
 
     for (int n = 0; n < NUM_SPECIES; ++n) { adv_flx(i,j,k,UFS+n) = ry_flx[n]; }
@@ -802,25 +813,25 @@ cns_riemann (int i, int j, int k, int dir,
                                                     //<< rl << " " << yl[0] << " " << yl[1] << ", " << rr << " " << yr[0] << " " << yr[1] << std::endl;
 }
 
-#if CNS_USE_EB
-AMREX_GPU_DEVICE AMREX_FORCE_INLINE void
-cns_riemann_eb (int i, int j, int k, int dir,
-                amrex::Array4<amrex::Real> const& adv_flx,
-                amrex::Array4<amrex::Real> const& p_flx,
-                amrex::Array4<const amrex::Real> const& q,
-                amrex::Array4<const amrex::Real> const& wl,
-                amrex::Array4<const amrex::Real> const& wr,
-                amrex::Array4<const amrex::EBCellFlag> const& flag,
-                Parm const& parm) noexcept
-{
-    const amrex::IntVect iv(AMREX_D_DECL(i, j, k));
-    const amrex::IntVect iv_dir = amrex::IntVect::TheDimensionVector(dir);
+// #if CNS_USE_EB
+// AMREX_GPU_DEVICE AMREX_FORCE_INLINE void
+// cns_riemann_eb (int i, int j, int k, int dir,
+//                 amrex::Array4<amrex::Real> const& adv_flx,
+//                 amrex::Array4<amrex::Real> const& p_flx,
+//                 amrex::Array4<const amrex::Real> const& q,
+//                 amrex::Array4<const amrex::Real> const& wl,
+//                 amrex::Array4<const amrex::Real> const& wr,
+//                 amrex::Array4<const amrex::EBCellFlag> const& flag,
+//                 Parm const& parm) noexcept
+// {
+//     const amrex::IntVect iv(AMREX_D_DECL(i, j, k));
+//     const amrex::IntVect iv_dir = amrex::IntVect::TheDimensionVector(dir);
 
-    if ( !flag(iv).isCovered() && !flag(iv-iv_dir).isCovered() ) {
-        cns_riemann(i, j, k, dir, adv_flx, p_flx, q, wl, wr, 0, parm);
-    }
-}
-#endif
+//     if ( !flag(iv).isCovered() && !flag(iv-iv_dir).isCovered() ) {
+//         cns_riemann(i, j, k, dir, adv_flx, p_flx, q, wl, wr, 0, parm);
+//     }
+// }
+// #endif
 
 // ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 //                                           EXPERIMENTAL
@@ -1130,71 +1141,75 @@ cns_riemann_eb (int i, int j, int k, int dir,
 //   }
 // }
 
-// AMREX_GPU_DEVICE AMREX_FORCE_INLINE void
-// new_riemann (int i, int j, int k, int dir,
-//              amrex::Array4<amrex::Real> const& adv_flx,
-//              amrex::Array4<amrex::Real> const& p_flx,
-//              amrex::Array4<const amrex::Real> const& ql,
-//              amrex::Array4<const amrex::Real> const& qr,
-//              Parm const& parm) noexcept
-// {
-//   using amrex::Real;
+AMREX_GPU_DEVICE AMREX_FORCE_INLINE void
+pure_riemann (int i, int j, int k, int dir,
+              amrex::Array4<amrex::Real> const& adv_flx,
+              amrex::Array4<amrex::Real> const& /*p_flx*/,
+              amrex::Array4<const amrex::Real> const& ql,
+              amrex::Array4<const amrex::Real> const& qr,
+              Parm const& parm) noexcept
+{
+  using amrex::Real;
 
-//   const amrex::IntVect iv(AMREX_D_DECL(i, j, k));
-//   const amrex::IntVect iv_dir = amrex::IntVect::TheDimensionVector(dir);
+  const amrex::IntVect iv(AMREX_D_DECL(i, j, k));
+  const amrex::IntVect iv_dir = amrex::IntVect::TheDimensionVector(dir);
 
-//   int UMN, UMT, UMTT, QUN, QUT, QUTT;
-//   if (dir == 0) {
-//     UMN = UMX; UMT = UMY; UMTT = UMZ;  QUN = QU;  QUT = QV;  QUTT = QW;
-//   } else if (dir == 1) {
-//     UMN = UMY; UMT = UMX; UMTT = UMZ;  QUN = QV;  QUT = QU;  QUTT = QW;
-//   } else {
-//     UMN = UMZ; UMT = UMX; UMTT = UMY;  QUN = QW;  QUT = QU;  QUTT = QV;
-//   }
+  int UMN, UMT, UMTT, QUN, QUT, QUTT;
+  if (dir == 0) {
+    UMN = UMX; UMT = UMY; UMTT = UMZ;  QUN = QU;  QUT = QV;  QUTT = QW;
+  } else if (dir == 1) {
+    UMN = UMY; UMT = UMX; UMTT = UMZ;  QUN = QV;  QUT = QU;  QUTT = QW;
+  } else {
+    UMN = UMZ; UMT = UMX; UMTT = UMY;  QUN = QW;  QUT = QU;  QUTT = QV;
+  }
 
-//   auto eos = pele::physics::PhysicsType::eos();
+  auto eos = pele::physics::PhysicsType::eos();
 
-//   Real rl, AMREX_D_DECL(ul, ut1l, ut2l), pl, yl[NUM_SPECIES], cl, el;
-//   rl = ql(iv,QRHO);
-//   AMREX_D_TERM(ul   = ql(iv,QUN); ,
-//                ut1l = ql(iv,QUT); ,
-//                ut2l = ql(iv,QUTT););
-//   pl = ql(iv,QPRES);
-//   for (int n = 0; n < NUM_SPECIES; ++n) {
-//     yl[n] = ql(iv,QFS+n);
-//   }
-//   eos.RYP2E(rl, yl, pl, el);
-//   el += 0.5*(AMREX_D_TERM(ul*ul, +ut1l*ut1l, +ut2l*ut2l));   
-//   eos.RPY2Cs(rl, pl, yl, cl);
+  Real rl, AMREX_D_DECL(ul, ut1l, ut2l), pl, yl[NUM_SPECIES], cl, el;
+  rl = ql(iv,QRHO);
+  AMREX_D_TERM(ul   = ql(iv,QUN); ,
+               ut1l = ql(iv,QUT); ,
+               ut2l = ql(iv,QUTT););
+  pl = ql(iv,QPRES);
+  for (int n = 0; n < NUM_SPECIES; ++n) {
+    yl[n] = ql(iv,QFS+n);
+  }
+  eos.RYP2E(rl, yl, pl, el);
+  el += 0.5*(AMREX_D_TERM(ul*ul, +ut1l*ut1l, +ut2l*ut2l));   
+  eos.RPY2Cs(rl, pl, yl, cl);
 
-//   Real rr, AMREX_D_DECL(ur, ut1r, ut2r), pr, yr[NUM_SPECIES], cr, er;
-//   rr = qr(iv,QRHO);
-//   AMREX_D_TERM(ur   = qr(iv,QUN); ,
-//                ut1r = qr(iv,QUT); ,
-//                ut2r = qr(iv,QUTT););
-//   pr = qr(iv,QPRES);
-//   for (int n = 0; n < NUM_SPECIES; ++n) {
-//     yr[n] = qr(iv,QFS+n);
-//   }
-//   eos.RYP2E(rr, yr, pr, er);
-//   er += 0.5*(AMREX_D_TERM(ur*ur, +ut1r*ut1r, +ut2r*ut2r));
-//   eos.RPY2Cs(rr, pr, yr, cr);
+  Real rr, AMREX_D_DECL(ur, ut1r, ut2r), pr, yr[NUM_SPECIES], cr, er;
+  rr = qr(iv,QRHO);
+  AMREX_D_TERM(ur   = qr(iv,QUN); ,
+               ut1r = qr(iv,QUT); ,
+               ut2r = qr(iv,QUTT););
+  pr = qr(iv,QPRES);
+  for (int n = 0; n < NUM_SPECIES; ++n) {
+    yr[n] = qr(iv,QFS+n);
+  }
+  eos.RYP2E(rr, yr, pr, er);
+  er += 0.5*(AMREX_D_TERM(ur*ur, +ut1r*ut1r, +ut2r*ut2r));
+  eos.RPY2Cs(rr, pr, yr, cr);
 
-//   amrex::Real ry_flx[NUM_SPECIES] = {0.0};
+  amrex::Real ry_flx[NUM_SPECIES] = {0.0};
 
-//   hllc(rl, AMREX_D_DECL(ul, ut1l, ut2l), pl, cl, el, yl,
-//        rr, AMREX_D_DECL(ur, ut1r, ut2r), pr, cr, er, yr,
-//        adv_flx(i,j,k,URHO), 
-//        AMREX_D_DECL(adv_flx(i,j,k,UMN), adv_flx(i,j,k,UMT), adv_flx(i,j,k,UMTT)), 
-//        p_flx(i,j,k,UMN), p_flx(i,j,k,UEDEN),
-//        adv_flx(i,j,k,UEDEN),
-//        ry_flx,
-//        parm);
+  hllc(rl, AMREX_D_DECL(ul, ut1l, ut2l), pl, cl, el, yl,
+       rr, AMREX_D_DECL(ur, ut1r, ut2r), pr, cr, er, yr,
+       adv_flx(i,j,k,URHO), 
+       AMREX_D_DECL(adv_flx(i,j,k,UMN), adv_flx(i,j,k,UMT), adv_flx(i,j,k,UMTT)), 
+       adv_flx(i,j,k,UEDEN), ry_flx,
+       parm);
 
-//   for (int n = 0; n < NUM_SPECIES; ++n) { 
-//     adv_flx(i,j,k,UFS+n) = ry_flx[n]; 
-//   }
-// }
+  for (int n = 0; n < NUM_SPECIES; ++n) { 
+    adv_flx(i,j,k,UFS+n) = ry_flx[n]; 
+  }
+
+  if (isnan(adv_flx(i,j,k,URHO))) {
+    amrex::Print() << dir << " flx(" << i << "," << j << "," << k << ") is nan \n";
+    amrex::Print() << rl << " " << ul << " " << ut1l << " " << pl << " " << cl << " " << el << " " << yl[0] << " " <<
+                      rr << " " << ur << " " << ut1r << " " << pr << " " << cr << " " << er << " " << yr[0] << "\n";
+  }
+}
 
 // // /** 
 // //  * \brief Reconstruction and Riemann solver all-in-one.

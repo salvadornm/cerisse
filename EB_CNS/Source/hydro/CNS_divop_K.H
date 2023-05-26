@@ -24,23 +24,27 @@ compute_hyp_wallflux (const amrex::Real rho,
   if (apnorm <= 0.0) amrex::Abort("compute_hyp_wallflux: we are in trouble.");
   
   Real apnorminv = 1./apnorm;
-  Real un = AMREX_D_TERM(u*(axm-axp)*apnorminv, + v*(aym-ayp)*apnorminv, + w*(azm-azp)*apnorminv);
-  Real AMREX_D_DECL(momfluxn, momfluxt1, momfluxt2);
-  Real y[NUM_SPECIES];
-  for (int n = 0; n < NUM_SPECIES; ++n) y[n] = sp[n];
+  // Real un = AMREX_D_TERM(u*(axm-axp)*apnorminv, + v*(aym-ayp)*apnorminv, + w*(azm-azp)*apnorminv);
+  // Real AMREX_D_DECL(momfluxn, momfluxt1, momfluxt2);
+  // Real y[NUM_SPECIES];
+  // for (int n = 0; n < NUM_SPECIES; ++n) y[n] = sp[n];
   
-  auto eos = pele::physics::PhysicsType::eos();
-  Real e, cs;
-  eos.RYP2E(rho, y, p, e);
-  e += 0.5*(AMREX_D_TERM(u*u, +v*v, +w*w));
-  eos.RPY2Cs(rho, p, y, cs);
+  // auto eos = pele::physics::PhysicsType::eos();
+  // Real e, cs;
+  // eos.RYP2E(rho, y, p, e);
+  // e += 0.5*(AMREX_D_TERM(u*u, +v*v, +w*w));
+  // eos.RPY2Cs(rho, p, y, cs);
 
-  Real dummy1, dummy2;
+  // Real dummy1, dummy2;
 
-  hllc(rho, AMREX_D_DECL( un, 0., 0.), p, cs, e, y,
-       rho, AMREX_D_DECL(-un, 0., 0.), p, cs, e, y,
-       fluxw[URHO], AMREX_D_DECL(momfluxn, momfluxt1, momfluxt2), dummy1, dummy2, 
-       fluxw[UEDEN], &fluxw[UFS], parm);
+  // hllc(rho, AMREX_D_DECL( un, 0., 0.), p, cs, e, y,
+  //      rho, AMREX_D_DECL(-un, 0., 0.), p, cs, e, y,
+  //      fluxw[URHO], AMREX_D_DECL(momfluxn, momfluxt1, momfluxt2), dummy1, dummy2, 
+  //      fluxw[UEDEN], &fluxw[UFS], parm);
+  fluxw[URHO] = 0.0;
+  Real momfluxn = p;
+  fluxw[UEDEN] = 0.0;
+  for (int n = 0; n < NUM_SPECIES; ++n) fluxw[UFS+n] = 0.0;
 
   AMREX_D_TERM(fluxw[UMX] = (axm-axp) * momfluxn;,
                fluxw[UMY] = (aym-ayp) * momfluxn;,
@@ -250,10 +254,15 @@ void eb_compute_div (int i, int j, int k,
           ( AMREX_D_TERM(dxinv[0] * (apx(i+1,j,k)*fxp - apx(i,j,k)*fxm) ,
                        + dxinv[1] * (apy(i,j+1,k)*fyp - apy(i,j,k)*fym) ,
                        + dxinv[2] * (apz(i,j,k+1)*fzp - apz(i,j,k)*fzm)) );
+      if (isnan(divu(i,j,k,n))) {
+        amrex::Print() << "div_eb1(" << i << "," << j << "," << k << "," << n << ") is nan \n";
+        amrex::Print() << "fxp=" << fxp << " fxm=" << fxm << " fyp=" << fyp << " fym=" << fym << "\n";
+        amrex::Print() << "up=" << u(i+1,j,k,n) << " um=" << u(i,j,k,n) << " vp=" << v(i,j+1,k,n) << " vm=" << v(i,j,k,n) << "\n";
+      }
     } //end loop n
 
     // Wall fluxes
-    GpuArray<Real,NVAR> flux_hyp_wall;
+    GpuArray<Real,NVAR> flux_hyp_wall = {0.0};
     Real sp[NUM_SPECIES];
     for (int n = 0; n < NUM_SPECIES; ++n) sp[n] = q(i,j,k,QFS+n);
     compute_hyp_wallflux(q(i,j,k,QRHO),AMREX_D_DECL(q(i,j,k,QU),q(i,j,k,QV),q(i,j,k,QW)),
@@ -264,7 +273,7 @@ void eb_compute_div (int i, int j, int k,
 #endif
                           flux_hyp_wall,parm);
 
-    GpuArray<Real,NVAR> flux_diff_wall = {0.0};    
+    GpuArray<Real,NVAR> flux_diff_wall = {0.0};
     if (do_visc && eb_no_slip) {
       compute_diff_wallflux(i,j,k,q,coefs,bcent,
                             apx(i,j,k),apx(i+1,j,k),apy(i,j,k),apy(i,j+1,k),
@@ -286,6 +295,10 @@ void eb_compute_div (int i, int j, int k,
 
       // The operations following this assume we have returned the negative of the divergence of fluxes.
       divu(i,j,k,n) *= -1.0;
-    }
-  } //end if
+
+      // if (isnan(divu(i,j,k,n))) amrex::Print() << "div_eb2(" << i << "," << j << "," << k << "," << n << ") is nan \n";
+      // if (isnan(divu(i,j,k,n))) amrex::Print() << q(i,j,k,QRHO) << " " << q(i,j,k,QU) << " " << q(i,j,k,QV) << " " << q(i,j,k,QPRES) << " " << sp[0] << " " << 
+      //                                             apx(i,j,k) << " " << apx(i+1,j,k) << " " << apy(i,j,k) << " " << apy(i,j+1,k) << "\n";
+      }
+  } //end if cut-cell
 }

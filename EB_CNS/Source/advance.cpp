@@ -22,7 +22,7 @@ CNS::advance(Real time, Real dt, int iteration, int ncycle)
 {
   BL_PROFILE("CNS::advance()");
 
-  // enforce_consistent_state(); // Enforce rho = sum(rhoY)
+  enforce_consistent_state(); // Enforce rho = sum(rhoY)
 
   // Prepare data fabs
   for (int i = 0; i < num_state_data_types; ++i) {
@@ -99,7 +99,7 @@ CNS::advance(Real time, Real dt, int iteration, int ncycle)
   if (do_react) { // Compute I_R^{n+1}(U^**) and do U^{n+1} = U^** + dt*I_R^{n+1}
     react_state(time, dt);
   }
-  enforce_consistent_state(); // Enforce rho = sum(rhoY)
+  // enforce_consistent_state(); // Enforce rho = sum(rhoY)
   
   // Iterate to couple chemistry (not tested)
   // if (do_react && (rk_reaction_iter > 1)) {
@@ -301,18 +301,28 @@ CNS::enforce_consistent_state ()
         ParallelFor(bx, [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept {
           const IntVect iv{AMREX_D_DECL(i, j, k)};
           const Real rhoOld = s_arr(iv, URHO);
+          if (rhoOld <= 0.0) amrex::Print() << "enforce_consistent_state(): rhoOld" << iv << "=" << rhoOld << "!\n";
           Real rhoinv = 1.0 / rhoOld;
                     
           // Clip species rhoYs and get new rho
           Real rhoNew = 0.0;
           Real rhoYOld;
           for (int n = 0; n < NUM_SPECIES; n++) {
-            rhoYOld = s_arr(iv, UFS+n);
-            s_arr(iv, UFS+n) = amrex::min<Real>(rhoOld, amrex::max<Real>(0.0, rhoYOld));
+            // rhoYOld = s_arr(iv, UFS+n);
+            // s_arr(iv, UFS+n) = amrex::min<Real>(rhoOld, amrex::max<Real>(0.0, rhoYOld));
+            s_arr(iv, UFS+n) = amrex::max<Real>(0.0, s_arr(iv, UFS+n));
             rhoNew += s_arr(iv, UFS+n);
           }
+          if (rhoNew <= 0.0) { 
+            amrex::Print() << "enforce_consistent_state(): rhoNew" << iv << "=" << rhoNew << "! Fixed \n";
+            
+            rhoNew = d_parm->smallr;
+            for (int n = 0; n < NUM_SPECIES; n++) {
+              s_arr(iv, UFS+n) = rhoNew / NUM_SPECIES;
+            }
+          }
           s_arr(iv, URHO) = rhoNew;
-
+          
           // Keep specific energy and velocity, recompute rhoE and mom
           s_arr(iv, UEDEN) *= rhoNew * rhoinv;
           for (int n = 0; n < AMREX_SPACEDIM; n++) {
@@ -333,11 +343,23 @@ CNS::enforce_consistent_state ()
           Real T;
           eos.REY2T(rhoNew, ei, Y, T);
           if (T < clip_temp) {
+            // Way 1: Keep KE, add energy to increase T
             std::cout << "Energy added to cell (" << i << "," << j << "," << k << "): T " << T << "->" << clip_temp << "\n";
             T = clip_temp;
             s_arr(iv, UEDEN) -= ei * rhoNew;
             eos.RTY2E(rhoNew, T, Y, ei);
             s_arr(iv, UEDEN) += ei * rhoNew;
+
+            // // Way 2: Keep total E, convert KE to T
+            // std::cout << "KE converted to T cell (" << i << "," << j << "," << k << "): T " << T << "->" << clip_temp << "\n";
+            // T = clip_temp;
+            // eos.RTY2E(rhoNew, T, Y, ei);
+
+            // AMREX_D_TERM(s_arr(iv, UMX) -= ei * rhoNew * rhoNew / s_arr(iv, UMX) / AMREX_SPACEDIM; ,
+            //              s_arr(iv, UMY) -= ei * rhoNew * rhoNew / s_arr(iv, UMY) / AMREX_SPACEDIM; ,        
+            //              s_arr(iv, UMY) -= ei * rhoNew * rhoNew / s_arr(iv, UMZ) / AMREX_SPACEDIM;)
+
+
           }
         });
       } // loop through NUM_FIELD
