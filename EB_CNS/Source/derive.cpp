@@ -473,3 +473,57 @@ void cns_dervary (const Box& bx, FArrayBox& derfab, int dcomp, int /*ncomp*/,
     }
   });
 }
+
+void cns_dervelgrad (const Box& bx, FArrayBox& derfab, int dcomp, int /*ncomp*/,
+                     const FArrayBox& datafab, const Geometry& geomdata, 
+                     Real /*time*/, const int* /*bcrec*/, int /*level*/)
+{
+  auto const dat = datafab.const_array();
+  auto gradu = derfab.array(dcomp);
+
+  AMREX_D_TERM(const Real dx = geomdata.CellSize(0); , 
+               const Real dy = geomdata.CellSize(1); ,
+               const Real dz = geomdata.CellSize(2););
+
+  amrex::ParallelFor(bx, [=] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {
+    AMREX_D_TERM(int im = i-1; int ip = i+1; , 
+                 int jm = j-1; int jp = j+1; , 
+                 int km = k-1; int kp = k+1;)
+
+    AMREX_D_TERM(      Real uhi = dat(ip, j, k, UMX) / dat(ip, j, k, URHO);
+                       Real ulo = dat(im, j, k, UMX) / dat(im, j, k, URHO);
+                 const Real dudx = 0.5 * (uhi - ulo) / dx;
+                 ,
+                            uhi = dat(i, jp, k, UMX) / dat(i, jp, k, URHO);
+                            ulo = dat(i, jm, k, UMX) / dat(i, jm, k, URHO);
+                       Real vhi = dat(i, jp, k, UMY) / dat(i, jp, k, URHO);
+                       Real vlo = dat(i, jm, k, UMY) / dat(i, jm, k, URHO);
+                 const Real dudy = 0.5 * (uhi - ulo) / dy;
+                 const Real dvdy = 0.5 * (vhi - vlo) / dy;
+                            vhi = dat(ip, j, k, UMY) / dat(ip, j, k, URHO);
+                            vlo = dat(im, j, k, UMY) / dat(im, j, k, URHO);
+                 const Real dvdx = 0.5 * (vhi - vlo) / dx;
+                 , 
+                            uhi = dat(i, j, kp, UMX) / dat(i, j, kp, URHO);
+                            ulo = dat(i, j, km, UMX) / dat(i, j, km, URHO);
+                            vhi = dat(i, j, kp, UMY) / dat(i, j, kp, URHO);
+                            vlo = dat(i, j, km, UMY) / dat(i, j, km, URHO);
+                       Real whi = dat(i, j, kp, UMZ) / dat(i, j, kp, URHO);
+                       Real wlo = dat(i, j, km, UMZ) / dat(i, j, km, URHO);
+                 const Real dudz = 0.5 * (uhi - ulo) / dz;
+                 const Real dvdz = 0.5 * (vhi - vlo) / dz;
+                 const Real dwdz = 0.5 * (whi - wlo) / dz;
+                            whi = dat(ip, j, k, UMZ) / dat(ip, j, k, URHO);
+                            wlo = dat(im, j, k, UMZ) / dat(im, j, k, URHO);
+                 const Real dwdx = 0.5 * (whi - wlo) / dx;
+                            whi = dat(i, jp, k, UMZ) / dat(i, jp, k, URHO);
+                            wlo = dat(i, jm, k, UMZ) / dat(i, jm, k, URHO);
+                 const Real dwdy = 0.5 * (whi - wlo) / dy;
+                 );
+
+
+    gradu(i, j, k) = sqrt(AMREX_D_TERM(dudx*dudx, 
+                                      +dudy*dudy +dvdx*dvdx+dvdy*dvdy, 
+                                      +dudz*dudz +dvdz*dvdz +dwdx*dwdx+dwdy*dwdy+dwdz*dwdz));
+  });
+}

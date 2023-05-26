@@ -475,7 +475,7 @@ CNS::errorEst (TagBoxArray& tags, int /*clearval*/, int tagval,
   auto const& tagma = tags.arrays();
 
   if (level < refine_dengrad_max_lev) {
-    const Real dengrad_threshold = refine_dengrad[level];
+    const Real threshold = refine_dengrad[level];
 
     MultiFab rho(Sborder, amrex::make_alias, URHO, 1);
     auto const& rhoma = rho.const_arrays();
@@ -483,13 +483,33 @@ CNS::errorEst (TagBoxArray& tags, int /*clearval*/, int tagval,
        
     ParallelFor(rho,
     [=] AMREX_GPU_DEVICE (int box_no, int i, int j, int k) noexcept {
-      cns_tag_grad(i, j, k, tagma[box_no], rhoma[box_no], dxinv, dengrad_threshold, tagval);
+      cns_tag_grad(i, j, k, tagma[box_no], rhoma[box_no], dxinv, threshold, tagval);
     });
     // Gpu::streamSynchronize();
   }
 
+  if (level < refine_velgrad_max_lev) {
+    const Real threshold = refine_velgrad[level];
+
+    for (MFIter mfi(tags, TilingIfNotGPU()); mfi.isValid(); ++mfi) {
+      const Box& bx = mfi.tilebox();
+      
+      FArrayBox velgrad(bx, 1);
+      const int* bc = 0; //dummy
+      cns_dervelgrad(bx, velgrad, 0, 1, Sborder[mfi], geom, cur_time, bc, level);
+    
+      auto tagarr = tags.array(mfi);
+      auto mvarr = velgrad.const_array();
+      ParallelFor(bx,
+      [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept {
+        cns_tag_error(i, j, k, tagarr, mvarr, threshold, tagval);
+      });
+    }
+    // Gpu::streamSynchronize();
+  }
+
   if (level < refine_magvort_max_lev) {
-    const Real magvort_threshold = refine_magvort[level];
+    const Real threshold = refine_magvort[level];
 
     for (MFIter mfi(tags, TilingIfNotGPU()); mfi.isValid(); ++mfi) {
       const Box& bx = mfi.tilebox();
@@ -502,7 +522,7 @@ CNS::errorEst (TagBoxArray& tags, int /*clearval*/, int tagval,
       auto mvarr = magvort.const_array();
       ParallelFor(bx,
       [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept {
-        cns_tag_error(i, j, k, tagarr, mvarr, magvort_threshold, tagval);
+        cns_tag_error(i, j, k, tagarr, mvarr, threshold, tagval);
       });
     }
     // Gpu::streamSynchronize();
@@ -748,6 +768,25 @@ CNS::read_params ()
       }
       for (; lev < max_level; ++lev) {
         refine_dengrad[lev] = refine_tmp[numvals-1];
+      }
+    }
+  }
+
+  pp.query("refine_velgrad_max_lev", refine_velgrad_max_lev);
+  numvals = pp.countval("refine_velgrad");  
+  if (numvals > 0) {
+    if (numvals == max_level) {
+      pp.queryarr("refine_velgrad", refine_velgrad);
+    } else if (max_level > 0) {
+      refine_velgrad.resize(max_level);
+      Vector<Real> refine_tmp;
+      pp.queryarr("refine_velgrad", refine_tmp);
+      int lev = 0;
+      for (; lev < std::min<int>(numvals, max_level); ++lev) {
+        refine_velgrad[lev] = refine_tmp[lev];
+      }
+      for (; lev < max_level; ++lev) {
+        refine_velgrad[lev] = refine_tmp[numvals-1];
       }
     }
   }

@@ -336,6 +336,8 @@ protected:
   static amrex::RealBox* dp_refine_boxes;
   static amrex::Vector<amrex::Real> refine_dengrad;
   static int refine_dengrad_max_lev;
+  static amrex::Vector<amrex::Real> refine_velgrad;
+  static int refine_velgrad_max_lev;
   static amrex::Vector<amrex::Real> refine_magvort;
   static int refine_magvort_max_lev;
   static amrex::Vector<amrex::Real> refine_tke;

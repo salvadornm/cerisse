@@ -152,6 +152,17 @@ void cns_dertke (
   const int* bcrec, 
   int level);
 
+void cns_dervelgrad (
+  const amrex::Box& bx, 
+  amrex::FArrayBox& derfab, 
+  int dcomp, 
+  int ncomp,
+  const amrex::FArrayBox& datafab, 
+  const amrex::Geometry& geomdata,
+  amrex::Real time, 
+  const int* bcrec, 
+  int level);
+
 // AMREX_GPU_DEVICE
 // AMREX_FORCE_INLINE
 // void
