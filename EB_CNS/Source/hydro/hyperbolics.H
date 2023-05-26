@@ -172,7 +172,7 @@ cns_unpackchar (const amrex::Real w1, const amrex::Real w2, const amrex::Real w3
     } else { // gamma system
         p = w2 + w3;
         // rho = w1 + (w2 + w3) * r / gamma / p; 
-        rho = w1 / (1.0 - (w2 + w3) / gamma / p);
+        rho = w1 / (1.0 - 1.0 / gamma);
         u = (w2 - w3) / std::sqrt(gamma*rho*p);
     }
 
@@ -635,13 +635,13 @@ cns_riemann (int i, int j, int k, int dir,
     const amrex::IntVect iv(AMREX_D_DECL(i, j, k));
     const amrex::IntVect iv_dir = amrex::IntVect::TheDimensionVector(dir);
 
-    int UMN, UMT, UMTT;
+    int UMN, UMT, UMTT;//, QUN;
     if (dir == 0) {
-        UMN = UMX; UMT = UMY; UMTT = UMZ;  
+        UMN = UMX; UMT = UMY; UMTT = UMZ; //QUN = QU;
     } else if (dir == 1) {
-        UMN = UMY; UMT = UMX; UMTT = UMZ;  
+        UMN = UMY; UMT = UMX; UMTT = UMZ; //QUN = QV;
     } else {
-        UMN = UMZ; UMT = UMX; UMTT = UMY;  
+        UMN = UMZ; UMT = UMX; UMTT = UMY; //QUN = QW;
     }
 
     // Real r = 0.5*(q(iv,QRHO) + q(iv-iv_dir,QRHO));
@@ -656,7 +656,6 @@ cns_riemann (int i, int j, int k, int dir,
     auto eos = pele::physics::PhysicsType::eos();
 
     // Unpack wl to ql (rl, ul, utl, pl, cl, el, yl)
-    // Real g = q(iv-iv_dir,QG);
     Real r = q(iv-iv_dir,QRHO);
     // if (wl(iv,WC) < 0.0) std::cout << "cl < 0 = " << wl(iv,WC) << std::endl;
     // Real cl = amrex::max(1e-10, wl(iv,WC));
@@ -681,36 +680,8 @@ cns_riemann (int i, int j, int k, int dir,
 
     cns_unpackchar(wl(iv,WRHO), wl(iv,WACO), wl(iv,WACO+1), cl, r, g, 
                    rl, ul, pl, sys, parm);
-
-    eos.RYP2E(rl, yl, pl, el);
-    el += 0.5*(AMREX_D_TERM(ul*ul, +ut1l*ut1l, +ut2l*ut2l));   
-    eos.RPY2Cs(rl, pl, yl, cl);
-
-    // for (int iter = 0; iter < 1; ++iter) {
-        // invc = 1.0 / cl;
-        // rl = 0.0;
-        // for (int n = 0; n < NUM_SPECIES; ++n) {
-        //     yl[n] = wl(iv,WY+n) + (wl(iv,WACO) + wl(iv,WACO+1)) * q(iv-iv_dir,QFS+n) * invc;
-        //     if (yl[n] < 0.0) {
-        //         amrex::Print() << iv << ": ryl["<< n <<"] = " << yl[n] << " < 0.0\n";
-        //         yl[n] = 0.0; //amrex::max(ryl[n], parm.smallr); //enforce positive density
-        //     }
-        //     rl += yl[n];
-        // }
-        // invr = 1.0 / rl;
-        // for (int n = 0; n < NUM_SPECIES; ++n) {
-        //     yl[n] = yl[n] * invr;
-        // }
-        
-        // rl = wl(iv,WRHO) + (wl(iv,WACO) + wl(iv,WACO+1)) * invc;
-        // rl = amrex::max(rl, parm.smallr); //enforce positive density
-        
-        // pl = (wl(iv,WACO) + wl(iv,WACO+1)) * cl;
-        // pl = amrex::max(pl, parm.smallp); //enforce positive pressure
-    // }
     
     // Convert wr to qr
-    // g = q(iv,QG);
     r = q(iv,QRHO);
     // if (wr(iv,WC) < 0.0) std::cout << "cr < 0 = " << wr(iv,WC) << std::endl;
     // Real cr = amrex::max(1e-10, wr(iv,WC));
@@ -736,54 +707,31 @@ cns_riemann (int i, int j, int k, int dir,
     cns_unpackchar(wr(iv,WRHO), wr(iv,WACO), wr(iv,WACO+1), cr, r, g, 
                    rr, ur, pr, sys, parm);
 
-    // Shu's positivity preserving limiter (!) need both ends of a cell
-    // amrex::Real m = amrex::min<amrex::Real>(rl, rr);
-    // rl = q(iv, )
+    // Limit recon values: return to Godunov scheme if not admissable
+    // if ((rl <= 0.0) || (pl <= 0.0) || (rr <= 0.0) || (pr <= 0.0)) {
+    //     amrex::Print() << " Recon state should return to Godunov at " << iv << " "
+    //                    << "rl=" << rl << " rr=" << rr << " pl=" << pl << " pr=" << pr << std::endl;
+    //     rl = q(iv-iv_dir, QRHO);  rr = q(iv, QRHO);
+    //     ul = q(iv-iv_dir, QUN);   ur = q(iv, QUN);
+    //     pl = q(iv-iv_dir, QPRES); pr = q(iv, QPRES);
+    //     for (int n = 0; n < NUM_SPECIES; ++n) {
+    //         yl[n] = q(iv-iv_dir, QFS+n);  yr[n] = q(iv, QFS+n);
+    //     }
+    // }
+    // if ((rl < 0.0) && (pl < 0.0)) { amrex::Print() << "Reverted r,pl at " << iv << "\n"; rl = -rl;  pl = -pl; }
+    // if ((rr < 0.0) && (pr < 0.0)) { amrex::Print() << "Reverted r,pr at " << iv << "\n"; rr = -rr;  pr = -pr; }
 
-    // eos.RYP2E(rl, yl, pl, el);
-    // el += 0.5*(AMREX_D_TERM(ul*ul, +ut1l*ut1l, +ut2l*ut2l));   
-    // eos.RPY2Cs(rl, pl, yl, cl);
+    eos.RYP2E(rl, yl, pl, el);
+    el += 0.5*(AMREX_D_TERM(ul*ul, +ut1l*ut1l, +ut2l*ut2l));   
+    eos.RPY2Cs(rl, pl, yl, cl);
 
     eos.RYP2E(rr, yr, pr, er);
     er += 0.5*(AMREX_D_TERM(ur*ur, +ut1r*ut1r, +ut2r*ut2r));
     eos.RPY2Cs(rr, pr, yr, cr);
 
-    // for (int iter = 0; iter < 1; ++iter) {
-        // invc = 1.0 / cr;
-        // rr = 0.0;
-        // for (int n = 0; n < NUM_SPECIES; ++n) {
-        //     yr[n] = wr(iv,WY+n) + (wr(iv,WACO)+wr(iv,WACO+1)) * q(iv,QFS+n) * invc;
-        //     if (yr[n] < 0.0) {
-        //         amrex::Print() << iv << ": ryr["<< n <<"] = " << yr[n] << " < 0.0\n";
-        //         yr[n] = 0.0; //amrex::max(ryr[n], parm.smallr); //enforce positive mass
-        //     }
-        //     rr += yr[n];
-        // }
-        // invr = 1.0 / rr;
-        // for (int n = 0; n < NUM_SPECIES; ++n) {
-        //     yr[n] = yr[n] * invr;
-        // }        
-        // for (int n = 0; n < NUM_SPECIES; ++n) {
-        //     yr[n] = wr(iv,WY+n);
-        //     rr += yr[n];
-        // }
-        // if (std::abs(rr - 1.0) > parm.smallr) {
-        //     invr = 1.0 / rr;
-        //     for (int n = 0; n < NUM_SPECIES; ++n) {
-        //         yr[n] *= invr;
-        //     }
-        // }
-        // rr = wr(iv,WRHO) + (wr(iv,WACO) + wr(iv,WACO+1)) * invc;
-        // rr = amrex::max(rr, parm.smallr); //enforce positive density
-        // AMREX_D_TERM(
-        //     ur   = (wr(iv,WACO) - wr(iv,WACO+1)) / rr; ,
-        //     ut1r = wr(iv,WUT); ,
-        //     ut2r = wr(iv,WUT+1););
-        // pr = (wr(iv,WACO) + wr(iv,WACO+1)) * cr;
-        // pr = amrex::max(pr, parm.smallp); //enforce positive pressure
-        // eos.RYP2E(rr, yr, pr, er);
-        // er += 0.5*(AMREX_D_TERM(ur*ur, +ut1r*ut1r, +ut2r*ut2r));
-        // eos.RPY2Cs(rr, pr, yr, cr);
+    // if ((rl <= 0.0) || (pl <= 0.0) || (rr <= 0.0) || (pr <= 0.0) || (er <= 0.0) || (cr <= 0.0) || (el <= 0.0) || (cl <= 0.0)) {
+    //     amrex::Print() << " rl=" << rl << " rr=" << rr << " pl=" << pl << " pr=" << pr << std::endl;
+    //     amrex::Print() << " el=" << el << " er=" << er << " cl=" << cl << " cr=" << cr << std::endl;
     // }
 
     amrex::Real ry_flx[NUM_SPECIES] = {0.0};
