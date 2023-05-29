@@ -1,0 +1,61 @@
+max_step = 500
+stop_time = 0.01
+
+geometry.is_periodic = 0 0 0
+geometry.coord_sys   = 0  # 0 => cart, 1 => RZ  2=>spherical
+geometry.prob_lo     = -20.0    0.0   -25.0
+geometry.prob_hi     =  60.0   50.0    25.0
+amr.n_cell           =    64     40      40
+
+# >>>>>>>>>>>>> BC FLAGS <<<<<<<<<<<<<<<<
+# 0 = Interior            3 = Symmetry
+# 1 = Inflow / UserBC     4 = SlipWall
+# 2 = Outflow (FOExtrap)  5 = NoSlipWall
+# >>>>>>>>>>>>> BC FLAGS <<<<<<<<<<<<<<<<
+cns.lo_bc       =  1 5 2
+cns.hi_bc       =  2 2 2
+
+cns.do_visc  = 1
+cns.do_react = 0
+
+cns.cfl = 0.3
+cns.dt_cutoff = 5.e-20
+cns.recon_scheme = 5  # 1: Godunov,  2: MUSCL,   3: WENO-Z3, 
+                      # 4: WENO-JS5, 5: WENO-Z5, 6: TENO-5
+cns.clip_temp = 60
+
+cns.v = 1
+amr.v = 1
+
+# LOAD BALANCE
+amr.loadbalance_with_workestimates = 1
+
+# REFINEMENT / REGRIDDING
+amr.max_level       = 2       # maximum level number allowed
+amr.ref_ratio       = 2 2 2 2 # refinement ratio
+amr.regrid_int      = 5       # how often to regrid
+amr.blocking_factor = 8
+amr.max_grid_size   = 64
+amr.n_error_buf     = 1       # number of buffer cells in error est
+amr.grid_eff        = 0.7
+
+cns.refine_dengrad = 0.0005 0.001
+cns.refine_dengrad_max_lev = 10
+
+cns.refine_velgrad = 2e5
+cns.refine_velgrad_max_lev = 10
+
+eb2.geom_type = double_ramp
+cns.eb_weights_type = 3
+cns.eb_no_slip = 1
+
+# CHECKPOINT FILES
+amr.checkpoint_files_output = 1
+amr.check_file      = chk        # root name of checkpoint file
+amr.check_int       = 10       # number of timesteps between checkpoints
+
+# PLOTFILES
+amr.plot_files_output = 1
+amr.plot_file         = plt      # root name of plotfile
+amr.plot_int          = 10      # number of timesteps between plotfiles
+amr.derive_plot_vars  = temp pressure x_velocity y_velocity z_velocity MachNumber divrho divu magvort cp cv transport_coef
