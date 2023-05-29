@@ -21,7 +21,9 @@ CEXE_sources += react.cpp
 CEXE_sources += pdf_model.cpp
 
 ifeq ($(USE_EB), TRUE)
+  CEXE_headers += custom_geometry.H
+
   CEXE_sources += init_eb2.cpp
   CEXE_sources += advance_box_eb.cpp
-  CEXE_headers += custom_geometry.H
+  CEXE_sources += custom_geometry.cpp
 endif
