@@ -156,7 +156,7 @@ CNS::compute_dSdt_box_eb (const Box& bx,
       amrex::ParallelFor(reconbox, NCHAR,
       [=] AMREX_GPU_DEVICE (int i, int j, int k, int n) noexcept {
         // cns_recon(i, j, k, n, cdir, w, wl, wr, recon_scheme, plm_theta); // Type 2 EB
-        cns_recon_eb(i, j, k, n, cdir, w, wl, wr, recon_scheme, plm_theta, flag, 0); // Type 1 EB
+        cns_recon_eb(i, j, k, n, cdir, w, wl, wr, recon_scheme, plm_theta, flag, 1); // Type 1 EB
       });
 
       // amrex::ParallelFor(reconbox, 

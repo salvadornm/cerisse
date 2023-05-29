@@ -51,6 +51,63 @@ compute_hyp_wallflux (const amrex::Real rho,
                fluxw[UMZ] = (azm-azp) * momfluxn;);
 }
 
+// TODO: This version accepts problem specific BC at EB (e.g. jets/isothermal/constant heat flux)
+// AMREX_GPU_DEVICE AMREX_FORCE_INLINE void
+// compute_hyp_wallflux (int i, int j, int k, amrex::GeometryData const& geomdata, const amrex::Real t,
+//                       const amrex::Real rho,
+//                       AMREX_D_DECL(const amrex::Real u, const amrex::Real v, const amrex::Real w),
+//                       const amrex::Real p,   amrex::Real sp[NUM_SPECIES],
+//                       const amrex::Real axm, const amrex::Real axp,
+//                       const amrex::Real aym, const amrex::Real ayp,
+// #if (AMREX_SPACEDIM == 3)
+//                       const amrex::Real azm, const amrex::Real azp,
+// #endif
+//                       amrex::GpuArray<amrex::Real,NVAR>& fluxw, Parm const& parm,
+//                       bool use_prob_wall_state) noexcept
+// {
+//   using amrex::Real;
+  
+//   Real apnorm = std::sqrt( AMREX_D_TERM((axm-axp)*(axm-axp), + (aym-ayp)*(aym-ayp), + (azm-azp)*(azm-azp)) );
+//   if (apnorm <= 0.0) amrex::Abort("compute_hyp_wallflux: we are in trouble.");
+  
+//   Real apnorminv = 1./apnorm;
+//   Real AMREX_D_DECL(momfluxn, momfluxt1, momfluxt2);
+
+//   if (use_prob_wall_state) {
+//     Real un = AMREX_D_TERM(u*(axm-axp)*apnorminv, + v*(aym-ayp)*apnorminv, + w*(azm-azp)*apnorminv);
+   
+//     auto eos = pele::physics::PhysicsType::eos();
+//     Real e, cs;
+//     eos.RYP2E(rho, sp, p, e);
+//     e += 0.5*(AMREX_D_TERM(u*u, +v*v, +w*w));
+//     eos.RPY2Cs(rho, p, sp, cs);
+
+//     Real x[3];
+//     const amrex::Real* prob_lo = geomdata.ProbLo();
+//     const amrex::Real* dx = geomdata.CellSize();
+//     x[0] = prob_lo[0] + (i + 0.5) * dx[0];
+//     x[1] = prob_lo[1] + (j + 0.5) * dx[1];
+//     x[2] = prob_lo[2] + (k + 0.5) * dx[2];
+
+//     Real rhow, unw, pw, yw[NUM_SPECIES], csw, ew;
+//     prob_wall_state(x, t, rhow, unw, pw, yw, rho, un, p, sp);
+
+//     hllc(rho,  AMREX_D_DECL(un,  0., 0.), p,  cs,  e,  sp,
+//          rhow, AMREX_D_DECL(unw, 0., 0.), pw, csw, ew, yw,
+//          fluxw[URHO], AMREX_D_DECL(momfluxn, momfluxt1, momfluxt2), 
+//          fluxw[UEDEN], &fluxw[UFS], parm);
+//   } else {
+//     fluxw[URHO] = 0.0;
+//     momfluxn = p;
+//     fluxw[UEDEN] = 0.0;
+//     for (int n = 0; n < NUM_SPECIES; ++n) fluxw[UFS+n] = 0.0;
+//   }  
+
+//   AMREX_D_TERM(fluxw[UMX] = (axm-axp) * momfluxn;,
+//                fluxw[UMY] = (aym-ayp) * momfluxn;,
+//                fluxw[UMZ] = (azm-azp) * momfluxn;);
+// }
+
 AMREX_GPU_DEVICE AMREX_FORCE_INLINE
 void eb_compute_div (int i, int j, int k, 
                     IntVect const& blo, IntVect const& bhi,

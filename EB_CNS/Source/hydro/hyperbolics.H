@@ -367,130 +367,128 @@ hllc (const amrex::Real rl,
 
         }
     }
-
-    // amrex::Print() << flxrho << " " << flxrhoy[0] << " " << flxrhoy[1] << std::endl;
 }
 
-AMREX_GPU_DEVICE AMREX_FORCE_INLINE void
-hllc (const amrex::Real rl, 
-      AMREX_D_DECL(const amrex::Real ul, const amrex::Real ut1l, const amrex::Real ut2l), 
-      const amrex::Real pl, const amrex::Real cl, const amrex::Real el,
-      const amrex::Real yl[NUM_SPECIES],
-      const amrex::Real rr, 
-      AMREX_D_DECL(const amrex::Real ur, const amrex::Real ut1r, const amrex::Real ut2r), 
-      const amrex::Real pr, const amrex::Real cr, const amrex::Real er,
-      const amrex::Real yr[NUM_SPECIES],
-      amrex::Real& flxrho, 
-      AMREX_D_DECL(amrex::Real& flxu, amrex::Real& flxut, amrex::Real& flxutt),
-      amrex::Real& pflxu, amrex::Real& pflxe,
-      amrex::Real& flxrhoe, 
-      amrex::Real flxrhoy[NUM_SPECIES],
-      Parm const& parm) noexcept
-{
-    // HLLC Riemann solver   
+// AMREX_GPU_DEVICE AMREX_FORCE_INLINE void
+// hllc (const amrex::Real rl, 
+//       AMREX_D_DECL(const amrex::Real ul, const amrex::Real ut1l, const amrex::Real ut2l), 
+//       const amrex::Real pl, const amrex::Real cl, const amrex::Real el,
+//       const amrex::Real yl[NUM_SPECIES],
+//       const amrex::Real rr, 
+//       AMREX_D_DECL(const amrex::Real ur, const amrex::Real ut1r, const amrex::Real ut2r), 
+//       const amrex::Real pr, const amrex::Real cr, const amrex::Real er,
+//       const amrex::Real yr[NUM_SPECIES],
+//       amrex::Real& flxrho, 
+//       AMREX_D_DECL(amrex::Real& flxu, amrex::Real& flxut, amrex::Real& flxutt),
+//       amrex::Real& pflxu, amrex::Real& pflxe,
+//       amrex::Real& flxrhoe, 
+//       amrex::Real flxrhoy[NUM_SPECIES],
+//       Parm const& parm) noexcept
+// {
+//     // HLLC Riemann solver   
 
-    using amrex::Real;
+//     using amrex::Real;
 
-    // Estimate wave speeds
-    // Arithmetic average (Davis), this alone won't work!
-    Real sl = ul - cl;
-    Real sr = ur + cr;
-    // Roe-average (Einfeldt's HLLE)
-    Real rp = sqrt(rr / rl);
-    Real uroe = (ul + ur*rp)/(1. + rp);
-    Real croe = (cl*cl + cr*cr*rp)/(1. + rp) + 0.5*rp/(1. + rp)/(1. + rp)
-                *(AMREX_D_TERM((ul-ur)*(ul-ur), +(ut1l-ut1r)*(ut1l-ut1r), +(ut2l-ut2r)*(ut2l-ut2r)));
-    croe = sqrt(croe); 
-    sl = amrex::min(sl, uroe-croe);
-    sr = amrex::max(sr, uroe+croe);
+//     // Estimate wave speeds
+//     // Arithmetic average (Davis), this alone won't work!
+//     Real sl = ul - cl;
+//     Real sr = ur + cr;
+//     // Roe-average (Einfeldt's HLLE)
+//     Real rp = sqrt(rr / rl);
+//     Real uroe = (ul + ur*rp)/(1. + rp);
+//     Real croe = (cl*cl + cr*cr*rp)/(1. + rp) + 0.5*rp/(1. + rp)/(1. + rp)
+//                 *(AMREX_D_TERM((ul-ur)*(ul-ur), +(ut1l-ut1r)*(ut1l-ut1r), +(ut2l-ut2r)*(ut2l-ut2r)));
+//     croe = sqrt(croe); 
+//     sl = amrex::min(sl, uroe-croe);
+//     sr = amrex::max(sr, uroe+croe);
 
-    Real yout[NUM_SPECIES];
-    Real rhoout, AMREX_D_DECL(uout, ut1out, ut2out), pout;
-    if (sl > 0) {
-        //q_out = q_l
-        rhoout = rl;
-        AMREX_D_TERM(
-            uout   = ul; ,
-            ut1out = ut1l; ,
-            ut2out = ut2l;)
-        pout = pl;
-        for (int n = 0; n < NUM_SPECIES; ++n) {
-            yout[n] = yl[n];
-        }
+//     Real yout[NUM_SPECIES];
+//     Real rhoout, AMREX_D_DECL(uout, ut1out, ut2out), pout;
+//     if (sl > 0) {
+//         //q_out = q_l
+//         rhoout = rl;
+//         AMREX_D_TERM(
+//             uout   = ul; ,
+//             ut1out = ut1l; ,
+//             ut2out = ut2l;)
+//         pout = pl;
+//         for (int n = 0; n < NUM_SPECIES; ++n) {
+//             yout[n] = yl[n];
+//         }
 
-    } else if (sr < 0) {
-        //q_out = q_r
-        rhoout = rr;
-        AMREX_D_TERM(
-            uout   = ur; ,
-            ut1out = ut1r; ,
-            ut2out = ut2r;)
-        pout = pr;
-        for (int n = 0; n < NUM_SPECIES; ++n) {
-            yout[n] = yr[n];
-        }
+//     } else if (sr < 0) {
+//         //q_out = q_r
+//         rhoout = rr;
+//         AMREX_D_TERM(
+//             uout   = ur; ,
+//             ut1out = ut1r; ,
+//             ut2out = ut2r;)
+//         pout = pr;
+//         for (int n = 0; n < NUM_SPECIES; ++n) {
+//             yout[n] = yr[n];
+//         }
 
-    } else {
-        Real sstar = (pr - pl + rl*ul*(sl-ul) - rr*ur*(sr-ur)) / (rl*(sl-ul) - rr*(sr-ur)); //contact wave speed
+//     } else {
+//         Real sstar = (pr - pl + rl*ul*(sl-ul) - rr*ur*(sr-ur)) / (rl*(sl-ul) - rr*(sr-ur)); //contact wave speed
 
-        if (sstar > parm.smallu*(amrex::Math::abs(ul) + amrex::Math::abs(ur))) {
-            //q_out = q_l*
-            rhoout = rl*(sl-ul)/(sl-sstar);
-            AMREX_D_TERM(
-                uout   = sstar; ,
-                ut1out = ut1l; ,
-                ut2out = ut2l;)
-            pout = pl + rl*(sl-ul)*(sstar-ul);
-            for (int n = 0; n < NUM_SPECIES; ++n) {
-                yout[n] = yl[n];
-            }
+//         if (sstar > parm.smallu*(amrex::Math::abs(ul) + amrex::Math::abs(ur))) {
+//             //q_out = q_l*
+//             rhoout = rl*(sl-ul)/(sl-sstar);
+//             AMREX_D_TERM(
+//                 uout   = sstar; ,
+//                 ut1out = ut1l; ,
+//                 ut2out = ut2l;)
+//             pout = pl + rl*(sl-ul)*(sstar-ul);
+//             for (int n = 0; n < NUM_SPECIES; ++n) {
+//                 yout[n] = yl[n];
+//             }
 
-        } else if (sstar < -parm.smallu*(amrex::Math::abs(ul) + amrex::Math::abs(ur))) {
-            //q_out = q_r*
-            rhoout = rr*(sr-ur)/(sr-sstar);
-            AMREX_D_TERM(
-                uout   = sstar; ,
-                ut1out = ut1r; ,
-                ut2out = ut2r;)
-            pout = pr + rr*(sr-ur)*(sstar-ur);
-            for (int n = 0; n < NUM_SPECIES; ++n) {
-                yout[n] = yr[n];
-            }
+//         } else if (sstar < -parm.smallu*(amrex::Math::abs(ul) + amrex::Math::abs(ur))) {
+//             //q_out = q_r*
+//             rhoout = rr*(sr-ur)/(sr-sstar);
+//             AMREX_D_TERM(
+//                 uout   = sstar; ,
+//                 ut1out = ut1r; ,
+//                 ut2out = ut2r;)
+//             pout = pr + rr*(sr-ur)*(sstar-ur);
+//             for (int n = 0; n < NUM_SPECIES; ++n) {
+//                 yout[n] = yr[n];
+//             }
 
-        } else { 
-            //sstar ~ 0, return to central scheme
-            rhoout = 0.5*(rl+rr);
-            AMREX_D_TERM(
-                uout   = 0.5*(ul+ur); ,
-                ut1out = 0.5*(ut1l+ut1r); ,
-                ut2out = 0.5*(ut2l+ut2r);)
-            pout = 0.5*(pl+pr);
-            for (int n = 0; n < NUM_SPECIES; ++n) {
-                yout[n] = 0.5*(yl[n]+yr[n]);                
-            }
+//         } else { 
+//             //sstar ~ 0, return to central scheme
+//             rhoout = 0.5*(rl+rr);
+//             AMREX_D_TERM(
+//                 uout   = 0.5*(ul+ur); ,
+//                 ut1out = 0.5*(ut1l+ut1r); ,
+//                 ut2out = 0.5*(ut2l+ut2r);)
+//             pout = 0.5*(pl+pr);
+//             for (int n = 0; n < NUM_SPECIES; ++n) {
+//                 yout[n] = 0.5*(yl[n]+yr[n]);                
+//             }
 
-        }
-    }
+//         }
+//     }
 
-    // flux(q_out)
-    auto eos = pele::physics::PhysicsType::eos();
-    Real eout;
-    eos.RYP2E(rhoout, yout, pout, eout);
-    eout += 0.5*(AMREX_D_TERM(uout*uout, +ut1out*ut1out, +ut2out*ut2out));
+//     // flux(q_out)
+//     auto eos = pele::physics::PhysicsType::eos();
+//     Real eout;
+//     eos.RYP2E(rhoout, yout, pout, eout);
+//     eout += 0.5*(AMREX_D_TERM(uout*uout, +ut1out*ut1out, +ut2out*ut2out));
 
-    flxrho = 0.;
-    AMREX_D_TERM(
-        flxu   = rhoout*uout*uout + pout; ,
-        flxut  = rhoout*uout*ut1out; ,
-        flxutt = rhoout*uout*ut2out;)
-    flxrhoe = uout*(rhoout*eout + pout);
-    for (int n = 0; n < NUM_SPECIES; ++n) {
-        flxrhoy[n] = rhoout*uout*yout[n];
-        flxrho += flxrhoy[n];
-    }
-    pflxu = pout;
-    pflxe = uout;
-}
+//     flxrho = 0.;
+//     AMREX_D_TERM(
+//         flxu   = rhoout*uout*uout + pout; ,
+//         flxut  = rhoout*uout*ut1out; ,
+//         flxutt = rhoout*uout*ut2out;)
+//     flxrhoe = uout*(rhoout*eout + pout);
+//     for (int n = 0; n < NUM_SPECIES; ++n) {
+//         flxrhoy[n] = rhoout*uout*yout[n];
+//         flxrho += flxrhoy[n];
+//     }
+//     pflxu = pout;
+//     pflxe = uout;
+// }
 
 // #if (AMREX_SPACEDIM > 1)
 // AMREX_GPU_DEVICE AMREX_FORCE_INLINE
