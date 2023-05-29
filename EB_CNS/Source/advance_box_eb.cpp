@@ -254,7 +254,8 @@ CNS::compute_dSdt_box_eb (const Box& bx,
                      AMREX_D_DECL(fx_out_arr, fy_out_arr, fz_out_arr),
                      flag, vfrac, bcent, coefs,
                      AMREX_D_DECL(apx, apy, apz),
-                     AMREX_D_DECL(fcx, fcy, fcz), dxinv, *lparm, do_visc, eb_no_slip);
+                     AMREX_D_DECL(fcx, fcy, fcz), dxinv, *lparm, do_visc, 
+                     eb_no_slip, eb_isothermal, eb_wall_temp);
     });
   
     // Now do redistribution

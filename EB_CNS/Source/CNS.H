@@ -327,6 +327,8 @@ protected:
   static int eb_weights_type;
   static int do_reredistribution;
   static bool eb_no_slip;
+  static bool eb_isothermal;
+  static amrex::Real eb_wall_temp;
 #endif
   
   static int refine_cutcells;  

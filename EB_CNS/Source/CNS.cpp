@@ -871,10 +871,8 @@ CNS::read_params ()
 
 #if CNS_USE_EB  
   // eb_weights_type:
-  //   0 -- weights = 1
-  //   1 -- use_int_energy_as_eb_weights
-  //   2 -- use_mass_as_eb_weights
-  //   3 -- use_volfrac_as_eb_weights
+  //   0 -- weights = 1             1 -- use_int_energy_as_eb_weights
+  //   2 -- use_mass_as_eb_weights  3 -- use_volfrac_as_eb_weights
   pp.query("eb_weights_type", eb_weights_type);
   if (eb_weights_type < 0 || eb_weights_type > 3) {
     amrex::Abort("CNS: eb_weights_type must be 0, 1, 2 or 3");
@@ -886,6 +884,10 @@ CNS::read_params ()
   }
 
   pp.query("eb_no_slip", eb_no_slip);
+  pp.query("eb_isothermal", eb_isothermal);
+  if (eb_isothermal) {
+    pp.get("eb_wall_temp", eb_wall_temp);
+  }
 #endif
 
   amrex::Gpu::copyAsync(amrex::Gpu::hostToDevice, h_parm, h_parm+1, d_parm);

@@ -49,12 +49,13 @@ bool     CNS::do_vpdf = false;
 bool     CNS::do_spdf = false;
 
 #if CNS_USE_EB
-int      CNS::eb_weights_type     = 0; // [0,1,2,3] 0: weights are all 1; 1: eint; 2: cell mass; 3: volfrac
-int      CNS::do_reredistribution = 1;
-bool     CNS::eb_no_slip          = true;
+int   CNS::eb_weights_type     = 3; // [0,1,2,3] 0: weights are all 1; 1: eint; 2: cell mass; 3: volfrac
+int   CNS::do_reredistribution = 1;
+bool  CNS::eb_no_slip          = true;
+bool  CNS::eb_isothermal       = false;
+Real  CNS::eb_wall_temp; // EB wall temperature
 #endif
 
-bool     CNS::signalStopJob = false;
-
+bool  CNS::signalStopJob = false;
 
 // #endif
