@@ -13,7 +13,7 @@ struct CnsFillExtDir
 
   /**
    * \param iv    index of the ghost cell
-   * \param dest  data array
+   * \param[out] dest data array
    * \param dcomp starting component of the data requested
    * \param numcomp number of components needed
    * \param geom  geometry data
@@ -81,92 +81,6 @@ struct CnsFillExtDir
     }
   }
 };
-
-//   AMREX_GPU_DEVICE void 
-//   operator() (const IntVect& iv, Array4<Real> const& dest,
-//               const int dcomp, const int numcomp,
-//               GeometryData const& geom, const Real time,
-//               const BCRec* bcr, const int bcomp,
-//               const int orig_comp) const
-//   {
-//     // Get BC data
-//     const BCRec& bc = bcr[bcomp];
-
-//     // Get geom data
-//     const int* domlo = geom.Domain().loVect();
-//     const int* domhi = geom.Domain().hiVect();
-//     const Real* prob_lo = geom.ProbLo();
-//     const Real* dx = geom.CellSize();
-//     const Real x[AMREX_SPACEDIM] = {AMREX_D_DECL(
-//         prob_lo[0] + static_cast<Real>(iv[0] + 0.5) * dx[0],
-//         prob_lo[1] + static_cast<Real>(iv[1] + 0.5) * dx[1],
-//         prob_lo[2] + static_cast<Real>(iv[2] + 0.5) * dx[2])};
-
-//     Real s_int[LEN_STATE] = {0.0};
-//     Real s_ext[LEN_STATE] = {0.0};
-//     if // x-lo
-//     ((bc.lo(0) == BCType::ext_dir) && (iv[0] < domlo[0])) {
-//       const int idir = 0;
-//       const IntVect loc(AMREX_D_DECL(domlo[0], iv[1], iv[2]));
-//       const int sgn = +1;
-
-//       for (int nc = 0; nc < numcomp; ++nc) s_int[dcomp + nc] = dest(loc, dcomp + nc);// Fill internal state data 
-//       bcnormal(x, s_int, s_ext, idir, sgn, time, geom, *lprobparm);                  // Call bcnormal from prob.H
-//       for (int nc = 0; nc < numcomp; ++nc) dest(iv, dcomp + nc) = s_ext[dcomp + nc]; // Only take the wanted components
-//     } else if // x-hi
-//     ((bc.hi(0) == BCType::ext_dir) && (iv[0] > domhi[0])) {
-//       const int idir = 0;
-//       const IntVect loc(AMREX_D_DECL(domhi[0], iv[1], iv[2]));
-//       const int sgn = -1;
-      
-//       for (int nc = 0; nc < numcomp; ++nc) s_int[dcomp + nc] = dest(loc, dcomp + nc);
-//       bcnormal(x, s_int, s_ext, idir, sgn, time, geom, *lprobparm);
-//       for (int nc = 0; nc < numcomp; ++nc) dest(iv, dcomp + nc) = s_ext[dcomp + nc]; 
-//     }
-// #if AMREX_SPACEDIM >= 2
-//     else if // y-lo
-//     ((bc.lo(1) == BCType::ext_dir) && (iv[1] < domlo[1])) {
-//       const int idir = 1;
-//       const amrex::IntVect loc(AMREX_D_DECL(iv[0], domlo[1], iv[2]));
-//       const int sgn = +1;
-
-//       for (int nc = 0; nc < numcomp; ++nc) s_int[dcomp + nc] = dest(loc, dcomp + nc);
-//       bcnormal(x, s_int, s_ext, idir, sgn, time, geom, *lprobparm);
-//       for (int nc = 0; nc < numcomp; ++nc) dest(iv, dcomp + nc) = s_ext[dcomp + nc]; 
-//     } else if // y-hi
-//     ((bc.hi(1) == BCType::ext_dir) && (iv[1] > domhi[1])) {
-//       const int idir = 1;
-//       const amrex::IntVect loc(AMREX_D_DECL(iv[0], domhi[1], iv[2]));
-//       const int sgn = -1;
-
-//       for (int nc = 0; nc < numcomp; ++nc) s_int[dcomp + nc] = dest(loc, dcomp + nc);
-//       bcnormal(x, s_int, s_ext, idir, sgn, time, geom, *lprobparm);
-//       for (int nc = 0; nc < numcomp; ++nc) dest(iv, dcomp + nc) = s_ext[dcomp + nc]; 
-//     }
-// #endif
-// #if AMREX_SPACEDIM == 3
-//     else if // z-lo
-//     ((bc.lo(2) == BCType::ext_dir) && (iv[2] < domlo[2])) {
-//       const int idir = 2;
-//       const amrex::IntVect loc(AMREX_D_DECL(iv[0], iv[1], domlo[2]));
-//       const int sgn = +1;
-
-//       for (int nc = 0; nc < numcomp; ++nc) s_int[dcomp + nc] = dest(loc, dcomp + nc);
-//       bcnormal(x, s_int, s_ext, idir, sgn, time, geom, *lprobparm);
-//       for (int nc = 0; nc < numcomp; ++nc) dest(iv, dcomp + nc) = s_ext[dcomp + nc]; 
-//     } else if // z-hi
-//     ((bc.hi(2) == BCType::ext_dir) && (iv[2] > domhi[2])) {
-//       const int idir = 2;
-//       const amrex::IntVect loc(AMREX_D_DECL(iv[0], iv[1], domhi[2]));
-//       const int sgn = -1;
-
-//       for (int nc = 0; nc < numcomp; ++nc) s_int[dcomp + nc] = dest(loc, dcomp + nc);
-//       bcnormal(x, s_int, s_ext, idir, sgn, time, geom, *lprobparm);
-//       for (int nc = 0; nc < numcomp; ++nc) dest(iv, dcomp + nc) = s_ext[dcomp + nc]; 
-//     }
-// #endif
-//   }
-// };
 
 struct CnsReactFillExtDir
 {

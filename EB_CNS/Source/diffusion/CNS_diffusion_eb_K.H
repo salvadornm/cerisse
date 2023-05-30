@@ -1,12 +1,11 @@
 #ifndef CNS_DIFFUSION_EB_K_H_
 #define CNS_DIFFUSION_EB_K_H_
 
-#include "index_macros.H"
-// #include "parm.H"
-
 #include <AMReX_FArrayBox.H>
 #include <AMReX_CONSTANTS.H>
 #include <cmath>
+
+#include "index_macros.H"
 
 AMREX_GPU_DEVICE AMREX_FORCE_INLINE
 void
@@ -344,8 +343,19 @@ cns_diff_eb_z (int i, int j, int k,
 }
 #endif
 
-AMREX_GPU_DEVICE AMREX_FORCE_INLINE 
-void
+/**
+ * @brief EB version of cns_diff.
+ * 
+ * @param i,j,k  x, y, z index. 
+ * @param dir    direction, 0:x, 1:y, 2:z.
+ * @param q      primitive variables.
+ * @param coeffs transport coefficients.
+ * @param flag   EB status flags.
+ * @param dxinv  1/dx.
+ * @param weights EB weights (why do we hav to pass this??)
+ * @param[out] flx_arr  output diffusion fluxes.
+ */
+AMREX_GPU_DEVICE AMREX_FORCE_INLINE void
 cns_diff_eb (int i, int j, int k, int dir,
              amrex::Array4<const amrex::Real> const& q,
              amrex::Array4<const amrex::Real> const& coeffs,

@@ -11,18 +11,31 @@
 
 #include "CNS.H"
 #include "parm.H"
-// #include "CNS_hydro_K.H"
-// #include "CNS_hydro_eb_K.H"
 
 using namespace amrex;
 
+/**
+ * @brief Redistribute EB small cells.
+ * 
+ * @param bx        amrex::Box to work on.
+ * @param[out] dqdt 
+ * @param divc 
+ * @param q 
+ * @param vfrac 
+ * @param flag 
+ * @param as_crse 
+ * @param rr_drho_crse 
+ * @param rr_flag_crse 
+ * @param as_fine 
+ * @param dm_as_fine 
+ * @param levmsk 
+ * @param dt 
+ */
 void
 CNS::cns_flux_redistribute (Box                const& bx,
                             Array4<      Real> const& dqdt,
                             Array4<const Real> const& divc,
                             Array4<const Real> const& q,
-                            // Array4<Real            > const& optmp,
-                            // Array4<Real            > const& delm,
                             Array4<const Real> const& vfrac,
                             Array4<const EBCellFlag> const& flag,
                             int as_crse,
@@ -65,11 +78,7 @@ CNS::cns_flux_redistribute (Box                const& bx,
         if (eb_weights_type == 0) { 
             redistwgt(i,j,k) = 1.0; 
         } else if (eb_weights_type == 1) { 
-            redistwgt(i,j,k) = q(i,j,k,QRHO)*( q(i,j,k,QEINT)
-                            // + 0.5*(AMREX_D_TERM(q(i,j,k,QU)*q(i,j,k,QU), 
-                            //                 + q(i,j,k,QV)*q(i,j,k,QV), 
-                            //                 + q(i,j,k,QW)*q(i,j,k,QW))) 
-                                            );
+            redistwgt(i,j,k) = q(i,j,k,QRHO)*q(i,j,k,QEINT);
         } else if (eb_weights_type == 2) { 
             redistwgt(i,j,k) = q(i,j,k,QRHO)*vfrac(i,j,k);
         } else if (eb_weights_type == 3) { 

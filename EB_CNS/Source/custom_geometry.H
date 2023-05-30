@@ -5,17 +5,14 @@
 
 #include <AMReX_ParmParse.H>
 #include <AMReX_Geometry.H>
-// #include <AMReX_DistributionMapping.H>
-// #include <AMReX_BoxArray.H>
-// #include <AMReX_VisMF.H>
-// #include <AMReX_PlotFileUtil.H>
 #include <AMReX_EB2.H>
 #include <AMReX_EB2_IF.H>
-// #include <AMReX_EBFluxRegister_C.H>
-// #include <AMReX_EB_utils.H>
 
 using namespace amrex;
 
+/**
+ * @brief Base class to register custom geometries.
+ */
 class CustomGeometry : public pele::physics::Factory<CustomGeometry>
 {
 public:

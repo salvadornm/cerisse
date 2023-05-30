@@ -9,6 +9,8 @@
 
 #include "index_macros.H"
 
+#if NUM_FIELD > 0
+
 /**
  * @brief A class for generating, broadcasting, and storing random numbers across levels
  */
@@ -51,7 +53,7 @@ class UniqueRand {
      * @param rand_mode 0: unmodified random normal; 1: normalised randn; 2: [1,-1]
      * @param sync_mode 0: randomise at finest level, sum up to coarser levels; 1: randomise at coarsest level, divide to finer levels
      */
-    void generate_new(amrex::Real sqrtdt_coarse, int rand_mode=2, int sync_mode=0) 
+    void generate_new(amrex::Real sqrtdt_coarse, int rand_mode, int sync_mode) 
     { 
       if (_lev == 0) { // only do this at the beginning of a coarse timestep      
         if (amrex::ParallelDescriptor::IOProcessor()) {
@@ -161,4 +163,25 @@ class UniqueRand {
     static amrex::Vector<amrex::Real> _data; // data object, static so only one copy exists
 };
 
-#endif
+#else 
+
+/**
+ * @brief A dummy UniqueRand class if NUM_FIELD == 0.
+ */
+class UniqueRand {
+  public:
+    UniqueRand() = default;
+    
+    void init(int num_rand, int lev, amrex::Vector<amrex::IntVect> ref_ratio) {}
+
+    void generate_new(amrex::Real sqrtdt_coarse, int rand_mode, int sync_mode) {}
+
+    void get_rand(int step, amrex::Real (&out)[][NUM_FIELD]) {}
+  
+  private:
+    static amrex::Vector<amrex::Real> _data; // data object, static so only one copy exists
+};
+
+#endif // end if NUM_FIELD > 0
+
+#endif // end ifndef

@@ -4,6 +4,17 @@
 #include "CNS.H"
 #include "index_macros.H"
 
+/**
+ * @brief Pull dp/dx of each field towards the mean <dp/dx>. This relaxation is essential for stability in compressible VPDF. 
+ *        Ref https://doi.org/10.1063/5.0039038.
+ * @param bx  box.
+ * @param[in,out] s  state array.
+ * @param dt  timestep size.
+ * @param dx  grid size.
+ * 
+ * @warning The current implementation is problematic because neighbouring p may be modified before this is called.
+ *          Should have computed p first, then do this.
+ */
 AMREX_FORCE_INLINE AMREX_GPU_DEVICE void 
 vpdf_psgs_model (const amrex::Box& bx,
                  amrex::Array4<amrex::Real>& s,
@@ -68,10 +79,8 @@ vpdf_psgs_model (const amrex::Box& bx,
         mean_u = s(i, j, k, UMX+dir) / s(i, j, k, URHO);
         u = s(i, j, k, nf*NVAR + UMX+dir) / s(i, j, k, nf*NVAR + URHO);
         
-        // u_sgs = -(mean_dp - dp[nf-1]) / 0.5*dx[dir] * dt; //central difference for dpdx
-        // this should be mom_sgs instead
-        
-        // s(i, j, k, nf*NVAR + UMX+dir) += u_sgs;
+        // central difference for dpdx
+        // mom_sgs = -(mean_dp - dp[nf-1]) / 0.5*dx[dir] * dt
         s(i, j, k, nf*NVAR + UMX+dir) -= (mean_dp - dp[nf-1]) / 0.5*dx[dir] * dt;
 
         // Enforce consistent e
@@ -83,6 +92,14 @@ vpdf_psgs_model (const amrex::Box& bx,
   });  
 }
 
+/**
+ * @brief Simple Langevin Model for VPDF. Ref https://doi.org/10.1063/1.865723.
+ * @param bx  box.
+ * @param[in,out] s  state array.
+ * @param dt  timestep size.
+ * @param dW  generated white noise (@see UniqueRand).
+ * @param dx  grid size.
+ */
 AMREX_FORCE_INLINE AMREX_GPU_DEVICE void 
 vpdf_langevin_model (const amrex::Box& bx,
                      amrex::Array4<amrex::Real>& s,
@@ -102,13 +119,8 @@ vpdf_langevin_model (const amrex::Box& bx,
       }
     }
     tke = 0.5 * tke / amrex::Real(NUM_FIELD-1); // k = 0.5*(u^2 + v^2 + w^2)
-    // if (tke < 0.0) { 
-    //   amrex::Print() << tke; 
-    //   amrex::Error("TKE < 0!!!"); 
-    // }
     amrex::Real deltainv = 1.0 / std::pow(AMREX_D_TERM(dx[0], * dx[1], * dx[2]), 1.0/amrex::Real(AMREX_SPACEDIM));
     amrex::Real eps = 0.53 * std::pow(tke, 1.5) * deltainv; //or 1.05? 0.53?
-    // eps = amrex::max(eps, 1e-10);
     tke = amrex::max(tke, 1e-10); //prevent divide by 0
 
     // rhou_i = rhou_i + rho_i*Gij*(mean_u_i - u_i)*dt + rho_i*sqrt(C0*eps)*dW
@@ -118,24 +130,31 @@ vpdf_langevin_model (const amrex::Box& bx,
       for (int dir = 0; dir < AMREX_SPACEDIM; ++dir) {
         mean_u = s(i, j, k, UMX+dir) / s(i, j, k, URHO);
         u = s(i, j, k, nf*NVAR + UMX+dir) / s(i, j, k, nf*NVAR + URHO);
+
         // Gij = 2.075*eps/tke, C0 = 2.1
         u_sgs = 2.075 * eps/tke * (mean_u - u) * dt + sqrt(2.1*eps)*dW[dir][nf-1];
 
         s(i, j, k, nf*NVAR + UMX+dir) += s(i, j, k, nf*NVAR + URHO) * u_sgs;
       }
     }
-    
-    // Test dW
-    // s(i, j, k, UFA+11) = dW[0][0];
   });
 }
 
+/**
+ * @brief Interact-by-Exchange-with-Mean Model for SPDF. Ref .
+ * @param bx  box.
+ * @param[in,out] s  state array.
+ * @param dt  timestep size.
+ * @param dx  grid size.
+ * @param C_E,C_Y  model parameters.
+ */
 AMREX_FORCE_INLINE AMREX_GPU_DEVICE void 
 spdf_iem_model (const amrex::Box& bx,
                 amrex::Array4<amrex::Real>& s,
                 const amrex::Real dt,
                 const amrex::Real(*)[] /*dW[AMREX_SPACEDIM][NUM_FIELD]*/,
-                const amrex::Real dx[AMREX_SPACEDIM])
+                const amrex::Real dx[AMREX_SPACEDIM],
+                const amrex::Real C_E=2, const amrex::Real C_Y=2)
 {   
   amrex::ParallelFor(bx, 
   [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept {
@@ -151,25 +170,23 @@ spdf_iem_model (const amrex::Box& bx,
     tke = 0.5 * tke / amrex::Real(NUM_FIELD-1); // k = 0.5*(u'^2 + v'^2 + w'^2)
     amrex::Real deltainv = 1.0 / std::pow(AMREX_D_TERM(dx[0], * dx[1], * dx[2]), 1.0/amrex::Real(AMREX_SPACEDIM));
     amrex::Real eps = 0.53 * std::pow(tke, 1.5) * deltainv; //or 1.05?
-    // if (isnan(eps)) amrex::Print() << i << "," << j << ": eps is nan!!!";
-    // eps = amrex::max(eps, 1e-10);
     tke = amrex::max(tke, 1e-10); //prevent divide by 0
 
     // rhoQ_i = rhoQ_i + rho_i*0.5*C_Q*eps/k*(mean_y - y)*dt
     amrex::Real mean_Q, Q, Q_sgs;
     for (int nf = 1; nf <= NUM_FIELD; ++nf) {
       for (int ns = 0; ns < NUM_SPECIES; ++ns) {
-        // Species (Q = Y), C_Y = 2
+        // Species (Q = Y)
         mean_Q = s(i, j, k, UFS+ns) / s(i, j, k, URHO);
         Q = s(i, j, k, nf*NVAR + UFS+ns) / s(i, j, k, nf*NVAR + URHO);        
-        Q_sgs = eps/tke * (mean_Q - Q) * dt;        
+        Q_sgs = 0.5 * C_Y * eps/tke * (mean_Q - Q) * dt;        
         s(i, j, k, nf*NVAR + UFS+ns) += s(i, j, k, nf*NVAR + URHO) * Q_sgs;
       }
 
-      // Energy (Q = E), C_E = 2
+      // Energy (Q = E)
       mean_Q = s(i, j, k, UEDEN) / s(i, j, k, URHO);
       Q = s(i, j, k, nf*NVAR + UEDEN) / s(i, j, k, nf*NVAR + URHO);        
-      Q_sgs = eps/tke * (mean_Q - Q) * dt;        
+      Q_sgs = 0.5 * C_E * eps/tke * (mean_Q - Q) * dt;        
       s(i, j, k, nf*NVAR + UEDEN) += s(i, j, k, nf*NVAR + URHO) * Q_sgs;
     }
     });

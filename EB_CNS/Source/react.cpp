@@ -1,9 +1,10 @@
 #include <AMReX_FArrayBox.H>
 
-// #include "index_macros.H"
 #include "CNS.H"
-// #include "PelePhysics.H"
 
+/**
+ * @brief TODO: Set typical values to help ODE solver.
+ */
 void
 CNS::set_typical_values_chem ()
 {
@@ -124,18 +125,6 @@ CNS::react_state (amrex::Real /*time*/,
         });
 
         // ===================== React =====================
-        // // My dummy reactor
-        // amrex::ParallelFor(bx, [=] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {
-        //   if (mask(i,j,k) != -1) {
-        //     amrex::Real rho = 0.0;
-        //     for (int n = 0; n < NUM_SPECIES; ++n) {        
-        //       rY(i,j,k,n) += dt*rYsrc(i,j,k,n);        
-        //       rho += rY(i,j,k,n);
-        //     }
-        //     rY(i,j,k,N2_ID) += -1e3*rho*dt;
-        //     rY(i,j,k,N_ID) += 1e3*rho*dt;      
-        //   }
-        // });
         amrex::Real current_time = 0.0;
         reactor->react(bx, rY, rYsrc, T, rEi, rEisrc, fc, mask, dt, current_time
   #ifdef AMREX_USE_GPU

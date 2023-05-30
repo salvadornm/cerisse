@@ -1,12 +1,11 @@
 #ifndef CNS_DIFFUSION_K_H_
 #define CNS_DIFFUSION_K_H_
 
-#include "index_macros.H"
-// #include "parm.H"
-
 #include <AMReX_FArrayBox.H>
 #include <AMReX_CONSTANTS.H>
 #include <cmath>
+
+#include "index_macros.H"
 
 AMREX_GPU_DEVICE AMREX_FORCE_INLINE
 void
@@ -256,8 +255,17 @@ cns_diff_z (int i, int j, int k,
 }
 #endif
 
-AMREX_GPU_DEVICE AMREX_FORCE_INLINE
-void
+/**
+ * @brief Compute diffusion fluxes.
+ * 
+ * @param i,j,k  x, y, z index. 
+ * @param dir    direction, 0:x, 1:y, 2:z.
+ * @param q      primitive variables.
+ * @param coeffs transport coefficients.
+ * @param dxinv  1/dx.
+ * @param[out] flx  output diffusion fluxes.
+ */
+AMREX_GPU_DEVICE AMREX_FORCE_INLINE void
 cns_diff (int i, int j, int k, int dir,
           amrex::Array4<const amrex::Real> const& q,
           amrex::Array4<const amrex::Real> const& coeffs,

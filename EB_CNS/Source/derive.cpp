@@ -403,6 +403,7 @@ void cns_dermolefrac (const Box& bx, FArrayBox& derfab, int dcomp, int /*ncomp*/
   });
 }
 
+#if NUM_FIELD > 0 // Cannot compute subgrid-variance and tke without SF
 void cns_dervaru (const Box& bx, FArrayBox& derfab, int dcomp, int /*ncomp*/,
                   const FArrayBox& datafab, const Geometry& /*geomdata*/,
                   Real /*time*/, const int* /*bcrec*/, int /*level*/)
@@ -473,6 +474,7 @@ void cns_dervary (const Box& bx, FArrayBox& derfab, int dcomp, int /*ncomp*/,
     }
   });
 }
+#endif
 
 void cns_dervelgrad (const Box& bx, FArrayBox& derfab, int dcomp, int /*ncomp*/,
                      const FArrayBox& datafab, const Geometry& geomdata, 

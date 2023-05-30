@@ -1,5 +1,6 @@
 #include "custom_geometry.H"
 
+//
 // Need to define build outside the class for Register to find the class. Why??
 
 #if AMREX_SPACEDIM == 3

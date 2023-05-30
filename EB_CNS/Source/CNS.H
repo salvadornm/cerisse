@@ -239,13 +239,11 @@ protected:
                       amrex::Array4<amrex::Real> const& ext_src, 
                       Parm const& parm, ProbParm const& prob_parm);
 
-  CNS& getLevel (int lev) { 
-    return dynamic_cast<CNS&>(parent->getLevel(lev)); 
-  }
+  CNS& getLevel (int lev) { return dynamic_cast<CNS&>(parent->getLevel(lev)); }
 
   void printTotalandCheckNan () const;
 
-  // void writeTimeStat ();
+  // void writeTimeStat (); // TODO
 
   void react_state (amrex::Real time, amrex::Real dt, bool init_react = false);
 
@@ -260,6 +258,11 @@ protected:
   ////////////////////////////////////////////////////////////////////////////
   //    Private data                                                        //
   ////////////////////////////////////////////////////////////////////////////
+
+  enum StateDataType { State_Type = 0, Reactions_Type, Cost_Type };
+  static int num_state_data_types;
+
+  static amrex::BCRec phys_bc;
 
   //
   // EB related
@@ -277,11 +280,6 @@ protected:
 #else
   amrex::YAFluxRegister flux_reg;
 #endif
-
-  enum StateDataType { State_Type = 0, Reactions_Type, Cost_Type };
-  static int num_state_data_types;
-
-  static amrex::BCRec phys_bc;
 
   //
   // PelePhysics related

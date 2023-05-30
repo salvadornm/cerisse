@@ -330,12 +330,6 @@ CNS::variableSetUp ()
     massfrac_names[i] = "Y_" + spec_names[i];
     molefrac_names[i] = "X_" + spec_names[i];
   }
-  // for (int nf = 1; nf <= NUM_FIELD; ++nf) {
-  //   for (int i = 0; i < NUM_SPECIES; i++) {
-  //     massfrac_names[nf*NUM_SPECIES + i] = "Y_" + spec_names[i] + "_Field" + std::to_string(nf);
-  //     molefrac_names[nf*NUM_SPECIES + i] = "X_" + spec_names[i] + "_Field" + std::to_string(nf);
-  //   }
-  // }
   derive_lst.add("massfrac", IndexType::TheCellType(), (NUM_FIELD+1)*NUM_SPECIES,
                  massfrac_names, cns_dermassfrac, DeriveRec::TheSameBox);
   derive_lst.addComponent("massfrac", desc_lst, State_Type, 0, LEN_STATE);

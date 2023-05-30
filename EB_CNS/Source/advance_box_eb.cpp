@@ -8,14 +8,10 @@
 #include <AMReX_EBMultiFabUtil_3D_C.H>
 #endif
 
-// #include "CNS_hydro_K.H"
 #include "hyperbolics.H"
 #include "recon_eb.H"
-// #include "CNS_hydro_eb_K.H"
 #include "CNS_divop_K.H"
 #include "CNS_diffusion_eb_K.H"
-
-// #include "characteristic_reconstruction.H"
 
 using namespace amrex;
 
@@ -142,27 +138,17 @@ CNS::compute_dSdt_box_eb (const Box& bx,
     for (int nf = 0; nf <= NUM_FIELD; ++nf) { // Loop through fields
       // Convert primitive to characteristic
       auto const& q = qtmp.array(nf*NPRIM);
-      // const auto domlo = geom.Domain().smallEnd();
-      // const auto domhi = geom.Domain().bigEnd();
-      // auto const& blo = bxg6.smallEnd();
-      // auto const& bhi = bxg6.bigEnd();
       amrex::ParallelFor(bxg6,
       [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept {
-        // cns_fill_eb_q(i, j, k, cdir, q, flag, blo, bhi, (do_visc && eb_no_slip)); // Type 2 EB
-        cns_ctochar(i, j, k, cdir, q, w, 0);
+        if (!flag(i,j,k).isCovered())
+          cns_ctochar(i, j, k, cdir, q, w, 0);
       });
 
       // Reconstruction            
       amrex::ParallelFor(reconbox, NCHAR,
       [=] AMREX_GPU_DEVICE (int i, int j, int k, int n) noexcept {
-        // cns_recon(i, j, k, n, cdir, w, wl, wr, recon_scheme, plm_theta); // Type 2 EB
         cns_recon_eb(i, j, k, n, cdir, w, wl, wr, recon_scheme, plm_theta, flag, 1); // Type 1 EB
       });
-
-      // amrex::ParallelFor(reconbox, 
-      // [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept {
-      //   char_recon(i, j, k, cdir, q, wl, wr, recon_scheme, plm_theta, 2, *lparm, &flag);
-      // });
 
       // Solve Riemann problem, store advection and pressure fluxes to flx_arr
       auto const& flx_arr = flux_tmp[cdir].array(nf*NVAR);      
@@ -171,7 +157,6 @@ CNS::compute_dSdt_box_eb (const Box& bx,
         if ( !flag(amrex::IntVect(AMREX_D_DECL(i,j,k))).isCovered() && 
              !flag(amrex::IntVect(AMREX_D_DECL(i,j,k))-amrex::IntVect::TheDimensionVector(cdir)).isCovered() )
           cns_riemann(i, j, k, cdir, flx_arr, p_arr, q, wl, wr, 0, *lparm);
-          // pure_riemann(i, j, k, cdir, flx_arr, p_arr, wl, wr, *lparm);
       });
 
       // Store viscous fluxes separately

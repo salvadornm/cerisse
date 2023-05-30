@@ -5,51 +5,6 @@
 #include "CNS_diffusion_eb_K.H"
 #include "hyperbolics.H"
 
-// This version assumes adiabatic wall
-// AMREX_GPU_DEVICE AMREX_FORCE_INLINE void
-// compute_hyp_wallflux (const amrex::Real rho,
-//                       AMREX_D_DECL(const amrex::Real u, const amrex::Real v, const amrex::Real w),
-//                       const amrex::Real p,   const amrex::Real sp[NUM_SPECIES],
-//                       const amrex::Real axm, const amrex::Real axp,
-//                       const amrex::Real aym, const amrex::Real ayp,
-// #if (AMREX_SPACEDIM == 3)
-//                       const amrex::Real azm, const amrex::Real azp,
-// #endif
-//                       amrex::GpuArray<amrex::Real,NVAR>& fluxw, Parm const& parm) noexcept
-// {
-//   using amrex::Real;
-  
-//   Real apnorm = std::sqrt( AMREX_D_TERM((axm-axp)*(axm-axp), + (aym-ayp)*(aym-ayp), + (azm-azp)*(azm-azp)) );
-//   if (apnorm <= 0.0) amrex::Abort("compute_hyp_wallflux: we are in trouble.");
-  
-//   Real apnorminv = 1./apnorm;
-//   // Real un = AMREX_D_TERM(u*(axm-axp)*apnorminv, + v*(aym-ayp)*apnorminv, + w*(azm-azp)*apnorminv);
-//   // Real AMREX_D_DECL(momfluxn, momfluxt1, momfluxt2);
-//   // Real y[NUM_SPECIES];
-//   // for (int n = 0; n < NUM_SPECIES; ++n) y[n] = sp[n];
-  
-//   // auto eos = pele::physics::PhysicsType::eos();
-//   // Real e, cs;
-//   // eos.RYP2E(rho, y, p, e);
-//   // e += 0.5*(AMREX_D_TERM(u*u, +v*v, +w*w));
-//   // eos.RPY2Cs(rho, p, y, cs);
-
-//   // Real dummy1, dummy2;
-
-//   // hllc(rho, AMREX_D_DECL( un, 0., 0.), p, cs, e, y,
-//   //      rho, AMREX_D_DECL(-un, 0., 0.), p, cs, e, y,
-//   //      fluxw[URHO], AMREX_D_DECL(momfluxn, momfluxt1, momfluxt2), dummy1, dummy2, 
-//   //      fluxw[UEDEN], &fluxw[UFS], parm);
-//   fluxw[URHO] = 0.0;
-//   Real momfluxn = p;
-//   fluxw[UEDEN] = 0.0;
-//   for (int n = 0; n < NUM_SPECIES; ++n) fluxw[UFS+n] = 0.0;
-
-//   AMREX_D_TERM(fluxw[UMX] = (axm-axp) * momfluxn;,
-//                fluxw[UMY] = (aym-ayp) * momfluxn;,
-//                fluxw[UMZ] = (azm-azp) * momfluxn;);
-// }
-
 // This version works for adiabatic or isothermal wall
 AMREX_GPU_DEVICE AMREX_FORCE_INLINE void
 compute_hyp_wallflux (const amrex::Real rho,
@@ -193,32 +148,30 @@ compute_hyp_wallflux (const amrex::Real rho,
 //                fluxw[UMZ] = (azm-azp) * momfluxn;);
 // }
 
-AMREX_GPU_DEVICE AMREX_FORCE_INLINE
-void eb_compute_div (int i, int j, int k, 
-                    IntVect const& blo, IntVect const& bhi,
-                    Array4<const Real> const& q, 
-                    Array4<Real> const& divu,
-                    AMREX_D_DECL(Array4<Real const> const& u,
-                                 Array4<Real const> const& v,
-                                 Array4<Real const> const& w),
-                    AMREX_D_DECL(Array4<Real> const& fx,
-                                 Array4<Real> const& fy,
-                                 Array4<Real> const& fz),
-                    Array4<EBCellFlag const> const& flag,
-                    Array4<Real const> const& vfrc,
-                    Array4<Real const> const& bcent,
-                    Array4<Real const> const& coefs,
-                    // Array4<Real      > const& redistwgt,
-                    AMREX_D_DECL(Array4<Real const> const& apx,
-                                 Array4<Real const> const& apy,
-                                 Array4<Real const> const& apz),
-                    AMREX_D_DECL(Array4<Real const> const& fcx,
-                                 Array4<Real const> const& fcy,
-                                 Array4<Real const> const& fcz),
-                    GpuArray<Real,AMREX_SPACEDIM> const& dxinv, Parm const& parm,
-                    // int eb_weights_type, 
-                    bool do_visc,
-                    bool eb_no_slip, bool eb_isothermal, const Real eb_wall_temp)
+AMREX_GPU_DEVICE AMREX_FORCE_INLINE void 
+eb_compute_div (int i, int j, int k, 
+                IntVect const& blo, IntVect const& bhi,
+                Array4<const Real> const& q, 
+                Array4<Real> const& divu,
+                AMREX_D_DECL(Array4<Real const> const& u,
+                              Array4<Real const> const& v,
+                              Array4<Real const> const& w),
+                AMREX_D_DECL(Array4<Real> const& fx,
+                              Array4<Real> const& fy,
+                              Array4<Real> const& fz),
+                Array4<EBCellFlag const> const& flag,
+                Array4<Real const> const& vfrc,
+                Array4<Real const> const& bcent,
+                Array4<Real const> const& coefs,
+                AMREX_D_DECL(Array4<Real const> const& apx,
+                              Array4<Real const> const& apy,
+                              Array4<Real const> const& apz),
+                AMREX_D_DECL(Array4<Real const> const& fcx,
+                              Array4<Real const> const& fcy,
+                              Array4<Real const> const& fcz),
+                GpuArray<Real,AMREX_SPACEDIM> const& dxinv, Parm const& parm,
+                bool do_visc,
+                bool eb_no_slip, bool eb_isothermal, const Real eb_wall_temp)
 {
   AMREX_D_TERM(bool x_high = (i == bhi[0]);,
                bool y_high = (j == bhi[1]);,
@@ -396,8 +349,10 @@ void eb_compute_div (int i, int j, int k,
           ( AMREX_D_TERM(dxinv[0] * (apx(i+1,j,k)*fxp - apx(i,j,k)*fxm) ,
                        + dxinv[1] * (apy(i,j+1,k)*fyp - apy(i,j,k)*fym) ,
                        + dxinv[2] * (apz(i,j,k+1)*fzp - apz(i,j,k)*fzm)) );
+
+      // Monitor nan
       if (isnan(divu(i,j,k,n))) {
-        amrex::Print() << "div_eb1(" << i << "," << j << "," << k << "," << n << ") is nan \n";
+        amrex::Print() << "div_eb(" << i << "," << j << "," << k << "," << n << ") is nan \n";
         amrex::Print() << "fxp=" << fxp << " fxm=" << fxm << " fyp=" << fyp << " fym=" << fym << "\n";
         amrex::Print() << "up=" << u(i+1,j,k,n) << " um=" << u(i,j,k,n) << " vp=" << v(i,j+1,k,n) << " vm=" << v(i,j,k,n) << "\n";
       }
@@ -422,25 +377,21 @@ void eb_compute_div (int i, int j, int k,
 #if (AMREX_SPACEDIM == 3)
                             apz(i,j,k),apz(i,j,k+1),
 #endif
-                            flux_diff_wall, eb_no_slip,eb_isothermal,eb_wall_temp);           
+                            flux_diff_wall, eb_no_slip,eb_isothermal,eb_wall_temp);
     }
 
     for (int n = 0; n < NVAR; ++n) {
-      // Here we assume dx == dy == dz
+      // These assume dx == dy == dz
       divu(i,j,k,n) += flux_hyp_wall[n]*dxinv[0]/vfrc(i,j,k);
 
 #if AMREX_SPACEDIM == 2
       divu(i,j,k,n) += flux_diff_wall[n]*dxinv[1]/vfrc(i,j,k);
 #elif AMREX_SPACEDIM == 3
-      divu(i,j,k,n) += flux_diff_wall[n]*(dxinv[0]*dxinv[0])/vfrc(i,j,k); //why this??
+      divu(i,j,k,n) += flux_diff_wall[n]*(dxinv[0]*dxinv[0])/vfrc(i,j,k); //because compute_diff_wallflux is nondimensionalised with dx
 #endif
 
       // The operations following this assume we have returned the negative of the divergence of fluxes.
       divu(i,j,k,n) *= -1.0;
-
-      // if (isnan(divu(i,j,k,n))) amrex::Print() << "div_eb2(" << i << "," << j << "," << k << "," << n << ") is nan \n";
-      // if (isnan(divu(i,j,k,n))) amrex::Print() << q(i,j,k,QRHO) << " " << q(i,j,k,QU) << " " << q(i,j,k,QV) << " " << q(i,j,k,QPRES) << " " << sp[0] << " " << 
-      //                                             apx(i,j,k) << " " << apx(i+1,j,k) << " " << apy(i,j,k) << " " << apy(i,j+1,k) << "\n";
       }
   } //end if cut-cell
 }

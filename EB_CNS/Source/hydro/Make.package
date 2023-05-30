@@ -1,6 +1,8 @@
-CEXE_headers += hyperbolics.H recon.H
+CEXE_headers += hyperbolics.H 
+CEXE_headers += recon.H
 
 ifeq ($(USE_EB), TRUE)
-  CEXE_headers += recon_eb.H CNS_divop_K.H 
+  CEXE_headers += recon_eb.H
+  CEXE_headers += CNS_divop_K.H 
   CEXE_sources += CNS_flux_redistribute.cpp
 endif
