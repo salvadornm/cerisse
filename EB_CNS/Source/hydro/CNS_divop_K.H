@@ -413,16 +413,16 @@ void eb_compute_div (int i, int j, int k,
 #if (AMREX_SPACEDIM == 3)
                           apz(i,j,k),apz(i,j,k+1),
 #endif
-                          flux_hyp_wall,parm,eb_isothermal,eb_wall_temp);
+                          flux_hyp_wall,parm, eb_isothermal,eb_wall_temp);
 
     GpuArray<Real,NVAR> flux_diff_wall = {0.0};
-    if (do_visc && eb_no_slip) {
+    if (do_visc && (eb_no_slip || eb_isothermal)) {
       compute_diff_wallflux(i,j,k,q,coefs,bcent,
                             apx(i,j,k),apx(i+1,j,k),apy(i,j,k),apy(i,j+1,k),
 #if (AMREX_SPACEDIM == 3)
                             apz(i,j,k),apz(i,j,k+1),
 #endif
-                            flux_diff_wall);           
+                            flux_diff_wall, eb_no_slip,eb_isothermal,eb_wall_temp);           
     }
 
     for (int n = 0; n < NVAR; ++n) {

@@ -392,7 +392,7 @@ compute_interp1d (amrex::Real cym,amrex::Real cy0,amrex::Real cyp, Array1D<Real,
 AMREX_GPU_DEVICE AMREX_FORCE_INLINE
 Real
 compute_interp2d(amrex::Real cym,amrex::Real cy0,amrex::Real cyp,
-               amrex::Real czm,amrex::Real cz0,amrex::Real czp, Array2D<Real, 1,3,1,3>& v)
+                 amrex::Real czm,amrex::Real cz0,amrex::Real czp, Array2D<Real, 1,3,1,3>& v)
 {
   Real x = czm*(cym*v(1,1) + cy0*v(2,1) + cyp*v(3,1)) + cz0*(cym*v(1,2) + cy0*v(2,2) + cyp*v(3,2))
           +czp*(cym*v(1,3) + cy0*v(2,3) + cyp*v(3,3));
@@ -408,9 +408,11 @@ compute_diff_wallflux(int i, int j, int k,
                       amrex::Array4<amrex::Real const> const& bcent,
                       const amrex::Real axm, const amrex::Real axp,
                       const amrex::Real aym, const amrex::Real ayp,
-                      amrex::GpuArray<amrex::Real,NVAR>& viscw) noexcept
+                      amrex::GpuArray<amrex::Real,NVAR>& viscw,
+                      bool eb_no_slip, 
+                      bool eb_isothermal, amrex::Real eb_wall_temp) noexcept
 {
-     //  This implementation assumes adiabatic walls
+     //  This implementation assumes adiabatic or isothermal walls
 
      using amrex::Real;
 
@@ -420,10 +422,7 @@ compute_diff_wallflux(int i, int j, int k,
      Real dapy = ayp - aym;
 
      Real apnorm = std::sqrt(dapx*dapx+dapy*dapy);
-
-     if (apnorm == 0.0) {
-          amrex::Abort("compute_diff_wallflux: we are in trouble.");
-     }
+     if (apnorm <= 0.0) amrex::Abort("compute_diff_wallflux: we are in trouble.");
 
      Real apnorminv = 1.0/apnorm;
      Real anrmx = -dapx * apnorminv; // unit vector pointing toward the wall
@@ -435,7 +434,7 @@ compute_diff_wallflux(int i, int j, int k,
      bct[0] = bcent(i,j,k,0);
      bct[1] = bcent(i,j,k,1);
 
-     Real u1,v1,u2,v2,d1,d2;
+     Real u1,v1,T1,u2,v2,T2,d1,d2;
 
      if (std::abs(anrmx) >= std::abs(anrmy))
      {
@@ -466,14 +465,17 @@ compute_diff_wallflux(int i, int j, int k,
           for (int ii = 1; ii<4; ii++){
                v(ii) = q(i+is,iyit-2+ii,k,QU);
           }
-
           u1 = compute_interp1d(cym,cy0,cyp, v);
 
           for (int ii = 1; ii<4; ii++){
                v(ii) = q(i+is,iyit-2+ii,k,QV);
           }
-
           v1 = compute_interp1d(cym,cy0,cyp, v);
+
+          for (int ii = 1; ii<4; ii++){
+               v(ii) = q(i+is,iyit-2+ii,k,QTEMP);
+          }
+          T1 = compute_interp1d(cym,cy0,cyp, v);
 
           //
           // the line intersects the y-z plane (x = 2*s) at ...
@@ -495,15 +497,17 @@ compute_diff_wallflux(int i, int j, int k,
           for (int ii = 1; ii<4; ii++){
                v(ii) = q(i+2*is,iyit-2+ii,k,QU);
           }
-
-
           u2 = compute_interp1d(cym,cy0,cyp, v);
 
           for (int ii = 1; ii<4; ii++){
                v(ii) = q(i+2*is,iyit-2+ii,k,QV);
           }
-
           v2 = compute_interp1d(cym,cy0,cyp, v);
+
+          for (int ii = 1; ii<4; ii++){
+               v(ii) = q(i+2*is,iyit-2+ii,k,QTEMP);
+          }
+          T2 = compute_interp1d(cym,cy0,cyp, v);
 
      } else {
 
@@ -526,14 +530,17 @@ compute_diff_wallflux(int i, int j, int k,
           for (int ii = 1; ii<4; ii++){
                v(ii) = q(ixit-2+ii,j+is,k,QU);
           }
-
           u1 = compute_interp1d(cxm,cx0,cxp, v);
 
           for (int ii = 1; ii<4; ii++){
                v(ii) = q(ixit-2+ii,j+is,k,QV);
           }
-
           v1 = compute_interp1d(cxm,cx0,cxp, v);
+
+          for (int ii = 1; ii<4; ii++){
+               v(ii) = q(ixit-2+ii,j+is,k,QTEMP);
+          }
+          T1 = compute_interp1d(cxm,cx0,cxp, v);
 
           d2 = (bct[1] - 2.0*s) * (1.0/anrmy);
           xit = bct[0] - d2*anrmx;
@@ -547,44 +554,53 @@ compute_diff_wallflux(int i, int j, int k,
           for (int ii = 1; ii<4; ii++){
                v(ii) = q(ixit-2+ii,j+2*is,k,QU);
           }
-
-
           u2 = compute_interp1d(cxm,cx0,cxp, v);
 
           for (int ii = 1; ii<4; ii++){
                v(ii) = q(ixit-2+ii,j+2*is,k,QV);
           }
-
           v2 = compute_interp1d(cxm,cx0,cxp, v);
 
-
+          for (int ii = 1; ii<4; ii++){
+               v(ii) = q(ixit-2+ii,j+2*is,k,QTEMP);
+          }
+          T2 = compute_interp1d(cxm,cx0,cxp, v);
      }
 
 
      // compute derivatives on the wall given that velocity is zero on the wall.
 
      Real ddinv = 1./(d1*d2*(d2-d1));
-     Real dudn = -ddinv*(d2*d2*u1-d1*d1*u2);  // note that the normal vector points toward the wall
-     Real dvdn = -ddinv*(d2*d2*v1-d1*d1*v2);
 
-     // transform them to d/dx, d/dy and d/dz given transverse derivatives are zero
+     if (eb_no_slip) {
+          Real dudn = -ddinv*(d2*d2*u1-d1*d1*u2);  // note that the normal vector points toward the wall
+          Real dvdn = -ddinv*(d2*d2*v1-d1*d1*v2);
 
-     Real dudx = dudn * anrmx;
-     Real dudy = dudn * anrmy;
+          // transform them to d/dx, d/dy and d/dz given transverse derivatives are zero
 
-     Real dvdx = dvdn * anrmx;
-     Real dvdy = dvdn * anrmy;
+          Real dudx = dudn * anrmx;
+          Real dudy = dudn * anrmy;
 
-     Real divu = dudx+dvdy;
+          Real dvdx = dvdn * anrmx;
+          Real dvdy = dvdn * anrmy;
 
-     Real tautmp = (coefs(i,j,k,CXI)-(2.0/3.0)*coefs(i,j,k,CMU))*divu;
-     Real tauxx = coefs(i,j,k,CMU)*2.*dudx + tautmp;
-     Real tauyy = coefs(i,j,k,CMU)*2.*dvdy + tautmp;
-     Real tauxy = coefs(i,j,k,CMU)*(dudy+dvdx);
+          Real divu = dudx+dvdy;
 
-     // assumes  dx == dy == dz
-     viscw[1] = (dapx*tauxx + dapy*tauxy);
-     viscw[2] = (dapx*tauxy + dapy*tauyy);
+          Real tautmp = (coefs(i,j,k,CXI)-(2.0/3.0)*coefs(i,j,k,CMU))*divu;
+          Real tauxx = coefs(i,j,k,CMU)*2.*dudx + tautmp;
+          Real tauyy = coefs(i,j,k,CMU)*2.*dvdy + tautmp;
+          Real tauxy = coefs(i,j,k,CMU)*(dudy+dvdx);
+          
+          // assumes dx == dy == dz
+          viscw[UMX] = (dapx*tauxx + dapy*tauxy);
+          viscw[UMY] = (dapx*tauxy + dapy*tauyy);
+     }
+
+     if (eb_isothermal) {
+          Real dTdn = ddinv*(d2*d2*T1-d1*d1*T2+(d1*d1-d2*d2)*eb_wall_temp); // normal temp gradient
+
+          viscw[UEDEN] = -coefs(i,j,k,CLAM)*dTdn;
+     }
 }
 
 #else // 3d version below
@@ -598,9 +614,11 @@ compute_diff_wallflux(int i, int j, int k,
                       const amrex::Real axm, const amrex::Real axp,
                       const amrex::Real aym, const amrex::Real ayp,
                       const amrex::Real azm, const amrex::Real azp,
-                      amrex::GpuArray<amrex::Real,NVAR>& viscw) noexcept
+                      amrex::GpuArray<amrex::Real,NVAR>& viscw,
+                      bool eb_no_slip, 
+                      bool eb_isothermal, amrex::Real eb_wall_temp) noexcept
 {
-  //  This implementation assumes adiabatic walls
+  //  This implementation assumes adiabatic or isothermal walls
 
   using amrex::Real;
 
@@ -623,7 +641,7 @@ compute_diff_wallflux(int i, int j, int k,
                bct[1] = bcent(i,j,k,1);,
                bct[2] = bcent(i,j,k,2););
 
-     Real u1,v1,w1,u2,v2,w2,d1,d2;
+     Real u1,v1,w1,T1,u2,v2,w2,T2,d1,d2;
 
      if ( (std::abs(anrmx) >= std::abs(anrmy) ) && ( std::abs(anrmx) >= std::abs(anrmz) ))
      {
@@ -664,22 +682,25 @@ compute_diff_wallflux(int i, int j, int k,
                for (int jj = 1; jj<4; jj++)
                v(ii,jj) = q(i+is,iyit-2+ii,izit-2+jj,QU);
           }
-
           u1 = compute_interp2d(cym,cy0,cyp,czm,cz0,czp, v);
 
           for (int ii = 1; ii<4; ii++){
                for (int jj = 1; jj<4; jj++)
                v(ii,jj) = q(i+is,iyit-2+ii,izit-2+jj,QV);
           }
-
           v1 = compute_interp2d(cym,cy0,cyp,czm,cz0,czp, v);
 
           for (int ii = 1; ii<4; ii++){
                for (int jj = 1; jj<4; jj++)
                v(ii,jj) = q(i+is,iyit-2+ii,izit-2+jj,QW);
           }
-
           w1 = compute_interp2d(cym,cy0,cyp,czm,cz0,czp, v);
+          
+          for (int ii = 1; ii<4; ii++){
+               for (int jj = 1; jj<4; jj++)
+               v(ii,jj) = q(i+is,iyit-2+ii,izit-2+jj,QTEMP);
+          }
+          T1 = compute_interp2d(cym,cy0,cyp,czm,cz0,czp, v);
 
           //
           // the line intersects the y-z plane (x = 2*s) at ...
@@ -708,23 +729,25 @@ compute_diff_wallflux(int i, int j, int k,
                for (int jj = 1; jj<4; jj++)
                v(ii,jj) = q(i+2*is,iyit-2+ii,izit-2+jj,QU);
           }
-
-
           u2 = compute_interp2d(cym,cy0,cyp,czm,cz0,czp, v);
 
           for (int ii = 1; ii<4; ii++){
                for (int jj = 1; jj<4; jj++)
                v(ii,jj) = q(i+2*is,iyit-2+ii,izit-2+jj,QV);
           }
-
           v2 = compute_interp2d(cym,cy0,cyp,czm,cz0,czp, v);
 
           for (int ii = 1; ii<4; ii++){
                for (int jj = 1; jj<4; jj++)
                v(ii,jj) = q(i+2*is,iyit-2+ii,izit-2+jj,QW);
           }
-
           w2 = compute_interp2d(cym,cy0,cyp,czm,cz0,czp, v);
+
+          for (int ii = 1; ii<4; ii++){
+               for (int jj = 1; jj<4; jj++)
+               v(ii,jj) = q(i+2*is,iyit-2+ii,izit-2+jj,QTEMP);
+          }
+          T2 = compute_interp2d(cym,cy0,cyp,czm,cz0,czp, v);
 
      } else if  (std::abs(anrmy) > std::abs(anrmx) && std::abs(anrmy) > std::abs(anrmz))
      {
@@ -754,22 +777,25 @@ compute_diff_wallflux(int i, int j, int k,
                for (int jj = 1; jj<4; jj++)
                v(ii,jj) = q(ixit-2+ii,j+is,izit-2+jj,QU);
           }
-
           u1 = compute_interp2d(cxm,cx0,cxp,czm,cz0,czp, v);
 
           for (int ii = 1; ii<4; ii++){
                for (int jj = 1; jj<4; jj++)
                v(ii,jj) = q(ixit-2+ii,j+is,izit-2+jj,QV);
           }
-
           v1 = compute_interp2d(cxm,cx0,cxp,czm,cz0,czp, v);
 
           for (int ii = 1; ii<4; ii++){
                for (int jj = 1; jj<4; jj++)
                v(ii,jj) = q(ixit-2+ii,j+is,izit-2+jj,QW);
           }
-
           w1 = compute_interp2d(cxm,cx0,cxp,czm,cz0,czp, v);
+          
+          for (int ii = 1; ii<4; ii++){
+               for (int jj = 1; jj<4; jj++)
+               v(ii,jj) = q(ixit-2+ii,j+is,izit-2+jj,QTEMP);
+          }
+          T1 = compute_interp2d(cxm,cx0,cxp,czm,cz0,czp, v);
 
           d2 = (bct[1] - 2.0*s) * (1.0/anrmy);
           xit = bct[0] - d2*anrmx;
@@ -791,23 +817,25 @@ compute_diff_wallflux(int i, int j, int k,
                for (int jj = 1; jj<4; jj++)
                v(ii,jj) = q(ixit-2+ii,j+2*is,izit-2+jj,QU);
           }
-
-
           u2 = compute_interp2d(cxm,cx0,cxp,czm,cz0,czp, v);
 
           for (int ii = 1; ii<4; ii++){
                for (int jj = 1; jj<4; jj++)
                v(ii,jj) = q(ixit-2+ii,j+2*is,izit-2+jj,QV);
           }
-
           v2 = compute_interp2d(cxm,cx0,cxp,czm,cz0,czp, v);
 
           for (int ii = 1; ii<4; ii++){
                for (int jj = 1; jj<4; jj++)
                v(ii,jj) = q(ixit-2+ii,j+2*is,izit-2+jj,QW);
           }
-
           w2 = compute_interp2d(cxm,cx0,cxp,czm,cz0,czp, v);
+          
+          for (int ii = 1; ii<4; ii++){
+               for (int jj = 1; jj<4; jj++)
+               v(ii,jj) = q(ixit-2+ii,j+2*is,izit-2+jj,QTEMP);
+          }
+          T2 = compute_interp2d(cxm,cx0,cxp,czm,cz0,czp, v);
 
      } else {
 
@@ -837,22 +865,25 @@ compute_diff_wallflux(int i, int j, int k,
                for (int jj = 1; jj<4; jj++)
                v(ii,jj) = q(ixit-2+ii,iyit-2+jj,k+is,QU);
           }
-
           u1 = compute_interp2d(cxm,cx0,cxp,cym,cy0,cyp, v);
 
           for (int ii = 1; ii<4; ii++){
                for (int jj = 1; jj<4; jj++)
                v(ii,jj) = q(ixit-2+ii,iyit-2+jj,k+is,QV);
           }
-
           v1 = compute_interp2d(cxm,cx0,cxp,cym,cy0,cyp, v);
 
           for (int ii = 1; ii<4; ii++){
                for (int jj = 1; jj<4; jj++)
                v(ii,jj) = q(ixit-2+ii,iyit-2+jj,k+is,QW);
           }
-
           w1 = compute_interp2d(cxm,cx0,cxp,cym,cy0,cyp, v);
+          
+          for (int ii = 1; ii<4; ii++){
+               for (int jj = 1; jj<4; jj++)
+               v(ii,jj) = q(ixit-2+ii,iyit-2+jj,k+is,QTEMP);
+          }
+          T1 = compute_interp2d(cxm,cx0,cxp,cym,cy0,cyp, v);
 
           d2 = (bct[2] - 2.*s) * (1.0/anrmz);
           xit = bct[0] - d2*anrmx;
@@ -873,62 +904,73 @@ compute_diff_wallflux(int i, int j, int k,
                for (int jj = 1; jj<4; jj++)
                v(ii,jj) = q(ixit-2+ii,iyit-2+jj,k+2*is,QU);
           }
-
-
-          u2 =compute_interp2d(cxm,cx0,cxp,cym,cy0,cyp, v);
+          u2 = compute_interp2d(cxm,cx0,cxp,cym,cy0,cyp, v);
 
           for (int ii = 1; ii<4; ii++){
                for (int jj = 1; jj<4; jj++)
                v(ii,jj) = q(ixit-2+ii,iyit-2+jj,k+2*is,QV);
           }
-
-          v2 =compute_interp2d(cxm,cx0,cxp,cym,cy0,cyp, v);
+          v2 = compute_interp2d(cxm,cx0,cxp,cym,cy0,cyp, v);
 
           for (int ii = 1; ii<4; ii++){
                for (int jj = 1; jj<4; jj++)
                v(ii,jj) = q(ixit-2+ii,iyit-2+jj,k+2*is,QW);
           }
-
-          w2 =compute_interp2d(cxm,cx0,cxp,cym,cy0,cyp, v);
+          w2 = compute_interp2d(cxm,cx0,cxp,cym,cy0,cyp, v);
+          
+          for (int ii = 1; ii<4; ii++){
+               for (int jj = 1; jj<4; jj++)
+               v(ii,jj) = q(ixit-2+ii,iyit-2+jj,k+2*is,QTEMP);
+          }
+          T2 = compute_interp2d(cxm,cx0,cxp,cym,cy0,cyp, v);
      }
-
 
      // compute derivatives on the wall given that velocity is zero on the wall.
 
      Real ddinv = 1./(d1*d2*(d2-d1));
-     Real dudn = -ddinv*(d2*d2*u1-d1*d1*u2);  // note that the normal vector points toward the wall
-     Real dvdn = -ddinv*(d2*d2*v1-d1*d1*v2);
-     Real dwdn = -ddinv*(d2*d2*w1-d1*d1*w2);
 
-     // transform them to d/dx, d/dy and d/dz given transverse derivatives are zero
+     if (eb_no_slip) {
+          Real dudn = -ddinv*(d2*d2*u1-d1*d1*u2);  // note that the normal vector points toward the wall
+          Real dvdn = -ddinv*(d2*d2*v1-d1*d1*v2);
+          Real dwdn = -ddinv*(d2*d2*w1-d1*d1*w2);
 
-     Real dudx = dudn * anrmx;
-     Real dvdx = dvdn * anrmx;
-     Real dwdx = dwdn * anrmx;
+          // transform them to d/dx, d/dy and d/dz given transverse derivatives are zero
 
-     Real dudy = dudn * anrmy;
-     Real dvdy = dvdn * anrmy;
-     Real dwdy = dwdn * anrmy;
+          Real dudx = dudn * anrmx;
+          Real dvdx = dvdn * anrmx;
+          Real dwdx = dwdn * anrmx;
 
-     Real dudz = dudn * anrmz;
-     Real dvdz = dvdn * anrmz;
-     Real dwdz = dwdn * anrmz;
+          Real dudy = dudn * anrmy;
+          Real dvdy = dvdn * anrmy;
+          Real dwdy = dwdn * anrmy;
 
-     Real divu = dudx+dvdy+dwdz;
+          Real dudz = dudn * anrmz;
+          Real dvdz = dvdn * anrmz;
+          Real dwdz = dwdn * anrmz;
 
-     Real tautmp = (coefs(i,j,k,CXI)-(2.0/3.0)*coefs(i,j,k,CMU))*divu;
-     Real tauxx = coefs(i,j,k,CMU)*2.*dudx + tautmp;
-     Real tauyy = coefs(i,j,k,CMU)*2.*dvdy + tautmp;
-     Real tauxy = coefs(i,j,k,CMU)*(dudy+dvdx);
+          Real divu = dudx+dvdy+dwdz;
 
-     Real tauzz = coefs(i,j,k,CMU)*2.*dwdz + tautmp;
-     Real tauxz = coefs(i,j,k,CMU)*(dudz+dwdx);
-     Real tauyz = coefs(i,j,k,CMU)*(dwdy+dvdz);
+          Real tautmp = (coefs(i,j,k,CXI)-(2.0/3.0)*coefs(i,j,k,CMU))*divu;
+          Real tauxx = coefs(i,j,k,CMU)*2.*dudx + tautmp;
+          Real tauyy = coefs(i,j,k,CMU)*2.*dvdy + tautmp;
+          Real tauxy = coefs(i,j,k,CMU)*(dudy+dvdx);
 
-     // assumes  dx == dy == dz
-     viscw[1] = (dapx*tauxx + dapy*tauxy + dapz*tauxz);
-     viscw[2] = (dapx*tauxy + dapy*tauyy + dapz*tauyz);
-     viscw[3] = (dapx*tauxz + dapy*tauyz + dapz*tauzz);
+          Real tauzz = coefs(i,j,k,CMU)*2.*dwdz + tautmp;
+          Real tauxz = coefs(i,j,k,CMU)*(dudz+dwdx);
+          Real tauyz = coefs(i,j,k,CMU)*(dwdy+dvdz);
+     
+
+          // assumes dx == dy == dz
+          viscw[UMX] = (dapx*tauxx + dapy*tauxy + dapz*tauxz);
+          viscw[UMY] = (dapx*tauxy + dapy*tauyy + dapz*tauyz);
+          viscw[UMZ] = (dapx*tauxz + dapy*tauyz + dapz*tauzz);
+     }
+
+     if (eb_isothermal) {
+          Real dTdn = ddinv*(d2*d2*T1-d1*d1*T2+(d1*d1-d2*d2)*eb_wall_temp); // normal temp gradient
+
+          viscw[UEDEN] = -coefs(i,j,k,CLAM)*dTdn;
+     }
 }
 #endif
 #endif
