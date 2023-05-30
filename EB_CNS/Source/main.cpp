@@ -58,7 +58,7 @@ int main (int argc, char* argv[])
 
 #if CNS_USE_EB
     AmrLevel::SetEBSupportLevel(EBSupport::full);// need both area and volume fractions
-    AmrLevel::SetEBMaxGrowCells(NUM_GROW, 4, 2); // 5 for ebcellflags, 4 for vfrac, 2 is not used for EBSupport::volume
+    AmrLevel::SetEBMaxGrowCells(NUM_GROW, 4, 2); // 6 for ebcellflags, 4 for vfrac, 2 is not used for EBSupport::volume
     initialize_EB2(amr.Geom(amr.maxLevel()), amr.maxLevel(), amr.maxLevel());
 #endif
 

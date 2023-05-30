@@ -5,8 +5,6 @@ CEXE_headers += CNS_K.H
 CEXE_headers += index_marcos.H
 CEXE_headers += parm.H
 CEXE_headers += default_parm.H
-CEXE_headers += pdf_model.H
-CEXE_headers += random.H
 
 CEXE_sources += main.cpp
 CEXE_sources += advance.cpp
@@ -18,7 +16,6 @@ CEXE_sources += CNSBld.cpp
 CEXE_sources += io.cpp
 CEXE_sources += setup.cpp
 CEXE_sources += react.cpp
-CEXE_sources += pdf_model.cpp
 
 ifeq ($(USE_EB), TRUE)
   CEXE_headers += custom_geometry.H

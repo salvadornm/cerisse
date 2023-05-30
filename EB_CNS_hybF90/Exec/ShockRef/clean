@@ -1,3 +1,0 @@
-rm -rf plt*
-rm -rf Backtrace*
-rm *.visit

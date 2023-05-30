@@ -350,11 +350,11 @@ eb_compute_div (int i, int j, int k,
                        + dxinv[1] * (apy(i,j+1,k)*fyp - apy(i,j,k)*fym) ,
                        + dxinv[2] * (apz(i,j,k+1)*fzp - apz(i,j,k)*fzm)) );
 
-      // Monitor nan
+      // Monitor problem cell
       if (isnan(divu(i,j,k,n))) {
-        amrex::Print() << "div_eb(" << i << "," << j << "," << k << "," << n << ") is nan \n";
-        amrex::Print() << "fxp=" << fxp << " fxm=" << fxm << " fyp=" << fyp << " fym=" << fym << "\n";
-        amrex::Print() << "up=" << u(i+1,j,k,n) << " um=" << u(i,j,k,n) << " vp=" << v(i,j+1,k,n) << " vm=" << v(i,j,k,n) << "\n";
+        std::cout << "div_eb(" << i << "," << j << "," << k << "," << n << ") is nan \n";
+        std::cout << "fxp=" << fxp << " fxm=" << fxm << " fyp=" << fyp << " fym=" << fym << "\n";
+        std::cout << "up=" << u(i+1,j,k,n) << " um=" << u(i,j,k,n) << " vp=" << v(i,j+1,k,n) << " vm=" << v(i,j,k,n) << "\n";
       }
     } //end loop n
 

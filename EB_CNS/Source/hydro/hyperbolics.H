@@ -56,12 +56,12 @@ cns_ctoprim (int i, int j, int k, int ns,
     q(i,j,k,QEINT) = ei;
     q(i,j,k,QTEMP) = T;
     
-    // Monitor nan
-    if (amrex::isnan(cs) || amrex::isnan(ux) || (rho < 0.0) || (p < 0.0)) {
-        std::cout << "i=" << i << " j=" << j << " k=" << k << " ns=" << ns << ": rho=" << rho << " T=" << T << " p=" << p;// << "\n";
+    // Monitor problem cell
+    if (amrex::isnan(cs) || amrex::isnan(ux) || (rho <= 0.0) || (p <= 0.0)) {
+        std::cout << "@ " << i << "," << j << "," << k << ": ns=" << ns << ": rho=" << rho << " T=" << T << " p=" << p;// << "\n";
         std::cout << " rhoE=" << u(i,j,k,ns+UEDEN) << " ei=" << ei << "\n";
         for (int n = 0; n < NUM_SPECIES; n++) {
-            std::cout << u(i,j,k,ns+UFS+n) << " ";
+            std::cout << "rhoY" << n << "=" << u(i,j,k,ns+UFS+n) << " ";
         }
         std::cout << "\n";
     }
@@ -170,9 +170,9 @@ cns_div (int i, int j, int k, int n,
                                + dxinv[1] * (fy(i,j,k,n) - fy(i,j+1,k,n)),
                                + dxinv[2] * (fz(i,j,k,n) - fz(i,j,k+1,n)));
     
-    // Monitor nan
+    // Monitor problem cell
     if (isnan(dsdt(i,j,k,n))) 
-        amrex::Print() << "div(" << i << "," << j << "," << k << ") is nan \n";
+        std::cout << "div(" << i << "," << j << "," << k << ") is nan \n";
 }
 
 /**
