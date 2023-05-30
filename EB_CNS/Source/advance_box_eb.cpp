@@ -15,7 +15,7 @@
 #include "CNS_divop_K.H"
 #include "CNS_diffusion_eb_K.H"
 
-#include "characteristic_reconstruction.H"
+// #include "characteristic_reconstruction.H"
 
 using namespace amrex;
 

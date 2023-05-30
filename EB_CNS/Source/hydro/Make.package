@@ -1,4 +1,4 @@
-CEXE_headers += hyperbolics.H recon.H characteristic_reconstruction.H
+CEXE_headers += hyperbolics.H recon.H
 
 ifeq ($(USE_EB), TRUE)
   CEXE_headers += recon_eb.H CNS_divop_K.H 
