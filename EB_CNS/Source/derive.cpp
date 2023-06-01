@@ -22,9 +22,11 @@ void cns_dertemp (const Box& bx, FArrayBox& derfab, int dcomp, int /*ncomp*/,
       massfrac[n] = dat(i, j, k, UFS + n) * rhoinv;
     }
     amrex::Real ei = dat(i, j, k, UEDEN) * rhoinv - 0.5* (AMREX_D_TERM(vx*vx, +vy*vy, +vz*vz));
-    
+    amrex::Real T;
     auto eos = pele::physics::PhysicsType::eos();
-    eos.REY2T(rho, ei, massfrac, Tfab(i, j, k));
+    eos.REY2T(rho, ei, massfrac, T);
+    
+    Tfab(i, j, k) = T;
   });
 }
 
@@ -254,15 +256,21 @@ void cns_dermachnumber (const Box& bx, FArrayBox& derfab, int dcomp, int /*ncomp
   });
 }
 
-// void cns_derextsrc (const Box& bx, FArrayBox& derfab, int dcomp, int /*ncomp*/,
-//                     const FArrayBox& datafab, const Geometry& geomdata,
-//                     Real time, const int* /*bcrec*/, int /*level*/)
+// void CNS::cns_derextsrc (
+//     const Box& bx, FArrayBox& derfab, int dcomp, int /*ncomp*/,
+//     const FArrayBox& datafab, const Geometry& /*geomdata*/,
+//     Real time, const int* /*bcrec*/, int /*level*/)
 // {
-//   auto const dat = datafab.array();
-//   auto Sfab = derfab.array(dcomp);
+//   auto const sarr = datafab.const_array();
+//   auto srcarr = derfab.array(dcomp);
   
-//   amrex::ParallelFor(bx, [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept {
-//     CNS::fill_ext_src(i, j, k, time, geomdata, dat, Sfab, parm, prob_parm);
+//   Parm const* lparm = d_parm;
+//   ProbParm const* lprobparm = d_prob_parm;
+//   const auto geomdata = geom.data();
+
+//   amrex::ParallelFor(bx,
+//   [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept {
+//     CNS::fill_ext_src(i, j, k, time, geomdata, sarr, srcarr, *lparm, *lprobparm);
 //   });
 // }
 
@@ -323,9 +331,9 @@ void cns_dercv (const Box& bx, FArrayBox& derfab, int dcomp, int /*ncomp*/,
 }
 
 void CNS::cns_dertranscoef (
-  const amrex::Box& bx, amrex::FArrayBox& derfab, int dcomp, int /*ncomp*/,
-  const amrex::FArrayBox& datafab, const amrex::Geometry& /*geomdata*/,
-  amrex::Real /*time*/, const int* /*bcrec*/, int /*level*/) 
+    const amrex::Box& bx, amrex::FArrayBox& derfab, int dcomp, int /*ncomp*/,
+    const amrex::FArrayBox& datafab, const amrex::Geometry& /*geomdata*/,
+    amrex::Real /*time*/, const int* /*bcrec*/, int /*level*/) 
 {
   auto const dat = datafab.const_array();
   auto Diag_arr = derfab.array(dcomp);

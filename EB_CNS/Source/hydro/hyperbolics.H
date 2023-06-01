@@ -193,7 +193,7 @@ cns_div (int i, int j, int k, int n,
  * @param er    right specific total energy.
  * @param yr    right mass fraction array.
  * @param[out] flxrho  output density flux (= sum mass fraction fluxes).
- * @param[out] flxu    output momentum fluxes.
+ * @param[out] flxu,flxut,flxutt  output momentum fluxes.
  * @param[out] flxrhoe output total energy fluxes.
  * @param[out] flxrhoy output mass fraction fluxes.
  * @param parm  parameters and constants (see parm.H).
@@ -257,7 +257,7 @@ hllc (const amrex::Real rl,
     } else {
         Real sstar = (pr - pl + rl*ul*(sl-ul) - rr*ur*(sr-ur)) / (rl*(sl-ul) - rr*(sr-ur)); //contact wave speed
         
-        if (sstar > parm.smallu*(amrex::Math::abs(ul) + amrex::Math::abs(ur))) {
+        if (sstar >= 0) { //parm.smallu*(amrex::Math::abs(ul) + amrex::Math::abs(ur))) {
             //flx_l* = flx_l + sl * (q_l* - q_l)
             Real frac = (sl - ul) / (sl - sstar) - 1.;
             flxrho = 0.;
@@ -272,7 +272,7 @@ hllc (const amrex::Real rl,
                 flxrho += flxrhoy[n];
             }
 
-        } else if (sstar < -parm.smallu*(amrex::Math::abs(ul) + amrex::Math::abs(ur))) {
+        } else if (sstar < 0) { //-parm.smallu*(amrex::Math::abs(ul) + amrex::Math::abs(ur))) {
             //flx_r* = flx_r + sr * (q_r* - q_r)
             Real frac = (sr - ur) / (sr - sstar) - 1.;
             flxrho = 0.;
@@ -287,24 +287,34 @@ hllc (const amrex::Real rl,
                 flxrho += flxrhoy[n];
             }
 
-        } else { 
-            //sstar ~ 0, return to central scheme
-            Real rc = 0.5 * (rl + rr);
-            Real uc = 0.5 * (ul + ur);
-            Real pc = 0.5 * (pl + pr);
-            flxrho = 0.;
-            AMREX_D_TERM(
-                flxu = rc*uc*uc + pc; ,
-                flxut  = rc*uc*0.5*(ut1l+ut1r); ,
-                flxutt = rc*uc*0.5*(ut2l+ut2r););
-            flxrhoe = uc*(rc*0.5*(el+er) + pc);
-            for (int n = 0; n < NUM_SPECIES; ++n) {
-                flxrhoy[n] = rc*uc*0.5*(yl[n]+yr[n]);
-                flxrho += flxrhoy[n];
-            }
-
+        // } else { 
+        //     //sstar ~ 0, return to central scheme
+        //     Real rc = 0.5 * (rl + rr);
+        //     Real uc = 0.5 * (ul + ur);
+        //     Real pc = 0.5 * (pl + pr);
+        //     flxrho = 0.;
+        //     AMREX_D_TERM(
+        //         flxu = rc*uc*uc + pc; ,
+        //         flxut  = rc*uc*0.5*(ut1l+ut1r); ,
+        //         flxutt = rc*uc*0.5*(ut2l+ut2r););
+        //     flxrhoe = uc*(rc*0.5*(el+er) + pc);
+        //     for (int n = 0; n < NUM_SPECIES; ++n) {
+        //         flxrhoy[n] = rc*uc*0.5*(yl[n]+yr[n]);
+        //         flxrho += flxrhoy[n];
+        //     }
         }
     }
+    
+    // // Dellacherie's low Mach correction
+    // Real Ml = sqrt(AMREX_D_TERM(ul*ul, +ut1l*ut1l, +ut2l*ut2l)) / cl;
+    // Real Mr = sqrt(AMREX_D_TERM(ur*ur, +ut1r*ut1r, +ut2r*ut2r)) / cr;
+    // Real thetaM = amrex::min( amrex::max(Ml, Mr), 1.0 ) - 1.0; // = (Mmax - 1), Xie
+    // // Real thetaM = amrex::min( amrex::Math::abs(uroe)/croe, 1.0 ) - 1.0; // Dellacherie
+    // Real rroe = sqrt(rl*rr);
+    // AMREX_D_TERM(
+    //     flxu += thetaM*rroe*croe*0.5*(ul-ur); ,
+    //     flxut  += thetaM*rroe*croe*0.5*(ut1l-ut1r); ,
+    //     flxutt += thetaM*rroe*croe*0.5*(ut2l-ut2r););
 }
 
 /**

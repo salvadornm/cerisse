@@ -607,7 +607,7 @@ compute_diff_wallflux(int i, int j, int k,
      }
 
      if (eb_isothermal) {
-          Real dTdn = ddinv*(d2*d2*T1-d1*d1*T2+(d1*d1-d2*d2)*eb_wall_temp); // normal temp gradient
+          Real dTdn = -ddinv*(d2*d2*T1-d1*d1*T2+(d1*d1-d2*d2)*eb_wall_temp); // normal temp gradient
 
           viscw[UEDEN] = -coefs(i,j,k,CLAM)*dTdn;
      }
@@ -977,7 +977,7 @@ compute_diff_wallflux(int i, int j, int k,
      }
 
      if (eb_isothermal) {
-          Real dTdn = ddinv*(d2*d2*T1-d1*d1*T2+(d1*d1-d2*d2)*eb_wall_temp); // normal temp gradient
+          Real dTdn = -ddinv*(d2*d2*T1-d1*d1*T2+(d1*d1-d2*d2)*eb_wall_temp); // normal temp gradient
 
           viscw[UEDEN] = -coefs(i,j,k,CLAM)*dTdn;
      }

@@ -10,8 +10,8 @@
 
 #include "hyperbolics.H"
 #include "recon_eb.H"
-#include "CNS_divop_K.H"
-#include "CNS_diffusion_eb_K.H"
+#include "divop_eb.H"
+#include "diffusion_eb.H"
 
 using namespace amrex;
 

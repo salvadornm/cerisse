@@ -1,6 +1,7 @@
 #include <AMReX_Derive.H>
 
 #include "CNS.H"
+#include "bcfill.H"
 #include "derive.H"
 #include "prob.H"
 
@@ -298,7 +299,7 @@ CNS::variableSetUp ()
 
   // External source term
   // derive_lst.add("ext_src", IndexType::TheCellType(), 1, 
-  //                cns_derextsrc, DeriveRec::TheSameBox);
+  //                CNS::cns_derextsrc, DeriveRec::TheSameBox);
   // derive_lst.addComponent("ext_src", desc_lst, State_Type, URHO, NVAR);
 
   // Cp and Cv
@@ -320,7 +321,7 @@ CNS::variableSetUp ()
   trans_coef_names[NUM_SPECIES+2] = "conductivity";
 
   derive_lst.add("transport_coef", IndexType::TheCellType(), NUM_SPECIES+3,
-                 trans_coef_names, cns_dertranscoef, DeriveRec::TheSameBox);
+                 trans_coef_names, CNS:: cns_dertranscoef, DeriveRec::TheSameBox);
   derive_lst.addComponent("transport_coef", desc_lst, State_Type, URHO, NVAR);
 
   // Derived mass and mole fractions (for all fields)

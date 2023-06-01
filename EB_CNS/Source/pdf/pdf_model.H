@@ -99,13 +99,15 @@ vpdf_psgs_model (const amrex::Box& bx,
  * @param dt  timestep size.
  * @param dW  generated white noise (@see UniqueRand).
  * @param dx  grid size.
+ * @param C0, C_e  model parameters
  */
 AMREX_FORCE_INLINE AMREX_GPU_DEVICE void 
 vpdf_langevin_model (const amrex::Box& bx,
                      amrex::Array4<amrex::Real>& s,
                      const amrex::Real dt,
                      const amrex::Real dW[AMREX_SPACEDIM][NUM_FIELD],
-                     const amrex::Real dx[AMREX_SPACEDIM])
+                     const amrex::Real dx[AMREX_SPACEDIM],
+                     const amrex::Real C0=2.1, const amrex::Real C_e=1.05) //1.05? or 0.53?
 {
   amrex::ParallelFor(bx, 
   [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept {
@@ -120,7 +122,7 @@ vpdf_langevin_model (const amrex::Box& bx,
     }
     tke = 0.5 * tke / amrex::Real(NUM_FIELD-1); // k = 0.5*(u^2 + v^2 + w^2)
     amrex::Real deltainv = 1.0 / std::pow(AMREX_D_TERM(dx[0], * dx[1], * dx[2]), 1.0/amrex::Real(AMREX_SPACEDIM));
-    amrex::Real eps = 0.53 * std::pow(tke, 1.5) * deltainv; //or 1.05? 0.53?
+    amrex::Real eps = C_e * std::pow(tke, 1.5) * deltainv;
     tke = amrex::max(tke, 1e-10); //prevent divide by 0
 
     // rhou_i = rhou_i + rho_i*Gij*(mean_u_i - u_i)*dt + rho_i*sqrt(C0*eps)*dW
@@ -131,8 +133,8 @@ vpdf_langevin_model (const amrex::Box& bx,
         mean_u = s(i, j, k, UMX+dir) / s(i, j, k, URHO);
         u = s(i, j, k, nf*NVAR + UMX+dir) / s(i, j, k, nf*NVAR + URHO);
 
-        // Gij = 2.075*eps/tke, C0 = 2.1
-        u_sgs = 2.075 * eps/tke * (mean_u - u) * dt + sqrt(2.1*eps)*dW[dir][nf-1];
+                // Gij = (0.5 + 0.75*C0)*eps/tke                B = sqrt(C0*eps) need to /mean_rho?
+        u_sgs = (0.5 + 0.75*C0) * eps/tke * (mean_u - u) * dt + sqrt(C0*eps)*dW[dir][nf-1];
 
         s(i, j, k, nf*NVAR + UMX+dir) += s(i, j, k, nf*NVAR + URHO) * u_sgs;
       }

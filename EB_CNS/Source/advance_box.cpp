@@ -1,5 +1,5 @@
 #include "CNS.H"
-#include "CNS_diffusion_K.H"
+#include "diffusion.H"
 #include "hyperbolics.H"
 #include "recon.H"
 
