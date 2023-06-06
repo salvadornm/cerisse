@@ -63,7 +63,8 @@ CNS::compute_dSdt_box (Box const& bx,
   }
 
   // A fab to store the viscous fluxes in VPDF or VSPDF
-  FArrayBox vflux_fab, pflux_fab;
+  FArrayBox vflux_fab;
+  FArrayBox pflux_fab; // unused
   
   for (int cdir = 0; cdir < AMREX_SPACEDIM; ++cdir) { // Loop through space direction
     const Box& flxbx = amrex::surroundingNodes(bx,cdir);
@@ -81,7 +82,7 @@ CNS::compute_dSdt_box (Box const& bx,
       auto const& q = qtmp.array(nf*NPRIM);
       amrex::ParallelFor(bxg3,
       [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept {
-        cns_ctochar(i, j, k, cdir, q, w, 0);
+        cns_ctochar(i, j, k, cdir, q, w, char_sys);
       });
 
       // Reconstruction            
@@ -95,7 +96,7 @@ CNS::compute_dSdt_box (Box const& bx,
       auto const& p_arr = pflux_fab.array(nf*NVAR);
       amrex::ParallelFor(flxbx,
       [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept {
-        cns_riemann(i, j, k, cdir, flx_arr, /*nf > 1 ? vflx_arr : flx_arr*/ p_arr, q, wl, wr, 0, *lparm);
+        cns_riemann(i, j, k, cdir, flx_arr, p_arr, q, wl, wr, char_sys, *lparm);
       });
 
       // Store viscous fluxes separately

@@ -22,6 +22,9 @@ CNS::advance(Real time, Real dt, int iteration, int ncycle)
 {
   BL_PROFILE("CNS::advance()");
 
+  // this must be put before we swap the new and old state (swapTimeLevels) 
+  // but is put at the beginning of the advance step rather than after RK step 2
+  // so that state after reflux is also corrected 
   enforce_consistent_state(); // Enforce rho = sum(rhoY) and clip temp
 
   // Prepare data fabs
@@ -249,22 +252,16 @@ CNS::compute_dSdt (const MultiFab& S, MultiFab& dSdt, Real dt,
 }
 
 /**
- * \brief This function enforces (1) all rhoY >= 0, (2) rho <- sum(rhoY), (3) T >= min_T, and update rhoU and rhoE accordingly.
+ * \brief This function enforces (1) all rhoY >= 0, (2) rho <- sum(rhoY), 
+ *        (3) T >= min_T, and update rhoU and rhoE accordingly. This is 
+ *        called before each compute_dSdt.
 */
 void
 CNS::enforce_consistent_state ()
 {
   BL_PROFILE("CNS::enforce_consistent_state()");
 
-  if (verbose > 1) {
-    amrex::Print() << " >> CNS::enforce_consistent_state()" << std::endl;
-  }
-
   MultiFab& S = get_new_data(State_Type);
-  // auto const& rho = Array4<Real>(state, URHO, 1); //this is how to slice array4!!
-  // auto const& rhoU = Array4<Real>(state, UMX, AMREX_SPACEDIM);
-  // auto const& rhoY = Array4<Real>(state, UFS, NUM_SPECIES);
-  // auto const& rhoE = Array4<Real>(state, UEDEN, 1);
 
 #if CNS_USE_EB
   auto const& fact = dynamic_cast<EBFArrayBoxFactory const&>(S.Factory());
@@ -288,7 +285,7 @@ CNS::enforce_consistent_state ()
         ParallelFor(bx, [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept {
           const IntVect iv{AMREX_D_DECL(i, j, k)};
           const Real rhoOld = s_arr(iv, URHO);
-          if (rhoOld <= 0.0) amrex::Print() << "enforce_consistent_state(): rhoOld" << iv << "=" << rhoOld << "!\n";
+          if (rhoOld <= 0.0 && verbose > 1) std::cout << "enforce_consistent_state(): rhoOld" << iv << "=" << rhoOld << "!\n";
           Real rhoinv = 1.0 / rhoOld;
                     
           // Clip species rhoYs and get new rho
@@ -299,7 +296,7 @@ CNS::enforce_consistent_state ()
             rhoNew += s_arr(iv, UFS+n);
           }
           if (rhoNew <= 0.0) { 
-            amrex::Print() << "enforce_consistent_state(): rhoNew" << iv << "=" << rhoNew << "! Fixed \n";
+            if (verbose > 1) std::cout << "enforce_consistent_state(): rhoNew" << iv << "=" << rhoNew << "! Fixed \n";
             
             rhoNew = d_parm->smallr;
             for (int n = 0; n < NUM_SPECIES; n++) {
@@ -327,9 +324,10 @@ CNS::enforce_consistent_state ()
           auto eos = pele::physics::PhysicsType::eos();
           Real T;
           eos.REY2T(rhoNew, ei, Y, T);
+
           if (T < clip_temp) {
             // Keep KE, add energy to increase T
-            std::cout << "Energy added to cell (" << i << "," << j << "," << k << "): T " << T << "->" << clip_temp << "\n";
+            if (verbose > 1) std::cout << "Energy added to cell (" << i << "," << j << "," << k << "): T " << T << "->" << clip_temp << "\n";
             T = clip_temp;
             s_arr(iv, UEDEN) -= ei * rhoNew;
             eos.RTY2E(rhoNew, T, Y, ei);

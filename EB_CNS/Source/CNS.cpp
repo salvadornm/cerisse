@@ -700,6 +700,7 @@ CNS::read_params ()
   pp.query("cfl", cfl);
   pp.query("dt_cutoff", dt_cutoff);
 
+  pp.query("char_sys", char_sys);
   // recon_scheme
   //  1 -- piecewise constant
   //  2 -- piecewise linear

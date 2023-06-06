@@ -319,6 +319,7 @@ protected:
   static bool update_heat_release;
   static int rk_reaction_iter;
 
+  static int char_sys;
   static amrex::Real plm_theta;
   static int recon_scheme;
 
