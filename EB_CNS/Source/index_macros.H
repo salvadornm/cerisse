@@ -51,7 +51,7 @@
 #define LEN_PRIM  int(NPRIM * (NUM_FIELD + 1))
 
 // Characteristic variables
-#define WRHO  0                    // material waves (rho)
+#define WRHO  0                    // material/entropy wave (rho)
 #define WY    1                    // Y, simply advected
 #define WACO  int(NUM_SPECIES + 1) // acoustic waves
 #define WUT   int(NUM_SPECIES + 3) // tangential velocities
