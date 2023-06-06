@@ -44,8 +44,8 @@ cns_ctoprim (int i, int j, int k, int ns,
     eos.REY2T(rho, ei, massfrac, T);
     eos.RTY2P(rho, T, massfrac, p);
     eos.RTY2Cs(rho, T, massfrac, cs);
-    eos.RTY2G(rho, T, massfrac, gamma);    
-
+    eos.RTY2G(rho, T, massfrac, gamma);
+    
     q(i,j,k,QRHO) = rho;
     AMREX_D_TERM(q(i,j,k,QU) = ux; ,
                  q(i,j,k,QV) = uy; ,
@@ -202,11 +202,11 @@ AMREX_GPU_DEVICE AMREX_FORCE_INLINE void
 hllc (const amrex::Real rl, 
       AMREX_D_DECL(const amrex::Real ul, const amrex::Real ut1l, const amrex::Real ut2l), 
       const amrex::Real pl, const amrex::Real cl, const amrex::Real el,
-      const amrex::Real yl[NUM_SPECIES],
+      amrex::Real yl[NUM_SPECIES],
       const amrex::Real rr, 
       AMREX_D_DECL(const amrex::Real ur, const amrex::Real ut1r, const amrex::Real ut2r), 
       const amrex::Real pr, const amrex::Real cr, const amrex::Real er,
-      const amrex::Real yr[NUM_SPECIES],
+      amrex::Real yr[NUM_SPECIES],
       amrex::Real& flxrho, 
       AMREX_D_DECL(amrex::Real& flxu, amrex::Real& flxut, amrex::Real& flxutt),
       amrex::Real& flxrhoe, 
@@ -221,7 +221,24 @@ hllc (const amrex::Real rl,
     Real sr = ur + cr;
     // Roe-average (Einfeldt's HLLE)
     Real rp = sqrt(rr / rl);
-    Real uroe = (ul + ur*rp)/(1. + rp);
+    // AMREX_D_TERM(
+    Real uroe = (ul + ur*rp)/(1. + rp);//,
+    // Real ut1roe = (ut1l + ut1r*rp)/(1. + rp);,
+    // Real ut2roe = (ut2l + ut1r*rp)/(1. + rp);)
+
+    // auto eos = pele::physics::PhysicsType::eos();
+    // Real ei, T, gl, gr, hl, hr;
+    // ei = el - 0.5*(AMREX_D_TERM(ul*ul, +ut1l*ut1l, +ut2l*ut2l));
+    // eos.REY2T(rl, ei, yl, T);
+    // eos.RTY2G(rl, T, yl, gl);
+    // eos.TY2H(T, yl, hl);
+    // hl += 0.5*(AMREX_D_TERM(ul*ul, +ut1l*ut1l, +ut2l*ut2l));
+    // ei = er - 0.5*(AMREX_D_TERM(ur*ur, +ut1r*ut1r, +ut2r*ut2r));
+    // eos.REY2T(rr, ei, yr, T);
+    // eos.RTY2G(rr, T, yr, gr);
+    // eos.TY2H(T, yr, hr);
+    // hr += 0.5*(AMREX_D_TERM(ur*ur, +ut1r*ut1r, +ut2r*ut2r));
+    // Real croe = 0.5*(gl+gr-2)*((hl + hr*rp)/(1. + rp) - 0.5*(AMREX_D_TERM(uroe*uroe, +ut1roe*ut1roe, +ut2roe*ut2roe)));
     Real croe = (cl*cl + cr*cr*rp)/(1. + rp) + 0.5*rp/(1. + rp)/(1. + rp)
                 *(AMREX_D_TERM((ul-ur)*(ul-ur), +(ut1l-ut1r)*(ut1l-ut1r), +(ut2l-ut2r)*(ut2l-ut2r)));
     croe = sqrt(croe); 
@@ -272,7 +289,7 @@ hllc (const amrex::Real rl,
                 flxrho += flxrhoy[n];
             }
 
-        } else if (sstar < 0) { //-parm.smallu*(amrex::Math::abs(ul) + amrex::Math::abs(ur))) {
+        } else { // if (sstar < -parm.smallu*(amrex::Math::abs(ul) + amrex::Math::abs(ur))) {
             //flx_r* = flx_r + sr * (q_r* - q_r)
             Real frac = (sr - ur) / (sr - sstar) - 1.;
             flxrho = 0.;
