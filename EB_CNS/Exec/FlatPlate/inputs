@@ -1,0 +1,77 @@
+max_step = 15000
+stop_time = 0.01
+
+geometry.is_periodic = 0 0
+geometry.coord_sys   = 0  # 0 => cart, 1 => RZ  2=>spherical
+geometry.prob_lo     = 0.0   0.0  -0.25
+geometry.prob_hi     = 21.   4.0   0.25
+amr.n_cell           = 64    64    8
+
+# >>>>>>>>>>>>> BC FLAGS <<<<<<<<<<<<<<<<
+# 0 = Interior            3 = Symmetry
+# 1 = Inflow / UserBC     4 = SlipWall
+# 2 = Outflow (FOExtrap)  5 = NoSlipWall
+# >>>>>>>>>>>>> BC FLAGS <<<<<<<<<<<<<<<<
+cns.lo_bc       =  1 1
+cns.hi_bc       =  2 2
+
+cns.do_visc  = 1
+cns.do_react = 0
+
+cns.cfl = 0.2
+cns.dt_cutoff = 5.e-20
+cns.recon_scheme = 5  # 1: Godunov,  2: MUSCL,   3: WENO-Z3, 
+                      # 4: WENO-JS5, 5: WENO-Z5, 6: TENO-5
+cns.clip_temp = 0.1
+
+cns.v = 2
+amr.v = 1
+
+# LOAD BALANCE
+amr.loadbalance_with_workestimates = 1
+
+# REFINEMENT / REGRIDDING
+amr.max_level       = 5       # maximum level number allowed
+amr.ref_ratio       = 2 2 2 2 # refinement ratio
+amr.regrid_int      = 100     # how often to regrid
+amr.blocking_factor = 8
+amr.max_grid_size   = 64
+amr.n_error_buf     = 2       # number of buffer cells in error est
+amr.grid_eff        = 0.7
+
+#cns.refine_box_lo_4 = 0.0  0.0 -1.0
+#cns.refine_box_hi_4 = 21.  0.5  1.0
+#cns.refine_box_max_level_4 = 5
+
+#cns.refine_box_lo_3 = 0.0  0.0 -1.0
+#cns.refine_box_hi_3 = 21.  0.6  1.0
+#cns.refine_box_max_level_3 = 4
+
+#cns.refine_box_lo_0 = 0.0  0.0 -1.0
+#cns.refine_box_hi_0 = 21.  0.7  1.0
+#cns.refine_box_max_level_0 = 3
+
+#cns.refine_box_lo_1 = 0.0  0.0 -1.0
+#cns.refine_box_hi_1 = 21.  0.8 1.0
+#cns.refine_box_max_level_1 = 2
+
+#cns.refine_box_lo_2 = 0.0  0.0 -1.0
+#cns.refine_box_hi_2 = 21.  1.0  1.0
+#cns.refine_box_max_level_2 = 1
+
+# PROBLEM PARAMETERS
+prob.M = 6.85
+prob.Re = 5e5
+prob.Pr = 0.71
+prob.Tw = 300.0
+
+# CHECKPOINT FILES
+amr.checkpoint_files_output = 1
+amr.check_file      = WENOZ48/chk    # root name of checkpoint file
+amr.check_int       = 1000   # number of timesteps between checkpoints
+
+# PLOTFILES
+amr.plot_files_output = 1
+amr.plot_file         = WENOZ48/plt  # root name of plotfile
+amr.plot_int          = 500  # number of timesteps between plotfiles
+amr.derive_plot_vars  = temp pressure x_velocity y_velocity z_velocity MachNumber magvort cp cv transport_coef

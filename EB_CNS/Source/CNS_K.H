@@ -5,17 +5,17 @@
 #include <limits>
 #include <cmath>
 
-// #include "CNS.H"
 #include "index_macros.H"
 #include "PelePhysics.H"
-// #include "prob.H"
-// #include "parm.H"
+
+// This file contains utility functions for the CNS class.
 
 /** 
  * \brief Compute max dt size based on hydrodynamic limit.
  */
 AMREX_GPU_DEVICE AMREX_FORCE_INLINE amrex::Real
-cns_estdt_hydro (int i, int j, int k, amrex::Array4<const amrex::Real> const& state,
+cns_estdt_hydro (int i, int j, int k, 
+                 amrex::Array4<const amrex::Real> const& state,
                  amrex::GpuArray<amrex::Real,AMREX_SPACEDIM> const& dx,
                  Parm const& /*parm*/) noexcept
 {
@@ -119,9 +119,6 @@ cns_check_species_sum_to_one (int i, int j, int k,
                   ", (i, j, k) = " + std::to_string(i) + ", " + std::to_string(j) + ", " + std::to_string(k));
 
   } else if (std::abs(sumRhoY - rho) > amrex::Real(1e-10)) {
-    // for (int n = 0; n < NUM_SPECIES; n++) {
-    //   state(i,j,k,UFS+n) = state(i,j,k,UFS+n) / sumRhoY * rho;
-    // }
     state(i, j, k, URHO) = sumRhoY; // always prioritise rhoY
   }
 }

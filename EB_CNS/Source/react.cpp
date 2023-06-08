@@ -1,9 +1,10 @@
 #include <AMReX_FArrayBox.H>
 
-// #include "index_macros.H"
 #include "CNS.H"
-// #include "PelePhysics.H"
 
+/**
+ * @brief TODO: Set typical values to help ODE solver.
+ */
 void
 CNS::set_typical_values_chem ()
 {
@@ -74,8 +75,9 @@ CNS::react_state (amrex::Real /*time*/,
     if ((typ == amrex::FabType::singlevalued) || (typ == amrex::FabType::regular)) 
 #endif
     {
-      for (int nf = NUM_FIELD > 0 ? 1 : 0; nf <= NUM_FIELD; ++nf) {
-        // ============== Prepare for react ==============
+      for (int nf = NUM_FIELD > 0 ? 1 : 0; nf <= NUM_FIELD; ++nf) 
+      {
+        ///////////////////// Prepare for react /////////////////////
         const amrex::Array4 sold_arr 
             = init_react ? Snew.array(mfi, nf*NVAR) : Sold.array(mfi, nf*NVAR); //don't have Sold at initialisation
         amrex::Array4 snew_arr = Snew.array(mfi, nf*NVAR);
@@ -123,19 +125,7 @@ CNS::react_state (amrex::Real /*time*/,
           mask(i,j,k) = (T(i,j,k) > min_react_temp) ? 1 : -1;
         });
 
-        // ===================== React =====================
-        // // My dummy reactor
-        // amrex::ParallelFor(bx, [=] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {
-        //   if (mask(i,j,k) != -1) {
-        //     amrex::Real rho = 0.0;
-        //     for (int n = 0; n < NUM_SPECIES; ++n) {        
-        //       rY(i,j,k,n) += dt*rYsrc(i,j,k,n);        
-        //       rho += rY(i,j,k,n);
-        //     }
-        //     rY(i,j,k,N2_ID) += -1e3*rho*dt;
-        //     rY(i,j,k,N_ID) += 1e3*rho*dt;      
-        //   }
-        // });
+        /////////////////////////// React ///////////////////////////
         amrex::Real current_time = 0.0;
         reactor->react(bx, rY, rYsrc, T, rEi, rEisrc, fc, mask, dt, current_time
   #ifdef AMREX_USE_GPU
@@ -144,10 +134,14 @@ CNS::react_state (amrex::Real /*time*/,
         );
         amrex::Gpu::Device::streamSynchronize();
 
-        // ================== Unpack data ==================
+        //////////////////////// Unpack data ////////////////////////
         amrex::ParallelFor(bx, [=] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {
           if (mask(i,j,k) != -1) {
-            if (T(i,j,k) < 0.0) std::cout << "Reaction causing T < 0 = " << T(i,j,k) << std::endl;
+            // Monitor problem cell
+            if (T(i,j,k) < 0.0) 
+              std::cout << "Reaction causing T=" << T(i,j,k)
+                        << " @ " << i << "," << j << "," << k << std::endl;
+
             // update U^{n+1} = U^** + dt*I_R^{n+1}
             if (!init_react) {
               snew_arr(i,j,k,URHO) = 0.0;
@@ -178,7 +172,7 @@ CNS::react_state (amrex::Real /*time*/,
               }
             }
 
-            // Average I_R and put into the front NREACT entries
+            // average I_R and put into the front NREACT entries
             if (NUM_FIELD > 0) {
               for (int n = 0; n < NREACT; ++n) {
                 I_R_mean_arr(i,j,k,n) += I_R_arr(i,j,k,n) / amrex::Real(NUM_FIELD);

@@ -176,23 +176,23 @@ CNS::computeInitialDt (int                    finest_level,
   Real dt_0 = std::numeric_limits<Real>::max();
   int n_factor = 1;
   for (int i = 0; i <= finest_level; i++) {
-      dt_level[i] = getLevel(i).estTimeStep();
-      n_factor *= n_cycle[i];
-      dt_0 = std::min<amrex::Real>(dt_0, n_factor*dt_level[i]);
+    dt_level[i] = getLevel(i).estTimeStep();
+    n_factor *= n_cycle[i];
+    dt_0 = std::min<amrex::Real>(dt_0, n_factor*dt_level[i]);
   }
 
   // Limit dt's by the value of stop_time
   const Real eps = 0.001*dt_0;
   Real cur_time  = state[State_Type].curTime();
   if (stop_time >= 0.0) {
-      if ((cur_time + dt_0) > (stop_time - eps))
+    if ((cur_time + dt_0) > (stop_time - eps))
       dt_0 = stop_time - cur_time;
   }
 
   n_factor = 1;
   for (int i = 0; i <= finest_level; i++) {
-      n_factor *= n_cycle[i];
-      dt_level[i] = dt_0/n_factor;
+    n_factor *= n_cycle[i];
+    dt_level[i] = dt_0/n_factor;
   }
 }
 
@@ -224,8 +224,8 @@ CNS::computeNewDt (int                    finest_level,
     static Real change_max = 1.1;
     for (int i = 0; i <= finest_level; i++) {
       if ((verbose > 0) && ParallelDescriptor::IOProcessor()) {                
-        Print() <<   " >> Compute new dt: limiting dt at level " << i << '\n';
-        Print() <<   "    new dt computed: " << dt_min[i] << '\n';
+        Print() << " >> Compute new dt: limiting dt at level " << i << '\n';
+        Print() << "    new dt computed: " << dt_min[i] << '\n';
         if (dt_min[i] > change_max * dt_level[i]) {
           Print() << "    but limited to: " << change_max * dt_level[i] 
                   << " = " << change_max << " * " << dt_level[i] << '\n';
@@ -312,7 +312,8 @@ CNS::post_timestep (int /*iteration*/)
   amrex::ParallelFor(S,
   [=] AMREX_GPU_DEVICE (int box_no, int i, int j, int k) noexcept {
     // Do sth here, e.g. calculate time statistics
-    prob_post_timestep(i, j, k, curtime, dtlev, sarrs[box_no], irarrs[box_no], geomdata, *lparm, *lprobparm);
+    prob_post_timestep(i, j, k, curtime, dtlev, sarrs[box_no], irarrs[box_no], 
+                       geomdata, *lparm, *lprobparm);
   });
 }
 
@@ -356,6 +357,8 @@ CNS::post_restart ()
   // Copy problem parameter structs to device
   // amrex::Gpu::copy(amrex::Gpu::hostToDevice, h_prob_parm, 
   //                  h_prob_parm+1, d_prob_parm);
+  // Done in prob.H
+
   #ifdef AMREX_USE_GPU
     // Cannot use Gpu::copy because ProbParm is not trivailly copyable.
     Gpu::htod_memcpy_async(CNS::d_prob_parm, CNS::h_prob_parm, sizeof(ProbParm));
@@ -634,7 +637,7 @@ CNS::printTotalandCheckNan () const
 }
 
 // /** 
-//  * \brief Write time statistics to aux variables (USTAT)
+//  * \brief Write time statistics to a file
 //  */
 // void
 // CNS::writeTimeStat ()
@@ -656,40 +659,7 @@ CNS::printTotalandCheckNan () const
 //     const auto IRarr = I_R.array(mfi);
 
 //     amrex::ParallelFor(tilebox, 
-//       [=] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {
-//         Real rho = Sarr(i, j, k, URHO);
-//         Real rhoinv = Real(1.0) / rho;
-//         AMREX_D_TERM(Real vx = Sarr(i, j, k, UMX) * rhoinv; ,
-//                      Real vy = Sarr(i, j, k, UMY) * rhoinv; ,
-//                      Real vz = Sarr(i, j, k, UMZ) * rhoinv;);
-//         Real ei = Sarr(i, j, k, UEDEN) * rhoinv - 0.5* (AMREX_D_TERM(vx*vx, +vy*vy, +vz*vz));
-//         Real massfrac[NUM_SPECIES];
-//         for (int n = 0; n < NUM_SPECIES; ++n) {
-//           massfrac[n] = Sarr(i, j, k, UFS + n) * rhoinv;
-//         }
-
-//         Real T;
-//         auto eos = pele::physics::PhysicsType::eos();
-//         eos.REY2T(rho, ei, massfrac, T);
-
-//         // (u, T, Y_H2, Y_OH, Y_H2O, hrr)
-//         // Mean 
-//         AMREX_D_TERM(
-//         Sarr(i, j, k, USTAT+0) += vx * dtlev; , // U
-//         Sarr(i, j, k, USTAT+1) += vy * dtlev; , // V
-//         Sarr(i, j, k, USTAT+2) += vz * dtlev; ) // W
-//         Sarr(i, j, k, USTAT+3) += T * dtlev; // T
-//         Sarr(i, j, k, USTAT+4) += massfrac[H2_ID] * dtlev; // Y(H2)
-//         Sarr(i, j, k, USTAT+5) += massfrac[OH_ID] * dtlev; // Y(OH)
-//         Sarr(i, j, k, USTAT+6) += massfrac[H2O_ID] * dtlev; // Y(H2O)
-//         Sarr(i, j, k, USTAT+7) += IRarr(i, j, k, NUM_SPECIES + 1) * dtlev; // heat release rate
-
-//         // RMS^2
-//         AMREX_D_TERM(
-//         Sarr(i, j, k, USTAT+8) += vx*vx * dtlev; , // U
-//         Sarr(i, j, k, USTAT+9) += vy*vy * dtlev; , // V
-//         Sarr(i, j, k, USTAT+10) += vz*vz * dtlev; )// W
-//         Sarr(i, j, k, USTAT+11) += T*T * dtlev; // T
+//     [=] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {
 //     });
 //   }
 // }
@@ -697,7 +667,7 @@ CNS::printTotalandCheckNan () const
 
 /**
  * \brief Return a flag signalling is it okay to continue the simulation.
- * test = 1: ok; = 0: stop
+ *        test == 1: ok, test == 0: stop.
  */
 int
 CNS::okToContinue () 
@@ -730,14 +700,18 @@ CNS::read_params ()
   pp.query("cfl", cfl);
   pp.query("dt_cutoff", dt_cutoff);
 
+  pp.query("char_sys", char_sys);
   // recon_scheme
   //  1 -- piecewise constant
   //  2 -- piecewise linear
   //  3 -- WENO-Z 3rd order
   //  4 -- WENO-JS 5th order
   //  5 -- WENO-Z 5th order
+  //  6 -- TENO 5
   pp.query("recon_scheme", recon_scheme); 
-  if (recon_scheme == 2) { pp.query("limiter_theta", plm_theta); } // MUSCL specific parameter
+  if (recon_scheme == 2) { 
+    pp.query("limiter_theta", plm_theta); // MUSCL specific parameter
+  }
 
   Vector<int> lo_bc(AMREX_SPACEDIM), hi_bc(AMREX_SPACEDIM);
   pp.getarr("lo_bc", lo_bc, 0, AMREX_SPACEDIM);
@@ -920,14 +894,14 @@ CNS::avgDown ()
 #endif
 
   if (do_react) {
-            MultiFab& R_crse =          get_new_data(Reactions_Type);
-      const MultiFab& R_fine = fine_lev.get_new_data(Reactions_Type);
+          MultiFab& R_crse =          get_new_data(Reactions_Type);
+    const MultiFab& R_fine = fine_lev.get_new_data(Reactions_Type);
 #if CNS_USE_EB
-      amrex::EB_average_down(R_fine, R_crse, volume, fine_lev.volFrac(),
-                              0, R_fine.nComp(), fine_ratio);
+    amrex::EB_average_down(R_fine, R_crse, volume, fine_lev.volFrac(),
+                           0, R_fine.nComp(), fine_ratio);
 #else
-      amrex::average_down(R_fine, R_crse, fgeom, cgeom, 
-                          0, R_fine.nComp(), fine_ratio);
+    amrex::average_down(R_fine, R_crse, fgeom, cgeom, 
+                        0, R_fine.nComp(), fine_ratio);
 #endif
   }
 }
@@ -1010,7 +984,6 @@ CNS::estTimeStep ()
         auto const* ltransparm = trans_parms.device_trans_parm();
         reduce_op.eval(bx, reduce_data, [=]
         AMREX_GPU_DEVICE (int i, int j, int k) -> ReduceTuple { 
-          // This may not work as covered cells may have crazy transcoef
           return cns_estdt_visc(i, j, k, s_arr, dx, *lparm, ltransparm);
         });
       }

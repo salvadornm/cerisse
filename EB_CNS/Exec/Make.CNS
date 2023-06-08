@@ -10,6 +10,7 @@ ifeq ($(USE_EB), TRUE)
 else
    USE_EB := FALSE
 endif
+
 USE_SUNDIALS = TRUE
 USE_SUNDIALS_PP = TRUE
 LAZY = TRUE
@@ -32,7 +33,7 @@ endif
 include $(AMREX_HOME)/Tools/GNUMake/Make.defs
 
 # ================= EB_CNS =================
-Bdirs := Source Source/hydro Source/diffusion                 # List of names of directory
+Bdirs := Source Source/hydro Source/diffusion Source/pdf      # List of names of directory
 Bpack += $(foreach dir, $(Bdirs), $(TOP)/$(dir)/Make.package) # List of Make.package
 Blocs += $(foreach dir, $(Bdirs), $(TOP)/$(dir))              # List of paths of directory
 
@@ -85,13 +86,16 @@ endif
 ifeq ($(Transport_Model),$(filter $(Transport_Model),Sutherland))
    DEFINES += -DUSE_SUTHERLAND_TRANSPORT
 endif
-ifeq ($(Transport_Model),$(filter $(Transport_Model),ProbTransport))
-   DEFINES += -DUSE_PROB_TRANSPORT
-endif
 
 # Reactions
 ifdef Chemistry_Model
    CHEM_HOME = $(PELE_PHYSICS_HOME)/Support/Mechanism/Models/$(Chemistry_Model)
+   include $(CHEM_HOME)/Make.package
+   INCLUDE_LOCATIONS += $(CHEM_HOME)
+   VPATH_LOCATIONS   += $(CHEM_HOME)
+endif
+ifdef Custom_Chemistry_Model
+   CHEM_HOME = $(Custom_Chemistry_Model)
    include $(CHEM_HOME)/Make.package
    INCLUDE_LOCATIONS += $(CHEM_HOME)
    VPATH_LOCATIONS   += $(CHEM_HOME)

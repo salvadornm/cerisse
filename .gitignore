@@ -1,10 +1,10 @@
 # data in Exec of CNS
-EB_CNS/Exec/*/*.ex*
-EB_CNS/Exec/*/plt*
-EB_CNS/Exec/*/chk*
-EB_CNS/Exec/*/*.visit
-EB_CNS/Exec/*/Backtrace*
-EB_CNS/Exec/*/tmp_build_dir
+EB_CNS/Exec/**/*.ex*
+EB_CNS/Exec/**/plt*
+EB_CNS/Exec/**/chk*
+EB_CNS/Exec/**/*.visit
+EB_CNS/Exec/**/Backtrace*
+EB_CNS/Exec/**/tmp_build_dir
 
 # data in Exec of hybrid CNS
 EB_CNS_hybF90/Exec/*/*.ex*

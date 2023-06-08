@@ -16,13 +16,16 @@ using namespace amrex;
                      final time of the coarser level below it. This
                      counter starts at 1
  *  @param ncycle  the number of subcycles at this level
- * */
+ */
 Real
 CNS::advance(Real time, Real dt, int iteration, int ncycle)
 {
   BL_PROFILE("CNS::advance()");
 
-  enforce_consistent_state(); // Enforce rho = sum(rhoY)
+  // this must be put before we swap the new and old state (swapTimeLevels) 
+  // but is put at the beginning of the advance step rather than after RK step 2
+  // so that state after reflux is also corrected 
+  enforce_consistent_state(); // Enforce rho = sum(rhoY) and clip temp
 
   // Prepare data fabs
   for (int i = 0; i < num_state_data_types; ++i) {
@@ -75,11 +78,8 @@ CNS::advance(Real time, Real dt, int iteration, int ncycle)
       MultiFab::Saxpy(S_new, dt, I_R, nf*NREACT, nf*NVAR+UFS, NUM_SPECIES, 0);
     }
   }
-  // if (NUM_FIELD > 0) {
-  //   do something
-  // }
-  enforce_consistent_state(); // Enforce rho = sum(rhoY)
-
+  enforce_consistent_state(); // Enforce rho = sum(rhoY) and clip temp
+  
   // RK2 stage 2: U^{n+1} = U^n + 0.5*dt*(dUdt^n + dUdt^{n+1}) + dt*I_R^{n+1}
   if (verbose > 0) amrex::Print() << " >> RK Step 2: Computing dSdt^{n+1}" << std::endl;
   FillPatch(*this, Sborder, NUM_GROW, time+dt, State_Type, 0, LEN_STATE);
@@ -92,15 +92,14 @@ CNS::advance(Real time, Real dt, int iteration, int ncycle)
   FillPatch(*this, Sborder, 1, time+dt, State_Type, 0, LEN_STATE);
   compute_pdf_model(Sborder, dt, iteration);
   MultiFab::Copy(S_new, Sborder, 0, 0, LEN_STATE, 0);
-  // computeAvg(S_new);
-  // enforce_consistent_state(); // Enforce rho = sum(rhoY)
+  computeAvg(S_new);
 #endif
 
-  if (do_react) { // Compute I_R^{n+1}(U^**) and do U^{n+1} = U^** + dt*I_R^{n+1}
+  if (do_react) { 
+    // Compute I_R^{n+1}(U^**) and do U^{n+1} = U^** + dt*I_R^{n+1}
     react_state(time, dt);
   }
-  // enforce_consistent_state(); // Enforce rho = sum(rhoY)
-  
+
   // Iterate to couple chemistry (not tested)
   // if (do_react && (rk_reaction_iter > 1)) {
   //   for (int iter = 1; iter < rk_reaction_iter; ++iter) {
@@ -117,18 +116,12 @@ CNS::advance(Real time, Real dt, int iteration, int ncycle)
   //   }
   // }
 
-  // if (NUM_FIELD > 0) {
-  //   computeAvg(S_new);
-  //   FillPatch(*this, Sborder, 1, time+dt, State_Type, 0, LEN_STATE);
-  //   compute_pdf_model(Sborder, dt);
-  //   MultiFab::Copy(S_new, Sborder, 0, 0, LEN_STATE, 0);
-  //   computeAvg(S_new);
-  //   enforce_consistent_state(); // Enforce rho = sum(rhoY)
-  // }
-
   return dt;
 }
 
+/**
+ * @brief Compute RHS of Navier-Stokes equation. 
+ */
 void
 CNS::compute_dSdt (const MultiFab& S, MultiFab& dSdt, Real dt,
 #if CNS_USE_EB
@@ -220,11 +213,8 @@ CNS::compute_dSdt (const MultiFab& S, MultiFab& dSdt, Real dt,
         
         Array4<const Real> const&    s_arr =    S.array(mfi);
         Array4<      Real> const& dsdt_arr = dSdt.array(mfi);
-        // AMREX_D_TERM(Array4<Real> xflx_arr = flux[0].array(); ,
-        //              Array4<Real> yflx_arr = flux[1].array(); ,
-        //              Array4<Real> zflx_arr = flux[2].array();)
         
-        compute_dSdt_box_eb(bx, s_arr, dsdt_arr, {AMREX_D_DECL(&flux[0],&flux[1],&flux[2])}, //AMREX_D_DECL(xflx_arr, yflx_arr, zflx_arr),
+        compute_dSdt_box_eb(bx, s_arr, dsdt_arr, {AMREX_D_DECL(&flux[0],&flux[1],&flux[2])},
                             flags.const_array(mfi), vf_arr,
                             AMREX_D_DECL(apx, apy, apz), AMREX_D_DECL(fcx, fcy, fcz), bcent_arr,
                             as_crse, p_drho_as_crse->array(), p_rrflag_as_crse->const_array(),
@@ -262,22 +252,16 @@ CNS::compute_dSdt (const MultiFab& S, MultiFab& dSdt, Real dt,
 }
 
 /**
- * \brief This function enforces (1) all rhoY >= 0, (2) rho <- sum(rhoY), (3) T >= min_T, and update rhoU and rhoE accordingly.
+ * \brief This function enforces (1) all rhoY >= 0, (2) rho <- sum(rhoY), 
+ *        (3) T >= min_T, and update rhoU and rhoE accordingly. This is 
+ *        called before each compute_dSdt.
 */
 void
 CNS::enforce_consistent_state ()
 {
   BL_PROFILE("CNS::enforce_consistent_state()");
 
-  // if (verbose > 0) {
-  //   amrex::Print() << " >> CNS::enforce_consistent_state()" << std::endl;
-  // }
-
   MultiFab& S = get_new_data(State_Type);
-  // auto const& rho = Array4<Real>(state, URHO, 1); //this is how to slice array4!!
-  // auto const& rhoU = Array4<Real>(state, UMX, AMREX_SPACEDIM);
-  // auto const& rhoY = Array4<Real>(state, UFS, NUM_SPECIES);
-  // auto const& rhoE = Array4<Real>(state, UEDEN, 1);
 
 #if CNS_USE_EB
   auto const& fact = dynamic_cast<EBFArrayBoxFactory const&>(S.Factory());
@@ -301,20 +285,18 @@ CNS::enforce_consistent_state ()
         ParallelFor(bx, [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept {
           const IntVect iv{AMREX_D_DECL(i, j, k)};
           const Real rhoOld = s_arr(iv, URHO);
-          if (rhoOld <= 0.0) amrex::Print() << "enforce_consistent_state(): rhoOld" << iv << "=" << rhoOld << "!\n";
+          if (rhoOld <= 0.0 && verbose > 1) std::cout << "enforce_consistent_state(): rhoOld" << iv << "=" << rhoOld << "!\n";
           Real rhoinv = 1.0 / rhoOld;
                     
           // Clip species rhoYs and get new rho
           Real rhoNew = 0.0;
           Real rhoYOld;
           for (int n = 0; n < NUM_SPECIES; n++) {
-            // rhoYOld = s_arr(iv, UFS+n);
-            // s_arr(iv, UFS+n) = amrex::min<Real>(rhoOld, amrex::max<Real>(0.0, rhoYOld));
             s_arr(iv, UFS+n) = amrex::max<Real>(0.0, s_arr(iv, UFS+n));
             rhoNew += s_arr(iv, UFS+n);
           }
           if (rhoNew <= 0.0) { 
-            amrex::Print() << "enforce_consistent_state(): rhoNew" << iv << "=" << rhoNew << "! Fixed \n";
+            if (verbose > 1) std::cout << "enforce_consistent_state(): rhoNew" << iv << "=" << rhoNew << "! Fixed \n";
             
             rhoNew = d_parm->smallr;
             for (int n = 0; n < NUM_SPECIES; n++) {
@@ -342,24 +324,14 @@ CNS::enforce_consistent_state ()
           auto eos = pele::physics::PhysicsType::eos();
           Real T;
           eos.REY2T(rhoNew, ei, Y, T);
+
           if (T < clip_temp) {
-            // Way 1: Keep KE, add energy to increase T
-            std::cout << "Energy added to cell (" << i << "," << j << "," << k << "): T " << T << "->" << clip_temp << "\n";
+            // Keep KE, add energy to increase T
+            if (verbose > 1) std::cout << "Energy added to cell (" << i << "," << j << "," << k << "): T " << T << "->" << clip_temp << "\n";
             T = clip_temp;
             s_arr(iv, UEDEN) -= ei * rhoNew;
             eos.RTY2E(rhoNew, T, Y, ei);
             s_arr(iv, UEDEN) += ei * rhoNew;
-
-            // // Way 2: Keep total E, convert KE to T
-            // std::cout << "KE converted to T cell (" << i << "," << j << "," << k << "): T " << T << "->" << clip_temp << "\n";
-            // T = clip_temp;
-            // eos.RTY2E(rhoNew, T, Y, ei);
-
-            // AMREX_D_TERM(s_arr(iv, UMX) -= ei * rhoNew * rhoNew / s_arr(iv, UMX) / AMREX_SPACEDIM; ,
-            //              s_arr(iv, UMY) -= ei * rhoNew * rhoNew / s_arr(iv, UMY) / AMREX_SPACEDIM; ,        
-            //              s_arr(iv, UMY) -= ei * rhoNew * rhoNew / s_arr(iv, UMZ) / AMREX_SPACEDIM;)
-
-
           }
         });
       } // loop through NUM_FIELD

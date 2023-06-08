@@ -1,5 +1,5 @@
-CEXE_headers += CNS_diffusion_K.H
+CEXE_headers += diffusion.H
 
 ifeq ($(USE_EB), TRUE)
-  CEXE_headers += CNS_diffusion_eb_K.H
+  CEXE_headers += diffusion_eb.H
 endif

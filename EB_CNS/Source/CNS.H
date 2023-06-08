@@ -146,10 +146,6 @@ public:
                             amrex::Array4<amrex::Real       const> const& Sfab,
                             amrex::Array4<amrex::Real            > const& dSdtfab,
                             const std::array<FArrayBox*, AMREX_SPACEDIM>& flux,
-                            // AMREX_D_DECL(
-                            //   amrex::Array4<amrex::Real          > const& fx_out_arr,
-                            //   amrex::Array4<amrex::Real          > const& fy_out_arr,
-                            //   amrex::Array4<amrex::Real          > const& fz_out_arr),
                             amrex::Array4<amrex::EBCellFlag const> const& flag,
                             amrex::Array4<amrex::Real       const> const& vfrac,
                             AMREX_D_DECL(
@@ -193,7 +189,7 @@ public:
 
   void enforce_consistent_state ();
 
-  // This needs to access trans_parm in the class
+  // These derive functions need to access variables in the class
   static void cns_dertranscoef (const amrex::Box& bx, 
                                 amrex::FArrayBox& derfab, 
                                 int dcomp, 
@@ -203,7 +199,17 @@ public:
                                 amrex::Real time, 
                                 const int* bcrec, 
                                 int level);
-      
+  
+  // static void cns_derextsrc (const amrex::Box& bx, 
+  //                            amrex::FArrayBox& derfab, 
+  //                            int dcomp, 
+  //                            int ncomp,
+  //                            const amrex::FArrayBox& datafab, 
+  //                            const amrex::Geometry& geomdata,
+  //                            amrex::Real time, 
+  //                            const int* bcrec, 
+  //                            int level);
+
   ////////////////////////////////////////////////////////////////////////////
   //    Public data                                                         //
   ////////////////////////////////////////////////////////////////////////////
@@ -239,13 +245,11 @@ protected:
                       amrex::Array4<amrex::Real> const& ext_src, 
                       Parm const& parm, ProbParm const& prob_parm);
 
-  CNS& getLevel (int lev) { 
-    return dynamic_cast<CNS&>(parent->getLevel(lev)); 
-  }
+  CNS& getLevel (int lev) { return dynamic_cast<CNS&>(parent->getLevel(lev)); }
 
   void printTotalandCheckNan () const;
 
-  // void writeTimeStat ();
+  // void writeTimeStat (); // TODO
 
   void react_state (amrex::Real time, amrex::Real dt, bool init_react = false);
 
@@ -260,6 +264,11 @@ protected:
   ////////////////////////////////////////////////////////////////////////////
   //    Private data                                                        //
   ////////////////////////////////////////////////////////////////////////////
+
+  enum StateDataType { State_Type = 0, Reactions_Type, Cost_Type };
+  static int num_state_data_types;
+
+  static amrex::BCRec phys_bc;
 
   //
   // EB related
@@ -277,11 +286,6 @@ protected:
 #else
   amrex::YAFluxRegister flux_reg;
 #endif
-
-  enum StateDataType { State_Type = 0, Reactions_Type, Cost_Type };
-  static int num_state_data_types;
-
-  static amrex::BCRec phys_bc;
 
   //
   // PelePhysics related
@@ -315,6 +319,7 @@ protected:
   static bool update_heat_release;
   static int rk_reaction_iter;
 
+  static int char_sys;
   static amrex::Real plm_theta;
   static int recon_scheme;
 
@@ -349,29 +354,5 @@ protected:
   static Parm* h_parm;
   static Parm* d_parm;
 };
-
-// Below are bcfill functions declared here so that setup.cpp can find them.
-
-void cns_bcfill (
-    amrex::Box const& bx, 
-    amrex::FArrayBox& data,
-    const int dcomp, 
-    const int numcomp,
-    amrex::Geometry const& geom, 
-    const amrex::Real time,
-    const amrex::Vector<amrex::BCRec>& bcr, 
-    const int bcomp,
-    const int scomp);
-
-void cns_react_bcfill (
-    amrex::Box const& bx, 
-    amrex::FArrayBox& data,
-    const int dcomp, 
-    const int numcomp,
-    amrex::Geometry const& geom, 
-    const amrex::Real time,
-    const amrex::Vector<amrex::BCRec>& bcr, 
-    const int bcomp,
-    const int scomp);
 
 #endif

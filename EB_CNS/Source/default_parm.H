@@ -40,6 +40,7 @@ Real     CNS::min_react_temp = 300.0;        // turn off reactor below this temp
 Real     CNS::clip_temp = std::numeric_limits<Real>::epsilon();
 bool     CNS::update_heat_release = true;    // write to heat release in I_R? switch it off for some performance gain (approx 3-5%)
 
+int      CNS::char_sys       = 1;   // Thermodynamic system used in characteristic reconstruction. 0:speed of sound, 1:gamma
 int      CNS::recon_scheme   = 5;   // 1: basic Godunov; 2: MUSCL; 3: WENO-Z3; 4: WENO-JS5; 5: WENO-Z5; 6: TENO5
 Real     CNS::plm_theta      = 2.0; // [1,2] 1: minmod; 2: van Leer's MC (higher sharper)
 

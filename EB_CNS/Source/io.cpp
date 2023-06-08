@@ -1,5 +1,4 @@
 #include "CNS.H"
-// #include <AMReX_EBMultiFabUtil.H>
 
 using namespace amrex;
 

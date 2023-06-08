@@ -1,10 +1,7 @@
 #include "CNS.H"
-// #include "CNS_hydro_K.H"
-#include "CNS_diffusion_K.H"
+#include "diffusion.H"
 #include "hyperbolics.H"
 #include "recon.H"
-
-#include "characteristic_reconstruction.H"
 
 using namespace amrex;
 
@@ -66,7 +63,8 @@ CNS::compute_dSdt_box (Box const& bx,
   }
 
   // A fab to store the viscous fluxes in VPDF or VSPDF
-  FArrayBox vflux_fab, pflux_fab;
+  FArrayBox vflux_fab;
+  FArrayBox pflux_fab; // unused
   
   for (int cdir = 0; cdir < AMREX_SPACEDIM; ++cdir) { // Loop through space direction
     const Box& flxbx = amrex::surroundingNodes(bx,cdir);
@@ -84,7 +82,7 @@ CNS::compute_dSdt_box (Box const& bx,
       auto const& q = qtmp.array(nf*NPRIM);
       amrex::ParallelFor(bxg3,
       [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept {
-        cns_ctochar(i, j, k, cdir, q, w, 0);
+        cns_ctochar(i, j, k, cdir, q, w, char_sys);
       });
 
       // Reconstruction            
@@ -93,66 +91,16 @@ CNS::compute_dSdt_box (Box const& bx,
         cns_recon(i, j, k, n, cdir, w, wl, wr, recon_scheme, plm_theta);
       });
 
-      // amrex::ParallelFor(reconbox,
-      // [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept {
-      //   new_recons(i, j, k, cdir, q, wl, wr, recon_scheme, 0, true, plm_theta, *lparm);
-      // });
-      // amrex::ParallelFor(reconbox, 
-      // [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept {
-      //   char_recon(i, j, k, cdir, q, wl, wr, recon_scheme, plm_theta, 2, *lparm);
-      // });
-
       // Solve Riemann problem, store advection and pressure fluxes to flx_arr
       auto const& flx_arr = flxfab[cdir]->array(nf*NVAR);
       auto const& p_arr = pflux_fab.array(nf*NVAR);
       amrex::ParallelFor(flxbx,
       [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept {
-        cns_riemann(i, j, k, cdir, flx_arr, /*nf > 1 ? vflx_arr : flx_arr*/ p_arr, q, wl, wr, 0, *lparm);
-        // pure_riemann(i, j, k, cdir, flx_arr, p_arr, wl, wr, *lparm);
+        cns_riemann(i, j, k, cdir, flx_arr, p_arr, q, wl, wr, char_sys, *lparm);
       });
-
-      // auto const& q = qtmp.array(nf*NPRIM);
-      // auto const& flx_arr = flxfab[cdir]->array(nf*NVAR);
-      // amrex::ParallelFor(flxbx,
-      // [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept {
-      //   recon_riemann_aio(i, j, k, cdir, q, flx_arr, /*nf > 1 ? pflx_arr :*/ flx_arr, recon_scheme, plm_theta, *lparm);
-      
-      // amrex::ParallelFor(flxbx,
-      // [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept {
-          // amrex::Real check_rho_flx = 0.0;
-          // for (int n = 0; n < NUM_SPECIES; ++n) {
-          //     check_rho_flx += flx_arr(i, j, k, UFS+n);
-          // }
-          // if (std::abs(check_rho_flx - flx_arr(i, j, k, URHO)) > 1e-20) {
-          //     amrex::Print() << i << " in bx " << bx;
-          //     amrex::Print() << ": sum(rY_flx) = " << check_rho_flx << ", sum(rho_flx) = " << flx_arr(i, j, k, URHO) << std::endl;
-              // amrex::Print() << flx_arr(i, j, k, UFS) << " " << flx_arr(i, j, k, UFS+1) << std::endl;
-                                  
-              // amrex::Real yl0 = wl(i, j, k, WY);
-              // amrex::Real yl1 = wl(i, j, k, WY+1);
-              // amrex::Real rl = wl(i, j, k, WRHO) + (wl(i, j, k, WACO) + wl(i, j, k, WACO+1)) / q(i-1, j, k, QC);
-              // amrex::Print() << yl0 << " " << yl1 << " " << rl << std::endl;
-              // amrex::Error();
-          // }
-      // });
 
       // Store viscous fluxes separately
       if (do_visc) {
-        // auto const& yin   = qtmp.array(nf*NPRIM + QFS, NUM_SPECIES);
-        // auto const& Tin   = qtmp.array(nf*NPRIM + QTEMP, 1);
-        // auto const& rhoin = qtmp.array(nf*NPRIM + QRHO, 1);
-        // auto const& mu     = diff_coeff.array(CMU, 1);
-        // auto const& xi     = diff_coeff.array(CXI, 1);
-        // auto const& lambda = diff_coeff.array(CLAM, 1);
-        // auto const& rhoD   = diff_coeff.array(CRHOD);
-
-        // // Get Transport coefs on GPU
-        // amrex::launch(bxg2, [=] AMREX_GPU_DEVICE(amrex::Box const& tbx) {
-        //   auto trans = pele::physics::PhysicsType::transport();
-        //   trans.get_transport_coeffs(
-        //       tbx, yin, Tin, rhoin, rhoD, mu, xi, lambda, ltransparm);
-        // });
-
         auto const& coefs = diff_coeff.array(nf*NCOEF);
         amrex::ParallelFor(flxbx,
         [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept {
@@ -161,38 +109,6 @@ CNS::compute_dSdt_box (Box const& bx,
       }
       
     } //for fields
-
-    // if ((NUM_FIELD > 0)) {
-    //   auto const& flx_arr = flxfab[cdir]->array();
-    //   auto const& p_arr = pflux_fab.array();
-
-      // amrex::ParallelFor(flxbx,
-      // [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept {
-      //     // Average p
-      //     amrex::Real mean_p = 0.0;
-      //     for (int nf = 1; nf <= NUM_FIELD; ++nf) {
-      //         mean_p += p_arr(i, j, k, nf*NVAR + UMX);
-      //     }
-      //     mean_p /= amrex::Real(NUM_FIELD);
-      //     // amrex::Real mean_p = p_arr(i, j, k, UMX);
-
-      //     // amrex::Real mean_rho = sarr(i, j, k, URHO);
-      //     amrex::Real rho, u, p;
-      //     // Add to hyperbolic fluxes
-      //     for (int nf = 1; nf <= NUM_FIELD; ++nf) {
-      //         // rho = sarr(i, j, k, nf*NVAR + URHO);
-      //         // u = p_arr(i, j, k, nf*NVAR + UEDEN); 
-      //         // u = sarr(i, j, k, nf*NVAR + UMX) / sarr(i, j, k, nf*NVAR + URHO);
-      //         p = p_arr(i, j, k, nf*NVAR + UMX); 
-              
-      //         // SGS "Force"
-      //         // flx_arr(i, j, k, nf*NVAR + UMX) += -p + mean_p;
-
-      //         // Work done by SGS "Force"
-      //         // flx_arr(i, j, k, nf*NVAR + UEDEN) += u*(-p + mean_p);
-      //     }
-      // });
-    // }
 
 #if NUM_FIELD > 0
     if (do_visc) {
@@ -210,12 +126,6 @@ CNS::compute_dSdt_box (Box const& bx,
         }
 
         amrex::Real mean_rho = sarr(i, j, k, URHO);
-        // for (int nf = 1; nf <= NUM_FIELD; ++nf) {
-        //     mean_rho += flx_arr(i, j, k, nf*NVAR + URHO) * flx_arr(i, j, k, nf*NVAR + URHO) 
-        //                 / amrex::max(flx_arr(i, j, k, nf*NVAR + UMX+cdir), 1e-6);
-        // }
-        // mean_rho /= amrex::Real(NUM_FIELD);
-
         amrex::Real rho;
         // Add to hyperbolic fluxes
         for (int nf = 1; nf <= NUM_FIELD; ++nf) {
@@ -225,14 +135,7 @@ CNS::compute_dSdt_box (Box const& bx,
           AMREX_D_TERM(
               flx_arr(i, j, k, nf*NVAR + UMX) += rho / mean_rho * vflx_arr(i, j, k, UMX); ,
               flx_arr(i, j, k, nf*NVAR + UMY) += rho / mean_rho * vflx_arr(i, j, k, UMY); ,
-              flx_arr(i, j, k, nf*NVAR + UMZ) += rho / mean_rho * vflx_arr(i, j, k, UMZ);)            
-
-          // u*<p>*rho/<rho>
-          // flx_arr(i, j, k, nf*NVAR + UEDEN) += AMREX_D_TERM( 
-          //     sarr(i, j, k, nf*NVAR + UMX) / mean_rho * vflx_arr(i, j, k, UMX) ,
-          //   + sarr(i, j, k, nf*NVAR + UMY) / mean_rho * vflx_arr(i, j, k, UMY) ,
-          //   + sarr(i, j, k, nf*NVAR + UMZ) / mean_rho * vflx_arr(i, j, k, UMZ));
-          // // <u*p>*rho/<rho>
+              flx_arr(i, j, k, nf*NVAR + UMZ) += rho / mean_rho * vflx_arr(i, j, k, UMZ);)
           flx_arr(i, j, k, nf*NVAR + UEDEN) += rho / mean_rho * vflx_arr(i, j, k, UEDEN);      
           for (int n = 0; n < NUM_SPECIES; ++n) {
             flx_arr(i, j, k, nf*NVAR + UFS+n) += rho / mean_rho * vflx_arr(i, j, k, UFS+n);
