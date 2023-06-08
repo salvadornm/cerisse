@@ -24,7 +24,7 @@ AMREX_GPU_DEVICE AMREX_FORCE_INLINE void
 cns_ctoprim (int i, int j, int k, int ns,
              amrex::Array4<amrex::Real const> const& u,
              amrex::Array4<amrex::Real> const& q,
-             Parm const& parm) noexcept
+             Parm const& /*parm*/) noexcept
 {
     amrex::Real rho = u(i,j,k,ns+URHO);
     amrex::Real rhoinv = amrex::Real(1.0) / rho;
@@ -49,7 +49,7 @@ cns_ctoprim (int i, int j, int k, int ns,
     q(i,j,k,QRHO) = rho;
     AMREX_D_TERM(q(i,j,k,QU) = ux; ,
                  q(i,j,k,QV) = uy; ,
-                 q(i,j,k,QW) = uz;);    
+                 q(i,j,k,QW) = uz;);
     q(i,j,k,QPRES) = p; 
     q(i,j,k,QC)    = cs;
     q(i,j,k,QG)    = gamma;
@@ -58,10 +58,10 @@ cns_ctoprim (int i, int j, int k, int ns,
     
     // Monitor problem cell
     if (amrex::isnan(cs) || amrex::isnan(ux) || (rho <= 0.0) || (p <= 0.0)) {
-        std::cout << "@ " << i << "," << j << "," << k << ": ns=" << ns << ": rho=" << rho << " T=" << T << " p=" << p;// << "\n";
-        std::cout << " rhoE=" << u(i,j,k,ns+UEDEN) << " ei=" << ei << "\n";
+        std::cout << "@" << i << "," << j << "," << k << ": ns=" << ns << ": rho=" << rho << " T=" << T << " p=" << p
+                  << " u=" << ux << " rhoE=" << u(i,j,k,ns+UEDEN) << " ei=" << ei << std::endl; //why it bugs if I use "\n" instead?
         for (int n = 0; n < NUM_SPECIES; n++) {
-            std::cout << "rhoY" << n << "=" << u(i,j,k,ns+UFS+n) << " ";
+            std::cout << " rhoY" << n << "=" << u(i,j,k,ns+UFS+n) << " ";
         }
         std::cout << "\n";
     }

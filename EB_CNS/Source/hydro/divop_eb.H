@@ -37,7 +37,7 @@ compute_hyp_wallflux (const amrex::Real rho,
     eos.RYP2E(rho, y, p, e);
     e += 0.5*(AMREX_D_TERM(u*u, +v*v, +w*w));
     eos.RPY2Cs(rho, p, y, cs);
-    eos.RYP2T(rho, p, y, T);
+    eos.RYP2T(rho, y, p, T);
 
     // Wall states (extrapolate p and y, use Tw to calculate rhow, ew, csw)
     Real rhow, ew, csw;
