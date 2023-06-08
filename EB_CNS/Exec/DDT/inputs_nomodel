@@ -1,0 +1,92 @@
+# ====================================================== #
+#                  CERISSE INPUT SCRIPT                  #
+# ====================================================== #
+# >> Case:     DDT                                       #
+# >> Settings: No model, full domain, min cell 200 μm    #
+# ====================================================== #
+max_step = 1000
+stop_time = 0.1
+
+# ================ COMPUTATIONAL DOMAIN ================ #
+geometry.is_periodic = 0 0 0
+geometry.coord_sys   = 0  # 0: cart, 1: RZ, 2:spherical
+geometry.prob_lo     = 0.   -3.0  -15.0
+geometry.prob_hi     = 540.  3.0   15.0
+amr.n_cell           = 720   8     40
+
+eb2.geom_type = GraVent
+
+# ================ BOUNDARY CONDITIONS ================= #
+# 0 = Interior             3 = Symmetry
+# 1 = Inflow / UserBC      4 = SlipWall = 3
+# 2 = Outflow (FOExtrap)   5 = NoSlipWall (adiabatic)
+cns.lo_bc = 5 5 5
+cns.hi_bc = 5 5 5
+
+# ==================== WHAT PHYSICS ==================== #
+cns.do_visc  = 1
+
+# ==================== WHAT NUMERICS =================== #
+cns.cfl = 0.3
+cns.dt_cutoff = 5.e-20
+cns.recon_scheme = 5   # 1: Godunov,  2: MUSCL,   3: WENO-Z3, 
+                       # 4: WENO-JS5, 5: WENO-Z5, 6: TENO-5
+cns.char_sys     = 0   # characteristic system, 0:sos, 1:gamma
+cns.clip_temp    = 90  # clip minimum temperature [K] (this is consistent with the chem mechanism)
+
+# ================== REACTION SETTINGS ================= #
+cns.do_react = 1
+cns.chem_integrator = "ReactorCvode"
+cvode.solve_type = "denseAJ_direct"
+ode.clean_init_massfrac = 1 # ensure 0 <= Y <= 1 before integration
+ode.rtol = 1e-5             # relative tolerance
+ode.atol = 1e-8             # absolute tolerance
+cns.use_typical_vals_chem = 0
+cns.min_react_temp = 500    # no reaction in cells below this temp (can reduce runtime in ReactorCvode)
+cns.update_heat_release = 1
+# cns.rk_reaction_iter = 0
+
+# ================ VERBOSITY & DIAGNOSIS =============== #
+cns.v = 2 # 0/1/2
+amr.v = 1
+ode.verbose = 0
+
+# ==================== LOAD BALANCE ==================== #
+amr.loadbalance_with_workestimates = 1 # loadbalance_int = regrid_int
+
+# =============== REFINEMENT / REGRIDDING ============== #
+amr.max_level       = 5     # maximum level number allowed
+amr.ref_ratio       = 2 2 2 # refinement ratio
+amr.regrid_int      = 100   # how often to regrid
+amr.blocking_factor = 8
+amr.max_grid_size   = 64
+amr.n_error_buf     = 2 2 2 # number of buffer cells in error est
+amr.grid_eff        = 0.7
+
+# ================== TAGGING CRITERIA ================== #
+cns.refine_dengrad = 1e-4
+cns.refine_dengrad_max_lev = 3
+
+cns.refine_magvort = 1e5
+cns.refine_magvort_max_lev = 3
+
+# ==================== OUTPUT FILES ==================== #
+amr.checkpoint_files_output = 1
+amr.check_file      = no_model/chk    # root name of checkpoint file
+amr.check_int       = 1000            # number of timesteps between checkpoints
+#amr.check_per # interval physical time between checkpoints
+
+amr.plot_files_output = 1
+amr.plot_file         = no_model/plt  # root name of plotfile
+amr.plot_int          = 100           # number of timesteps between plotfiles
+#amr.plot_per # interval physical time between plotfiles
+amr.derive_plot_vars  = ALL
+cns.plot_rhoy = 0
+cns.plot_molefrac = 0
+cns.plot_massfrac = 1
+cns.plot_fields = 0
+
+# ================= PROBLEM PARAMETERS ================= #
+prob.BR = 0.6
+prob.S = 30.0 # [cm], only support 10.0 or 30.0
+prob.volH2 = 0.175
