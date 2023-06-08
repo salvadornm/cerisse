@@ -7,7 +7,7 @@ This simulation is based on the experiments carried out at the [GraVent Explosio
 | Blockage ratio          | 60%                                  |
 | Obstacle spacing        | 30.0 cm                              |
 | Obstacle orientation    | horizontal                           |
-| Mixture                 | premixed H$_2$-air, 17.5% H$_2$ vol. |
+| Mixture                 | premixed H<sub>2</sub>-air, 17.5% H<sub>2</sub> vol. |
 | First obstacle location | 25.0 cm                              |
 | Last obstacle location  | 205.0 cm                             |
 | Channel length          | 540.0 cm                             |
