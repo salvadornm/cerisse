@@ -326,12 +326,14 @@ CNS::enforce_consistent_state ()
           eos.REY2T(rhoNew, ei, Y, T);
 
           if (T < clip_temp) {
-            // Keep KE, add energy to increase T
-            if (verbose > 1) std::cout << "Energy added to cell (" << i << "," << j << "," << k << "): T " << T << "->" << clip_temp << "\n";
+            // Keep KE, add energy to increase T            
+            if (verbose > 1) std::cout << "Energy added to cell (" << i << "," << j << "," << k << "): T " << T << "->" << clip_temp
+             << "rhoE " << s_arr(iv, UEDEN);
             T = clip_temp;
             s_arr(iv, UEDEN) -= ei * rhoNew;
             eos.RTY2E(rhoNew, T, Y, ei);
             s_arr(iv, UEDEN) += ei * rhoNew;
+            if (verbose > 1) std::cout << "->" << s_arr(iv, UEDEN) << std::endl;            
           }
         });
       } // loop through NUM_FIELD

@@ -172,7 +172,138 @@ cns_div (int i, int j, int k, int n,
     
     // Monitor problem cell
     if (isnan(dsdt(i,j,k,n))) 
-        std::cout << "div(" << i << "," << j << "," << k << ") is nan \n";
+        std::cout << "div(" << i << "," << j << "," << k << ") is nan" << std::endl;
+}
+
+AMREX_GPU_DEVICE inline void
+riemann (const amrex::Real rl, const amrex::Real ul, const amrex::Real ut1l, const amrex::Real ut2l, 
+         const amrex::Real pl, const amrex::Real cl, const amrex::Real /*el*/, const amrex::Real* /*yl[NUM_SPECIES]*/,
+         const amrex::Real rr, const amrex::Real ur, const amrex::Real ut1r, const amrex::Real ut2r, 
+         const amrex::Real pr, const amrex::Real cr, const amrex::Real /*er*/, const amrex::Real* /*yr[NUM_SPECIES]*/,
+         amrex::Real& flxrho, amrex::Real& flxu, amrex::Real& flxut, amrex::Real& flxutt,
+         amrex::Real& flxe, amrex::Real flxy[NUM_SPECIES], Parm parm) noexcept
+{
+    using amrex::Real;
+
+    constexpr Real weakwv = Real(1.e-3);
+    constexpr Real small = Real(1.e-6);
+    constexpr Real gamma = Real(1.4);
+    Real smallp = parm.smallp;
+
+    Real wl = cl;
+    Real wr = cr;
+    Real cleft = wl/rl;
+    Real cright = wr/rr;
+    Real ccsmall = small*(cleft+cright);
+
+    Real pstar = (wl*pr + wr*pl - wr*wl*(ur-ul))/(wl+wr);
+    pstar = amrex::max(pstar,smallp);
+    Real pstnm1 = pstar;
+
+    Real wlsq = (Real(0.5)*(gamma-Real(1.))*(pstar+pl)+pstar)*rl;
+    Real wrsq = (Real(0.5)*(gamma-Real(1.))*(pstar+pr)+pstar)*rr;
+
+    wl = std::sqrt(wlsq);
+    wr = std::sqrt(wrsq);
+    Real ustarp = ul - (pstar-pl)/wl;
+    Real ustarm = ur + (pstar-pr)/wr;
+
+    pstar = (wl*pr + wr*pl - wr*wl*(ur-ul))/(wl+wr);
+    pstar = amrex::max(pstar,smallp);
+
+    Real ustar;
+    for (int iter = 0; iter < 3; ++iter)
+    {
+        wlsq = (Real(0.5)*(gamma-Real(1.))*(pstar+pl)+pstar)*rl;
+        wrsq = (Real(0.5)*(gamma-Real(1.))*(pstar+pr)+pstar)*rr;
+
+        wl = Real(1.)/std::sqrt(wlsq);
+        wr = Real(1.)/std::sqrt(wrsq);
+
+        Real ustnm1 = ustarm;
+        Real ustnp1 = ustarp;
+
+        ustarm = ur - (pr - pstar)*wr;
+        ustarp = ul + (pl - pstar)*wl;
+
+        Real dpditer = std::abs(pstnm1-pstar);
+        Real zp = std::abs(ustarp-ustnp1);
+        if (zp-weakwv*cleft < Real(0.0) ) {
+            zp = dpditer*wl;
+        }
+        Real zm = std::abs(ustarm-ustnm1);
+        if (zm-weakwv*cright < Real(0.0) ) {
+            zm = dpditer*wr;
+        }
+
+        Real zz = zp+zm;
+        Real denom = dpditer/ amrex::max(zz,ccsmall);
+        pstnm1 = pstar;
+        pstar = pstar - denom*(ustarm-ustarp);
+        pstar = amrex::max(pstar,smallp);
+        ustar = Real(0.5)*(ustarm+ustarp);
+    }
+
+    Real ro, uo, po, sgnm, utrans1, utrans2;
+    if (ustar > Real(0.)) {
+        ro = rl;
+        uo = ul;
+        po = pl;
+        sgnm = Real(1.);
+        utrans1 = ut1l;
+        utrans2 = ut2l;
+    } else if (ustar < Real(0.)) {
+        ro = rr;
+        uo = ur;
+        po = pr;
+        sgnm = Real(-1.);
+        utrans1 = ut1r;
+        utrans2 = ut2r;
+    } else {
+        uo = Real(0.5)*(ur+ul);
+        po = Real(0.5)*(pr+pl);
+        ro = Real(2.)*(rl*rr)/(rl+rr);
+        sgnm = Real(1.);
+        utrans1 = Real(0.5)*(ut1l+ut1r);
+        utrans2 = Real(0.5)*(ut2l+ut2r);
+    }
+    Real wosq = (Real(0.5)*(gamma-Real(1.))*(pstar+po)+pstar)*ro;
+    Real co = std::sqrt(gamma * po / ro);
+    Real wo = std::sqrt(wosq);
+    Real dpjmp = pstar-po;
+    Real rstar = ro/(Real(1.)-ro*dpjmp/wosq);
+    Real cstar = std::sqrt(gamma * pstar / rstar);
+    Real spout = co-sgnm*uo;
+    Real spin = cstar - sgnm*uo;
+    if(pstar >= po) {
+        spin = wo/ro-sgnm*uo;
+        spout = spin;
+    }
+    Real ss = amrex::max(spout-spin, spout+spin);
+    Real frac = Real(0.5)*(Real(1.)+(spin+spout)/amrex::max(ss,ccsmall));
+
+    Real rgdnv, ugdnv, pgdnv;
+    if (spout < Real(0.)) {
+        rgdnv = ro;
+        ugdnv = uo;
+        pgdnv = po;
+    } else if(spin >= Real(0.)) {
+        rgdnv = rstar;
+        ugdnv = ustar;
+        pgdnv = pstar;
+    } else {
+        rgdnv = frac*rstar + (Real(1.) - frac)* ro;
+        ugdnv = frac*ustar + (Real(1.) - frac)* uo;
+        pgdnv = frac*pstar + (Real(1.) - frac)* po;
+    }
+
+    flxrho = rgdnv*ugdnv;
+    flxu = rgdnv*ugdnv*ugdnv+pgdnv;
+    flxut = rgdnv*ugdnv*utrans1;
+    flxutt = rgdnv*ugdnv*utrans2;
+    flxe = ugdnv*(Real(0.5)*rgdnv*(ugdnv*ugdnv+utrans1*utrans1+utrans2*utrans2) + pgdnv/(gamma -Real(1.)) + pgdnv);
+    for (int n = 0; n < NUM_SPECIES; ++n)
+        flxy[n] = rgdnv*ugdnv;
 }
 
 /**
