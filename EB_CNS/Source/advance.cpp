@@ -116,6 +116,8 @@ CNS::advance(Real time, Real dt, int iteration, int ncycle)
   //   }
   // }
 
+  enforce_consistent_state(); // Enforce rho = sum(rhoY)
+
   return dt;
 }
 
@@ -328,7 +330,7 @@ CNS::enforce_consistent_state ()
           if (T < clip_temp) {
             // Keep KE, add energy to increase T            
             if (verbose > 1) std::cout << "Energy added to cell (" << i << "," << j << "," << k << "): T " << T << "->" << clip_temp
-             << "rhoE " << s_arr(iv, UEDEN);
+             << " rhoE " << s_arr(iv, UEDEN);
             T = clip_temp;
             s_arr(iv, UEDEN) -= ei * rhoNew;
             eos.RTY2E(rhoNew, T, Y, ei);

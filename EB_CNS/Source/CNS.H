@@ -11,13 +11,14 @@
 #endif
 // #include <AMReX_ErrorList.H>
 
-#include "PelePhysics.H"
-#include "ReactorBase.H"
+#include <PelePhysics.H>
+#include <ReactorBase.H>
 
 #include "prob_parm.H"
 #include "index_macros.H"
 #include "parm.H"
 #include "random.H"
+#include "LES.H"
 
 using namespace amrex;
 
@@ -216,8 +217,19 @@ public:
 
   static ProbParm* h_prob_parm;
   static ProbParm* d_prob_parm;
+
   static pele::physics::transport::TransportParams<
       pele::physics::PhysicsType::transport_type> trans_parms;
+
+  // Eddy viscosity type LES
+
+  static bool do_les;
+  static bool do_pasr;
+  static std::string les_model_name;
+  static amrex::Real Cs;
+  static amrex::Real Pr_T;
+  static amrex::Real Sc_T;
+  static std::unique_ptr<LESModel> les_model;
 
 protected:
 
@@ -303,6 +315,7 @@ protected:
   // Control parameters
 
   static amrex::Real cfl;
+  static amrex::Real fixed_dt;
   static amrex::Real dt_cutoff;
   static int verbose;
   static int do_reflux;
@@ -319,9 +332,14 @@ protected:
   static bool update_heat_release;
   static int rk_reaction_iter;
 
+  // Reconstruction
+
+  static bool recon_char_var;
   static int char_sys;
   static amrex::Real plm_theta;
   static int recon_scheme;
+
+  // LES-PDF stochastic fields
 
   static bool do_restart_fields;
   static bool do_psgs;

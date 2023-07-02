@@ -1,11 +1,109 @@
-#include <AMReX_Config.H>
+// #include <AMReX_Config.H>
 #include <AMReX_REAL.H>
 #include <parm.H>
 
 #include "diffusion_eb.H"
 #include "hyperbolics.H"
 
-// This version works for adiabatic or isothermal wall
+// // This version works for adiabatic or isothermal wall
+// AMREX_GPU_DEVICE AMREX_FORCE_INLINE void
+// compute_hyp_wallflux (const amrex::Real rho,
+//                       AMREX_D_DECL(const amrex::Real u, const amrex::Real v, const amrex::Real w),
+//                       const amrex::Real p,   const amrex::Real sp[NUM_SPECIES],
+//                       const amrex::Real axm, const amrex::Real axp,
+//                       const amrex::Real aym, const amrex::Real ayp,
+// #if (AMREX_SPACEDIM == 3)
+//                       const amrex::Real azm, const amrex::Real azp,
+// #endif
+//                       amrex::GpuArray<amrex::Real,NVAR>& fluxw, Parm const& parm, 
+//                       bool eb_isothermal, amrex::Real wall_temp) noexcept
+// {
+//   using amrex::Real;
+  
+//   AMREX_D_TERM(Real dapx = axp - axm;,
+//                Real dapy = ayp - aym;,
+//                Real dapz = azp - azm;);
+  
+//   Real apnorm = std::sqrt(AMREX_D_TERM(dapx*dapx,+dapy*dapy,+dapz*dapz));
+//   if (apnorm <= 0.0) amrex::Abort("compute_hyp_wallflux: we are in trouble.");
+  
+//   Real apnorminv = 1./apnorm;
+//   // Real apt1inv = 1./std::sqrt(dapx*dapx+dapy*dapy);
+//   // Project normal is into the wall
+//   Real un = AMREX_D_TERM(u*(-dapx)*apnorminv, + v*(-dapy)*apnorminv, + w*(-dapz)*apnorminv);
+// //   Real ut1 = AMREX_D_TERM(u*(dapy)*apt1inv, + v*(-dapx)*apt1inv, + 0.0);
+// // #if AMREX_SPACEDIM == 3
+// //   Real apt2inv = apnorminv * apt1inv;
+// //   Real ut2 = AMREX_D_TERM(u*(-dapx*dapz)*apt2inv, + v*(-dapy*dapz)*apt2inv, + w*(dapx*dapx+dapy*dapy)*apt2inv);
+// // #endif
+//   Real AMREX_D_DECL(momfluxn, momfluxt1, momfluxt2);
+//   // Real momfluxn, momfluxt1, momfluxt2;
+
+//   // if (eb_isothermal) {
+//     // Fluid states
+//     // Real y[NUM_SPECIES];
+//     // for (int n = 0; n < NUM_SPECIES; ++n) y[n] = sp[n];
+  
+//     // auto eos = pele::physics::PhysicsType::eos();
+//     // Real e, cs, T;
+//     // eos.RYP2E(rho, y, p, e);
+//     // e += 0.5*(AMREX_D_TERM(u*u, +v*v, +w*w));
+//     // eos.RPY2Cs(rho, p, y, cs);
+//     // eos.RYP2T(rho, y, p, T);
+
+//     // // Wall states (extrapolate p and y, use Tw to calculate rhow, ew, csw)
+//     // Real rhow, ew, csw;//, csw2;
+//     // if (eb_isothermal) {
+//     // eos.PYT2RE(p, y, 2*wall_temp-T, rhow, ew);
+//     // ew += 0.5*(AMREX_D_TERM(u*u, +v*v, +w*w));
+//     // eos.RPY2Cs(rhow, p, y, csw);
+//     // // eos.RTY2Cs(rhow, 2*wall_temp-T, y, csw2);
+//     // // assert(csw == csw2);
+//     // } else {
+//     //   rhow = rho;
+//     //   csw = cs;
+//     //   ew = e;
+//     // }
+
+//     // // no slip so -ut1 and -ut2
+//     // hllc(rho,  AMREX_D_DECL( un, ut1, ut2), p, cs,  e,  y,
+//     //      rhow, AMREX_D_DECL(-un, -ut1, -ut2), p, csw, ew, y,
+//     //      fluxw[URHO], AMREX_D_DECL(momfluxn, momfluxt1, momfluxt2), 
+//     //      fluxw[UEDEN], &fluxw[UFS], parm);
+
+//     // amrex::Print() << fluxw[UEDEN] << std::endl;
+//   //   // amrex::Print() << fluxw[URHO] << " " << momfluxn << "(" << p << ") " << momfluxt1 
+//   //   //                << " " << fluxw[UEDEN] << " " << fluxw[UFS] << " " << fluxw[UFS+1] 
+//   //   //                << " " << rho << " " << rhow << " " << cs << " " << csw << std::endl;
+
+//   //   // riemann(rho, un, 0., 0., p, cs, e, y,
+//   //   //      rhow, -un, 0., 0., p, csw, ew, y,
+//   //   //      fluxw[URHO], momfluxn, momfluxt1, momfluxt2, 
+//   //   //      fluxw[UEDEN], &fluxw[UFS], parm);
+
+//   //   // amrex::Print() << fluxw[URHO] << " " << momfluxn << "(" << p << ") " << momfluxt1 
+//   //   //                << " " << fluxw[UEDEN] << " " << fluxw[UFS] << " " << fluxw[UFS+1] 
+//   //   //                << " " << rho << " " << rhow << " " << cs << " " << csw << std::endl;
+//   // } else {
+//     // Adaibatic wall
+//     fluxw[URHO] = 0.0;
+//     momfluxn = p;
+//     fluxw[UEDEN] = 0.0;
+//     for (int n = 0; n < NUM_SPECIES; ++n) fluxw[UFS+n] = 0.0;
+//   // }
+
+//   // fluxw[URHO] *= -apnorm;
+//   // fluxw[UEDEN] *= -apnorm;
+//   // for (int n = 0; n < NUM_SPECIES; ++n) fluxw[UFS+n] *= -apnorm;
+  
+//   AMREX_D_TERM(fluxw[UMX] = (axm-axp) * momfluxn;,
+//                fluxw[UMY] = (aym-ayp) * momfluxn;,
+//                fluxw[UMZ] = (azm-azp) * momfluxn;);
+//   // AMREX_D_TERM(fluxw[UMX] = -dapx * momfluxn +dapy*apt1inv*apnorm * momfluxt1;,
+//   //              fluxw[UMY] = -dapy * momfluxn -dapx*apt1inv*apnorm * momfluxt1;,
+//   //              fluxw[UMZ] = -dapz * momfluxn;);
+// }
+
 AMREX_GPU_DEVICE AMREX_FORCE_INLINE void
 compute_hyp_wallflux (const amrex::Real rho,
                       AMREX_D_DECL(const amrex::Real u, const amrex::Real v, const amrex::Real w),
@@ -16,9 +114,11 @@ compute_hyp_wallflux (const amrex::Real rho,
                       const amrex::Real azm, const amrex::Real azp,
 #endif
                       amrex::GpuArray<amrex::Real,NVAR>& fluxw, Parm const& parm, 
-                      bool eb_isothermal, amrex::Real wall_temp) noexcept
+                      bool /*eb_isothermal*/, amrex::Real /*wall_temp*/) noexcept
 {
   using amrex::Real;
+
+  // Assume adiabatic wall
   
   Real apnorm = std::sqrt( AMREX_D_TERM((axm-axp)*(axm-axp), + (aym-ayp)*(aym-ayp), + (azm-azp)*(azm-azp)) );
   if (apnorm <= 0.0) amrex::Abort("compute_hyp_wallflux: we are in trouble.");
@@ -26,40 +126,19 @@ compute_hyp_wallflux (const amrex::Real rho,
   Real apnorminv = 1./apnorm;
   Real un = AMREX_D_TERM(u*(axm-axp)*apnorminv, + v*(aym-ayp)*apnorminv, + w*(azm-azp)*apnorminv);
   Real AMREX_D_DECL(momfluxn, momfluxt1, momfluxt2);
+  Real y[NUM_SPECIES];
+  for (int n = 0; n < NUM_SPECIES; ++n) y[n] = sp[n];
   
-  if (eb_isothermal) {
-    // Fluid states
-    Real y[NUM_SPECIES];
-    for (int n = 0; n < NUM_SPECIES; ++n) y[n] = sp[n];
-  
-    auto eos = pele::physics::PhysicsType::eos();
-    Real e, cs, T;
-    eos.RYP2E(rho, y, p, e);
-    e += 0.5*(AMREX_D_TERM(u*u, +v*v, +w*w));
-    eos.RPY2Cs(rho, p, y, cs);
-    eos.RYP2T(rho, y, p, T);
+  auto eos = pele::physics::PhysicsType::eos();
+  Real e, cs;
+  eos.RYP2E(rho, y, p, e);
+  e += 0.5*(AMREX_D_TERM(u*u, +v*v, +w*w));
+  eos.RPY2Cs(rho, p, y, cs);
 
-    // Wall states (extrapolate p and y, use Tw to calculate rhow, ew, csw)
-    Real rhow, ew, csw;
-    eos.PYT2RE(p, y, 2*wall_temp-T, rhow, ew);
-    ew += 0.5*(AMREX_D_TERM(u*u, +v*v, +w*w));
-    eos.RPY2Cs(rhow, p, y, csw);
-
-    hllc(rho,  AMREX_D_DECL( un, 0., 0.), p, cs,  e,  y,
-         rhow, AMREX_D_DECL(-un, 0., 0.), p, csw, ew, y,
-         fluxw[URHO], AMREX_D_DECL(momfluxn, momfluxt1, momfluxt2), 
-         fluxw[UEDEN], &fluxw[UFS], parm);
-
-    // amrex::Print() << fluxw[URHO] << " " << momfluxn << "(" << p << ") " << momfluxt1 
-    //                << " " << fluxw[UEDEN] << " " << fluxw[UFS] << " " << fluxw[UFS+1] 
-    //                << " " << rho << " " << rhow << " " << cs << " " << csw << std::endl;
-  } else {
-    // Adaibatic wall
-    fluxw[URHO] = 0.0;
-    momfluxn = p;
-    fluxw[UEDEN] = 0.0;
-    for (int n = 0; n < NUM_SPECIES; ++n) fluxw[UFS+n] = 0.0;
-  }
+  hllc(rho, AMREX_D_DECL( un, 0., 0.), p, cs, e, y,
+       rho, AMREX_D_DECL(-un, 0., 0.), p, cs, e, y,
+       fluxw[URHO], AMREX_D_DECL(momfluxn, momfluxt1, momfluxt2),
+       fluxw[UEDEN], &fluxw[UFS], parm);
 
   AMREX_D_TERM(fluxw[UMX] = (axm-axp) * momfluxn;,
                fluxw[UMY] = (aym-ayp) * momfluxn;,
@@ -385,14 +464,9 @@ eb_compute_div (int i, int j, int k,
     }
 
     for (int n = 0; n < NVAR; ++n) {
-      // These assume dx == dy == dz
+      // Assume dx == dy == dz, A_wall/V = apnorm/dx/vfrc
       divu(i,j,k,n) += flux_hyp_wall[n]*dxinv[0]/vfrc(i,j,k);
-
-#if AMREX_SPACEDIM == 2
-      divu(i,j,k,n) += flux_diff_wall[n]*dxinv[0]/vfrc(i,j,k);
-#elif AMREX_SPACEDIM == 3
-      divu(i,j,k,n) += flux_diff_wall[n]*(dxinv[0]*dxinv[0])/vfrc(i,j,k); //because compute_diff_wallflux is nondimensionalised with dx
-#endif
+      divu(i,j,k,n) += flux_diff_wall[n]*dxinv[0]*dxinv[0]/vfrc(i,j,k); // because d()/dn in flux_diff_wall is normalised by dx, i.e. they are d()/dn*dx, so we need to divide by dx here
 
       // The operations following this assume we have returned the negative of the divergence of fluxes.
       divu(i,j,k,n) *= -1.0;

@@ -537,3 +537,35 @@ void cns_dervelgrad (const Box& bx, FArrayBox& derfab, int dcomp, int /*ncomp*/,
                                       +dudz*dudz +dvdz*dvdz +dwdx*dwdx+dwdy*dwdy+dwdz*dwdz));
   });
 }
+
+void cns_dermut (const Box& bx, FArrayBox& derfab, int dcomp, int /*ncomp*/,
+                 const FArrayBox& datafab, const Geometry& geomdata, 
+                 Real /*time*/, const int* /*bcrec*/, int /*level*/)
+{
+  auto const dat = datafab.const_array();
+  auto mu_T = derfab.array(dcomp);
+
+  const auto dxinv = geomdata.InvCellSizeArray();
+
+  const amrex::Box& gbx = amrex::grow(bx, 1);
+  amrex::FArrayBox local(gbx, AMREX_SPACEDIM+1, amrex::The_Async_Arena()); // [rho, u, v, w]
+  auto larr = local.array();
+
+  amrex::ParallelFor(gbx, [=] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {
+    const amrex::Real rhoinv = 1.0 / dat(i, j, k, URHO);
+    larr(i, j, k, QRHO) = dat(i, j, k, URHO);
+    AMREX_D_TERM(larr(i, j, k, QU) = dat(i, j, k, UMX) * rhoinv;, 
+                 larr(i, j, k, QV) = dat(i, j, k, UMY) * rhoinv;, 
+                 larr(i, j, k, QW) = dat(i, j, k, UMZ) * rhoinv;)
+  });
+
+  amrex::ParallelFor(bx, [=] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {
+#if AMREX_SPACEDIM == 2
+    Real delta = std::pow(dxinv[0]*dxinv[1], -1./2.);
+#else
+    Real delta = std::pow(dxinv[0]*dxinv[1]*dxinv[2], -1./3.);
+#endif
+
+    CNS::les_model->mu_T_cc(i, j, k, larr, dxinv, delta, CNS::Cs, mu_T(i, j, k));
+  });
+}

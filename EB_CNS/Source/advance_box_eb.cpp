@@ -7,9 +7,11 @@
 #elif (AMREX_SPACEDIM == 3)
 #include <AMReX_EBMultiFabUtil_3D_C.H>
 #endif
+#include <AMReX_EB_utils.H>
 
 #include "hyperbolics.H"
 #include "recon_eb.H"
+#include "char_recon.H"
 #include "divop_eb.H"
 #include "diffusion_eb.H"
 
@@ -110,7 +112,7 @@ CNS::compute_dSdt_box_eb (const Box& bx,
   }
 
   // A fab to store the viscous fluxes in VPDF or VSPDF
-  FArrayBox vflux_fab, pflux_fab;
+  FArrayBox vflux_fab; //, pflux_fab;
 
   // EB weights
   GpuArray<const Real, 3> weights{0.0, 1.0, 0.5};
@@ -128,20 +130,38 @@ CNS::compute_dSdt_box_eb (const Box& bx,
     }
     auto const& vflx_arr = vflux_fab.array();
     // Tmp fab for pressure fluxes (not used)
-    pflux_fab.resize(flxbx, NVAR);
-    pflux_fab.setVal(0.0);
-    auto const& p_arr = pflux_fab.array();
+    // pflux_fab.resize(flxbx, NVAR);
+    // pflux_fab.setVal<RunOn::Device>(0.0);
+    
     // Tmp fab for all fluxes
     flux_tmp[cdir].resize(flxbx,LEN_STATE);
     flux_tmp[cdir].setVal<RunOn::Device>(0.);
 
     for (int nf = 0; nf <= NUM_FIELD; ++nf) { // Loop through fields
-      // Convert primitive to characteristic
       auto const& q = qtmp.array(nf*NPRIM);
+      auto const& flx_arr = flux_tmp[cdir].array(nf*NVAR);     
+      // auto const& p_arr = pflux_fab.array(nf*NVAR);
+
+// #ifdef CNS_TRUE_CHAR_RECON
+//       // Reconstruction
+//       amrex::ParallelFor(reconbox, 
+//       [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept {
+//         char_recon(i, j, k, cdir, q, wl, wr, recon_scheme, plm_theta, char_sys, *lparm, &flag);
+//       });
+
+//       // Riemann solver
+//       amrex::ParallelFor(flxbx,
+//       [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept {
+//         if ( !flag(amrex::IntVect(AMREX_D_DECL(i,j,k))).isCovered() && 
+//              !flag(amrex::IntVect(AMREX_D_DECL(i,j,k))-amrex::IntVect::TheDimensionVector(cdir)).isCovered() )
+//           pure_riemann(i, j, k, cdir, flx_arr, wl, wr, *lparm);
+//       });
+// #else
+      // Convert primitive to characteristic
       amrex::ParallelFor(bxg6,
       [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept {
         if (!flag(i,j,k).isCovered())
-          cns_ctochar(i, j, k, cdir, q, w, 0);
+          cns_ctochar(i, j, k, cdir, q, w, char_sys);
       });
 
       // Reconstruction            
@@ -150,15 +170,14 @@ CNS::compute_dSdt_box_eb (const Box& bx,
         cns_recon_eb(i, j, k, n, cdir, w, wl, wr, recon_scheme, plm_theta, flag, 1); // Type 1 EB
       });
 
-      // Solve Riemann problem, store advection and pressure fluxes to flx_arr
-      auto const& flx_arr = flux_tmp[cdir].array(nf*NVAR);      
+      // Solve Riemann problem, store advection and pressure fluxes to flx_arr 
       amrex::ParallelFor(flxbx,
       [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept {
         if ( !flag(amrex::IntVect(AMREX_D_DECL(i,j,k))).isCovered() && 
              !flag(amrex::IntVect(AMREX_D_DECL(i,j,k))-amrex::IntVect::TheDimensionVector(cdir)).isCovered() )
-          cns_riemann(i, j, k, cdir, flx_arr, p_arr, q, wl, wr, 0, *lparm);
+          cns_riemann(i, j, k, cdir, flx_arr, q, wl, wr, char_sys, recon_char_var, *lparm);
       });
-
+// #endif
       // Store viscous fluxes separately
       if (do_visc == 1) {
         auto const& coefs = diff_coeff.array(nf*NCOEF);
@@ -244,9 +263,29 @@ CNS::compute_dSdt_box_eb (const Box& bx,
     });
   
     // Now do redistribution
-    cns_flux_redistribute(bx, dsdtarr, divc_arr, q, vfrac, flag,
-                          as_crse, drho_as_crse, rrflag_as_crse, 
-                          as_fine, dm_as_fine, lev_mask, dt);
+    // cns_flux_redistribute(bx, dsdtarr, divc_arr, q, vfrac, flag,
+    //                       as_crse, drho_as_crse, rrflag_as_crse, 
+    //                       as_fine, dm_as_fine, lev_mask, dt);
+
+    // Make the redistwgt array here
+    FArrayBox redistwgt_fab(bxg2, 1); //redistribution weights
+    auto const& redistwgt = redistwgt_fab.array();
+
+    amrex::ParallelFor(bxg2, 
+    [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept {
+      if (eb_weights_type == 0) { 
+        redistwgt(i,j,k) = 1.0; 
+      } else if (eb_weights_type == 1) { 
+        redistwgt(i,j,k) = q(i,j,k,QRHO)*q(i,j,k,QEINT);
+      } else if (eb_weights_type == 2) { 
+        redistwgt(i,j,k) = q(i,j,k,QRHO)*vfrac(i,j,k);
+      } else if (eb_weights_type == 3) { 
+        redistwgt(i,j,k) = vfrac(i,j,k); 
+      }
+    });
+    
+    amrex::apply_flux_redistribution(bx, dsdtarr, divc_arr, redistwgt,
+                                     nf*NVAR, NVAR, flag, vfrac, geom);
   } //loop for fields
 
   //////////////////////// END EB CALCULATIONS ////////////////////////

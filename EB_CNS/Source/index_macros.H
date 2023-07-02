@@ -54,8 +54,9 @@
 #define WRHO  0                    // material/entropy wave (rho)
 #define WY    1                    // Y, simply advected
 #define WACO  int(NUM_SPECIES + 1) // acoustic waves
-#define WUT   int(NUM_SPECIES + 3) // tangential velocities
-#define NCHAR int(NUM_SPECIES + AMREX_SPACEDIM + 2)
+#define WTHER int(NUM_SPECIES + 3) // thermodynamic variable (sos or gamma)
+#define WUT   int(NUM_SPECIES + 4) // tangential velocities
+#define NCHAR int(NUM_SPECIES + AMREX_SPACEDIM + 3)
 
 // Transport coefficients (_MeanField, _Field0, _Field1, ...)
 #define CMU    0  // dynamic viscosity

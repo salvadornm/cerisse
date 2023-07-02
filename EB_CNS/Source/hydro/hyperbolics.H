@@ -1,6 +1,7 @@
 #ifndef CNS_HYPERBOLICS_H_
 #define CNS_HYPERBOLICS_H_
 
+#include <math.h>
 #include <AMReX_FArrayBox.H>
 
 #include "index_macros.H"
@@ -57,7 +58,7 @@ cns_ctoprim (int i, int j, int k, int ns,
     q(i,j,k,QTEMP) = T;
     
     // Monitor problem cell
-    if (amrex::isnan(cs) || amrex::isnan(ux) || (rho <= 0.0) || (p <= 0.0)) {
+    if ((T <= 0.0) || amrex::isnan(cs) || amrex::isnan(ux) || (rho <= 0.0) || (p <= 0.0)) {
         std::cout << "@" << i << "," << j << "," << k << ": ns=" << ns << ": rho=" << rho << " T=" << T << " p=" << p
                   << " u=" << ux << " rhoE=" << u(i,j,k,ns+UEDEN) << " ei=" << ei << std::endl; //why it bugs if I use "\n" instead?
         for (int n = 0; n < NUM_SPECIES; n++) {
@@ -93,16 +94,18 @@ cns_ctochar (int i, int j, int k, int dir,
         w(i,j,k,WRHO)   = q(i,j,k,QRHO) - q(i,j,k,QPRES)/q(i,j,k,QC)/q(i,j,k,QC); //rho minus p over c^2
         w(i,j,k,WACO)   = 0.5 * (q(i,j,k,QPRES)/q(i,j,k,QC) + q(i,j,k,QRHO)*q(i,j,k,QUN));
         w(i,j,k,WACO+1) = 0.5 * (q(i,j,k,QPRES)/q(i,j,k,QC) - q(i,j,k,QRHO)*q(i,j,k,QUN));
+        w(i,j,k,WTHER)  = q(i,j,k,QC);
     } 
     else if (sys == 1) { // gamma system
         w(i,j,k,WRHO)   = q(i,j,k,QRHO) * (1.0 - 1.0 / q(i,j,k,QG));
         w(i,j,k,WACO)   = 0.5 * (q(i,j,k,QPRES) + std::sqrt(q(i,j,k,QG)*q(i,j,k,QRHO)*q(i,j,k,QPRES))*q(i,j,k,QUN));
         w(i,j,k,WACO+1) = 0.5 * (q(i,j,k,QPRES) - std::sqrt(q(i,j,k,QG)*q(i,j,k,QRHO)*q(i,j,k,QPRES))*q(i,j,k,QUN));
+        w(i,j,k,WTHER)  = q(i,j,k,QG);
     } else {
         amrex::Abort("Unrecognised thermodynamic system. Choose between sos (0) and gamma (1).");
     }
 
-    // Passive scalars are the same for both systems
+    // Passive scalars are the same for both systems    
     for (int n = 0; n < NUM_SPECIES; ++n) {
         w(i,j,k,WY+n) = q(i,j,k,QFS+n);
     }
@@ -141,7 +144,7 @@ cns_unpackchar (const amrex::Real w1, const amrex::Real w2, const amrex::Real w3
     } 
     else if (sys == 1) { // gamma system
         p = w2 + w3;        
-        rho = w1 / (1.0 - 1.0 / gamma); // rho = w1 + (w2 + w3) * r / gamma / p; 
+        rho = w1 / (1.0 - 1.0 / gamma);
         u = (w2 - w3) / std::sqrt(gamma*rho*p);
     } 
     else {
@@ -348,29 +351,12 @@ hllc (const amrex::Real rl,
 
     // Estimate wave speeds
     // Arithmetic average (Davis), this alone won't work!
-    Real sl = ul - cl;
-    Real sr = ur + cr;
+    Real sl = amrex::min(ul - cl, ur - cr);
+    Real sr = amrex::max(ul + cl, ur + cr);
     // Roe-average (Einfeldt's HLLE)
     Real rp = sqrt(rr / rl);
-    // AMREX_D_TERM(
-    Real uroe = (ul + ur*rp)/(1. + rp);//,
-    // Real ut1roe = (ut1l + ut1r*rp)/(1. + rp);,
-    // Real ut2roe = (ut2l + ut1r*rp)/(1. + rp);)
-
-    // auto eos = pele::physics::PhysicsType::eos();
-    // Real ei, T, gl, gr, hl, hr;
-    // ei = el - 0.5*(AMREX_D_TERM(ul*ul, +ut1l*ut1l, +ut2l*ut2l));
-    // eos.REY2T(rl, ei, yl, T);
-    // eos.RTY2G(rl, T, yl, gl);
-    // eos.TY2H(T, yl, hl);
-    // hl += 0.5*(AMREX_D_TERM(ul*ul, +ut1l*ut1l, +ut2l*ut2l));
-    // ei = er - 0.5*(AMREX_D_TERM(ur*ur, +ut1r*ut1r, +ut2r*ut2r));
-    // eos.REY2T(rr, ei, yr, T);
-    // eos.RTY2G(rr, T, yr, gr);
-    // eos.TY2H(T, yr, hr);
-    // hr += 0.5*(AMREX_D_TERM(ur*ur, +ut1r*ut1r, +ut2r*ut2r));
-    // Real croe = 0.5*(gl+gr-2)*((hl + hr*rp)/(1. + rp) - 0.5*(AMREX_D_TERM(uroe*uroe, +ut1roe*ut1roe, +ut2roe*ut2roe)));
-    Real croe = (cl*cl + cr*cr*rp)/(1. + rp) + 0.5*rp/(1. + rp)/(1. + rp)
+    Real uroe = (ul + ur*rp)/(1. + rp);
+    Real croe = (cl*cl + cr*cr*rp)/(1. + rp) + 0.5*rp/(1. + rp)/(1. + rp) //(sqrt(rl)+sqrt(rr))
                 *(AMREX_D_TERM((ul-ur)*(ul-ur), +(ut1l-ut1r)*(ut1l-ut1r), +(ut2l-ut2r)*(ut2l-ut2r)));
     croe = sqrt(croe); 
     sl = amrex::min(sl, uroe-croe);
@@ -404,10 +390,16 @@ hllc (const amrex::Real rl,
 
     } else {
         Real sstar = (pr - pl + rl*ul*(sl-ul) - rr*ur*(sr-ur)) / (rl*(sl-ul) - rr*(sr-ur)); //contact wave speed
+        if (isnan(rl*(sl-ul) - rr*(sr-ur))) {
+            std::cout << "(rl*(sl-ul) - rr*(sr-ur)) is nan \n";
+            std::cout << rl << " " << sl << " " << ul << "  " << rr << " " << sr << " " << ur << " " << std::endl;
+        }
         
         if (sstar >= 0) { //parm.smallu*(amrex::Math::abs(ul) + amrex::Math::abs(ur))) {
             //flx_l* = flx_l + sl * (q_l* - q_l)
             Real frac = (sl - ul) / (sl - sstar) - 1.;
+            if (isnan(frac)) std::cout << "frac (sstar >= 0) is nan \n";
+        
             flxrho = 0.;
             AMREX_D_TERM(
                 flxu = rl*ul*ul + pl + sl*rl*((frac + 1.)*sstar - ul); ,
@@ -423,6 +415,8 @@ hllc (const amrex::Real rl,
         } else { // if (sstar < -parm.smallu*(amrex::Math::abs(ul) + amrex::Math::abs(ur))) {
             //flx_r* = flx_r + sr * (q_r* - q_r)
             Real frac = (sr - ur) / (sr - sstar) - 1.;
+            if (isnan(frac)) std::cout << "frac (sstar < 0) is nan \n";
+        
             flxrho = 0.;
             AMREX_D_TERM(
                 flxu = rr*ur*ur + pr + sr*rr*((frac + 1.)*sstar - ur); ,
@@ -465,6 +459,77 @@ hllc (const amrex::Real rl,
     //     flxutt += thetaM*rroe*croe*0.5*(ut2l-ut2r););
 }
 
+AMREX_GPU_DEVICE AMREX_FORCE_INLINE void
+hll (const amrex::Real rl, 
+     AMREX_D_DECL(const amrex::Real ul, const amrex::Real ut1l, const amrex::Real ut2l), 
+     const amrex::Real pl, const amrex::Real cl, const amrex::Real el,
+     amrex::Real yl[NUM_SPECIES],
+     const amrex::Real rr, 
+     AMREX_D_DECL(const amrex::Real ur, const amrex::Real ut1r, const amrex::Real ut2r), 
+     const amrex::Real pr, const amrex::Real cr, const amrex::Real er,
+     amrex::Real yr[NUM_SPECIES],
+     amrex::Real& flxrho, 
+     AMREX_D_DECL(amrex::Real& flxu, amrex::Real& flxut, amrex::Real& flxutt),
+     amrex::Real& flxrhoe, 
+     amrex::Real flxrhoy[NUM_SPECIES],
+     Parm const& parm) noexcept
+{
+    using amrex::Real;
+
+    // Estimate wave speeds
+    // Arithmetic average (Davis)
+    Real sl = amrex::min(ul - cl, ur - cr);
+    Real sr = amrex::max(ul + cl, ur + cr);
+    // Roe-average (Einfeldt's HLLE)
+    // Real rp = sqrt(rr / rl);
+    // Real uroe = (ul + ur*rp)/(1. + rp);
+    // Real croe = (cl*cl + cr*cr*rp)/(1. + rp) + 0.5*rp/(1. + rp)/(sqrt(rl)+sqrt(rr))
+    //             *(AMREX_D_TERM((ul-ur)*(ul-ur), +(ut1l-ut1r)*(ut1l-ut1r), +(ut2l-ut2r)*(ut2l-ut2r)));
+    // croe = sqrt(croe); 
+    // sl = amrex::min(sl, uroe-croe);
+    // sr = amrex::max(sr, uroe+croe);
+
+    if (sl > 0) {
+        //flx_l
+        flxrho = 0.;
+        AMREX_D_TERM(
+            flxu = rl*ul*ul + pl; ,
+            flxut = rl*ul*ut1l; ,
+            flxutt = rl*ul*ut2l;);
+        flxrhoe = ul*(rl*el + pl);
+        for (int n = 0; n < NUM_SPECIES; ++n) {
+            flxrhoy[n] = rl*ul*yl[n];
+            flxrho += flxrhoy[n];
+        }
+
+    } else if (sr < 0) {
+        //flx_r
+        flxrho = 0.;
+        AMREX_D_TERM(
+            flxu = rr*ur*ur + pr; ,
+            flxut = rr*ur*ut1r; ,
+            flxutt = rr*ur*ut2r;);
+        flxrhoe = ur*(rr*er + pr);
+        for (int n = 0; n < NUM_SPECIES; ++n) {
+            flxrhoy[n] = rr*ur*yr[n];
+            flxrho += flxrhoy[n];
+        }
+
+    } else {
+        Real inv_diff_s = 1.0 / (sr - sl);
+        flxrho = 0.;
+        AMREX_D_TERM(
+            flxu = (sr*(rl*ul*ul + pl) - sl*(rr*ur*ur + pr) + sl*sr*(rr*ur - rl*ul)) * inv_diff_s; ,
+            flxut  = (sr*rl*ul*ut1l - sl*rr*ur*ut1r + sl*sr*(rr*ut1r - rl*ut1l)) * inv_diff_s; ,
+            flxutt = (sr*rl*ul*ut2l - sl*rr*ur*ut2r + sl*sr*(rr*ut2r - rl*ut2l)) * inv_diff_s;)
+        flxrhoe = (sr*ul*(rl*el + pl) - sl*ur*(rr*er + pr) + sl*sr*(rr*er - rl*el)) * inv_diff_s;
+        for (int n = 0; n < NUM_SPECIES; ++n) {
+            flxrhoy[n] = (sr*rl*ul*yl[n] - sl*rr*ur*yr[n] + sl*sr*(rr*yr[n] - rl*yl[n])) * inv_diff_s;
+            flxrho += flxrhoy[n];
+        }
+    }
+}
+
 /**
  * \brief Unpack reconstructed characteristic variables, then run the HLLC Riemann solver.
  * 
@@ -477,11 +542,12 @@ hllc (const amrex::Real rl,
 AMREX_GPU_DEVICE AMREX_FORCE_INLINE void
 cns_riemann (int i, int j, int k, int dir,
              amrex::Array4<amrex::Real> const& adv_flx,
-             amrex::Array4<amrex::Real> const& /*p_flx*/,
+            //  amrex::Array4<amrex::Real> const& /*p_flx*/,
              amrex::Array4<const amrex::Real> const& q,
-             amrex::Array4<const amrex::Real> const& wl,
-             amrex::Array4<const amrex::Real> const& wr,
+             amrex::Array4<amrex::Real> const& wl,
+             amrex::Array4<amrex::Real> const& wr,
              const int sys,
+             const bool recon_char_var,
              Parm const& parm) noexcept
 {
     using amrex::Real;
@@ -500,10 +566,16 @@ cns_riemann (int i, int j, int k, int dir,
 
     auto eos = pele::physics::PhysicsType::eos();
 
-    // Unpack wl to ql (rl, ul, utl, pl, cl, el, yl)
-    Real g = q(iv-iv_dir,QG);
+    if (recon_char_var && (!isgreater(wl(iv,WTHER),0.0) || !isgreater(wr(iv,WTHER),0.0))) { // isgreater() returns false with nan
+        // Limit reconstructed thermodynamic variable
+        wl(iv,WTHER) = (sys == 0) ? q(iv-iv_dir,QC) : q(iv-iv_dir,QG);
+        wr(iv,WTHER) = (sys == 0) ? q(iv,QC) : q(iv,QG);
+    }
+
+    // Unpack wl to ql (rl, ul, utl, pl, cl, el, yl)    
+    Real g = (recon_char_var && sys == 1) ? wl(iv,WTHER) : q(iv-iv_dir,QG);
+    Real cl = (recon_char_var && sys == 0) ? wl(iv,WTHER) : q(iv-iv_dir,QC);
     Real r = q(iv-iv_dir,QRHO);
-    Real cl = q(iv-iv_dir,QC);
     Real yl[NUM_SPECIES];
     Real rl, AMREX_D_DECL(ul, ut1l, ut2l), pl, el;
     
@@ -520,15 +592,15 @@ cns_riemann (int i, int j, int k, int dir,
     }
     AMREX_D_TERM(,
         ut1l = wl(iv,WUT); ,
-        ut2l = wl(iv,WUT+1););
+        ut2l = wl(iv,WUT+1););    
 
     cns_unpackchar(wl(iv,WRHO), wl(iv,WACO), wl(iv,WACO+1), cl, r, g, 
                    rl, ul, pl, sys, parm);
     
     // Convert wr to qr
-    g = q(iv,QG);
+    g = (recon_char_var && sys == 1) ? wr(iv,WTHER) : q(iv,QG);
+    Real cr = (recon_char_var && sys == 0) ? wr(iv,WTHER) : q(iv,QC);
     r = q(iv,QRHO);
-    Real cr = q(iv,QC);
     Real yr[NUM_SPECIES];
     Real rr, AMREX_D_DECL(ur, ut1r, ut2r), pr, er;
 
@@ -550,6 +622,16 @@ cns_riemann (int i, int j, int k, int dir,
     cns_unpackchar(wr(iv,WRHO), wr(iv,WACO), wr(iv,WACO+1), cr, r, g, 
                    rr, ur, pr, sys, parm);
 
+    if (!isgreater(rl,0.0) || !isgreater(rr,0.0) || !isgreater(pl,0.0) || !isgreater(pr,0.0)) { // isgreater() returns false with nan
+        // Revert to piecewise linear (Godunov) reconstruction
+        rl = q(iv-iv_dir,QRHO);
+        ul = q(iv-iv_dir,QU+dir);
+        pl = q(iv-iv_dir,QPRES);
+        rr = q(iv,QRHO);
+        ur = q(iv,QU+dir);
+        pr = q(iv,QPRES);
+    }
+
     eos.RYP2E(rl, yl, pl, el);
     el += 0.5*(AMREX_D_TERM(ul*ul, +ut1l*ut1l, +ut2l*ut2l));   
     eos.RPY2Cs(rl, pl, yl, cl);
@@ -557,6 +639,12 @@ cns_riemann (int i, int j, int k, int dir,
     eos.RYP2E(rr, yr, pr, er);
     er += 0.5*(AMREX_D_TERM(ur*ur, +ut1r*ut1r, +ut2r*ut2r));
     eos.RPY2Cs(rr, pr, yr, cr);
+
+    if (isnan(cl) || isnan(cr)) {
+        std::cout << "l c=" << cl << " p="<< pl << " r=" << rl << " u=" << ul
+                 << " r c=" << cr << " p="<< pr << " r=" << rr << " u=" << ur << std::endl;
+    }
+
 
     Real ry_flx[NUM_SPECIES] = {0.0};
 
@@ -566,6 +654,12 @@ cns_riemann (int i, int j, int k, int dir,
          AMREX_D_DECL(adv_flx(i,j,k,UMN), adv_flx(i,j,k,UMT), adv_flx(i,j,k,UMTT)), 
          adv_flx(i,j,k,UEDEN), ry_flx,
          parm);
+    // riemann(rl, ul, ut1l, 0.0, pl, cl, el, yl,
+    //      rr, ur, ut1r, 0.0, pr, cr, er, yr,
+    //      adv_flx(i,j,k,URHO), 
+    //      adv_flx(i,j,k,UMN), adv_flx(i,j,k,UMT), adv_flx(i,j,k,UMTT), 
+    //      adv_flx(i,j,k,UEDEN), ry_flx, 
+    //      parm);
 
     for (int n = 0; n < NUM_SPECIES; ++n) { adv_flx(i,j,k,UFS+n) = ry_flx[n]; }
 }

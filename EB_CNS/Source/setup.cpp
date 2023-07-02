@@ -110,12 +110,12 @@ CNS::variableSetUp ()
 //                        The interpolation is conservative in finite-volume sense for both Cartesian and curvilinear coordinates.
 // cell_cons_interp     : Similar to lincc_interp. There are two differences. 1) the interpolations for each component are independent of each other. 
 // (CNS default)          2) after the dimension-by-dimension linear interpolation with limiting, there is a further limiting to ensure no new min or max are created in fine cells.
-// pretected_interp     : Similar to lincc_interp. Additionally, it has a protect function one can call to ensure no values are negative.
+// protected_interp     : Similar to lincc_interp. Additionally, it has a protect function one can call to ensure no values are negative.
 // quartic_interp       : Quartic polynomial conservative interpolation for cell-centered data
 #if CNS_USE_EB
   EBMFCellConsLinInterp* interp = &eb_mf_cell_cons_interp;
 #else
-  Interpolater* interp = &quadratic_interp; //what is the difference between cell_cons_interp and mf_cell_cons_interp?
+  MFInterpolater* interp = &mf_cell_cons_interp; //what is the difference between cell_cons_interp and mf_cell_cons_interp?
 #endif
 
   // Setup State_Type
@@ -283,19 +283,20 @@ CNS::variableSetUp ()
                  cns_dermachnumber, DeriveRec::TheSameBox);
   derive_lst.addComponent("MachNumber", desc_lst, State_Type, URHO, NVAR);
 
+  // Note: All GrowBoxByOne derived quantities need all NVAR states because bcnormal may need them (e.g. isothermal wall)
+
   // Vorticity
   derive_lst.add("magvort", IndexType::TheCellType(), 1, 
                  cns_dermagvort, DeriveRec::GrowBoxByOne);
-  derive_lst.addComponent("magvort", desc_lst, State_Type, URHO, AMREX_SPACEDIM + 1);
-
+  derive_lst.addComponent("magvort", desc_lst, State_Type, URHO, NVAR); 
   // Numerical schlieren
   derive_lst.add("divu", IndexType::TheCellType(), 1, 
                  cns_derdivu, DeriveRec::GrowBoxByOne);
-  derive_lst.addComponent("divu", desc_lst, State_Type, URHO, AMREX_SPACEDIM + 1);
+  derive_lst.addComponent("divu", desc_lst, State_Type, URHO, NVAR);
 
   derive_lst.add("divrho", IndexType::TheCellType(), 1, 
                  cns_derdivrho, DeriveRec::GrowBoxByOne);
-  derive_lst.addComponent("divrho", desc_lst, State_Type, URHO, 1);
+  derive_lst.addComponent("divrho", desc_lst, State_Type, URHO, NVAR);
 
   // External source term
   // derive_lst.add("ext_src", IndexType::TheCellType(), 1, 
@@ -337,6 +338,13 @@ CNS::variableSetUp ()
   derive_lst.add("molefrac", IndexType::TheCellType(), (NUM_FIELD+1)*NUM_SPECIES,
                  molefrac_names, cns_dermolefrac, DeriveRec::TheSameBox);
   derive_lst.addComponent("molefrac", desc_lst, State_Type, 0, LEN_STATE);
+
+  // LES model constants
+  if (do_les) {
+    derive_lst.add("mu_t", IndexType::TheCellType(), 1, 
+                 cns_dermut, DeriveRec::GrowBoxByOne);
+    derive_lst.addComponent("mu_t", desc_lst, State_Type, URHO, NVAR); 
+  }
 
 #if NUM_FIELD > 0
   // Derived variance of velocity, species, energy (turbulent stat??)

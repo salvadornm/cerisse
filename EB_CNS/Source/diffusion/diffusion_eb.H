@@ -582,6 +582,25 @@ compute_diff_wallflux(int i, int j, int k,
 
      Real ddinv = 1./(d1*d2*(d2-d1));
 
+     // get transport coefficients
+     amrex::Real mu, xi, lam;
+     if (eb_isothermal) {
+          auto trans = pele::physics::PhysicsType::transport();
+          auto const* ltransparm = CNS::trans_parms.device_trans_parm();
+          amrex::Real rho, dummy2, y[NUM_SPECIES];
+          for (int n = 0; n < NUM_SPECIES; ++n) y[n] = q(i,j,k,QFS+n);
+          
+          auto eos = pele::physics::PhysicsType::eos();
+          eos.PYT2R(q(i,j,k,QPRES), y, eb_wall_temp, rho); // assume dp/dn ~ 0
+
+          trans.transport(1, 1, 1, 0, eb_wall_temp, rho, y, &dummy2, mu, xi, lam, ltransparm);
+     } else {
+          // Adiabatic wall dT/dn ~ 0
+          mu = coefs(i,j,k,CMU);
+          xi = coefs(i,j,k,CXI);
+          lam = coefs(i,j,k,CLAM);
+     }
+
      if (eb_no_slip) {
           Real dudn = -ddinv*(d2*d2*u1-d1*d1*u2);  // note that the normal vector points toward the wall
           Real dvdn = -ddinv*(d2*d2*v1-d1*d1*v2);
@@ -596,10 +615,10 @@ compute_diff_wallflux(int i, int j, int k,
 
           Real divu = dudx+dvdy;
 
-          Real tautmp = (coefs(i,j,k,CXI)-(2.0/3.0)*coefs(i,j,k,CMU))*divu;
-          Real tauxx = coefs(i,j,k,CMU)*2.*dudx + tautmp;
-          Real tauyy = coefs(i,j,k,CMU)*2.*dvdy + tautmp;
-          Real tauxy = coefs(i,j,k,CMU)*(dudy+dvdx);
+          Real tautmp = (xi-(2.0/3.0)*mu)*divu;
+          Real tauxx = mu*2.*dudx + tautmp;
+          Real tauyy = mu*2.*dvdy + tautmp;
+          Real tauxy = mu*(dudy+dvdx);
           
           // assumes dx == dy == dz
           viscw[UMX] = (dapx*tauxx + dapy*tauxy);
@@ -607,9 +626,9 @@ compute_diff_wallflux(int i, int j, int k,
      }
 
      if (eb_isothermal) {
-          Real dTdn = -ddinv*(d2*d2*T1-d1*d1*T2+(d1*d1-d2*d2)*eb_wall_temp); // normal temp gradient
+          Real dTdn = ddinv*(d2*d2*T1-d1*d1*T2+(d1*d1-d2*d2)*eb_wall_temp); // normal (into cell) temp gradient
 
-          viscw[UEDEN] = -coefs(i,j,k,CLAM)*dTdn;
+          viscw[UEDEN] = apnorm*lam*dTdn; //coefs(i,j,k,CLAM)
      }
 }
 
@@ -939,6 +958,25 @@ compute_diff_wallflux(int i, int j, int k,
 
      Real ddinv = 1./(d1*d2*(d2-d1));
 
+     // get transport coefficients
+     amrex::Real mu, xi, lam;
+     if (eb_isothermal) {
+          auto trans = pele::physics::PhysicsType::transport();
+          auto const* ltransparm = CNS::trans_parms.device_trans_parm();
+          amrex::Real rho, dummy2, y[NUM_SPECIES];
+          for (int n = 0; n < NUM_SPECIES; ++n) y[n] = q(i,j,k,QFS+n);
+          
+          auto eos = pele::physics::PhysicsType::eos();
+          eos.PYT2R(q(i,j,k,QPRES), y, eb_wall_temp, rho); // assume dp/dn ~ 0
+
+          trans.transport(1, 1, 1, 0, eb_wall_temp, rho, y, &dummy2, mu, xi, lam, ltransparm);
+     } else {
+          // Adiabatic wall dT/dn ~ 0
+          mu = coefs(i,j,k,CMU);
+          xi = coefs(i,j,k,CXI);
+          lam = coefs(i,j,k,CLAM);
+     }
+
      if (eb_no_slip) {
           Real dudn = -ddinv*(d2*d2*u1-d1*d1*u2);  // note that the normal vector points toward the wall
           Real dvdn = -ddinv*(d2*d2*v1-d1*d1*v2);
@@ -960,15 +998,14 @@ compute_diff_wallflux(int i, int j, int k,
 
           Real divu = dudx+dvdy+dwdz;
 
-          Real tautmp = (coefs(i,j,k,CXI)-(2.0/3.0)*coefs(i,j,k,CMU))*divu;
-          Real tauxx = coefs(i,j,k,CMU)*2.*dudx + tautmp;
-          Real tauyy = coefs(i,j,k,CMU)*2.*dvdy + tautmp;
-          Real tauxy = coefs(i,j,k,CMU)*(dudy+dvdx);
+          Real tautmp = (xi-(2.0/3.0)*mu)*divu;
+          Real tauxx = mu*2.*dudx + tautmp;
+          Real tauyy = mu*2.*dvdy + tautmp;
+          Real tauxy = mu*(dudy+dvdx);
 
-          Real tauzz = coefs(i,j,k,CMU)*2.*dwdz + tautmp;
-          Real tauxz = coefs(i,j,k,CMU)*(dudz+dwdx);
-          Real tauyz = coefs(i,j,k,CMU)*(dwdy+dvdz);
-     
+          Real tauzz = mu*2.*dwdz + tautmp;
+          Real tauxz = mu*(dudz+dwdx);
+          Real tauyz = mu*(dwdy+dvdz);
 
           // assumes dx == dy == dz
           viscw[UMX] = (dapx*tauxx + dapy*tauxy + dapz*tauxz);
@@ -977,9 +1014,9 @@ compute_diff_wallflux(int i, int j, int k,
      }
 
      if (eb_isothermal) {
-          Real dTdn = -ddinv*(d2*d2*T1-d1*d1*T2+(d1*d1-d2*d2)*eb_wall_temp); // normal temp gradient
+          Real dTdn = ddinv*(d2*d2*T1-d1*d1*T2+(d1*d1-d2*d2)*eb_wall_temp); // normal (into cell) temp gradient
 
-          viscw[UEDEN] = -coefs(i,j,k,CLAM)*dTdn;
+          viscw[UEDEN] = apnorm*lam*dTdn;
      }
 }
 #endif

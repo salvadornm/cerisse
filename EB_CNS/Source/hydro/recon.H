@@ -5,7 +5,12 @@
 
 #include "index_macros.H"
 
-/// \brief MUSCL/TVD/PLM.
+/** 
+ * \brief MUSCL/TVD/PLM.
+ * @param s       stencils.
+ * @param sm[out] the value of the interpolation on the left edge of the i cell.
+ * @param sp[out] the value of the interpolation on the right edge of the i cell.
+ */
 AMREX_GPU_DEVICE AMREX_FORCE_INLINE void
 muscl (amrex::Real s[3], amrex::Real& sm, amrex::Real& sp, amrex::Real plm_theta) noexcept
 {
@@ -134,7 +139,7 @@ wenojs5 (amrex::Real s[5], amrex::Real& sm, amrex::Real& sp) noexcept
         (alpha[2] * vr[2] + alpha[1] * vr[1] + alpha[0] * vr[0]);
 }
 
-/// \brief WENO-Z 5th order. Ref Fu (2019) https://doi.org/10.1016/j.jcp.2010.11.028.
+/// \brief WENO-Z 5th order. Ref https://doi.org/10.1016/j.jcp.2010.11.028.
 AMREX_GPU_DEVICE AMREX_FORCE_INLINE void
 wenoz5 (amrex::Real s[5], amrex::Real& sm, amrex::Real& sp) noexcept
 {

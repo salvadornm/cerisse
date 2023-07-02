@@ -48,7 +48,7 @@ cns_recon_eb (int i, int j, int k, int n, int dir,
   bool cp1 = flag(iv).isConnected(iv_dir);
   bool cp2 = flag(iv+iv_dir).isConnected(iv_dir);    
   ivp1 = cp1 ? ivp1 : iv;
-  ivp2 = cp1 && cp2 ? ivp2 : ivp1;    
+  ivp2 = cp1 && cp2 ? ivp2 : ivp1;
 
   // Switch to second order scheme near EB
   if ((eb_mode == 1) && (recon_scheme > 2)) {

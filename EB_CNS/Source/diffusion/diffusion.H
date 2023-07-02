@@ -31,9 +31,46 @@ cns_diff_x (int i, int j, int k,
 #endif
   Real divu = AMREX_D_TERM(dudx, + dvdy, + dwdz);
 
-  const Real mu = 0.5*(coeffs(i,j,k,CMU)+coeffs(i-1,j,k,CMU));
-  const Real xi = 0.5*(coeffs(i,j,k,CXI)+coeffs(i-1,j,k,CXI));
-  const Real lamda = 0.5*(coeffs(i,j,k,CLAM)+coeffs(i-1,j,k,CLAM));
+  Real mu = 0.5*(coeffs(i,j,k,CMU)+coeffs(i-1,j,k,CMU));
+  Real xi = 0.5*(coeffs(i,j,k,CXI)+coeffs(i-1,j,k,CXI));
+  Real lamda = 0.5*(coeffs(i,j,k,CLAM)+coeffs(i-1,j,k,CLAM));
+  Real rhoD[NUM_SPECIES];
+  for (int n = 0; n < NUM_SPECIES; ++n)
+    rhoD[n] = 0.5*(coeffs(i,j,k,CRHOD+n)+coeffs(i-1,j,k,CRHOD+n));
+
+  if (CNS::do_les) {
+#if AMREX_SPACEDIM == 2
+    Real dwdx = 0.0;
+    Real dwdy = 0.0;
+    Real dwdz = 0.0;
+    Real dudz = 0.0;
+    Real dvdz = 0.0;
+    Real delta = std::pow(dxinv[0]*dxinv[1], -1./2.);
+#else
+    Real dwdy = (q(i,j+1,k,QW)+q(i-1,j+1,k,QW)-q(i,j-1,k,QW)-q(i-1,j-1,k,QW))*(0.25*dxinv[1]);
+    Real dvdz = (q(i,j,k+1,QV)+q(i-1,j,k+1,QV)-q(i,j,k-1,QV)-q(i-1,j,k-1,QV))*(0.25*dxinv[2]);
+    Real delta = std::pow(dxinv[0]*dxinv[1]*dxinv[2], -1./3.);
+#endif
+    Real rho = 0.5*(q(i,j,k,QRHO)+q(i-1,j,k,QRHO));
+    Real mu_T;
+
+    CNS::les_model->mu_T_fc(dudx,dudy,dudz,dvdx,dvdy,dvdz,dwdx,dwdy,dwdz,
+                            rho,delta,CNS::Cs,mu_T);
+
+    mu += mu_T;
+
+    Real y[NUM_SPECIES];
+    for (int n = 0; n < NUM_SPECIES; ++n)
+      y[n] = 0.5*(q(i,j,k,QFS+n)+q(i-1,j,k,QFS+n));
+    auto eos = pele::physics::PhysicsType::eos();
+    Real cp;
+    eos.RTY2Cp(rho, 0.5*(q(i,j,k,QTEMP)+q(i-1,j,k,QTEMP)), y, cp);
+    lamda += cp*mu_T/CNS::Pr_T;
+
+    for (int n = 0; n < NUM_SPECIES; ++n)
+      rhoD[n] += mu_T/CNS::Sc_T;
+  }
+
   AMREX_D_TERM(Real tauxx = mu*(2.0*dudx-2.0/3.0*divu) + xi*divu; ,
                Real tauxy = mu*(dudy+dvdx); ,
                Real tauxz = mu*(dudz+dwdx););
@@ -77,7 +114,7 @@ cns_diff_x (int i, int j, int k,
     const amrex::Real Yface = 0.5*(mass1[n]+mass2[n]);
     const amrex::Real hface = 0.5*(hi1[n]+hi2[n]);
     const amrex::Real dXdx = (mole1[n]-mole2[n])*dxinv[0];
-    const amrex::Real Vd = -0.5*(coeffs(iv,CRHOD+n)+coeffs(ivm,CRHOD+n))*(dXdx+(Xface-Yface)*dlnp);
+    const amrex::Real Vd = -rhoD[n]*(dXdx+(Xface-Yface)*dlnp);
     Vc += Vd;
     fx(iv,UFS+n) += Vd;
     fx(iv,UEDEN) += Vd*hface;

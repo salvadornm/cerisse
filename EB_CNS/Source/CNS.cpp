@@ -65,6 +65,11 @@ CNS::CNS (Amr&            papa,
   WienerProcess.init(AMREX_SPACEDIM, level, ref_ratio);
 #endif
 
+  // Initialise LES model
+  if (do_les || do_pasr) {
+    les_model = LESModel::create(les_model_name);
+  }
+
 #if CNS_USE_EB
   // make sure dx = dy = dz
   const amrex::GpuArray<amrex::Real, AMREX_SPACEDIM> dx = geom.CellSizeArray();
@@ -592,6 +597,8 @@ CNS::errorEst (TagBoxArray& tags, int /*clearval*/, int tagval,
   [=] AMREX_GPU_DEVICE (int box_no, int i, int j, int k) noexcept {
     prob_tag_error(i, j, k, tagarr[box_no], sarrs[box_no], level, tagval, time, geomdata, *lparm, *lprobparm);
   });
+
+  Gpu::streamSynchronize();
 }
 
 ////////////////////////////////////////////////////////////////////////////
@@ -698,9 +705,14 @@ CNS::read_params ()
 
   pp.query("v", verbose);
   pp.query("cfl", cfl);
+  pp.query("fixed_dt", fixed_dt);
   pp.query("dt_cutoff", dt_cutoff);
 
+  pp.query("recon_char_var", recon_char_var);
   pp.query("char_sys", char_sys);
+  if (char_sys != 0 && char_sys != 1) {
+    amrex::Abort("CNS: char_sys must be 0 (speed of sound) or 1 (gamma)");
+  }
   // recon_scheme
   //  1 -- piecewise constant
   //  2 -- piecewise linear
@@ -709,9 +721,9 @@ CNS::read_params ()
   //  5 -- WENO-Z 5th order
   //  6 -- TENO 5
   pp.query("recon_scheme", recon_scheme); 
-  if (recon_scheme == 2) { 
-    pp.query("limiter_theta", plm_theta); // MUSCL specific parameter
-  }
+  // if (recon_scheme == 2) { // because we return to PLM near EBs, so give this option to users
+  pp.query("limiter_theta", plm_theta); // MUSCL specific parameter
+  // }
 
   Vector<int> lo_bc(AMREX_SPACEDIM), hi_bc(AMREX_SPACEDIM);
   pp.getarr("lo_bc", lo_bc, 0, AMREX_SPACEDIM);
@@ -843,6 +855,16 @@ CNS::read_params ()
   pp.query("do_vpdf", do_vpdf);
   pp.query("do_spdf", do_spdf);
 
+  pp.query("do_les", do_les);
+  pp.query("do_pasr", do_pasr);
+  if (do_les) {
+    if (AMREX_SPACEDIM == 1) amrex::Abort("CNS: LES not supporting 1D");
+    pp.get("les_model", les_model_name);
+    pp.query("Cs", Cs);
+    pp.query("Pr_T", Pr_T);
+    pp.query("Sc_T", Sc_T);
+  }
+
 #if CNS_USE_EB  
   // eb_weights_type:
   //   0 -- weights = 1             1 -- use_int_energy_as_eb_weights
@@ -946,6 +968,8 @@ Real
 CNS::estTimeStep ()
 {
   BL_PROFILE("CNS::estTimeStep()");
+
+  if (fixed_dt > 0) { return fixed_dt; }
 
   const auto dx = geom.CellSizeArray();
   const MultiFab& S = get_new_data(State_Type);

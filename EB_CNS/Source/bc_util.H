@@ -59,7 +59,8 @@ bc_isothermal_wall (amrex::Real s_ext[NVAR],
 
   // Wall states (extrapolate p and y, calculate rhow, ew based on Tw)
   amrex::Real rhow, ew;
-  eos.PYT2RE(p, y, 2*Tw-T, rhow, ew);
+  amrex::Real Tg = amrex::max(1e-5, 2*Tw-T); // temp of ghost cell, prevent negative temp
+  eos.PYT2RE(p, y, Tg, rhow, ew);
   ew += ke;
 
   s_ext[URHO] = rhow;

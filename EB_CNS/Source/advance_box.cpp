@@ -2,6 +2,7 @@
 #include "diffusion.H"
 #include "hyperbolics.H"
 #include "recon.H"
+#include "char_recon.H"
 
 using namespace amrex;
 
@@ -64,13 +65,13 @@ CNS::compute_dSdt_box (Box const& bx,
 
   // A fab to store the viscous fluxes in VPDF or VSPDF
   FArrayBox vflux_fab;
-  FArrayBox pflux_fab; // unused
+  // FArrayBox pflux_fab; // unused
   
   for (int cdir = 0; cdir < AMREX_SPACEDIM; ++cdir) { // Loop through space direction
     const Box& flxbx = amrex::surroundingNodes(bx,cdir);
     const Box& reconbox = amrex::grow(bx,cdir,1);
-    pflux_fab.resize(flxbx, LEN_STATE);
-    pflux_fab.setVal(0.0);
+    // pflux_fab.resize(flxbx, LEN_STATE);
+    // pflux_fab.setVal(0.0);
     if (do_visc == 1) {
       vflux_fab.resize(flxbx, NVAR);
       vflux_fab.setVal(0.0);            
@@ -80,6 +81,22 @@ CNS::compute_dSdt_box (Box const& bx,
     for (int nf = 0; nf <= NUM_FIELD; ++nf) {       // Loop through fields
       // Convert primitive to characteristic
       auto const& q = qtmp.array(nf*NPRIM);
+      auto const& flx_arr = flxfab[cdir]->array(nf*NVAR);
+      // auto const& p_arr = pflux_fab.array(nf*NVAR);
+
+// #ifdef CNS_TRUE_CHAR_RECON
+//       // Reconstruction
+//       amrex::ParallelFor(reconbox, 
+//       [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept {
+//         char_recon(i, j, k, cdir, q, wl, wr, recon_scheme, plm_theta, char_sys, *lparm);
+//       });
+
+//       // Riemann solver
+//       amrex::ParallelFor(flxbx,
+//       [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept {
+//         pure_riemann(i, j, k, cdir, flx_arr, wl, wr, *lparm);
+//       });
+// #else
       amrex::ParallelFor(bxg3,
       [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept {
         cns_ctochar(i, j, k, cdir, q, w, char_sys);
@@ -91,13 +108,12 @@ CNS::compute_dSdt_box (Box const& bx,
         cns_recon(i, j, k, n, cdir, w, wl, wr, recon_scheme, plm_theta);
       });
 
-      // Solve Riemann problem, store advection and pressure fluxes to flx_arr
-      auto const& flx_arr = flxfab[cdir]->array(nf*NVAR);
-      auto const& p_arr = pflux_fab.array(nf*NVAR);
+      // Solve Riemann problem, store advection and pressure fluxes to flx_arr      
       amrex::ParallelFor(flxbx,
       [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept {
-        cns_riemann(i, j, k, cdir, flx_arr, p_arr, q, wl, wr, char_sys, *lparm);
+        cns_riemann(i, j, k, cdir, flx_arr, q, wl, wr, char_sys, recon_char_var, *lparm);
       });
+// #endif
 
       // Store viscous fluxes separately
       if (do_visc) {
