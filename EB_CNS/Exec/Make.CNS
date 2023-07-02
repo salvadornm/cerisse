@@ -33,9 +33,9 @@ endif
 include $(AMREX_HOME)/Tools/GNUMake/Make.defs
 
 # ================= EB_CNS =================
-Bdirs := Source Source/hydro Source/diffusion Source/pdf      # List of names of directory
-Bpack += $(foreach dir, $(Bdirs), $(TOP)/$(dir)/Make.package) # List of Make.package
-Blocs += $(foreach dir, $(Bdirs), $(TOP)/$(dir))              # List of paths of directory
+Bdirs := Source Source/hydro Source/diffusion Source/pdf Source/turb  # List of names of directory
+Bpack += $(foreach dir, $(Bdirs), $(TOP)/$(dir)/Make.package)         # List of Make.package
+Blocs += $(foreach dir, $(Bdirs), $(TOP)/$(dir))                      # List of paths of directory
 
 include $(Bpack)
 INCLUDE_LOCATIONS += $(Blocs)
