@@ -11,7 +11,7 @@
 
 #include "hyperbolics.H"
 #include "recon_eb.H"
-#include "char_recon.H"
+// #include "char_recon.H"
 #include "divop_eb.H"
 #include "diffusion_eb.H"
 
