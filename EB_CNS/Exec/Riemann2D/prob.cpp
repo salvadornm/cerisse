@@ -12,6 +12,30 @@ void amrex_probinit (const int* /*init*/,
     amrex::Real massfrac[NUM_SPECIES] = {1.0};
     amrex::Real e;
 
+    // Parse params
+    {
+        amrex::ParmParse pp("prob");
+        pp.query("p_1", CNS::h_prob_parm->p_1);
+        pp.query("u_1", CNS::h_prob_parm->u_1);
+        pp.query("v_1", CNS::h_prob_parm->v_1);
+        pp.query("rho_1", CNS::h_prob_parm->rho_1);
+
+        pp.query("p_2", CNS::h_prob_parm->p_2);
+        pp.query("u_2", CNS::h_prob_parm->u_2);
+        pp.query("v_2", CNS::h_prob_parm->v_2);
+        pp.query("rho_2", CNS::h_prob_parm->rho_2);
+
+        pp.query("p_3", CNS::h_prob_parm->p_3);
+        pp.query("u_3", CNS::h_prob_parm->u_3);
+        pp.query("v_3", CNS::h_prob_parm->v_3);
+        pp.query("rho_3", CNS::h_prob_parm->rho_3);
+
+        pp.query("p_4", CNS::h_prob_parm->p_4);
+        pp.query("u_4", CNS::h_prob_parm->u_4);
+        pp.query("v_4", CNS::h_prob_parm->v_4);
+        pp.query("rho_4", CNS::h_prob_parm->rho_4);
+    }
+
     auto eos = pele::physics::PhysicsType::eos();
     eos.RYP2E(CNS::h_prob_parm->rho_1, massfrac,
               CNS::h_prob_parm->p_1, e);
@@ -36,4 +60,15 @@ void amrex_probinit (const int* /*init*/,
     amrex::Gpu::copy(amrex::Gpu::hostToDevice, CNS::h_prob_parm, CNS::h_prob_parm+1,
                      CNS::d_prob_parm);
 }
+}
+
+void
+CNS::fill_ext_src (int i, int j, int k, 
+                   amrex::Real time,
+                   amrex::GeometryData const& geomdata, 
+                   amrex::Array4<const amrex::Real> const& /*state*/, 
+                   amrex::Array4<amrex::Real> const& ext_src, 
+                   Parm const& /*parm*/,
+                   ProbParm const& pp)
+{
 }

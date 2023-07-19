@@ -109,7 +109,11 @@ prob_post_timestep (
 }
 
 AMREX_GPU_DEVICE AMREX_FORCE_INLINE void
-prob_get_aux_name (amrex::Vector<std::string>& aux_name) 
+prob_tag_error (int i, int j, int k, amrex::Array4<char> const& tagarr, 
+                amrex::Array4<const amrex::Real> const& /*sarr*/, 
+                int level, char tagval, const amrex::Real /*time*/,
+                amrex::GeometryData const& geomdata,
+                Parm const& /*parm*/, ProbParm const& /*pp*/)
 {
 }
 

@@ -38,38 +38,38 @@ cns_diff_x (int i, int j, int k,
   for (int n = 0; n < NUM_SPECIES; ++n)
     rhoD[n] = 0.5*(coeffs(i,j,k,CRHOD+n)+coeffs(i-1,j,k,CRHOD+n));
 
-  if (CNS::do_les) {
-#if AMREX_SPACEDIM == 2
-    Real dwdx = 0.0;
-    Real dwdy = 0.0;
-    Real dwdz = 0.0;
-    Real dudz = 0.0;
-    Real dvdz = 0.0;
-    Real delta = std::pow(dxinv[0]*dxinv[1], -1./2.);
-#else
-    Real dwdy = (q(i,j+1,k,QW)+q(i-1,j+1,k,QW)-q(i,j-1,k,QW)-q(i-1,j-1,k,QW))*(0.25*dxinv[1]);
-    Real dvdz = (q(i,j,k+1,QV)+q(i-1,j,k+1,QV)-q(i,j,k-1,QV)-q(i-1,j,k-1,QV))*(0.25*dxinv[2]);
-    Real delta = std::pow(dxinv[0]*dxinv[1]*dxinv[2], -1./3.);
-#endif
-    Real rho = 0.5*(q(i,j,k,QRHO)+q(i-1,j,k,QRHO));
-    Real mu_T;
+//   if (CNS::do_les) {
+// #if AMREX_SPACEDIM == 2
+//     Real dwdx = 0.0;
+//     Real dwdy = 0.0;
+//     Real dwdz = 0.0;
+//     Real dudz = 0.0;
+//     Real dvdz = 0.0;
+//     Real delta = std::pow(dxinv[0]*dxinv[1], -1./2.);
+// #else
+//     Real dwdy = (q(i,j+1,k,QW)+q(i-1,j+1,k,QW)-q(i,j-1,k,QW)-q(i-1,j-1,k,QW))*(0.25*dxinv[1]);
+//     Real dvdz = (q(i,j,k+1,QV)+q(i-1,j,k+1,QV)-q(i,j,k-1,QV)-q(i-1,j,k-1,QV))*(0.25*dxinv[2]);
+//     Real delta = std::pow(dxinv[0]*dxinv[1]*dxinv[2], -1./3.);
+// #endif
+//     Real rho = 0.5*(q(i,j,k,QRHO)+q(i-1,j,k,QRHO));
+//     Real mu_T;
 
-    CNS::les_model->mu_T_fc(dudx,dudy,dudz,dvdx,dvdy,dvdz,dwdx,dwdy,dwdz,
-                            rho,delta,CNS::Cs,mu_T);
+//     CNS::les_model->mu_T_fc(dudx,dudy,dudz,dvdx,dvdy,dvdz,dwdx,dwdy,dwdz,
+//                             rho,delta,CNS::Cs,mu_T);
 
-    mu += mu_T;
+//     mu += mu_T;
 
-    Real y[NUM_SPECIES];
-    for (int n = 0; n < NUM_SPECIES; ++n)
-      y[n] = 0.5*(q(i,j,k,QFS+n)+q(i-1,j,k,QFS+n));
-    auto eos = pele::physics::PhysicsType::eos();
-    Real cp;
-    eos.RTY2Cp(rho, 0.5*(q(i,j,k,QTEMP)+q(i-1,j,k,QTEMP)), y, cp);
-    lamda += cp*mu_T/CNS::Pr_T;
+//     Real y[NUM_SPECIES];
+//     for (int n = 0; n < NUM_SPECIES; ++n)
+//       y[n] = 0.5*(q(i,j,k,QFS+n)+q(i-1,j,k,QFS+n));
+//     auto eos = pele::physics::PhysicsType::eos();
+//     Real cp;
+//     eos.RTY2Cp(rho, 0.5*(q(i,j,k,QTEMP)+q(i-1,j,k,QTEMP)), y, cp);
+//     lamda += cp*mu_T/CNS::Pr_T;
 
-    for (int n = 0; n < NUM_SPECIES; ++n)
-      rhoD[n] += mu_T/CNS::Sc_T;
-  }
+//     for (int n = 0; n < NUM_SPECIES; ++n)
+//       rhoD[n] += mu_T/CNS::Sc_T;
+//   }
 
   AMREX_D_TERM(Real tauxx = mu*(2.0*dudx-2.0/3.0*divu) + xi*divu; ,
                Real tauxy = mu*(dudy+dvdx); ,

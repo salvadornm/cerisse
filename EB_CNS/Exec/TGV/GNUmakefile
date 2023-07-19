@@ -12,11 +12,11 @@ MEM_PROFILE = FALSE
 USE_GPROF = FALSE
 
 # Performance
-USE_MPI = TRUE
-USE_OMP = FALSE
+USE_MPI = FALSE
+USE_OMP = TRUE
 USE_CUDA = FALSE
 USE_HIP = FALSE
-USE_DPCPP = FALSE
+USE_SYCL = FALSE
 
 # Debugging
 DEBUG = FALSE
@@ -29,7 +29,7 @@ Transport_Model := Constant
 Chemistry_Model := Null
 
 # CNS
-NUM_FIELD = 0
+NUM_FIELD = 8
 
 # GNU Make
 include ./Make.package

@@ -138,6 +138,7 @@ prob_post_timestep (
   Parm const& /*parm*/,
   ProbParm const& pp)
 {
+#if NUM_AUX > 0
   if (pp.record_statistics) {
     Real rho = state(i, j, k, URHO);
     Real rhoinv = Real(1.0) / rho;
@@ -164,7 +165,7 @@ prob_post_timestep (
     state(i, j, k, UFA+4) += massfrac[H2_ID] * dtlev; // Y(H2)
     state(i, j, k, UFA+5) += massfrac[OH_ID] * dtlev; // Y(OH)
     state(i, j, k, UFA+6) += massfrac[H2O_ID] * dtlev; // Y(H2O)
-    state(i, j, k, UFA+7) += reactions(i, j, k, NUM_SPECIES + 1) * dtlev; // heat release rate
+    state(i, j, k, UFA+7) += reactions(i, j, k, NUM_SPECIES) * dtlev; // heat release rate
 
     // RMS^2
     AMREX_D_TERM(
@@ -172,8 +173,24 @@ prob_post_timestep (
     state(i, j, k, UFA+9) += vy*vy * dtlev; , // V
     state(i, j, k, UFA+10) += vz*vz * dtlev; )// W
   }
+#endif
 }
 
+AMREX_GPU_DEVICE AMREX_FORCE_INLINE void
+prob_tag_error (
+  int i, int j, int k, 
+  amrex::Array4<char> const& tagarr, 
+  amrex::Array4<const amrex::Real> const& /*sarr*/, 
+  int level, 
+  char tagval,
+  const amrex::Real /*time*/,
+  amrex::GeometryData const& geomdata,
+  Parm const& /*parm*/,
+  ProbParm const& /*pp*/)
+{
+}
+
+#if NUM_AUX > 0
 AMREX_GPU_DEVICE AMREX_FORCE_INLINE void
 prob_get_aux_name (amrex::Vector<std::string>& aux_name) 
 {
@@ -191,5 +208,6 @@ prob_get_aux_name (amrex::Vector<std::string>& aux_name)
   aux_name[10] = "mean_squared_w";
   aux_name[11] = "test_dW";
 }
+#endif
 
 #endif

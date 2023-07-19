@@ -6,13 +6,9 @@ EB_CNS/Exec/**/*.visit
 EB_CNS/Exec/**/Backtrace*
 EB_CNS/Exec/**/tmp_build_dir
 
-# data in Exec of hybrid CNS
-EB_CNS_hybF90/Exec/*/*.ex*
-EB_CNS_hybF90/Exec/*/plt*
-EB_CNS_hybF90/Exec/*/chk*
-EB_CNS_hybF90/Exec/*/*.visit
-EB_CNS_hybF90/Exec/*/Backtrace*
-EB_CNS_hybF90/Exec/*/tmp_build_dir
+# data in Build
+Build
+.old
 
 # vscode data
 .vscode/*

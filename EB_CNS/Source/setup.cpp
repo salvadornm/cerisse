@@ -7,7 +7,7 @@
 
 using namespace amrex;
 
-int CNS::num_state_data_types = 0;
+// int CNS::num_state_data_types = 0;
 Parm* CNS::h_parm = nullptr;
 Parm* CNS::d_parm = nullptr;
 ProbParm* CNS::h_prob_parm = nullptr;
@@ -129,19 +129,20 @@ CNS::variableSetUp ()
   Vector<std::string>  name(LEN_STATE);
   BCRec bc;
 
+  // Get the species names from the network model
   pele::physics::eos::speciesNames<pele::physics::PhysicsType::eos_type>(spec_names);
     
   if (ParallelDescriptor::IOProcessor()) {
-    Print() << NUM_REACTIONS << " Reactions in mechanism \n";
+    amrex::Print() << NUM_REACTIONS << " Reactions in mechanism \n";
     // Print species names
-    Print() << NUM_SPECIES << " Species: ";
+    amrex::Print() << NUM_SPECIES << " Species: " << std::endl;
     for (int i = 0; i < NUM_SPECIES; i++) {
-      Print() << spec_names[i] << ' ' << ' ';
+      amrex::Print() << spec_names[i] << ' ' << ' ';
     }
-    Print() << std::endl;
+    amrex::Print() << std::endl;
 
     // Print number of fields and aux
-    Print() << NUM_FIELD << " Fields" << std::endl
+    amrex::Print() << NUM_FIELD << " Fields" << std::endl
             << NUM_AUX   << " Auxiliary Variables" << std::endl 
             << LEN_STATE << LEN_REACT << LEN_PRIM << LEN_COEF
             << std::endl;
@@ -236,7 +237,7 @@ CNS::variableSetUp ()
                          0, 1, &pc_interp);
   desc_lst.setComponent(Cost_Type, 0, "Cost", bc, bndryfunc);
 
-  num_state_data_types = desc_lst.size();
+  assert(num_state_data_types == desc_lst.size());
   Print() << desc_lst.size() << " Data Types:" << std::endl;
   for (int typ = 0; typ < desc_lst.size(); typ++) {
     Print() << typ << " - ";
@@ -259,6 +260,11 @@ CNS::variableSetUp ()
   derive_lst.add("pressure", IndexType::TheCellType(), 1,
                  cns_derpres, DeriveRec::TheSameBox);
   derive_lst.addComponent("pressure", desc_lst, State_Type, URHO, NVAR);
+
+  // Internal energy
+  derive_lst.add("eint", IndexType::TheCellType(), 1,
+                 cns_dereint, DeriveRec::TheSameBox);
+  derive_lst.addComponent("eint", desc_lst, State_Type, URHO, NVAR);
 
   // Velocities
   derive_lst.add("x_velocity", IndexType::TheCellType(), 1,

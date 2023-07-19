@@ -14,6 +14,8 @@ void amrex_probinit (const int* /*init*/,
         ParmParse pp("prob");
         pp.query("M", M);
         pp.query("Tw", CNS::h_prob_parm->Tw);
+        pp.query("Re", Re);
+        pp.query("Pr", Pr);
     }
 
     Real e, c;

@@ -1,0 +1,122 @@
+# ====================================================== #
+#                  CERISSE INPUT SCRIPT                  #
+# ====================================================== #
+max_step = 200
+stop_time = 0.1
+amrex.fpe_trap_invalid = 1
+
+# ================ COMPUTATIONAL DOMAIN ================ #
+geometry.is_periodic = 0 0 0
+geometry.coord_sys   = 0  # 0 => cart, 1 => RZ  2=>spherical
+geometry.prob_lo     = 0.    0. 
+geometry.prob_hi     = 5.0   2.5
+amr.n_cell           = 64    32
+#amr.n_cell           = 256   128
+
+# ================ BOUNDARY CONDITIONS ================= #
+# 0 = Interior             3 = Symmetry
+# 1 = Inflow / UserBC      4 = SlipWall = 3
+# 2 = Outflow (FOExtrap)   5 = NoSlipWall (adiabatic)
+cns.lo_bc       =  2 4
+cns.hi_bc       =  2 4
+
+# ====================== GEOMETRY ====================== #
+# eb2.geom_type = all_regular
+eb2.geom_type = triangles
+triangles.num_tri = 2
+triangles.tri_0_point_0 = -1.0  1.0
+triangles.tri_0_point_1 = -1.0 -1.0
+triangles.tri_0_point_2 =  1.5 -1.0
+
+triangles.tri_1_point_0 = -1.0  1.0
+triangles.tri_1_point_1 =  1.5 -1.0
+triangles.tri_1_point_2 =  1.5  1.0
+# triangles.tri_1_point_2 =  1.484375  .9765625
+
+cns.eb_no_slip = 0
+cns.eb_isothermal = 0
+# cns.eb_weights_type = 0 #old
+
+# ==================== WHAT PHYSICS ==================== #
+cns.do_visc    = 0
+cns.do_ext_src = 0
+cns.do_react   = 1
+
+# ==================== WHAT NUMERICS =================== #
+cns.rk_order = 2
+cns.cfl = 0.3
+# cns.fixed_dt = 8e-8
+cns.dt_cutoff = 5.e-20
+cns.recon_scheme = 2  # 1: Godunov, 2: MUSCL, 3: WENO-Z3,
+                      # 4: WENO-JS5, 5: WENO-Z5, 6: TENO5
+cns.char_sys       = 0
+cns.recon_char_var = 0
+cns.clip_temp    = 200  # clip minimum temperature [K]
+cns.do_psgs      = 1   # enable p_sgs correction
+cns.do_vpdf      = 1   # enable Lagevin model
+cns.do_spdf      = 1   # enable IEM model
+
+# ================== REACTION SETTINGS ================= #
+cns.chem_integrator = "ReactorCvode"
+cvode.solve_type = "denseAJ_direct"
+ode.clean_init_massfrac = 1 # ensure Y in [0,1] before integration
+cns.min_react_temp = 600    # no reaction below this temp
+cns.update_heat_release = 1
+# cns.rk_reaction_iter = 2
+
+# ================ VERBOSITY & DIAGNOSIS =============== #
+cns.v = 2 # 0/1/2
+amr.v = 1
+
+# ==================== LOAD BALANCE ==================== #
+amr.loadbalance_with_workestimates = 1 # for multi-level run, loadbalance_int = regrid_int
+#amr.loadbalance_level0_int = 1000     # for single level run (amr.max_level = 0) only
+#amr.loadbalance_max_fac    = 1.5      # default 1.5, what is this??
+
+# =============== REFINEMENT / REGRIDDING ============== #
+amr.max_level       = 2       # maximum level number allowed
+amr.ref_ratio       = 2 2 2 2 # refinement ratio
+amr.regrid_int      = 5       # how often to regrid
+amr.blocking_factor = 8
+amr.max_grid_size   = 64
+amr.n_error_buf     = 2 2 2 2 # number of buffer cells in error est
+amr.grid_eff        = 0.95
+# amr.subcycling_mode = "Auto" 
+
+# ================== TAGGING CRITERIA ================== #
+cns.refine_dengrad = 0.01
+cns.refine_dengrad_max_lev = 10
+
+# ==================== OUTPUT FILES ==================== #
+amr.checkpoint_files_output = 0
+
+amr.plot_files_output = 1
+amr.plot_int  = 10         # number of timesteps between plotfiles
+amr.plot_file = 90deg/plt  # root name of plotfile
+amr.derive_plot_vars  = temp pressure x_velocity y_velocity MachNumber divrho divu magvort cp cv
+cns.plot_rhoy = 0
+cns.plot_molefrac = 0
+cns.plot_massfrac = 1
+cns.plot_rho_omega = 0
+
+# ================= PROBLEM PARAMETERS ================= #
+# Using gamma = 1.42 (unburnt mix)
+prob.p_1 = 3.52565e7
+# prob.u_1 = 170102.010
+prob.v_1 = 0
+prob.T_1 = 2511.81757
+# Using gamma = 1.3 (average)  (burnt mixture gamma = 1.16)
+# prob.p_1 = 3.39909e7
+# prob.u_1 = 178976.898
+# prob.T_1 = 1902.59247
+# Gamma = 1.16
+# prob.p_1 = 3.23366e7
+# prob.u_1 = 342235.582
+# prob.T_1 = 1164.55651
+# Something in between
+prob.u_1 = 1.5e5
+
+prob.p_2 = 8.106e5
+prob.u_2 = 0
+prob.v_2 = 0
+prob.T_2 = 295

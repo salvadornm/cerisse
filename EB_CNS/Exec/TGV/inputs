@@ -10,14 +10,11 @@ geometry.coord_sys   = 0  # 0 => cart, 1 => RZ  2=>spherical
 geometry.prob_lo     = -1.0 -1.0 -1.0
 geometry.prob_hi     =  1.0  1.0  1.0
 # use with single level
-#amr.n_cell           =  16    16    16
 #amr.n_cell           =  32    32    32
 #amr.n_cell           =  64    64    64
 amr.n_cell           =  128    128    128
 #amr.n_cell           =  256   256   256
 #amr.n_cell           =  512    512    512
-# use with 1 level of refinement
-#amr.n_cell           =  128   128   128
 eb2.geom_type = all_regular
 
 # ================ BOUNDARY CONDITIONS ================= #
@@ -34,9 +31,9 @@ cns.do_visc  = 1
 # ==================== WHAT NUMERICS =================== #
 cns.cfl = 0.3
 cns.dt_cutoff = 5.e-20
-cns.recon_scheme = 5   # 1: Godunov, 2: MUSCL, 
+cns.recon_scheme = 6   # 1: Godunov, 2: MUSCL, 
                        # 3: WENO-Z3, 4: WENO-JS5, 5: WENO-Z5
-cns.do_vpdf      = 0   # enable Lagevin model and p_sgs correction
+cns.do_vpdf      = 1   # enable Lagevin model and p_sgs correction
 cns.do_spdf      = 0   # enable IEM model
 cns.clip_temp    = 0   # clip minimum temperature [K]
 
@@ -71,14 +68,14 @@ amr.grid_eff        = 0.7
 # ==================== OUTPUT FILES ==================== #
 amr.checkpoint_files_output = 0
 amr.check_file      = chk    # root name of checkpoint file
-amr.check_int       = 100    # number of timesteps between checkpoints
+amr.check_int       = 1000   # number of timesteps between checkpoints
 #amr.check_per # interval physical time between checkpoints
 
 amr.plot_files_output = 1
-amr.plot_file         = muscl/128^3/plt  # root name of plotfile
-amr.plot_int          = 100  # number of timesteps between plotfiles
+amr.plot_file         = /media/enson/data1/enson/TGV/teno5/sf128^3/plt  # root name of plotfile
+amr.plot_int          = 200  # number of timesteps between plotfiles
 #amr.plot_per # interval physical time between plotfiles
-amr.derive_plot_vars  = temp pressure x_velocity y_velocity z_velocity MachNumber divrho divu magvort cv cp transport_coef
+amr.derive_plot_vars  = pressure x_velocity y_velocity z_velocity magvort transport_coef reynolds_stress #temp MachNumber divrho divu cv cp 
 cns.plot_rhoy = 0
 cns.plot_molefrac = 0
 cns.plot_massfrac = 0

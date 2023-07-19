@@ -1,3 +1,4 @@
+#include "CNS.H"
 #include "prob.H"
 
 using namespace amrex;

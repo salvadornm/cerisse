@@ -207,7 +207,7 @@ teno5 (amrex::Real s[5], amrex::Real& sm, amrex::Real& sp) noexcept
 {
   using amrex::Real;
 
-  const Real eps = 1e-40;
+  const Real eps = 1e-30; // the original 1e-40 is too close to machine zero
   Real vl[3];
   Real vr[3];
   Real beta[3];

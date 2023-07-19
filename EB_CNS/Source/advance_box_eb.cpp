@@ -7,7 +7,8 @@
 #elif (AMREX_SPACEDIM == 3)
 #include <AMReX_EBMultiFabUtil_3D_C.H>
 #endif
-#include <AMReX_EB_utils.H>
+// #include <AMReX_EB_utils.H>
+#include <AMReX_EB_Redistribution.H>
 
 #include "hyperbolics.H"
 #include "recon_eb.H"
@@ -33,12 +34,12 @@ CNS::compute_dSdt_box_eb (const Box& bx,
                             Array4<const Real> const& fcy,
                             Array4<const Real> const& fcz),
                           Array4<const Real> const& bcent,
-                          int as_crse,
-                          Array4<Real> const& drho_as_crse,
-                          Array4<const int> const& rrflag_as_crse,
-                          int as_fine,
-                          Array4<Real> const& dm_as_fine,
-                          Array4<const int> const& lev_mask,
+                          // int as_crse,                             // legacy redist which allows EB to cross C/F boundary
+                          // Array4<Real> const& drho_as_crse,
+                          // Array4<const int> const& rrflag_as_crse,
+                          // int as_fine,
+                          // Array4<Real> const& dm_as_fine,
+                          // Array4<const int> const& lev_mask,
                           Real dt)
 {
   BL_PROFILE("CNS::compute_dSdt_box_eb()");
@@ -53,12 +54,21 @@ CNS::compute_dSdt_box_eb (const Box& bx,
   const auto dxinv = geom.InvCellSizeArray();
 
   // Quantities for redistribution
-  FArrayBox divc, redistwgt;
-  divc.resize(bxg2, LEN_STATE); //div before redist
+  // FArrayBox divc, redistwgt;
+  // divc.resize(bxg2, LEN_STATE); //div before redist
+  // divc.setVal<RunOn::Device>(0.0);
+  FArrayBox divc(bxg3, LEN_STATE, The_Async_Arena());
   divc.setVal<RunOn::Device>(0.0);
 
+  // if (as_fine) {
+  //   amrex::ParallelFor(bxg1, LEN_STATE,
+  //   [=] AMREX_GPU_DEVICE (int i, int j, int k, int n) noexcept {
+  //     dm_as_fine(i,j,k,n) = 0.;
+  //   });
+  // }
+
   // Primitive variables
-  FArrayBox qtmp(bxg6, LEN_PRIM);
+  FArrayBox qtmp(bxg6, LEN_PRIM, The_Async_Arena());
   qtmp.setVal<RunOn::Device>(0.0); //set covered cells to zero to prevent error in compute_diff_wallflux
   Parm const* lparm = d_parm;
   for (int nf = 0; nf <= NUM_FIELD; ++nf){
@@ -71,9 +81,9 @@ CNS::compute_dSdt_box_eb (const Box& bx,
   }
 
   // Arrays for characteristic reconstruction
-  FArrayBox wtmp(bxg6, NCHAR);
-  FArrayBox wl_tmp(bxg5, NPRIM);
-  FArrayBox wr_tmp(bxg5, NPRIM);
+  FArrayBox wtmp(bxg6, NCHAR, The_Async_Arena());
+  FArrayBox wl_tmp(bxg5, NPRIM, The_Async_Arena());
+  FArrayBox wr_tmp(bxg5, NPRIM, The_Async_Arena());
   auto const& w = wtmp.array();
   auto const& wl = wl_tmp.array();
   auto const& wr = wr_tmp.array();
@@ -81,34 +91,50 @@ CNS::compute_dSdt_box_eb (const Box& bx,
   // Transport coef
   FArrayBox diff_coeff;
   if (do_visc == 1) {
-    diff_coeff.resize(bxg4, LEN_COEF);
+    BL_PROFILE("PelePhysics::get_transport_coeffs()");
+
+    diff_coeff.resize(bxg4, LEN_COEF, The_Async_Arena());
 
     for (int nf = 0; nf <= NUM_FIELD; ++nf){
       auto const& qar_yin   = qtmp.array(nf*NPRIM + QFS);
       auto const& qar_Tin   = qtmp.array(nf*NPRIM + QTEMP);
       auto const& qar_rhoin = qtmp.array(nf*NPRIM + QRHO);
-      auto const& mu     = diff_coeff.array(nf*NCOEF + CMU);
-      auto const& xi     = diff_coeff.array(nf*NCOEF + CXI);
-      auto const& lambda = diff_coeff.array(nf*NCOEF + CLAM);
-      auto const& rhoD   = diff_coeff.array(nf*NCOEF + CRHOD);
+      auto const& mu     = diff_coeff.array(nf*NCOEF + CMU);  // dynamic viscosity
+      auto const& xi     = diff_coeff.array(nf*NCOEF + CXI);  // bulk viscosity
+      auto const& lambda = diff_coeff.array(nf*NCOEF + CLAM); // thermal conductivity
+      auto const& rhoD   = diff_coeff.array(nf*NCOEF + CRHOD); // species diffusivity (multiplied by rho)
 
-      // Get Transport coefs on GPU
-      BL_PROFILE("PelePhysics::get_transport_coeffs()");      
+      // Get Transport coefs (on GPU?) 
       auto const* ltransparm = trans_parms.device_trans_parm();
-      amrex::launch(bxg4, [=] AMREX_GPU_DEVICE(amrex::Box const& tbx) {
-        auto trans = pele::physics::PhysicsType::transport();
-        trans.get_transport_coeffs(
-            tbx, qar_yin, qar_Tin, qar_rhoin, rhoD, mu, xi, lambda, ltransparm);
+      constexpr bool wtr_get_xi = true;
+      constexpr bool wtr_get_mu = true;
+      constexpr bool wtr_get_lam = true;
+      constexpr bool wtr_get_Ddiag = true;
+      amrex::ParallelFor(bxg4, [=] (int i, int j, int k) {
+        if (!flag(i,j,k).isCovered()) {
+          // Copy to input
+          Real muloc, xiloc, lamloc;
+          Real Ddiag[NUM_SPECIES] = {0.0};
+          Real yin[NUM_SPECIES] = {0.0};
+          for (int n = 0; n < NUM_SPECIES; ++n) {
+            yin[n] = qar_yin(i,j,k,n);
+          }
+
+          auto trans = pele::physics::PhysicsType::transport();
+          trans.transport(
+            wtr_get_xi, wtr_get_mu, wtr_get_lam, wtr_get_Ddiag, qar_Tin(i,j,k), qar_rhoin(i,j,k),
+            yin, Ddiag, muloc, xiloc, lamloc, ltransparm);
+
+          // Copy to output
+          for (int n = 0; n < NUM_SPECIES; ++n) {
+            rhoD(i, j, k, n) = Ddiag[n];
+          }
+          mu(i, j, k) = muloc;
+          xi(i, j, k) = xiloc;
+          lambda(i, j, k) = lamloc;
+        }
       });
     }
-  }
-
-  // Initialize dm_as_fine to 0
-  if (as_fine) {
-    amrex::ParallelFor(bxg1, LEN_STATE,
-    [=] AMREX_GPU_DEVICE (int i, int j, int k, int n) noexcept {
-      dm_as_fine(i,j,k,n) = 0.;
-    });
   }
 
   // A fab to store the viscous fluxes in VPDF or VSPDF
@@ -125,8 +151,8 @@ CNS::compute_dSdt_box_eb (const Box& bx,
     const Box& reconbox = amrex::grow(bxg3,cdir,1);
     // Tmp fab for viscous fluxes
     if (do_visc == 1) {
-      vflux_fab.resize(flxbx, NVAR);
-      vflux_fab.setVal(0.0);            
+      vflux_fab.resize(flxbx, NVAR, The_Async_Arena());
+      vflux_fab.setVal<RunOn::Device>(0.0);
     }
     auto const& vflx_arr = vflux_fab.array();
     // Tmp fab for pressure fluxes (not used)
@@ -134,7 +160,7 @@ CNS::compute_dSdt_box_eb (const Box& bx,
     // pflux_fab.setVal<RunOn::Device>(0.0);
     
     // Tmp fab for all fluxes
-    flux_tmp[cdir].resize(flxbx,LEN_STATE);
+    flux_tmp[cdir].resize(flxbx, LEN_STATE, The_Async_Arena());
     flux_tmp[cdir].setVal<RunOn::Device>(0.);
 
     for (int nf = 0; nf <= NUM_FIELD; ++nf) { // Loop through fields
@@ -249,7 +275,7 @@ CNS::compute_dSdt_box_eb (const Box& bx,
     auto const& q = qtmp.array(nf*NPRIM);
     auto const& coefs = diff_coeff.array(nf*NCOEF);
 
-    amrex::ParallelFor(bxg2,
+    amrex::ParallelFor(bxg3,
     [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept {
       // This does the divergence but not the redistribution -- we will do that later
       // We do compute the weights here though (WHY??? WHY NOT COMPUTE LATER? NO LOOP THERE)
@@ -261,33 +287,73 @@ CNS::compute_dSdt_box_eb (const Box& bx,
                      AMREX_D_DECL(fcx, fcy, fcz), dxinv, *lparm, do_visc, 
                      eb_no_slip, eb_isothermal, eb_wall_temp);
     });
-  
-    // Now do redistribution
-    // cns_flux_redistribute(bx, dsdtarr, divc_arr, q, vfrac, flag,
-    //                       as_crse, drho_as_crse, rrflag_as_crse, 
-    //                       as_fine, dm_as_fine, lev_mask, dt);
-
-    // Make the redistwgt array here
-    FArrayBox redistwgt_fab(bxg2, 1); //redistribution weights
-    auto const& redistwgt = redistwgt_fab.array();
-
-    amrex::ParallelFor(bxg2, 
-    [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept {
-      if (eb_weights_type == 0) { 
-        redistwgt(i,j,k) = 1.0; 
-      } else if (eb_weights_type == 1) { 
-        redistwgt(i,j,k) = q(i,j,k,QRHO)*q(i,j,k,QEINT);
-      } else if (eb_weights_type == 2) { 
-        redistwgt(i,j,k) = q(i,j,k,QRHO)*vfrac(i,j,k);
-      } else if (eb_weights_type == 3) { 
-        redistwgt(i,j,k) = vfrac(i,j,k); 
-      }
-    });
-    
-    amrex::apply_flux_redistribution(bx, dsdtarr, divc_arr, redistwgt,
-                                     nf*NVAR, NVAR, flag, vfrac, geom);
   } //loop for fields
 
+  // Now do redistribution
+  // cns_flux_redistribute(bx, dsdtarr, divc_arr, q, vfrac, flag,
+  //                       as_crse, drho_as_crse, rrflag_as_crse, 
+  //                       as_fine, dm_as_fine, lev_mask, dt);
+
+  {
+    BL_PROFILE("redistribution()");
+    // Make the redistwgt array here
+    FArrayBox redistwgt_fab(bxg3, 1); //redistribution weights
+    auto const& redistwgt = redistwgt_fab.array();
+    FArrayBox srd_update_scale_fab(bxg3, 1); //redistribution weights
+    auto const& srd_update_scale = srd_update_scale_fab.array();
+
+    amrex::ParallelFor(bxg3, 
+    [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept {
+      // if (eb_weights_type == 0) { 
+        // redistwgt(i,j,k) = 1.0; 
+      // } else if (eb_weights_type == 1) { 
+      //   redistwgt(i,j,k) = q(i,j,k,QRHO)*q(i,j,k,QEINT);
+      // } else if (eb_weights_type == 2) { 
+      //   redistwgt(i,j,k) = q(i,j,k,QRHO);
+      // } else if (eb_weights_type == 3) { 
+        redistwgt(i,j,k) = vfrac(i,j,k);
+      // }
+
+      srd_update_scale(i,j,k) = 0.5;
+    });
+
+  // Flux redistribution scheme for case where C/F interface does *not* cross EB
+  // amrex::apply_flux_redistribution(bx, dsdtarr, divc_arr, redistwgt,
+  //                                  nf*NVAR, NVAR, flag, vfrac, geom, true);  
+
+  // Flux redistribution scheme for case where C/F interface crosses EB
+  // amrex::amrex_flux_redistribute(bx, dsdtarr, divc_arr, redistwgt,
+  //                               vfrac, flag, as_crse, drho_as_crse, rrflag_as_crse,
+  //                               as_fine, dm_as_fine, lev_mask, geom, true, 
+  //                               d_parm->level_mask_notcovered, nf*NVAR, NVAR, dt);
+
+    constexpr int ncomp = UFA; // UFA because we want to redist all fields, except time averages
+
+    // amrex::Gpu::DeviceVector<amrex::BCRec> d_bcs(ncomp);
+    // amrex::Gpu::copy(amrex::Gpu::hostToDevice, phys_bc.begin(), phys_bc.end(), d_bcs.begin());
+
+    bool use_wts_in_divnc = true;
+    int srd_max_order = 2;
+    amrex::Real target_volfrac = 0.5;
+
+    FArrayBox tmpfab(bxg3, ncomp, The_Async_Arena());
+    Array4<Real> scratch = tmpfab.array();
+    if (redistribution_type == "FluxRedist") {
+      amrex::ParallelFor(bxg3, 
+      [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept {
+        scratch(i,j,k) = redistwgt(i,j,k);
+      });
+    }
+
+    auto const& divc_arr = divc.array();
+    
+    amrex::ApplyRedistribution( 
+      bx, ncomp, dsdtarr, divc_arr, sarr, scratch, flag, 
+      AMREX_D_DECL(apx, apy, apz), vfrac, AMREX_D_DECL(fcx, fcy, fcz), 
+      bcent, &phys_bc, geom, dt, redistribution_type, 
+      use_wts_in_divnc, srd_max_order, target_volfrac, srd_update_scale);
+  }
+  
   //////////////////////// END EB CALCULATIONS ////////////////////////
 
   // Add external source term

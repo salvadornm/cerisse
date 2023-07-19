@@ -44,6 +44,8 @@ CNS::CNS (Amr&            papa,
 
   buildMetrics();
 
+  Sborder.define(grids, dmap, LEN_STATE, NUM_GROW, MFInfo(), Factory());
+
   // Initialize reaction
   get_new_data(Reactions_Type).setVal(0.0);
   if (do_react) {
@@ -69,18 +71,6 @@ CNS::CNS (Amr&            papa,
   if (do_les || do_pasr) {
     les_model = LESModel::create(les_model_name);
   }
-
-#if CNS_USE_EB
-  // make sure dx = dy = dz
-  const amrex::GpuArray<amrex::Real, AMREX_SPACEDIM> dx = geom.CellSizeArray();
-  const amrex::Real small = 1.e-13;
-  if (amrex::max<amrex::Real>(AMREX_D_DECL(
-      static_cast<amrex::Real>(0.0),
-      static_cast<amrex::Real>(std::abs(dx[0] - dx[1])),
-      static_cast<amrex::Real>(std::abs(dx[0] - dx[2])))) > small * dx[0]) {
-    amrex::Abort("EB formulation assumes dx == dy == dz");
-  }
-#endif
 }
 
 CNS::~CNS () 
@@ -110,7 +100,7 @@ CNS::init (AmrLevel& old)
   if (do_react) {
     FillPatch(old, React_new, 0, cur_time, Reactions_Type, 0, React_new.nComp());
   } else {
-    React_new.setVal(0);
+    React_new.setVal(0.0);
   }
 
   MultiFab& C_new = get_new_data(Cost_Type);
@@ -268,11 +258,11 @@ CNS::computeNewDt (int                    finest_level,
 void
 CNS::post_regrid (int /*lbase*/, int /*new_finest*/)
 {
+  // enforce_consistent_state();
+
   if (do_react && use_typical_vals_chem) {
     set_typical_values_chem();        
   }
-  
-  enforce_consistent_state();
 }
 
 void
@@ -290,19 +280,14 @@ CNS::post_timestep (int /*iteration*/)
     fine_level.flux_reg.Reflux(S_crse);
 #endif
 
-    if ((verbose != 0) && amrex::ParallelDescriptor::IOProcessor()) {
-      amrex::Print() << " >> Reflux() at level " << level
-                     << " : time = " << state[State_Type].curTime() << std::endl;
+    if (verbose != 0) {
+      amrex::Print() << " >> Reflux() at level " << level << '\n';
     }
   }
 
   if (level < parent->finestLevel()) {
     avgDown();
-  }
-
-  if (do_react && use_typical_vals_chem 
-    && parent->levelSteps(0) % reset_typical_vals_int == 0) {
-      set_typical_values_chem();
+    getLevel(level+1).resetFillPatcher();
   }
 
   MultiFab& S = get_new_data(State_Type);
@@ -320,6 +305,13 @@ CNS::post_timestep (int /*iteration*/)
     prob_post_timestep(i, j, k, curtime, dtlev, sarrs[box_no], irarrs[box_no], 
                        geomdata, *lparm, *lprobparm);
   });
+
+  enforce_consistent_state();
+
+  if (do_react && use_typical_vals_chem 
+    && parent->levelSteps(0) % reset_typical_vals_int == 0) {
+      set_typical_values_chem();
+  }
 }
 
 void
@@ -707,6 +699,10 @@ CNS::read_params ()
   pp.query("cfl", cfl);
   pp.query("fixed_dt", fixed_dt);
   pp.query("dt_cutoff", dt_cutoff);
+  pp.query("rk_order", rk_order); // 1 or 2
+  if (rk_order != 1 && rk_order != 2) {
+    amrex::Abort("CNS: rk_order must be 1 or 2");
+  }
 
   pp.query("recon_char_var", recon_char_var);
   pp.query("char_sys", char_sys);
@@ -733,7 +729,7 @@ CNS::read_params ()
     phys_bc.setHi(i,hi_bc[i]);
   }
 
-  // pp.query("do_reflux", do_reflux); // How can you not do reflux?!
+  pp.query("do_reflux", do_reflux); // How can you not do reflux?!
 
   pp.query("refine_cutcells", refine_cutcells);
   pp.query("refine_cutcells_max_lev", refine_cutcells_max_lev);
@@ -874,11 +870,12 @@ CNS::read_params ()
     amrex::Abort("CNS: eb_weights_type must be 0, 1, 2 or 3");
   }
 
-  pp.query("do_reredistribution", do_reredistribution);
-  if (do_reredistribution != 0 && do_reredistribution != 1) {
-    amrex::Abort("CNS: do_reredistibution must be 0 or 1");
+  pp.query("redistribution_type", redistribution_type);
+  if (redistribution_type != "StateRedist" 
+  && redistribution_type != "FluxRedist" && redistribution_type != "NoRedist") {
+    amrex::Abort("CNS: redistribution_type must be StateRedist or FluxRedist or NoRedist");
   }
-
+  
   pp.query("eb_no_slip", eb_no_slip);
   pp.query("eb_isothermal", eb_isothermal);
   if (eb_isothermal) {
@@ -937,13 +934,19 @@ CNS::buildMetrics ()
   // make sure dx == dy == dz if use EB
   const Real* dx = geom.CellSize();
 
-  if (AMREX_D_TERM(, std::abs(dx[0]-dx[1]) > 1.e-12*dx[0], 
-                  || std::abs(dx[0]-dx[2]) > 1.e-12*dx[0])) {
-    amrex::Abort("EB must have dx == dy == dz (for cut surface fluxes)\n");
-  }
+  ParmParse ppeb2("eb2");
+  std::string geom_type = "all_regular";
+  ppeb2.query("geom_type", geom_type);
 
-  if ((AMREX_SPACEDIM == 1) && (CNS_USE_EB)) {
-    amrex::Abort("1D cannot do EB\n");
+  if (geom_type != "all_regular") {
+    if (AMREX_D_TERM(, std::abs(dx[0]-dx[1]) > 1.e-12*dx[0], 
+                    || std::abs(dx[0]-dx[2]) > 1.e-12*dx[0])) {
+      amrex::Abort("EB must have dx == dy == dz (for cut surface fluxes)\n");
+    }
+
+    if ((AMREX_SPACEDIM == 1) && (CNS_USE_EB)) {
+      amrex::Abort("1D cannot do EB\n");
+    }
   }
 
   const auto& ebfactory = dynamic_cast<EBFArrayBoxFactory const&>(Factory());
@@ -954,6 +957,7 @@ CNS::buildMetrics ()
 
   Parm const* l_parm = d_parm;
 
+  // Level mask for legacy redistribution
   level_mask.clear();
   level_mask.define(grids,dmap,1,3);
   level_mask.BuildMask(geom.Domain(), geom.periodicity(),

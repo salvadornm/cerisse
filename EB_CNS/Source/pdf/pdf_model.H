@@ -13,7 +13,7 @@
  * @param dx  grid size.
  * 
  * @warning The current implementation is problematic because neighbouring p may be modified before this is called.
- *          Should have computed p first, then do this.
+ *          Should have computed p first, then do this. (FIXED, TODO: test)
  */
 AMREX_FORCE_INLINE AMREX_GPU_DEVICE void 
 vpdf_psgs_model (const amrex::Box& bx,
@@ -22,74 +22,80 @@ vpdf_psgs_model (const amrex::Box& bx,
                  const amrex::Real(*)[] /*dW[AMREX_SPACEDIM][NUM_FIELD]*/,
                  const amrex::Real dx[AMREX_SPACEDIM])
 {
-  amrex::ParallelFor(bx, 
-  [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept {
-    // Compute pressure (store pressure of each field in p[])
+  // Compute p
+  const Box& bxg1 = amrex::grow(bx,1);
+  FArrayBox pfab(bxg1, NUM_FIELD, The_Async_Arena());
+  auto const& p = pfab.array();
+
+  amrex::ParallelFor(bxg1, [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept {
+    auto eos = pele::physics::PhysicsType::eos();
+
+    for (int nf = 1; nf <= NUM_FIELD; ++nf) {
+      amrex::Real rho = s(i, j, k, nf*NVAR + URHO);
+      amrex::Real rhoinv = 1.0 / rho;
+      AMREX_D_TERM(
+        amrex::Real ux = s(i,j,k, nf*NVAR + UMX) * rhoinv; ,
+        amrex::Real uy = s(i,j,k, nf*NVAR + UMY) * rhoinv; ,
+        amrex::Real uz = s(i,j,k, nf*NVAR + UMZ) * rhoinv;);
+      amrex::Real ei = s(i,j,k, nf*NVAR + UEDEN) * rhoinv - amrex::Real(0.5)*(AMREX_D_TERM(ux*ux, + uy*uy, + uz*uz));
+      amrex::Real Y[NUM_SPECIES];
+      for (int n = 0; n < NUM_SPECIES; ++n) 
+        Y[n] = s(i,j,k, nf*NVAR + UFS+n) * rhoinv;
+      
+      amrex::Real T = 0, pres;
+      eos.REY2T(rho, ei, Y, T); 
+      eos.RTY2P(rho, T, Y, pres);
+      p(i, j, k, nf-1) = pres;
+      
+      if (isnan(pres)) 
+        std::cout << i << "," << j << "," << k << ": p is nan!!! T=" << T 
+                  << ", rho=" << rho << ", ei=" << ei << std::endl;
+    }
+  });
+
+  // Compute (dp/dx)_sgs and (dup/dx)_sgs
+  amrex::ParallelFor(bx, [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept {
     const amrex::IntVect iv{AMREX_D_DECL(i, j, k)};
+
     for (int dir = 0; dir < AMREX_SPACEDIM; ++dir) {
       amrex::IntVect iv_dir = amrex::IntVect::TheDimensionVector(dir);
       amrex::Real mean_dp = 0.0;
       amrex::Real dp[NUM_FIELD];
       amrex::Real mean_dup = 0.0;
       amrex::Real dup[NUM_FIELD];
-      amrex::Real rho, rhoinv, ei, T, p, massfrac[NUM_SPECIES], up;
-      auto eos = pele::physics::PhysicsType::eos();
+      
+      amrex::Real um, up;
       for (int nf = 1; nf <= NUM_FIELD; ++nf) {
-        // i-1
-        rho = s(iv-iv_dir, nf*NVAR + URHO);
-        rhoinv = 1.0 / rho;
-        AMREX_D_TERM(amrex::Real ux = s(iv-iv_dir, nf*NVAR + UMX) * rhoinv; ,
-                     amrex::Real uy = s(iv-iv_dir, nf*NVAR + UMY) * rhoinv; ,
-                     amrex::Real uz = s(iv-iv_dir, nf*NVAR + UMZ) * rhoinv;);
-        ei = s(iv-iv_dir, nf*NVAR + UEDEN) * rhoinv - amrex::Real(0.5)*(AMREX_D_TERM(ux*ux, + uy*uy, + uz*uz));
-        for (int n = 0; n < NUM_SPECIES; ++n) {
-          massfrac[n] = s(iv-iv_dir, nf*NVAR + UFS+n)*rhoinv;
-        }
-        eos.REY2T(rho, ei, massfrac, T); 
-        eos.RTY2P(rho, T, massfrac, p);
-        if (isnan(p)) amrex::Print() << i << ": p_{i-1} is nan!!! T = " << T << ", ei = " << ei << 
-                            ", rho = " << rho << " = 1/" << 1 / rho << ", ux = " << ux << " = " << s(i-1, j, k, nf*NVAR + UMX) / rho << std::endl;
-        up = s(iv-iv_dir, nf*NVAR + UMX+dir)*rhoinv*p;
-
-        // i+1
-        rho = s(iv+iv_dir, nf*NVAR + URHO);
-        rhoinv = 1.0 / rho;
-        AMREX_D_TERM(ux = s(iv+iv_dir, nf*NVAR + UMX)*rhoinv; ,
-                    uy = s(iv+iv_dir, nf*NVAR + UMY)*rhoinv; ,
-                    uz = s(iv+iv_dir, nf*NVAR + UMZ)*rhoinv;);
-        ei = s(iv+iv_dir, nf*NVAR + UEDEN) * rhoinv - amrex::Real(0.5)*(AMREX_D_TERM(ux*ux, + uy*uy, + uz*uz));
-        for (int n = 0; n < NUM_SPECIES; ++n) {
-            massfrac[n] = s(iv+iv_dir, nf*NVAR + UFS+n)*rhoinv;
-        }
-        eos.REY2T(rho, ei, massfrac, T);
-        eos.RTY2P(rho, T, massfrac, dp[nf-1]);
-        if (isnan(dp[nf-1])) amrex::Print() << i << ": p_{i+1} is nan!!! T = " << T << ", ei = " << ei << 
-                                                    ", rho = " << rho << ", mx = " << s(i+1, j, k, nf*NVAR + UMX) << ", ux = " << ux << std::endl;
-        dup[nf-1] = s(iv+iv_dir, nf*NVAR + UMX+dir)*rhoinv*dp[nf-1] - up;
+        // u_{i-1}
+        um = s(iv-iv_dir, nf*NVAR + UMX+dir) / s(iv-iv_dir, nf*NVAR + URHO);
+        // u_{i+1}
+        up = s(iv+iv_dir, nf*NVAR + UMX+dir) / s(iv+iv_dir, nf*NVAR + URHO);
+        
+        dup[nf-1] = up * p(iv+iv_dir, nf-1) - um * p(iv-iv_dir, nf-1); // up_{i+1} - up_{i-1}
         mean_dup += dup[nf-1];
 
-        dp[nf-1] = dp[nf-1] - p; // p_{i+1} - p{i-1}
+        dp[nf-1] = p(iv+iv_dir, nf-1) - p(iv-iv_dir, nf-1); // p_{i+1} - p{i-1}
         mean_dp += dp[nf-1];
       }
-      mean_dp /= amrex::Real(NUM_FIELD);
+      mean_dp /= amrex::Real(NUM_FIELD); // or use mean calculated p?
       mean_dup /= amrex::Real(NUM_FIELD);
 
-      amrex::Real mean_u, u, u_sgs;
-      for (int nf = 1; nf <= NUM_FIELD; ++nf) {        
-        mean_u = s(i, j, k, UMX+dir) / s(i, j, k, URHO);
-        u = s(i, j, k, nf*NVAR + UMX+dir) / s(i, j, k, nf*NVAR + URHO);
+      // amrex::Real mean_u, u, u_sgs;
+      for (int nf = 1; nf <= NUM_FIELD; ++nf) {
+        // mean_u = s(i, j, k, UMX+dir) / s(i, j, k, URHO);
+        // u = s(i, j, k, nf*NVAR + UMX+dir) / s(i, j, k, nf*NVAR + URHO);
         
         // central difference for dpdx
         // mom_sgs = -(mean_dp - dp[nf-1]) / 0.5*dx[dir] * dt
-        s(i, j, k, nf*NVAR + UMX+dir) -= (mean_dp - dp[nf-1]) / 0.5*dx[dir] * dt;
+        s(i, j, k, nf*NVAR + UMX+dir) -= 0.5 * (mean_dp - dp[nf-1]) / dx[dir] * dt;
 
         // Enforce consistent e
         // s(i, j, k, nf*NVAR + UEDEN) += 0.5 * s(i, j, k, nf*NVAR + URHO) * ((u+u_sgs)*(u+u_sgs) - u*u);      
         // s(i, j, k, nf*NVAR + UEDEN) += s(i, j, k, nf*NVAR + URHO) * u * u_sgs; //vspdf21
-        s(i, j, k, nf*NVAR + UEDEN) -= (mean_dup - dup[nf-1]) / 0.5*dx[dir] * dt; //vspdf22
+        s(i, j, k, nf*NVAR + UEDEN) -= 0.5 * (mean_dup - dup[nf-1]) / dx[dir] * dt; //vspdf22
       }
     }
-  });  
+  });
 }
 
 /**

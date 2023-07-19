@@ -4,6 +4,7 @@
 #include <AMReX_Geometry.H>
 #include <AMReX_FArrayBox.H>
 #include <AMReX_REAL.H>
+#include <AMReX_ParmParse.H>
 
 #include "CNS.H"
 #include "prob_parm.H"
@@ -19,10 +20,8 @@
  * @param parm      Parm data defined in parm.H.
  * @param prob_parm ProbParm data as defined in prob_parm.H and initialised in amrex_probinit.
  */
-AMREX_GPU_DEVICE
-AMREX_FORCE_INLINE
-void
-cns_initdata (int i, int j, int k, 
+AMREX_GPU_DEVICE AMREX_FORCE_INLINE void
+prob_initdata (int i, int j, int k, 
               amrex::Array4<amrex::Real> const& state,
               amrex::GeometryData const& geomdata,
               Parm const& /*parm*/,
@@ -41,8 +40,8 @@ cns_initdata (int i, int j, int k,
         state(i, j, k, UMY) = prob_parm.rho_1 * prob_parm.v_1;
         state(i, j, k, UMZ) = 0.0;
         state(i, j, k, UEDEN) = prob_parm.rhoe_1 + 0.5 * prob_parm.rho_1 * (prob_parm.u_1 * prob_parm.u_1 + prob_parm.v_1 * prob_parm.v_1);
-        state(i, j, k, UEINT) = prob_parm.rhoe_1;
-        state(i, j, k, UTEMP) = prob_parm.T_1;
+        // state(i, j, k, UEINT) = prob_parm.rhoe_1;
+        // state(i, j, k, UTEMP) = prob_parm.T_1;
         state(i, j, k, UFS) = prob_parm.rho_1;
     } else if (x < 0.5 && y >= 0.5) {
         state(i, j, k, URHO) = prob_parm.rho_2;
@@ -50,8 +49,8 @@ cns_initdata (int i, int j, int k,
         state(i, j, k, UMY) = prob_parm.rho_2 * prob_parm.v_2;
         state(i, j, k, UMZ) = 0.0;
         state(i, j, k, UEDEN) = prob_parm.rhoe_2 + 0.5 * prob_parm.rho_2 * (prob_parm.u_2 * prob_parm.u_2 + prob_parm.v_2 * prob_parm.v_2);
-        state(i, j, k, UEINT) = prob_parm.rhoe_2;
-        state(i, j, k, UTEMP) = prob_parm.T_2;
+        // state(i, j, k, UEINT) = prob_parm.rhoe_2;
+        // state(i, j, k, UTEMP) = prob_parm.T_2;
         state(i, j, k, UFS) = prob_parm.rho_2;
     } else if (x < 0.5 && y < 0.5) {
         state(i, j, k, URHO) = prob_parm.rho_3;
@@ -59,8 +58,8 @@ cns_initdata (int i, int j, int k,
         state(i, j, k, UMY) = prob_parm.rho_3 * prob_parm.v_3;
         state(i, j, k, UMZ) = 0.0;
         state(i, j, k, UEDEN) = prob_parm.rhoe_3 + 0.5 * prob_parm.rho_3 * (prob_parm.u_3 * prob_parm.u_3 + prob_parm.v_3 * prob_parm.v_3);
-        state(i, j, k, UEINT) = prob_parm.rhoe_3;
-        state(i, j, k, UTEMP) = prob_parm.T_3;
+        // state(i, j, k, UEINT) = prob_parm.rhoe_3;
+        // state(i, j, k, UTEMP) = prob_parm.T_3;
         state(i, j, k, UFS) = prob_parm.rho_3;
     } else {
         state(i, j, k, URHO) = prob_parm.rho_4;
@@ -68,8 +67,8 @@ cns_initdata (int i, int j, int k,
         state(i, j, k, UMY) = prob_parm.rho_4 * prob_parm.v_4;
         state(i, j, k, UMZ) = 0.0;
         state(i, j, k, UEDEN) = prob_parm.rhoe_4 + 0.5 * prob_parm.rho_4 * (prob_parm.u_4 * prob_parm.u_4 + prob_parm.v_4 * prob_parm.v_4);
-        state(i, j, k, UEINT) = prob_parm.rhoe_4;
-        state(i, j, k, UTEMP) = prob_parm.T_4;
+        // state(i, j, k, UEINT) = prob_parm.rhoe_4;
+        // state(i, j, k, UTEMP) = prob_parm.T_4;
         state(i, j, k, UFS) = prob_parm.rho_4;
     }
 }
@@ -88,11 +87,10 @@ cns_initdata (int i, int j, int k,
  * @sa CnsFillExtDir
  * @sa CnsFillExtDir::operator()
  */
-AMREX_GPU_DEVICE
-AMREX_FORCE_INLINE
-void
+AMREX_GPU_DEVICE AMREX_FORCE_INLINE void
 bcnormal (const amrex::Real x[AMREX_SPACEDIM],
           const amrex::Real* /*s_int[LEN_STATE]*/,
+          const amrex::Real s_refl[LEN_STATE],
           amrex::Real s_ext[LEN_STATE],
           const int idir,
           const int sgn, 
@@ -113,15 +111,43 @@ bcnormal (const amrex::Real x[AMREX_SPACEDIM],
  * @param parm      Parm data defined in parm.H.
  * @param prob_parm ProbParm data as defined in prob_parm.H and initialised in amrex_probinit.
  */
-AMREX_GPU_DEVICE
-AMREX_FORCE_INLINE
-void
-cns_prob_post_restart (int i, int j, int k, 
+AMREX_GPU_DEVICE AMREX_FORCE_INLINE void
+prob_post_restart (int i, int j, int k, 
                        amrex::Array4<amrex::Real> const& state,
                        amrex::GeometryData const& geomdata,
                        Parm const& parm,
                        ProbParm const& prob_parm)
 {
 }
+
+AMREX_GPU_DEVICE AMREX_FORCE_INLINE void
+prob_post_timestep (
+  int i, int j, int k, 
+  const amrex::Real /*curtime*/,
+  const amrex::Real dtlev,
+  amrex::Array4<amrex::Real> const& state,
+  amrex::Array4<const amrex::Real> const& reactions,
+  amrex::GeometryData const& /*geomdata*/,
+  Parm const& /*parm*/,
+  ProbParm const& pp)
+{
+}
+
+AMREX_GPU_DEVICE AMREX_FORCE_INLINE void
+prob_tag_error (int i, int j, int k, 
+                amrex::Array4<char> const& tagarr, 
+                amrex::Array4<const amrex::Real> const& /*sarr*/, 
+                int level, 
+                char tagval,
+                const amrex::Real /*time*/,
+                amrex::GeometryData const& geomdata,
+                Parm const& /*parm*/,
+                ProbParm const& /*pp*/)
+{
+}
+
+// AMREX_GPU_DEVICE AMREX_FORCE_INLINE void
+// prob_get_aux_name (amrex::Vector<std::string>& aux_name) 
+// {}
 
 #endif

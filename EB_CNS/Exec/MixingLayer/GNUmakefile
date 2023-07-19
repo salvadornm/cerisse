@@ -16,7 +16,7 @@ USE_MPI = TRUE
 USE_OMP = FALSE
 USE_CUDA = FALSE
 USE_HIP = FALSE
-USE_DPCPP = FALSE
+USE_SYCL = FALSE
 
 # Debugging
 DEBUG = FALSE
@@ -26,7 +26,7 @@ THREAD_SANITIZER = FALSE
 # PeleC
 Eos_Model := Fuego
 Transport_Model := Simple
-Chemistry_Model := Yetter
+Custom_Chemistry_Model := Yetter
 
 # CNS
 NUM_FIELD = 8

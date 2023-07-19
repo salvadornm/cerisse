@@ -21,9 +21,16 @@ int main (int argc, char* argv[])
 {
   amrex::Initialize(argc,argv);
 
+  amrex::Print() << R"(
+                    ____ _______   __ ____________                    
+                   / __// __/ _ \ / // __/ __/ __/                    
+                  / /_ / __/ _/_// /_\ \_\ \/ _/                      
+                  \___/___/_/|_|/_//___/___/___/                      
+    )" << '\n';
+
   BL_PROFILE_VAR("main()", pmain);
 
-  double timer_tot = amrex::second();
+  double timer_tot = amrex::ParallelDescriptor::second();
   double timer_init = 0.;
   double timer_advance = 0.;
 
@@ -52,21 +59,21 @@ int main (int argc, char* argv[])
   }
 
   {
-    timer_init = amrex::second();
+    timer_init = amrex::ParallelDescriptor::second();
 
     Amr amr(getLevelBld());
 
 #if CNS_USE_EB
-    AmrLevel::SetEBSupportLevel(EBSupport::full);// need both area and volume fractions
-    AmrLevel::SetEBMaxGrowCells(NUM_GROW, 4, 2); // 6 for ebcellflags, 4 for vfrac, 2 is not used for EBSupport::volume
+    AmrLevel::SetEBSupportLevel(EBSupport::full);// need all
+    AmrLevel::SetEBMaxGrowCells(6, 4, 4); // 6 for ebcellflags, 4 for vfrac, 4 for area fraction, boundary centroids and face centroids
     initialize_EB2(amr.Geom(amr.maxLevel()), amr.maxLevel(), amr.maxLevel());
 #endif
 
     amr.init(strt_time,stop_time);
 
-    timer_init = amrex::second() - timer_init;
+    timer_init = amrex::ParallelDescriptor::second() - timer_init;
 
-    timer_advance = amrex::second();
+    timer_advance = amrex::ParallelDescriptor::second();
 
     while ((amr.okToContinue()) && 
            (amr.levelSteps(0) < max_step || max_step < 0) &&
@@ -76,7 +83,7 @@ int main (int argc, char* argv[])
       amr.coarseTimeStep(stop_time);
     }
 
-    timer_advance = amrex::second() - timer_advance;
+    timer_advance = amrex::ParallelDescriptor::second() - timer_advance;
 
     // Write final checkpoint and plotfile
     if (amr.stepOfLastCheckPoint() < amr.levelSteps(0)) {
@@ -88,7 +95,7 @@ int main (int argc, char* argv[])
     }
   }
 
-  timer_tot = amrex::second() - timer_tot;
+  timer_tot = amrex::ParallelDescriptor::second() - timer_tot;
 
   ParallelDescriptor::ReduceRealMax({timer_tot, timer_init, timer_advance},
                                     ParallelDescriptor::IOProcessorNumber());

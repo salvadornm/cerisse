@@ -8,6 +8,7 @@ using namespace amrex::literals;
 
 struct ProbParm
 {
+    // Config 3
     amrex::Real p_1 = 1.5;   // top right
     amrex::Real u_1 = 0.0;
     amrex::Real v_1 = 0.0;

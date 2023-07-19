@@ -116,7 +116,8 @@ public:
 
   virtual void setPlotVariables() override;
 
-  virtual int WorkEstType () override { return Cost_Type; }
+  // Provide state data type to AmrLevel for load balancing. -1 means none.
+  virtual int WorkEstType () override { return do_load_balance ? Cost_Type : -1; }
 
   // Write a plotfile to specified directory
   virtual void writePlotFile (const std::string& dir,
@@ -158,27 +159,27 @@ public:
                               amrex::Array4<amrex::Real     const> const& fcy,
                               amrex::Array4<amrex::Real     const> const& fcz),
                             amrex::Array4<amrex::Real       const> const& bcent,
-                            int                                           as_crse,
-                            amrex::Array4<amrex::Real            > const& drho_as_crse,
-                            amrex::Array4<int               const> const& rrflag_as_crse,
-                            int                                           as_fine,
-                            amrex::Array4<amrex::Real            > const& dm_as_fine,
-                            amrex::Array4<int               const> const& lev_mask,
+                            // int                                           as_crse,
+                            // amrex::Array4<amrex::Real            > const& drho_as_crse,
+                            // amrex::Array4<int               const> const& rrflag_as_crse,
+                            // int                                           as_fine,
+                            // amrex::Array4<amrex::Real            > const& dm_as_fine,
+                            // amrex::Array4<int               const> const& lev_mask,
                             amrex::Real                                   dt);
 
-  void cns_flux_redistribute (const amrex::Box& bx,
-                              amrex::Array4<amrex::Real            > const& dqdt,
-                              amrex::Array4<amrex::Real       const> const& divc,
-                              amrex::Array4<amrex::Real       const> const& q,
-                              amrex::Array4<amrex::Real       const> const& vfrac,
-                              amrex::Array4<amrex::EBCellFlag const> const& flag,
-                              int as_crse,
-                              amrex::Array4<amrex::Real            > const& drho_as_crse,
-                              amrex::Array4<int               const> const& rrflag_as_crse,
-                              int as_fine,
-                              amrex::Array4<amrex::Real            > const& dm_as_fine,
-                              amrex::Array4<int               const> const& lev_mask,
-                              amrex::Real dt);
+  // void cns_flux_redistribute (const amrex::Box& bx,
+  //                             amrex::Array4<amrex::Real            > const& dqdt,
+  //                             amrex::Array4<amrex::Real       const> const& divc,
+  //                             amrex::Array4<amrex::Real       const> const& q,
+  //                             amrex::Array4<amrex::Real       const> const& vfrac,
+  //                             amrex::Array4<amrex::EBCellFlag const> const& flag,
+  //                             int as_crse,
+  //                             amrex::Array4<amrex::Real            > const& drho_as_crse,
+  //                             amrex::Array4<int               const> const& rrflag_as_crse,
+  //                             int as_fine,
+  //                             amrex::Array4<amrex::Real            > const& dm_as_fine,
+  //                             amrex::Array4<int               const> const& lev_mask,
+  //                             amrex::Real dt);
 #endif
 
   void computeAvg (amrex::MultiFab& State);
@@ -277,10 +278,21 @@ protected:
   //    Private data                                                        //
   ////////////////////////////////////////////////////////////////////////////
 
-  enum StateDataType { State_Type = 0, Reactions_Type, Cost_Type };
-  static int num_state_data_types;
+  enum StateDataType { State_Type = 0, Reactions_Type, Cost_Type, num_state_data_types };
 
   static amrex::BCRec phys_bc;
+
+  //
+  // Advance related
+  
+#if CNS_USE_EB
+  amrex::EBFluxRegister flux_reg;
+#else
+  amrex::YAFluxRegister flux_reg;
+#endif
+
+  amrex::MultiFab Sborder; // A state array with ghost zones. It is put here inside 
+                           // the class so alloc overhead only happen once.
 
   //
   // EB related
@@ -291,12 +303,6 @@ protected:
   std::array<const amrex::MultiCutFab*,AMREX_SPACEDIM> areafrac;
   std::array<const amrex::MultiCutFab*,AMREX_SPACEDIM> facecent;
   amrex::iMultiFab level_mask;
-#endif
-
-#if CNS_USE_EB
-  amrex::EBFluxRegister flux_reg;
-#else
-  amrex::YAFluxRegister flux_reg;
 #endif
 
   //
@@ -317,8 +323,10 @@ protected:
   static amrex::Real cfl;
   static amrex::Real fixed_dt;
   static amrex::Real dt_cutoff;
+  static int rk_order;
   static int verbose;
-  static int do_reflux;
+  static bool do_reflux;
+  static bool do_load_balance;
   static bool signalStopJob;
 
   static bool do_visc;
@@ -346,12 +354,14 @@ protected:
   static bool do_vpdf;
   static bool do_spdf;
 
+  // EB
+
 #if CNS_USE_EB
-  static int eb_weights_type;
-  static int do_reredistribution;
+  static int eb_weights_type; // this is deprecated. TODO: remove this
   static bool eb_no_slip;
   static bool eb_isothermal;
   static amrex::Real eb_wall_temp;
+  static std::string redistribution_type;
 #endif
   
   static int refine_cutcells;  

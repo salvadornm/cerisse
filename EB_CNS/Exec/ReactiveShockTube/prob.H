@@ -24,9 +24,7 @@
  * @param parm      Parm data defined in parm.H.
  * @param prob_parm ProbParm data as defined in prob_parm.H and initialised in amrex_probinit.
  */
-AMREX_GPU_DEVICE
-AMREX_FORCE_INLINE
-void
+AMREX_GPU_DEVICE AMREX_FORCE_INLINE void
 prob_initdata (int i, int j, int k, 
                amrex::Array4<amrex::Real> const& state,
                amrex::GeometryData const& geomdata,
@@ -57,7 +55,7 @@ prob_initdata (int i, int j, int k,
       state(i, j, k, nf*NVAR + UEDEN) = prob_parm.rho_r * prob_parm.e_r + 0.5 * prob_parm.rho_r * prob_parm.u_r * prob_parm.u_r;
       for (int n = 0; n < NUM_SPECIES; ++n) {
         state(i, j, k, nf*NVAR + UFS + n) = prob_parm.rho_r * prob_parm.massfrac_r[n];
-      }    
+      }
     }
   } 
 }
@@ -66,28 +64,43 @@ prob_initdata (int i, int j, int k,
  * \brief Fill external boundary conditions for ghost cells.
  * 
  * @param x         ghost cell cooridinates.
- * @param s_int     flow state inside of the domain.
+ * @param s_int     flow state of the first cell inside of the domain.
+ * @param s_refl    flow state of the reflected cell inside of the domain.
  * @param s_ext     flow state to be filled.
  * @param idir      direction (0: x, 1: y, 2: z).
  * @param sgn       high or low boundary (1: low, -1: high).
  * @param time      time.
  * @param geomdata  domain geometry data.
  * @param prob_parm ProbParm data as defined in prob_parm.H and initialised in amrex_probinit.
- * @sa CnsFillExtDir
- * @sa CnsFillExtDir::operator()
  */
-AMREX_GPU_DEVICE
-AMREX_FORCE_INLINE
-void
+AMREX_GPU_DEVICE AMREX_FORCE_INLINE void
 bcnormal (const amrex::Real x[AMREX_SPACEDIM],
-          const amrex::Real* /*s_int[LEN_STATE]*/,
+          const amrex::Real s_int[LEN_STATE],
+          const amrex::Real s_refl[LEN_STATE],
           amrex::Real s_ext[LEN_STATE],
           const int idir,
           const int sgn, 
           const amrex::Real /*time*/,
           amrex::GeometryData const& /*geomdata*/,
           ProbParm const& prob_parm)
-{
+{ 
+  // Isothermal walls
+  amrex::Real Y[NUM_SPECIES];
+  s_ext[URHO] = s_int[URHO];
+  s_ext[UMX] = -s_int[UMX];
+  s_ext[UMY] = -s_int[UMY];
+  s_ext[UMZ] = -s_int[UMZ];
+  s_ext[UEDEN] = s_int[UEDEN];
+  for (int n = 0; n < NUM_SPECIES; ++n) {
+    s_ext[UFS+n] = s_int[UFS+n];
+    Y[n] = s_int[UFS+n] / s_int[URHO];
+  }
+
+  // auto eos = pele::physics::PhysicsType::eos();
+  // amrex::Real ei, T = 757.95;
+  // eos.TY2E(T, Y, ei);
+  // s_ext[UEDEN] = s_int[URHO]*ei
+  //     + 0.5*(s_int[UMX]*s_int[UMX] + s_int[UMY]*s_int[UMY] + s_int[UMZ]*s_int[UMZ])/s_int[URHO];
 }
 
 /**
@@ -104,11 +117,33 @@ bcnormal (const amrex::Real x[AMREX_SPACEDIM],
 AMREX_GPU_DEVICE
 AMREX_FORCE_INLINE
 void
-cns_prob_post_restart (int i, int j, int k, 
+prob_post_restart (int i, int j, int k, 
                        amrex::Array4<amrex::Real> const& state,
                        amrex::GeometryData const& geomdata,
                        Parm const& parm,
                        ProbParm const& prob_parm)
+{
+}
+
+AMREX_GPU_DEVICE AMREX_FORCE_INLINE void
+prob_post_timestep (
+  int i, int j, int k, 
+  const amrex::Real /*curtime*/,
+  const amrex::Real dtlev,
+  amrex::Array4<amrex::Real> const& state,
+  amrex::Array4<const amrex::Real> const& reactions,
+  amrex::GeometryData const& /*geomdata*/,
+  Parm const& /*parm*/,
+  ProbParm const& pp)
+{
+}
+
+AMREX_GPU_DEVICE AMREX_FORCE_INLINE void
+prob_tag_error (int i, int j, int k, amrex::Array4<char> const& tagarr, 
+                amrex::Array4<const amrex::Real> const& /*sarr*/, 
+                int level, char tagval, const amrex::Real /*time*/,
+                amrex::GeometryData const& geomdata,
+                Parm const& /*parm*/, ProbParm const& /*pp*/)
 {
 }
 

@@ -76,7 +76,8 @@ AMREX_GPU_DEVICE
 AMREX_FORCE_INLINE
 void
 bcnormal (const amrex::Real x[AMREX_SPACEDIM],
-          const amrex::Real s_int[LEN_STATE],
+          const amrex::Real s_int[LEN_STATE], //int
+          const amrex::Real* /*s_int[LEN_STATE]*/, //refl
           amrex::Real s_ext[LEN_STATE],
           const int idir,
           const int sgn, 
@@ -99,7 +100,15 @@ bcnormal (const amrex::Real x[AMREX_SPACEDIM],
             if (sgn == 1) { //ylo
                 if (x[0] < 1./6.) {
                     // FOExtrap
-                    for (int i = 0; i < LEN_STATE; ++i) s_ext[i] = s_int[i];
+                    // for (int i = 0; i < LEN_STATE; ++i) s_ext[i] = s_int[i];
+                    
+                    // Post shock conditions (?)
+                    s_ext[nf*NVAR + URHO] = prob_parm.rho_l;
+                    s_ext[nf*NVAR + UMX] = prob_parm.rho_l * prob_parm.u_l;
+                    s_ext[nf*NVAR + UMY] = prob_parm.rho_l * prob_parm.v_l;
+                    s_ext[nf*NVAR + UMZ] = 0.0;
+                    s_ext[nf*NVAR + UEDEN] = prob_parm.rhoe_l + 0.5 * prob_parm.rho_l * (prob_parm.u_l * prob_parm.u_l + prob_parm.v_l * prob_parm.v_l);
+                    s_ext[nf*NVAR + UFS] = prob_parm.rho_l;
                 } else {
                     // SlipWall
                     s_ext[nf*NVAR + URHO] = s_int[URHO];
@@ -107,8 +116,6 @@ bcnormal (const amrex::Real x[AMREX_SPACEDIM],
                     s_ext[nf*NVAR + UMY] =-s_int[UMY];
                     s_ext[nf*NVAR + UMZ] = s_int[UMZ];
                     s_ext[nf*NVAR + UEDEN] = s_int[UEDEN];
-                    // s_ext[nf*NVAR + UEINT] = s_int[UEINT];
-                    // s_ext[nf*NVAR + UTEMP] = s_int[UTEMP];
                     s_ext[nf*NVAR + UFS] = s_int[UFS];
                 }
             } else { //yhi
@@ -152,12 +159,43 @@ bcnormal (const amrex::Real x[AMREX_SPACEDIM],
 AMREX_GPU_DEVICE
 AMREX_FORCE_INLINE
 void
-cns_prob_post_restart (int i, int j, int k, 
+prob_post_restart (int i, int j, int k, 
                        amrex::Array4<amrex::Real> const& state,
                        amrex::GeometryData const& geomdata,
                        Parm const& parm,
                        ProbParm const& prob_parm)
 {
 }
+
+AMREX_GPU_DEVICE AMREX_FORCE_INLINE void
+prob_post_timestep (
+  int i, int j, int k, 
+  const amrex::Real /*curtime*/,
+  const amrex::Real dtlev,
+  amrex::Array4<amrex::Real> const& state,
+  amrex::Array4<const amrex::Real> const& reactions,
+  amrex::GeometryData const& /*geomdata*/,
+  Parm const& /*parm*/,
+  ProbParm const& pp)
+{
+}
+
+AMREX_GPU_DEVICE AMREX_FORCE_INLINE void
+prob_tag_error (int i, int j, int k, 
+                amrex::Array4<char> const& tagarr, 
+                amrex::Array4<const amrex::Real> const& /*sarr*/, 
+                int level, 
+                char tagval,
+                const amrex::Real /*time*/,
+                amrex::GeometryData const& geomdata,
+                Parm const& /*parm*/,
+                ProbParm const& /*pp*/)
+{
+}
+
+// AMREX_GPU_DEVICE AMREX_FORCE_INLINE void
+// prob_get_aux_name (amrex::Vector<std::string>& aux_name) 
+// {
+// }
 
 #endif

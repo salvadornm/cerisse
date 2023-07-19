@@ -3,6 +3,5 @@ CEXE_headers += recon.H
 
 ifeq ($(USE_EB), TRUE)
   CEXE_headers += recon_eb.H
-  CEXE_headers += divop_eb.H 
-  CEXE_sources += flux_redistribute_eb.cpp
+  CEXE_headers += divop_eb.H
 endif

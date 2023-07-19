@@ -8,7 +8,7 @@
 #include "index_macros.H"
 #include "PelePhysics.H"
 
-// This file contains utility functions for the CNS class.
+// This file contains kernel functions for the CNS class.
 
 /** 
  * \brief Compute max dt size based on hydrodynamic limit.

@@ -69,6 +69,7 @@ prob_initdata (int i, int j, int k,
 AMREX_GPU_DEVICE AMREX_FORCE_INLINE void
 bcnormal (const amrex::Real x[AMREX_SPACEDIM],
           const amrex::Real* /*s_int[LEN_STATE]*/,
+          const amrex::Real* /*s_refl[LEN_STATE]*/,
           amrex::Real s_ext[LEN_STATE],
           const int idir,
           const int sgn, 
@@ -90,7 +91,7 @@ bcnormal (const amrex::Real x[AMREX_SPACEDIM],
  * @param prob_parm ProbParm data as defined in prob_parm.H and initialised in amrex_probinit.
  */
 AMREX_GPU_DEVICE AMREX_FORCE_INLINE void
-cns_prob_post_restart (int i, int j, int k, 
+prob_post_restart (int i, int j, int k, 
                        amrex::Array4<amrex::Real> const& state,
                        amrex::GeometryData const& geomdata,
                        Parm const& parm,

@@ -16,7 +16,7 @@ USE_MPI = TRUE
 USE_OMP = FALSE
 USE_CUDA = FALSE
 USE_HIP = FALSE
-USE_DPCPP = FALSE
+USE_SYCL = FALSE
 
 # Debugging
 DEBUG = FALSE
@@ -29,7 +29,7 @@ Transport_Model := Simple
 Chemistry_Model := BurkeDryer
 
 # CNS
-NUM_FIELD = 3
+NUM_FIELD = 0
 
 # GNU Make
 include ./Make.package

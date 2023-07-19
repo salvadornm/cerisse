@@ -99,12 +99,12 @@ cns.refine_magvort_max_lev = 3
 
 # ==================== OUTPUT FILES ==================== #
 amr.checkpoint_files_output = 1
-amr.check_file      = vspdf23/chk    # root name of checkpoint file
+amr.check_file      = vspdf24/chk    # root name of checkpoint file
 amr.check_int       = 1000   # number of timesteps between checkpoints
 #amr.check_per # interval physical time between checkpoints
 
 amr.plot_files_output = 1
-amr.plot_file         = vspdf23/plt  # root name of plotfile
+amr.plot_file         = vspdf24/plt  # root name of plotfile
 amr.plot_int          = 100  # number of timesteps between plotfiles
 #amr.plot_per # interval physical time between plotfiles
 amr.derive_plot_vars  = temp pressure x_velocity y_velocity z_velocity MachNumber divrho divu magvort cv cp transport_coef reynolds_stress
@@ -122,5 +122,5 @@ prob.p = 942322.5
 prob.vorticity_thickness = 0.0198
 prob.record_statistics = 1
 
-amr.restart = vspdf21/chk01000
+amr.restart = vspdf18-2/chk01000
 #amr.plotfile_on_restart = 1

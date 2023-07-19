@@ -27,6 +27,17 @@ cns_ctoprim (int i, int j, int k, int ns,
              amrex::Array4<amrex::Real> const& q,
              Parm const& /*parm*/) noexcept
 {
+    // std::ostringstream ss;
+    // amrex::Real sumRY = 0.0;
+    // ss << "@" << i << "," << j << "," << k << ": ns=" << ns << ": rho=" << u(i,j,k,ns+URHO)
+    //    << " xmom=" << u(i,j,k,ns+UMX) << " ymom=" << u(i,j,k,ns+UMY) << " zmom=" << u(i,j,k,ns+UMZ) << " rhoE=" << u(i,j,k,ns+UEDEN) << std::endl;
+    // for (int n = 0; n < NUM_SPECIES; n++) {
+    //     ss << " rhoY" << n << "=" << u(i,j,k,ns+UFS+n) << " ";
+    //     sumRY += u(i,j,k,ns+UFS+n);
+    // }
+    // ss << " sum=" << sumRY << "\n";        
+    // BL_BACKTRACE_PUSH(ss.str()); // PUSH takes std::string    
+
     amrex::Real rho = u(i,j,k,ns+URHO);
     amrex::Real rhoinv = amrex::Real(1.0) / rho;
     AMREX_D_TERM(amrex::Real ux = u(i,j,k,ns+UMX)*rhoinv; ,
@@ -41,9 +52,16 @@ cns_ctoprim (int i, int j, int k, int ns,
     }
 
     auto eos = pele::physics::PhysicsType::eos();
-    amrex::Real T, p, cs, gamma;
+    amrex::Real T=0, p, cs, gamma;
     eos.REY2T(rho, ei, massfrac, T);
     eos.RTY2P(rho, T, massfrac, p);
+
+    // ss << "@" << i << "," << j << "," << k << ": ns=" << ns << ": rho=" << rho << " T=" << T << " p=" << p;
+    // for (int n = 0; n < NUM_SPECIES; n++) {
+    //     ss << " Y" << n << "=" << massfrac[n] << " ";
+    // }      
+    // BL_BACKTRACE_PUSH(ss.str()); // PUSH takes std::string    
+
     eos.RTY2Cs(rho, T, massfrac, cs);
     eos.RTY2G(rho, T, massfrac, gamma);
     
@@ -57,15 +75,19 @@ cns_ctoprim (int i, int j, int k, int ns,
     q(i,j,k,QEINT) = ei;
     q(i,j,k,QTEMP) = T;
     
-    // Monitor problem cell
-    if ((T <= 0.0) || amrex::isnan(cs) || amrex::isnan(ux) || (rho <= 0.0) || (p <= 0.0)) {
-        std::cout << "@" << i << "," << j << "," << k << ": ns=" << ns << ": rho=" << rho << " T=" << T << " p=" << p
-                  << " u=" << ux << " rhoE=" << u(i,j,k,ns+UEDEN) << " ei=" << ei << std::endl; //why it bugs if I use "\n" instead?
-        for (int n = 0; n < NUM_SPECIES; n++) {
-            std::cout << " rhoY" << n << "=" << u(i,j,k,ns+UFS+n) << " ";
-        }
-        std::cout << "\n";
-    }
+    // // Monitor problem cell
+    // std::ostringstream ss;
+    
+    // if ((T <= 0.0) || amrex::isnan(cs) || amrex::isnan(ux) || (rho <= 0.0) || (p <= 0.0)) {
+    //     ss << "@" << i << "," << j << "," << k << ": ns=" << ns << ": rho=" << rho << " T=" << T << " p=" << p
+    //               << " u=" << ux << " rhoE=" << u(i,j,k,ns+UEDEN) << " ei=" << ei << std::endl; //why it bugs if I use "\n" instead?
+    //     for (int n = 0; n < NUM_SPECIES; n++) {
+    //         ss << " rhoY" << n << "=" << u(i,j,k,ns+UFS+n) << " ";
+    //     }
+    //     ss << "\n";
+        
+    //     BL_BACKTRACE_PUSH(ss.str()); // PUSH takes std::string
+    // }
 }
 
 /**
@@ -555,13 +577,16 @@ cns_riemann (int i, int j, int k, int dir,
     const amrex::IntVect iv(AMREX_D_DECL(i, j, k));
     const amrex::IntVect iv_dir = amrex::IntVect::TheDimensionVector(dir);
 
-    int UMN, UMT, UMTT;
+    int UMN, UMT, UMTT, QUN, QUT, QUTT;
     if (dir == 0) {
         UMN = UMX; UMT = UMY; UMTT = UMZ;
+        QUN = QU;  QUT = QV;  QUTT = QW;
     } else if (dir == 1) {
         UMN = UMY; UMT = UMX; UMTT = UMZ;
+        QUN = QV;  QUT = QU;  QUTT = QW;
     } else {
         UMN = UMZ; UMT = UMX; UMTT = UMY;
+        QUN = QW;  QUT = QU;  QUTT = QV;
     }
 
     auto eos = pele::physics::PhysicsType::eos();
@@ -584,12 +609,12 @@ cns_riemann (int i, int j, int k, int dir,
         yl[n] = amrex::max<Real>(0.0, wl(iv,WY+n));
         sumY += yl[n];
     }    
-    if (std::abs(sumY - 1.0) > parm.smally) {
-        Real invsumY = 1.0 / sumY;
-        for (int n = 0; n < NUM_SPECIES; ++n) {
-            yl[n] *= invsumY;
-        }
+    // if (std::abs(sumY - 1.0) > parm.smally) {
+    Real invsumY = 1.0 / sumY;
+    for (int n = 0; n < NUM_SPECIES; ++n) {
+        yl[n] *= invsumY;
     }
+    // }
     AMREX_D_TERM(,
         ut1l = wl(iv,WUT); ,
         ut2l = wl(iv,WUT+1););    
@@ -609,12 +634,12 @@ cns_riemann (int i, int j, int k, int dir,
         yr[n] = amrex::max<Real>(0.0, wr(iv,WY+n));
         sumY += yr[n];
     }
-    if (std::abs(sumY - 1.0) > parm.smally) {
-        Real invsumY = 1.0 / sumY;
-        for (int n = 0; n < NUM_SPECIES; ++n) {
-            yr[n] *= invsumY;
-        }
+    // if (std::abs(sumY - 1.0) > parm.smally) {
+    invsumY = 1.0 / sumY;
+    for (int n = 0; n < NUM_SPECIES; ++n) {
+        yr[n] *= invsumY;
     }
+    // }
     AMREX_D_TERM(,
         ut1r = wr(iv,WUT); ,
         ut2r = wr(iv,WUT+1););
@@ -622,14 +647,25 @@ cns_riemann (int i, int j, int k, int dir,
     cns_unpackchar(wr(iv,WRHO), wr(iv,WACO), wr(iv,WACO+1), cr, r, g, 
                    rr, ur, pr, sys, parm);
 
-    if (!isgreater(rl,0.0) || !isgreater(rr,0.0) || !isgreater(pl,0.0) || !isgreater(pr,0.0)) { // isgreater() returns false with nan
+    if (!isgreater(rl,0.0) || !isgreater(rr,0.0) || 
+        !isgreater(pl,0.0) || !isgreater(pr,0.0)) { // isgreater() returns false with nan
         // Revert to piecewise linear (Godunov) reconstruction
         rl = q(iv-iv_dir,QRHO);
-        ul = q(iv-iv_dir,QU+dir);
+        AMREX_D_TERM(ul   = q(iv-iv_dir,QUN);,
+                     ut1l = q(iv-iv_dir,QUT); ,
+                     ut2l = q(iv-iv_dir,QUTT););  
         pl = q(iv-iv_dir,QPRES);
+        for (int n = 0; n < NUM_SPECIES; ++n) {
+            yl[n] = q(iv-iv_dir,QFS+n);
+        }
         rr = q(iv,QRHO);
-        ur = q(iv,QU+dir);
+        AMREX_D_TERM(ur   = q(iv,QUN);,
+                     ut1r = q(iv,QUT); ,
+                     ut2r = q(iv,QUTT););  
         pr = q(iv,QPRES);
+        for (int n = 0; n < NUM_SPECIES; ++n) {
+            yr[n] = q(iv,QFS+n);
+        }
     }
 
     eos.RYP2E(rl, yl, pl, el);
@@ -644,7 +680,6 @@ cns_riemann (int i, int j, int k, int dir,
         std::cout << "l c=" << cl << " p="<< pl << " r=" << rl << " u=" << ul
                  << " r c=" << cr << " p="<< pr << " r=" << rr << " u=" << ur << std::endl;
     }
-
 
     Real ry_flx[NUM_SPECIES] = {0.0};
 

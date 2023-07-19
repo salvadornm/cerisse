@@ -16,14 +16,14 @@ USE_MPI = TRUE
 USE_OMP = FALSE
 USE_CUDA = FALSE
 USE_HIP = FALSE
-USE_DPCPP = FALSE
+USE_SYCL = FALSE
 
 # Debugging
 DEBUG = FALSE
 FSANITIZER = FALSE
 THREAD_SANITIZER = FALSE
 
-# PeleC
+# PelePhysics
 Eos_Model := Fuego
 Transport_Model := Simple
 Chemistry_Model := LiDryer

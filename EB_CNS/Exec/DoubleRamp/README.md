@@ -14,7 +14,7 @@ Three-dimensional flow of Mach 3 over a double-compression ramp. The ramp angles
 ## Problem geometry
 To define the problem geometry, user needs to first declare a class inherited from ```CustomGeometry``` in ```prob.H``` such that it is registered. Then, the build method is defined in ```prob.cpp```. More about the usage of EB2 implicit functions (IF) can be found in [```Submodules/amrex/Src/EB```](../../../Submodules/amrex/Src/EB).
 
-## Different boundary conditions
+<!-- ## Different boundary conditions
 Figure below compares the results of adiabatic (left), isothermal with inviscid fluxes only (middle, not currently available), and full isothermal (right) boundary conditions.
 
-![](compare_bc.png)
+![](compare_bc.png) -->

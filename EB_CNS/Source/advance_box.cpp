@@ -20,7 +20,7 @@ CNS::compute_dSdt_box (Box const& bx,
   const auto dxinv = geom.InvCellSizeArray();
   
   // Primitive variables
-  FArrayBox qtmp(bxg3, LEN_PRIM); 
+  FArrayBox qtmp(bxg3, LEN_PRIM, The_Async_Arena()); 
   Parm const* lparm = d_parm;
   for (int nf = 0; nf <= NUM_FIELD; ++nf){
     auto const& qfill = qtmp.array(nf*NPRIM);
@@ -31,9 +31,9 @@ CNS::compute_dSdt_box (Box const& bx,
   }
   
   // Arrays for characteristic reconstruction
-  FArrayBox wtmp(bxg3, NCHAR);
-  FArrayBox wl_tmp(bxg2, NPRIM);
-  FArrayBox wr_tmp(bxg2, NPRIM);
+  FArrayBox wtmp(bxg3, NCHAR, The_Async_Arena());
+  FArrayBox wl_tmp(bxg2, NPRIM, The_Async_Arena());
+  FArrayBox wr_tmp(bxg2, NPRIM, The_Async_Arena());
   auto const& w = wtmp.array();
   auto const& wl = wl_tmp.array();
   auto const& wr = wr_tmp.array();
@@ -41,7 +41,7 @@ CNS::compute_dSdt_box (Box const& bx,
   // Transport coef
   FArrayBox diff_coeff;
   if (do_visc == 1) {
-    diff_coeff.resize(bxg2, LEN_COEF);
+    diff_coeff.resize(bxg2, LEN_COEF, The_Async_Arena());
   
     for (int nf = 0; nf <= NUM_FIELD; ++nf){
       auto const& qar_yin   = qtmp.array(nf*NPRIM + QFS);
@@ -73,7 +73,7 @@ CNS::compute_dSdt_box (Box const& bx,
     // pflux_fab.resize(flxbx, LEN_STATE);
     // pflux_fab.setVal(0.0);
     if (do_visc == 1) {
-      vflux_fab.resize(flxbx, NVAR);
+      vflux_fab.resize(flxbx, NVAR, The_Async_Arena());
       vflux_fab.setVal(0.0);            
     }
     auto const& vflx_arr = vflux_fab.array();

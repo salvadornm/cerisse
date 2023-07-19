@@ -91,7 +91,7 @@ bcnormal (
 {
   BL_PROFILE("bcnormal()");
 
-  const amrex::Real rsqr = x[1]*x[1] + x[2]*x[2];
+  const amrex::Real rsqr = AMREX_D_TERM(, x[1]*x[1], + x[2]*x[2]);
 
   for (int nf = 0; nf <= NUM_FIELD; ++nf) {
     if (rsqr > 0.1905*0.1905 && rsqr < 0.889*0.889) { // Air inlet
@@ -224,6 +224,7 @@ prob_post_timestep (
   Parm const& /*parm*/,
   ProbParm const& pp)
 {
+#if NUM_AUX > 0
   if (pp.record_statistics) {
     Real rho = state(i, j, k, URHO);
     Real rhoinv = Real(1.0) / rho;
@@ -236,7 +237,8 @@ prob_post_timestep (
       massfrac[n] = state(i, j, k, UFS + n) * rhoinv;
     }
 
-    Real T, X[NUM_SPECIES];
+    Real T = 0.0;
+    Real X[NUM_SPECIES];
     auto eos = pele::physics::PhysicsType::eos();
     eos.REY2T(rho, ei, massfrac, T);
     eos.Y2X(massfrac, X);
@@ -252,7 +254,7 @@ prob_post_timestep (
     state(i, j, k, UFA+6) += X[H2O_ID] * dtlev; // X(H2O)
     state(i, j, k, UFA+7) += X[N2_ID] * dtlev; // X(N2)
     state(i, j, k, UFA+8) += X[O2_ID] * dtlev; // X(O2)
-    state(i, j, k, UFA+9) += reactions(i, j, k, NUM_SPECIES + 1) * dtlev; // heat release rate
+    state(i, j, k, UFA+9) += reactions(i, j, k, NUM_SPECIES) * dtlev; // heat release rate
 
     // RMS^2   
     state(i, j, k, UFA+10) += T*T * dtlev; // T
@@ -262,8 +264,10 @@ prob_post_timestep (
     state(i, j, k, UFA+14) += X[N2_ID]*X[N2_ID] * dtlev; // X(N2)
     state(i, j, k, UFA+15) += X[O2_ID]*X[O2_ID] * dtlev; // X(O2)
   }
+#endif
 }
 
+#if NUM_AUX > 0
 AMREX_GPU_DEVICE AMREX_FORCE_INLINE void
 prob_get_aux_name (amrex::Vector<std::string>& aux_name) 
 {
@@ -286,5 +290,6 @@ prob_get_aux_name (amrex::Vector<std::string>& aux_name)
   aux_name[14] = "mean_squared_X_N2";
   aux_name[15] = "mean_squared_X_O2";
 }
+#endif
 
 #endif

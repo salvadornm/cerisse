@@ -7,8 +7,10 @@ int      CNS::verbose   = 2;
 Real     CNS::cfl       = 0.3;
 Real     CNS::fixed_dt  = -1;
 Real     CNS::dt_cutoff = 5.e-20;
+int      CNS::rk_order  = 2;
 
-int             CNS::do_reflux = 1;
+bool     CNS::do_reflux = true;
+bool     CNS::do_load_balance = true;
 
 int             CNS::refine_cutcells = 1;
 int             CNS::refine_cutcells_max_lev = 10;
@@ -61,10 +63,10 @@ Real    CNS::Sc_T = 0.7;  // Turbulent Schmidt number = mu_T/(rho*D_T)
 
 #if CNS_USE_EB
 int   CNS::eb_weights_type     = 3; // [0,1,2,3] 0: weights are all 1; 1: eint; 2: cell mass; 3: volfrac
-int   CNS::do_reredistribution = 1;
 bool  CNS::eb_no_slip          = true;
 bool  CNS::eb_isothermal       = false;
 Real  CNS::eb_wall_temp; // EB wall temperature
+std::string CNS::redistribution_type = "StateRedist";  // StateRedist / FluxRedist / NoRedist
 #endif
 
 bool  CNS::signalStopJob = false;
