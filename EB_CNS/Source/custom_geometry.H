@@ -1,12 +1,11 @@
 #ifndef CNS_CUSTOM_GEOMETRY_H_
 #define CNS_CUSTOM_GEOMETRY_H_
 
-#include <Factory.H>
-
-#include <AMReX_ParmParse.H>
-#include <AMReX_Geometry.H>
 #include <AMReX_EB2.H>
 #include <AMReX_EB2_IF.H>
+#include <AMReX_Geometry.H>
+#include <AMReX_ParmParse.H>
+#include <Factory.H>
 
 using namespace amrex;
 
@@ -20,7 +19,7 @@ public:
 
   ~CustomGeometry() override = default;
 
-  virtual void build(const Geometry& geom, const int max_coarsening_level) = 0;  
+  virtual void build(const Geometry& geom, const int max_coarsening_level) = 0;
 };
 
 //
@@ -28,8 +27,7 @@ public:
 // See PelePhysics Factory.H for how to define a subclass
 
 #if AMREX_SPACEDIM == 3
-class Combustor : 
-  public CustomGeometry::Register<Combustor>
+class Combustor : public CustomGeometry::Register<Combustor>
 {
 public:
   static const std::string identifier() { return "combustor"; }
@@ -37,8 +35,7 @@ public:
   void build(const Geometry& geom, const int max_coarsening_level) override;
 };
 
-class ConvergingNozzle : 
-  public CustomGeometry::Register<ConvergingNozzle>
+class ConvergingNozzle : public CustomGeometry::Register<ConvergingNozzle>
 {
 public:
   static std::string identifier() { return "converging-nozzle"; }
@@ -47,8 +44,7 @@ public:
 };
 #endif
 
-class Triangles : 
-  public CustomGeometry::Register<Triangles>
+class Triangles : public CustomGeometry::Register<Triangles>
 {
 public:
   static std::string identifier() { return "triangles"; }
@@ -56,7 +52,7 @@ public:
   void build(const Geometry& geom, const int max_coarsening_level) override;
 };
 
-// 
+//
 // Define methods to build custom geometries in custom_geometry.cpp
 
 #endif

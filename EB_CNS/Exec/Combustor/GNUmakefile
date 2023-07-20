@@ -16,7 +16,7 @@ USE_MPI = TRUE
 USE_OMP = FALSE
 USE_CUDA = FALSE
 USE_HIP = FALSE
-USE_DPCPP = FALSE
+USE_SYCL = FALSE
 
 # Debugging
 DEBUG = FALSE
@@ -27,6 +27,9 @@ THREAD_SANITIZER = FALSE
 Eos_Model := Fuego
 Transport_Model := Simple
 Chemistry_Model := air
+
+# CNS
+USE_EB = TRUE
 
 # GNU Make
 include ./Make.package

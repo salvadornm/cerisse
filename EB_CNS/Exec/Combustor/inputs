@@ -1,4 +1,4 @@
-max_step = 200
+max_step = 1000
 stop_time = 0.2
 
 geometry.is_periodic = 0 0 0
@@ -16,31 +16,36 @@ cns.lo_bc       =  5 5 1
 cns.hi_bc       =  5 5 2 
 
 cns.do_visc  = 1
-#cns.use_const_visc = 0
-#cns.const_visc_mu  = 0.001
-#cns.const_visc_ki  = 0.0
-#cns.const_lambda   = 0.01
+
 cns.do_react = 0
 cns.chem_integrator = Reactor_Null
 
-cns.cfl = 0.5     # cfl number for hyperbolic system (max tested is 0.5)
+# ==================== WHAT NUMERICS =================== #
+cns.cfl = 0.3
 cns.dt_cutoff = 5.e-20
+cns.recon_scheme = 6   # 1: Godunov,  2: MUSCL,   3: WENO-Z3, 
+                       # 4: WENO-JS5, 5: WENO-Z5, 6: TENO-5
+cns.clip_temp    = 0   # clip minimum temperature [K]
+# cns.eb_weights_type = 3
 
 cns.v = 2
 amr.v = 1
 
 # LOAD BALANCE
 amr.loadbalance_with_workestimates = 1
-amr.loadbalance_level0_int = 100
+#amr.loadbalance_level0_int = 100
 
 # REFINEMENT / REGRIDDING
 amr.max_level       = 1       # maximum level number allowed
 amr.ref_ratio       = 2 2 2 2 # refinement ratio
 amr.regrid_int      = 10      # how often to regrid
-amr.blocking_factor = 4
+amr.blocking_factor = 8
 amr.max_grid_size   = 32
-amr.n_error_buf     = 2       # number of buffer cells in error est
-amr.grid_eff        = 0.7
+amr.n_error_buf     = 0       # number of buffer cells in error est
+amr.grid_eff        = 0.8
+
+#cns.refine_magvort = 3e5
+#cns.refine_magvort_max_lev = 3
 
 # CHECKPOINT FILES
 amr.checkpoint_files_output = 1
@@ -50,11 +55,14 @@ amr.check_int       = 100        # number of timesteps between checkpoints
 # PLOTFILES
 amr.plot_files_output = 1
 amr.plot_file         = plt      # root name of plotfile
-amr.plot_int          = 10      # number of timesteps between plotfiles
-amr.derive_plot_vars  = pressure x_velocity y_velocity z_velocity MachNumber divrho divu magvort
+amr.plot_int          = 10       # number of timesteps between plotfiles
+amr.derive_plot_vars  = temp pressure x_velocity y_velocity z_velocity MachNumber divrho divu magvort
+cns.plot_massfrac = 1
 
 #this is for the JBB combustor
 eb2.geom_type = "combustor" 
+cns.eb_no_slip = 1
+cns.eb_isothermal = 0
 
 #Far wall location in x
 combustor.far_wall_loc = 2.25
@@ -72,6 +80,8 @@ combustor.ramp_plane3_point = 0.5 0.
 combustor.pipe_lo = 0.3 -5.0
 combustor.pipe_hi = 0.5 2.5
 
-amr.restart = chk00100
-amr.plotfile_on_restart = 1
-cns.do_restart_fields = 1
+prob.inflow_mach = 0.8
+
+#amr.restart = chk00100
+#amr.plotfile_on_restart = 1
+#cns.do_restart_fields = 1

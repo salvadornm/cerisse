@@ -2,36 +2,32 @@
 
 using namespace amrex;
 
-void
-CNS::restart (Amr& papa, std::istream& is, bool bReadSpecial)
+void CNS::restart(Amr& papa, std::istream& is, bool bReadSpecial)
 {
-  AmrLevel::restart(papa,is,bReadSpecial);
+  AmrLevel::restart(papa, is, bReadSpecial);
 
   if (do_reflux && level > 0) {
-    flux_reg.define(grids, papa.boxArray(level-1),
-                    dmap, papa.DistributionMap(level-1),
-                    geom, papa.Geom(level-1),
-                    papa.refRatio(level-1), level, LEN_STATE);
+    flux_reg.define(grids, papa.boxArray(level - 1), dmap,
+                    papa.DistributionMap(level - 1), geom, papa.Geom(level - 1),
+                    papa.refRatio(level - 1), level, LEN_STATE);
   }
 
   buildMetrics();
 }
 
-void
-CNS::checkPoint (const std::string& dir, std::ostream& os, VisMF::How how, bool dump_old)
+void CNS::checkPoint(const std::string& dir, std::ostream& os, VisMF::How how,
+                     bool dump_old)
 {
   AmrLevel::checkPoint(dir, os, how, dump_old);
 }
 
-void
-CNS::writePlotFile (const std::string& dir, std::ostream& os, VisMF::How how)
+void CNS::writePlotFile(const std::string& dir, std::ostream& os, VisMF::How how)
 {
   BL_PROFILE("CNS::writePlotFile()");
   AmrLevel::writePlotFile(dir, os, how);
 }
 
-void 
-CNS::setPlotVariables ()
+void CNS::setPlotVariables()
 {
   // This will add everything into the plotfile by default
   amrex::AmrLevel::setPlotVariables();
@@ -59,9 +55,10 @@ CNS::setPlotVariables ()
   pp.query("plot_rho_omega", plot_rho_omega);
   if (do_react && !plot_rho_omega) {
     for (int nf = 0; nf <= NUM_FIELD; ++nf) {
-    for (int i = 0; i < NUM_SPECIES + 1; i++) {
-      amrex::Amr::deleteStatePlotVar(desc_lst[Reactions_Type].name(nf*NREACT + i));
-    }
+      for (int i = 0; i < NUM_SPECIES + 1; i++) {
+        amrex::Amr::deleteStatePlotVar(
+          desc_lst[Reactions_Type].name(nf * NREACT + i));
+      }
     }
   }
 
@@ -69,23 +66,23 @@ CNS::setPlotVariables ()
   pp.query("update_heat_release", plot_hrr);
   if (do_react && !plot_hrr) {
     for (int nf = 0; nf <= NUM_FIELD; ++nf) {
-      amrex::Amr::deleteStatePlotVar(desc_lst[Reactions_Type].name(nf*NREACT + NUM_SPECIES));
+      amrex::Amr::deleteStatePlotVar(
+        desc_lst[Reactions_Type].name(nf * NREACT + NUM_SPECIES));
     }
   }
 
   // Transport coefficients
-  if (!do_visc) {
-    amrex::Amr::deleteDerivePlotVar("transport_coef");
-  }
+  if (!do_visc) { amrex::Amr::deleteDerivePlotVar("transport_coef"); }
 
   // rhoY / Y / X
   bool plot_rhoy = true;
   pp.query("plot_rhoy", plot_rhoy);
-  if (!plot_rhoy) {    
+  if (!plot_rhoy) {
     for (int nf = 0; nf <= NUM_FIELD; ++nf) {
-    for (int i = 0; i < NUM_SPECIES; i++) {
-      amrex::Amr::deleteStatePlotVar(desc_lst[State_Type].name(nf*NVAR + UFS + i));
-    }
+      for (int i = 0; i < NUM_SPECIES; i++) {
+        amrex::Amr::deleteStatePlotVar(
+          desc_lst[State_Type].name(nf * NVAR + UFS + i));
+      }
     }
   }
 
@@ -115,8 +112,9 @@ CNS::setPlotVariables ()
       amrex::Amr::deleteStatePlotVar("ymom_Field" + std::to_string(nf));
       amrex::Amr::deleteStatePlotVar("zmom_Field" + std::to_string(nf));
       amrex::Amr::deleteStatePlotVar("rho_E_Field" + std::to_string(nf));
-      for (int i = 0; i < NUM_SPECIES; ++i) {  
-        amrex::Amr::deleteStatePlotVar("rho_omega_" + spec_names[i] + "_Field" + std::to_string(nf));
+      for (int i = 0; i < NUM_SPECIES; ++i) {
+        amrex::Amr::deleteStatePlotVar("rho_omega_" + spec_names[i] + "_Field" +
+                                       std::to_string(nf));
       }
       amrex::Amr::deleteStatePlotVar("heatRelease_Field" + std::to_string(nf));
     }

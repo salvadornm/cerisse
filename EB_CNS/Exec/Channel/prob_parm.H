@@ -1,8 +1,8 @@
 #ifndef CNS_PROB_PARM_H
 #define CNS_PROB_PARM_H
 
-#include <AMReX_REAL.H>
 #include <AMReX_GpuMemory.H>
+#include <AMReX_REAL.H>
 
 using namespace amrex;
 
@@ -15,7 +15,7 @@ struct ProbParm
   Real u_tau = 3500.0; // friction velocity = sqrt(tau_w/rho_w) [cm/s]
   Real T_w = 500.0;    // wall temperature [K]
   Real mu_w = 2.67e-4; // dynamic viscosity at Tw [g/cm-s]
-  
+
   Real rho_w;
   Real u_b;
   Real rho_b;

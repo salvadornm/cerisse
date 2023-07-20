@@ -1,13 +1,8 @@
 #include "prob.H"
 
 extern "C" {
-void
-amrex_probinit(
-  const int* /*init*/,
-  const int* /*name*/,
-  const int* /*namelen*/,
-  const amrex::Real* problo,
-  const amrex::Real* probhi)
+void amrex_probinit(const int* /*init*/, const int* /*name*/, const int* /*namelen*/,
+                    const amrex::Real* problo, const amrex::Real* probhi)
 {
   // Parse params
   {
@@ -36,28 +31,29 @@ amrex_probinit(
 
   // Initial density and ei
   auto eos = pele::physics::PhysicsType::eos();
-  eos.PYT2RE(CNS::h_prob_parm->p, CNS::h_prob_parm->massfrac1.begin(), CNS::h_prob_parm->T1,
-    CNS::h_prob_parm->rho1, CNS::h_prob_parm->ei1);
-  eos.PYT2RE(CNS::h_prob_parm->p, CNS::h_prob_parm->massfrac2.begin(), CNS::h_prob_parm->T2,
-    CNS::h_prob_parm->rho2, CNS::h_prob_parm->ei2);
+  eos.PYT2RE(CNS::h_prob_parm->p, CNS::h_prob_parm->massfrac1.begin(),
+             CNS::h_prob_parm->T1, CNS::h_prob_parm->rho1, CNS::h_prob_parm->ei1);
+  eos.PYT2RE(CNS::h_prob_parm->p, CNS::h_prob_parm->massfrac2.begin(),
+             CNS::h_prob_parm->T2, CNS::h_prob_parm->rho2, CNS::h_prob_parm->ei2);
 
   amrex::Real c1, c2;
-  eos.RTY2Cs(CNS::h_prob_parm->rho1, CNS::h_prob_parm->T1, CNS::h_prob_parm->massfrac1.begin(), c1);
-  eos.RTY2Cs(CNS::h_prob_parm->rho2, CNS::h_prob_parm->T2, CNS::h_prob_parm->massfrac2.begin(), c2);
-  CNS::h_prob_parm->uc = (c1*CNS::h_prob_parm->u1 + c2*CNS::h_prob_parm->u2) / (c1 + c2);
+  eos.RTY2Cs(CNS::h_prob_parm->rho1, CNS::h_prob_parm->T1,
+             CNS::h_prob_parm->massfrac1.begin(), c1);
+  eos.RTY2Cs(CNS::h_prob_parm->rho2, CNS::h_prob_parm->T2,
+             CNS::h_prob_parm->massfrac2.begin(), c2);
+  CNS::h_prob_parm->uc =
+    (c1 * CNS::h_prob_parm->u1 + c2 * CNS::h_prob_parm->u2) / (c1 + c2);
 
-  amrex::Gpu::copy(amrex::Gpu::hostToDevice, CNS::h_prob_parm, CNS::h_prob_parm+1, CNS::d_prob_parm);
+  amrex::Gpu::copy(amrex::Gpu::hostToDevice, CNS::h_prob_parm, CNS::h_prob_parm + 1,
+                   CNS::d_prob_parm);
 }
 }
 
-void
-CNS::fill_ext_src (int i, int j, int k, 
-                   amrex::Real time,
-                   amrex::GeometryData const& geomdata, 
-                   amrex::Array4<const amrex::Real> const& /*state*/, 
-                   amrex::Array4<amrex::Real> const& ext_src, 
-                   Parm const& /*parm*/,
-                   ProbParm const& pp)
+void CNS::fill_ext_src(int i, int j, int k, amrex::Real time,
+                       amrex::GeometryData const& geomdata,
+                       amrex::Array4<const amrex::Real> const& /*state*/,
+                       amrex::Array4<amrex::Real> const& ext_src,
+                       Parm const& /*parm*/, ProbParm const& pp)
 {
   // Geometry
   const amrex::Real* prob_lo = geomdata.ProbLo();
@@ -66,12 +62,15 @@ CNS::fill_ext_src (int i, int j, int k,
   const amrex::Real y = prob_lo[1] + (j + 0.5) * dx[1];
   const amrex::Real z = prob_lo[2] + (k + 0.5) * dx[2];
 
-  const amrex::Real rsq = AMREX_D_TERM((x - 4*pp.theta_w)*(x - 4*pp.theta_w), + y*y, + z*z);
-  const amrex::Real theta_sq = pp.theta_w*pp.theta_w;
+  const amrex::Real rsq =
+    AMREX_D_TERM((x - 4 * pp.theta_w) * (x - 4 * pp.theta_w), +y * y, +z * z);
+  const amrex::Real theta_sq = pp.theta_w * pp.theta_w;
 
   if (rsq >= theta_sq) {
     for (int nf = 0; nf <= NUM_FIELD; ++nf) {
-      ext_src(i, j, k, nf*NVAR + UMY) += 0.01 * pp.uc * exp(-rsq / theta_sq) * sin(1e-6 * time); // Yuri says amplitude is 0.1*Uc ??
+      ext_src(i, j, k, nf * NVAR + UMY) +=
+        0.01 * pp.uc * exp(-rsq / theta_sq) *
+        sin(1e-6 * time); // Yuri says amplitude is 0.1*Uc ??
     }
   }
 }

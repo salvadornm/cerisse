@@ -20,9 +20,9 @@ cns.do_visc  = 1
 cns.do_react = 0
 
 cns.cfl = 0.3
-#cns.fixed_dt = 1e-7
+#cns.fixed_dt = 2e-7
 cns.dt_cutoff = 5.e-20
-cns.recon_scheme = 1  # 1: Godunov,  2: MUSCL,   3: WENO-Z3, 
+cns.recon_scheme = 5  # 1: Godunov,  2: MUSCL,   3: WENO-Z3, 
                       # 4: WENO-JS5, 5: WENO-Z5, 6: TENO-5
 cns.char_sys = 1
 #cns.clip_temp = 50
@@ -54,10 +54,6 @@ triangles.tri_1_point_0 = 19.0 0.0 0.0
 triangles.tri_1_point_1 = 10.0 -2.0 0.0
 triangles.tri_1_point_2 = 19.0 -2.0 0.0
 
-#eb2.geom_type = plane
-#eb2.plane_point = 0.5  -3.0
-#eb2.plane_normal = 1.0 -1.732
-
 cns.eb_no_slip = 1
 cns.eb_isothermal = 1
 cns.eb_wall_temp = 300.0
@@ -72,11 +68,11 @@ prob.ang = 0.0
 
 # CHECKPOINT FILES
 amr.checkpoint_files_output = 1
-amr.check_file      = iso_ns_3d_2/chk    # root name of checkpoint file
+amr.check_file      = chk    # root name of checkpoint file
 amr.check_int       = 500   # number of timesteps between checkpoints
 
 # PLOTFILES
 amr.plot_files_output = 1
-amr.plot_file         = iso_ns_3d_2/plt  # root name of plotfile
+amr.plot_file         = plt  # root name of plotfile
 amr.plot_int          = 100  # number of timesteps between plotfiles
 amr.derive_plot_vars  = temp pressure x_velocity y_velocity MachNumber magvort

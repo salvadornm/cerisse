@@ -1,8 +1,8 @@
 #ifndef CNS_PROB_PARM_H
 #define CNS_PROB_PARM_H
 
-#include <AMReX_REAL.H>
 #include <AMReX_GpuMemory.H>
+#include <AMReX_REAL.H>
 
 struct ProbParm
 {
@@ -29,7 +29,8 @@ struct ProbParm
   amrex::Real ei_a;
   amrex::GpuArray<amrex::Real, NUM_SPECIES> Y_a = {0.0};
 
-  bool record_statistics;
+  bool record_statistics = false;
+  bool clean_aux_on_restart = false;
 };
 
 #endif

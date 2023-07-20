@@ -2,7 +2,7 @@
 
 # Build and test solver using CMake + CTest
 # Usage: run this from the root /cerisse directory, i.e.
-# cd ../../.. && ./build-and-test.sh [2D/3D]
+#        cd ../../.. && ./EB_CNS/Tools/CTest/build-and-test.sh [2D/3D]
 
 mkdir Build
 cd Build
