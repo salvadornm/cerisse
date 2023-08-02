@@ -22,7 +22,8 @@ struct ProbParm
   amrex::Real theta_w = 0.0198; // vorticity thickness
   amrex::Real uc;               // convective velocity
 
-  bool record_statistics; // record statistics or not
+  bool record_statistics = false; // record statistics or not
+  bool clean_aux_on_restart = false;
 };
 
 #endif

@@ -161,6 +161,7 @@ target_sources(${exe_name}
       ${SRC_DIR}/turb/LES.H 
       ${SRC_DIR}/turb/Smagorinsky.cpp
       ${SRC_DIR}/turb/WALE.cpp
+      ${SRC_DIR}/turb/PaSR.H
 )
 
 if(CNS_ENABLE_EB)

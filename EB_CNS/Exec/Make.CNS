@@ -20,6 +20,9 @@ DEFINES += -DCRSEGRNDOMP # Coarse-grained OMP approach
 
 ifdef NUM_FIELD
    DEFINES += -DNUM_FIELD=$(NUM_FIELD)
+   ifneq ($(NUM_FIELD), 0)
+      USERSuffix = .SF$(NUM_FIELD)
+   endif
 endif
 
 ifdef NUM_AUX
@@ -102,7 +105,7 @@ ifdef Custom_Chemistry_Model
 endif
 
 all: $(executable)
-	@echo SUCCESS
+	@echo SUCCESS: $(executable)
 
 include $(AMREX_HOME)/Tools/GNUMake/Make.rules
 

@@ -4,7 +4,6 @@
 #endif
 
 #include "CNS.H"
-#include "pdf_model.H"
 
 using namespace amrex;
 

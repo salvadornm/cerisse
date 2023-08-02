@@ -1,6 +1,7 @@
 #include <AMReX_FArrayBox.H>
 
 #include "CNS.H"
+#include "PaSR.H"
 
 using namespace amrex;
 
@@ -28,7 +29,7 @@ void CNS::set_typical_values_chem()
 /**
  * \brief Compute I_R and update S_new += dt*I_R
  */
-void CNS::react_state(Real /*time*/, Real dt, bool init_react)
+void CNS::react_state(Real time, Real dt, bool init_react)
 {
   BL_PROFILE("CNS::react_state()");
   const Real strt_time = amrex::ParallelDescriptor::second();
@@ -43,7 +44,9 @@ void CNS::react_state(Real /*time*/, Real dt, bool init_react)
   }
 
   // State Fabs
-  const MultiFab& Sold = get_old_data(State_Type);
+  MultiFab Sold(grids, dmap, LEN_STATE, 1, MFInfo(),
+                Factory()); //= get_old_data(State_Type);
+  FillPatch(*this, Sold, 1, time, State_Type, 0, LEN_STATE);
   MultiFab& Snew = get_new_data(State_Type);
   MultiFab& I_R = get_new_data(Reactions_Type);
   I_R.setVal(0.0);
@@ -76,7 +79,10 @@ void CNS::react_state(Real /*time*/, Real dt, bool init_react)
       if (flags[mfi].getType(bx) != amrex::FabType::covered)
 #endif
       {
-        for (int nf = NUM_FIELD > 0 ? 1 : 0; nf <= NUM_FIELD; ++nf) {
+        bool do_react_fields = (NUM_FIELD > 0); // && do_spdf;
+        int nf_start = do_react_fields ? 1 : 0;
+        int nf_end = do_react_fields ? NUM_FIELD : 0;
+        for (int nf = nf_start; nf <= nf_end; ++nf) {
           ///////////////////// Prepare for react /////////////////////
           const Array4 sold_arr =
             init_react
@@ -135,7 +141,7 @@ void CNS::react_state(Real /*time*/, Real dt, bool init_react)
             // fill mask
             mask(i, j, k) = (T(i, j, k) > min_react_temp) ? 1 : -1;
 #if CNS_USE_EB
-            mask(i, j, k) = (vfrac_arr(i, j, k) > 0.0) ? mask(i, j, k) : -1; 
+            mask(i, j, k) = (vfrac_arr(i, j, k) > 0.0) ? mask(i, j, k) : -1;
 #endif
           });
 
@@ -150,39 +156,105 @@ void CNS::react_state(Real /*time*/, Real dt, bool init_react)
           amrex::Gpu::Device::streamSynchronize();
 
           //////////////////////// Unpack data ////////////////////////
+          // Prepare (rho, velocities, mu) for PaSR
+          FArrayBox qfab, mufab;
+          if (do_pasr && !init_react) {
+            const Box bxg1 = amrex::grow(bx, 1);
+            qfab.resize(bxg1, 4, The_Async_Arena()); // [rho, u, v, w]
+            auto const& qarr = qfab.array();
+            amrex::ParallelFor(
+              bxg1, [=] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {
+                qarr(i, j, k, QRHO) = sold_arr(i, j, k, URHO);
+                AMREX_D_TERM(qarr(i, j, k, QU) =
+                               sold_arr(i, j, k, UMX) / sold_arr(i, j, k, URHO);
+                             , qarr(i, j, k, QV) =
+                                 sold_arr(i, j, k, UMY) / sold_arr(i, j, k, URHO);
+                             , qarr(i, j, k, QW) =
+                                 sold_arr(i, j, k, UMZ) / sold_arr(i, j, k, URHO);)
+              });
+
+            mufab.resize(bx, 1, The_Async_Arena()); // [mu]
+            auto const& mu = mufab.array();
+            amrex::ParallelFor(
+              bx, [=] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {
+                // Copy to input
+                Real muloc;
+                Real xiloc, lamloc, Ddiag[NUM_SPECIES]; // not used
+                Real Tin = T(i, j, k);
+                Real rhoin = sold_arr(i, j, k, URHO);
+                Real yin[NUM_SPECIES];
+                for (int n = 0; n < NUM_SPECIES; ++n) {
+                  yin[n] = sold_arr(i, j, k, UFS + n) / rhoin;
+                }
+
+                constexpr bool get_xi = false;
+                constexpr bool get_mu = true;
+                constexpr bool get_lam = false;
+                constexpr bool get_Ddiag = false;
+                auto trans = pele::physics::PhysicsType::transport();
+                auto const* ltransparm = trans_parms.device_trans_parm();
+                trans.transport(get_xi, get_mu, get_lam, get_Ddiag, Tin, rhoin, yin,
+                                Ddiag, muloc, xiloc, lamloc, ltransparm);
+
+                // Copy to output
+                mu(i, j, k) = muloc;
+              });
+          }
+
+          // For unpack_pasr
+          auto const& qarr = qfab.array();
+          auto const& muarr = mufab.array();
+          const auto dx = geom.CellSizeArray();
+          const auto dxinv = geom.InvCellSizeArray();
+
           amrex::ParallelFor(bx, [=] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {
             if (mask(i, j, k) != -1) {
               // Monitor problem cell
-              // bool any_rY_unbounded = false;
-              // for (int n = 0; n < NUM_SPECIES; ++n)
-              //   if (rY(i,j,k,n) < -1e-6 || rY(i,j,k,n) > 1.0 + 1e-6 ||
-              //   std::isnan(rY(i,j,k,n)))
-              //     any_rY_unbounded = true;
+              bool any_rY_unbounded = false;
+              for (int n = 0; n < NUM_SPECIES; ++n)
+                any_rY_unbounded |=
+                  (rY(i, j, k, n) < -1e-5 || rY(i, j, k, n) > 1.0 + 1e-5 ||
+                   std::isnan(rY(i, j, k, n)));
+              if (any_rY_unbounded) {
+                std::cout << "Reaction causing rY=[ ";
+                for (int n = 0; n < NUM_SPECIES; ++n)
+                  std::cout << rY(i, j, k, n) << " ";
+                std::cout << "] @ " << i << "," << j << "," << k << '\n';
+              }
               if (T(i, j, k) < clip_temp) {
                 std::cout << "Reaction causing T=" << T(i, j, k) << " @ " << i << ","
-                          << j << "," << k << std::endl;
-                // } else if (any_rY_unbounded) {
-                //   std::cout << "Reaction causing rY=[";
-                //   for (int n = 0; n < NUM_SPECIES; ++n)
-                //     std::cout << rY(i,j,k,n) << " ";
-                //   std::cout << "] @ " << i << "," << j << "," << k << std::endl;
+                          << j << "," << k << '\n';
               }
-              // else
-              // {
 
               // update U^{n+1} = U^** + dt*I_R^{n+1}
               if (!init_react) {
-                snew_arr(i, j, k, URHO) = 0.0;
+                amrex::Real new_rho = 0.0;
+                if (do_pasr) {
+                  unpack_pasr(i, j, k, snew_arr, new_rho, sold_arr, rY, rYsrc, qarr,
+                              muarr, dx, dxinv, dt);
+                } else {
+                  for (int n = 0; n < NUM_SPECIES; ++n) {
+                    snew_arr(i, j, k, UFS + n) = amrex::max(0.0, rY(i, j, k, n));
+                    new_rho += snew_arr(i, j, k, UFS + n);
+                  }
+                }
+
+                // Enforce conservation of rho
+                // if (std::abs(snew_arr(i, j, k, URHO) - new_rho) > 1e-3 *
+                // snew_arr(i, j, k, URHO))
+                //     std::cout << "Reaction changing rho: diff=" << snew_arr(i, j,
+                //     k, URHO) - new_rho
+                //               << " @ " << i << "," << j << "," << k << '\n';  //
+                //               for debug
                 for (int n = 0; n < NUM_SPECIES; ++n) {
-                  snew_arr(i, j, k, URHO) += rY(i, j, k, n);
-                  snew_arr(i, j, k, UFS + n) = rY(i, j, k, n);
+                  snew_arr(i, j, k, UFS + n) *= snew_arr(i, j, k, URHO) / new_rho;
                 }
               }
 
               // update drY/dt
               for (int n = 0; n < NUM_SPECIES; ++n) {
                 I_R_arr(i, j, k, n) =
-                  (rY(i, j, k, n) - sold_arr(i, j, k, UFS + n)) / dt -
+                  (snew_arr(i, j, k, UFS + n) - sold_arr(i, j, k, UFS + n)) / dt -
                   rYsrc(i, j, k, n);
               }
 

@@ -5,6 +5,7 @@
 
 #if CNS_USE_EB
 #include <AMReX_EBCellFlag.H>
+#include <AMReX_EBFArrayBox.H>
 #include <AMReX_EBFluxRegister.H>
 #else
 #include <AMReX_YAFluxRegister.H>
@@ -195,6 +196,7 @@ public:
   static amrex::Real Pr_T;
   static amrex::Real Sc_T;
   static std::unique_ptr<LESModel> les_model;
+  static amrex::Real Cm;
 
 protected:
   ////////////////////////////////////////////////////////////////////////////

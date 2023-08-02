@@ -66,6 +66,61 @@ bc_isothermal_wall(amrex::Real s_ext[NVAR], const amrex::Real s_int[NVAR],
   for (int n = 0; n < NUM_SPECIES; ++n) s_ext[UFS + n] = rhow * y[n];
 }
 
+/**
+ * @brief Helper function to generate ghost cell states for subsonic pressure outlet.
+ *        It returns to FOExtrap when local Mach number >= 1.
+ *
+ * @param[out] s_ext output ghost cell states.
+ * @param s_int    input near-wall states.
+ * @param p_ext    far field pressure.
+ * @param dir      direction, 0:x, 1:y, 2:z.
+ */
+AMREX_GPU_DEVICE AMREX_FORCE_INLINE void bc_pressure_outlet(
+  amrex::Real s_ext[NVAR], const amrex::Real s_int[NVAR], amrex::Real p_ext, int dir)
+{
+  auto eos = pele::physics::PhysicsType::eos();
+
+  // Fluid states
+  amrex::Real rhoinv = 1.0 / s_int[URHO];
+  amrex::Real y[NUM_SPECIES], T = 0.0, cs;
+  for (int n = 0; n < NUM_SPECIES; ++n) y[n] = s_int[UFS + n] * rhoinv;
+  amrex::Real ke = 0.5 * rhoinv * rhoinv *
+                   (AMREX_D_TERM(s_int[UMX] * s_int[UMX], +s_int[UMY] * s_int[UMY],
+                                 +s_int[UMZ] * s_int[UMZ]));
+  amrex::Real ei = rhoinv * s_int[UEDEN] - ke;
+  eos.REY2T(s_int[URHO], ei, y, T);
+  eos.RTY2Cs(s_int[URHO], T, y, cs);
+  amrex::Real M = std::sqrt(2 * ke) / cs; // lcoal Mach number
+
+  // Ghost states
+  if (M >= 1) {
+    for (int n = 0; n < NVAR; ++n) s_ext[n] = s_int[n]; // FOExtrap
+  } else {
+    amrex::Real gamma, p_int, cs_ext;
+    eos.RTY2G(s_int[URHO], T, y, gamma);
+    eos.RTY2P(s_int[URHO], T, y, p_int);
+    amrex::Real rhog = s_int[URHO] * std::pow(p_ext / p_int, 1.0 / gamma);
+    eos.RPY2Cs(rhog, p_int, y, cs_ext);
+    amrex::Real eg;
+    eos.RYP2E(rhog, y, p_ext, eg);
+
+    // amrex::Real p_int;
+    // eos.RTY2P(s_int[URHO], T, y, p_int);
+    // amrex::Real rhog = s_int[URHO] * p_ext / p_int;
+    // amrex::Real eg;
+    // eos.RYP2E(rhog, y, p_ext, eg);
+
+    // eos.PYT2E(p_ext, y, T, eg); // set p_ghost = p_ext
+
+    s_ext[URHO] = rhog;
+    s_ext[UMX] = rhog * rhoinv * (dir == 0 ? std::abs(s_int[UMX]) : s_int[UMX]);
+    s_ext[UMY] = rhog * rhoinv * (dir == 1 ? std::abs(s_int[UMY]) : s_int[UMY]);
+    s_ext[UMZ] = rhog * rhoinv * (dir == 2 ? std::abs(s_int[UMZ]) : s_int[UMZ]);
+    s_ext[UEDEN] = rhog * (eg + ke);
+    for (int n = 0; n < NUM_SPECIES; ++n) s_ext[UFS + n] = rhog * y[n];
+  }
+}
+
 // TODO: Riemann invariant based in/outlet, NSCBC
 
 // /**

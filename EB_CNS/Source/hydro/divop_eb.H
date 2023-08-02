@@ -392,14 +392,15 @@ AMREX_GPU_DEVICE AMREX_FORCE_INLINE void eb_compute_div(
                       +dxinv[1] * (apy(i, j + 1, k) * fyp - apy(i, j, k) * fym),
                       +dxinv[2] * (apz(i, j, k + 1) * fzp - apz(i, j, k) * fzm)));
 
-      // Monitor problem cell (this may report false nan as flx may be nan but a is 0)
-      // if (isnan(divu(i, j, k, n))) {
+      // Monitor problem cell (this may report false nan as flx may be nan but a is
+      // 0) if (isnan(divu(i, j, k, n))) {
       //   std::cout << "div_eb(" << i << "," << j << "," << k << "," << n
       //             << ") is nan \n";
       //   std::cout << "fxp=" << fxp << " fxm=" << fxm << " fyp=" << fyp
       //             << " fym=" << fym << "\n";
       //   std::cout << "up=" << u(i + 1, j, k, n) << " um=" << u(i, j, k, n)
-      //             << " vp=" << v(i, j + 1, k, n) << " vm=" << v(i, j, k, n) << '\n';
+      //             << " vp=" << v(i, j + 1, k, n) << " vm=" << v(i, j, k, n) <<
+      //             '\n';
       // }
     } // end loop n
 

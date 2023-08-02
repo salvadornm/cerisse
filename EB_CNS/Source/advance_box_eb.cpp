@@ -114,6 +114,8 @@ void CNS::compute_dSdt_box_eb(
           lambda(i, j, k) = lamloc;
         }
       });
+
+      if (do_les) { amrex::Abort("LES for EB not implemented yet. Abort"); }
     }
   }
 
@@ -177,7 +179,8 @@ void CNS::compute_dSdt_box_eb(
       amrex::ParallelFor(flxbx, [=] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {
         if (!flag(amrex::IntVect(AMREX_D_DECL(i, j, k))).isCovered() &&
             !flag(amrex::IntVect(AMREX_D_DECL(i, j, k)) -
-                  amrex::IntVect::TheDimensionVector(cdir)).isCovered())
+                  amrex::IntVect::TheDimensionVector(cdir))
+               .isCovered())
           cns_riemann(i, j, k, cdir, flx_arr, q, wl, wr, char_sys, recon_char_var,
                       *lparm);
       });
@@ -185,11 +188,11 @@ void CNS::compute_dSdt_box_eb(
       // Store viscous fluxes separately
       if (do_visc == 1) {
         auto const& coefs = diff_coeff.array(nf * NCOEF);
-        amrex::ParallelFor(flxbx, 
-        [=] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {
-          cns_diff_eb(i, j, k, cdir, q, coefs, flag, dxinv,
-                      weights, nf > 0 ? vflx_arr : flx_arr);
-        });
+        amrex::ParallelFor(flxbx,
+                           [=] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {
+                             cns_diff_eb(i, j, k, cdir, q, coefs, flag, dxinv,
+                                         weights, nf > 0 ? vflx_arr : flx_arr);
+                           });
       }
 
     } // loop for fields
@@ -287,7 +290,9 @@ void CNS::compute_dSdt_box_eb(
       redistwgt(i, j, k) = vfrac(i, j, k);
       // }
 
-      srd_update_scale(i, j, k) = 0.5; // this makes things more stable, why?
+      srd_update_scale(i, j, k) =
+        1.0; // this affects stablity, why?
+             // = 1.0 more stable for detondiff, = 0.5 for airfoil
     });
 
     constexpr int ncomp =

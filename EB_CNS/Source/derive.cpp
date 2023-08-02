@@ -9,7 +9,7 @@ void cns_dertemp(const Box& bx, FArrayBox& derfab, int dcomp, int /*ncomp*/,
                  const FArrayBox& datafab, const Geometry& /*geomdata*/,
                  Real /*time*/, const int* /*bcrec*/, int /*level*/)
 {
-  auto const dat = datafab.array();
+  auto const dat = datafab.const_array();
   auto Tfab = derfab.array(dcomp);
 
   amrex::ParallelFor(bx, [=] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {
@@ -36,7 +36,7 @@ void cns_derpres(const Box& bx, FArrayBox& derfab, int dcomp, int /*ncomp*/,
                  const FArrayBox& datafab, const Geometry& /*geomdata*/,
                  Real /*time*/, const int* /*bcrec*/, int /*level*/)
 {
-  auto const dat = datafab.array();
+  auto const dat = datafab.const_array();
   auto pfab = derfab.array(dcomp);
 
   amrex::ParallelFor(bx, [=] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {
@@ -62,7 +62,7 @@ void cns_dereint(const Box& bx, FArrayBox& derfab, int dcomp, int /*ncomp*/,
                  const FArrayBox& datafab, const Geometry& /*geomdata*/,
                  Real /*time*/, const int* /*bcrec*/, int /*level*/)
 {
-  auto const dat = datafab.array();
+  auto const dat = datafab.const_array();
   auto eifab = derfab.array(dcomp);
 
   amrex::ParallelFor(bx, [=] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {
@@ -86,7 +86,7 @@ void cns_dervel(const Box& bx, FArrayBox& derfab, int dcomp, int /*ncomp*/,
                 const FArrayBox& datafab, const Geometry& /*geomdata*/,
                 Real /*time*/, const int* /*bcrec*/, int /*level*/)
 {
-  auto const dat = datafab.array();
+  auto const dat = datafab.const_array();
   auto vel = derfab.array();
   amrex::ParallelFor(bx, [=] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {
     vel(i, j, k, dcomp) = dat(i, j, k, 1) / dat(i, j, k, 0);
@@ -106,14 +106,19 @@ void cns_dermagvort(const Box& bx, FArrayBox& derfab, int dcomp, int /*ncomp*/,
   amrex::Elixir local_eli = local.elixir();
   auto larr = local.array();
 
-  // const auto& flag_fab = amrex::getEBCellFlagFab(datafab);
-  // const auto& typ = flag_fab.getType(bx);
-  // if (typ == amrex::FabType::covered) {
-  //   derfab.setVal<amrex::RunOn::Device>(0.0, bx);
-  //   return;
-  // }
-  // const auto& flags = flag_fab.const_array();
-  // const bool all_regular = typ == amrex::FabType::regular;
+#if CNS_USE_EB
+  const auto& flag_fab = amrex::getEBCellFlagFab(datafab);
+  const auto& typ = flag_fab.getType(bx);
+  if (typ == amrex::FabType::covered) {
+    // derfab.setVal<amrex::RunOn::Device>(0.0, bx);
+    amrex::ParallelFor(bx, [=] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {
+      vort(i, j, k) = 0.0;
+    });
+    return;
+  }
+  const auto& flags = flag_fab.const_array();
+  const bool all_regular = typ == amrex::FabType::regular;
+#endif
 
   // Convert momentum to velocity
   amrex::ParallelFor(gbx, [=] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {
@@ -129,20 +134,19 @@ void cns_dermagvort(const Box& bx, FArrayBox& derfab, int dcomp, int /*ncomp*/,
 
   // Calculate vorticity
   amrex::ParallelFor(bx, [=] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {
-    // AMREX_D_TERM(int im; int ip; ,
-    //              int jm; int jp; ,
-    //              int km; int kp;)
-    // if fab is all regular -> call regular idx and weights
-    // otherwise
-    // AMREX_D_TERM(get_idx(i, 0, all_regular, flags(i, j, k), im, ip); ,
-    //              get_idx(j, 1, all_regular, flags(i, j, k), jm, jp); ,
-    //              get_idx(k, 2, all_regular, flags(i, j, k), km, kp);)
-    // AMREX_D_TERM(const amrex::Real wi = get_weight(im, ip); ,
-    //              const amrex::Real wj = get_weight(jm, jp); ,
-    //              const amrex::Real wk = get_weight(km, kp);)
+#if CNS_USE_EB
+    AMREX_D_TERM(int im; int ip;, int jm; int jp;, int km; int kp;)
+    AMREX_D_TERM(get_idx(i, 0, all_regular, flags(i, j, k), im, ip);
+                 , get_idx(j, 1, all_regular, flags(i, j, k), jm, jp);
+                 , get_idx(k, 2, all_regular, flags(i, j, k), km, kp);)
+    AMREX_D_TERM(const amrex::Real wi = get_weight(im, ip);
+                 , const amrex::Real wj = get_weight(jm, jp);
+                 , const amrex::Real wk = get_weight(km, kp);)
+#else
     AMREX_D_TERM(int im = i - 1; int ip = i + 1; amrex::Real wi = 0.5;
                  , int jm = j - 1; int jp = j + 1; amrex::Real wj = 0.5;
                  , int km = k - 1; int kp = k + 1; amrex::Real wk = 0.5;)
+#endif
 
     AMREX_D_TERM(
       vort(i, j, k) = 0.0;
@@ -165,32 +169,38 @@ void cns_derdivu(const Box& bx, FArrayBox& derfab, int dcomp, int /*ncomp*/,
   auto const dat = datafab.const_array();
   auto divu = derfab.array(dcomp);
 
-  // const auto& flag_fab = amrex::getEBCellFlagFab(datafab);
-  // const auto& typ = flag_fab.getType(bx);
-  // if (typ == amrex::FabType::covered) {
-  //   derfab.setVal<amrex::RunOn::Device>(0.0, bx);
-  //   return;
-  // }
-  // const auto& flags = flag_fab.const_array();
-  // const bool all_regular = typ == amrex::FabType::regular;
+#if CNS_USE_EB
+  const auto& flag_fab = amrex::getEBCellFlagFab(datafab);
+  const auto& typ = flag_fab.getType(bx);
+  if (typ == amrex::FabType::covered) {
+    // derfab.setVal<amrex::RunOn::Device>(0.0, bx);
+    amrex::ParallelFor(bx, [=] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {
+      divu(i, j, k) = 0.0;
+    });
+    return;
+  }
+  const auto& flags = flag_fab.const_array();
+  const bool all_regular = typ == amrex::FabType::regular;
+#endif
 
   AMREX_D_TERM(const amrex::Real dx = geomdata.CellSize(0);
                , const amrex::Real dy = geomdata.CellSize(1);
                , const amrex::Real dz = geomdata.CellSize(2););
 
   amrex::ParallelFor(bx, [=] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {
-    // AMREX_D_TERM(int im; int ip;,
-    //              int jm; int jp;,
-    //              int km; int kp;)
-    // AMREX_D_TERM(get_idx(i, 0, all_regular, flags(i, j, k), im, ip); ,
-    //              get_idx(j, 1, all_regular, flags(i, j, k), jm, jp); ,
-    //              get_idx(k, 2, all_regular, flags(i, j, k), km, kp);)
-    // AMREX_D_TERM(const amrex::Real wi = get_weight(im, ip); ,
-    //              const amrex::Real wj = get_weight(jm, jp); ,
-    //              const amrex::Real wk = get_weight(km, kp);)
+#if CNS_USE_EB
+    AMREX_D_TERM(int im; int ip;, int jm; int jp;, int km; int kp;)
+    AMREX_D_TERM(get_idx(i, 0, all_regular, flags(i, j, k), im, ip);
+                 , get_idx(j, 1, all_regular, flags(i, j, k), jm, jp);
+                 , get_idx(k, 2, all_regular, flags(i, j, k), km, kp);)
+    AMREX_D_TERM(const amrex::Real wi = get_weight(im, ip);
+                 , const amrex::Real wj = get_weight(jm, jp);
+                 , const amrex::Real wk = get_weight(km, kp);)
+#else
     AMREX_D_TERM(int im = i - 1; int ip = i + 1; amrex::Real wi = 0.5;
                  , int jm = j - 1; int jp = j + 1; amrex::Real wj = 0.5;
                  , int km = k - 1; int kp = k + 1; amrex::Real wk = 0.5;)
+#endif
 
     AMREX_D_TERM(const amrex::Real uhi = dat(ip, j, k, UMX) / dat(ip, j, k, URHO);
                  const amrex::Real ulo = dat(im, j, k, UMX) / dat(im, j, k, URHO);
@@ -210,32 +220,38 @@ void cns_derdivrho(const Box& bx, FArrayBox& derfab, int dcomp, int /*ncomp*/,
   auto const dat = datafab.const_array();
   auto divrho = derfab.array(dcomp);
 
-  // const auto& flag_fab = amrex::getEBCellFlagFab(datafab);
-  // const auto& typ = flag_fab.getType(bx);
-  // if (typ == amrex::FabType::covered) {
-  //   derfab.setVal<amrex::RunOn::Device>(0.0, bx);
-  //   return;
-  // }
-  // const auto& flags = flag_fab.const_array();
-  // const bool all_regular = typ == amrex::FabType::regular;
+#if CNS_USE_EB
+  const auto& flag_fab = amrex::getEBCellFlagFab(datafab);
+  const auto& typ = flag_fab.getType(bx);
+  if (typ == amrex::FabType::covered) {
+    // derfab.setVal<amrex::RunOn::Device>(0.0, bx);
+    amrex::ParallelFor(bx, [=] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {
+      divrho(i, j, k) = 0.0;
+    });
+    return;
+  }
+  const auto& flags = flag_fab.const_array();
+  const bool all_regular = typ == amrex::FabType::regular;
+#endif
 
   AMREX_D_TERM(const amrex::Real dx = geomdata.CellSize(0);
                , const amrex::Real dy = geomdata.CellSize(1);
                , const amrex::Real dz = geomdata.CellSize(2););
 
   amrex::ParallelFor(bx, [=] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {
-    // AMREX_D_TERM(int im; int ip;,
-    //              int jm; int jp;,
-    //              int km; int kp;)
-    // AMREX_D_TERM(get_idx(i, 0, all_regular, flags(i, j, k), im, ip); ,
-    //              get_idx(j, 1, all_regular, flags(i, j, k), jm, jp); ,
-    //              get_idx(k, 2, all_regular, flags(i, j, k), km, kp);)
-    // AMREX_D_TERM(const amrex::Real wi = get_weight(im, ip); ,
-    //              const amrex::Real wj = get_weight(jm, jp); ,
-    //              const amrex::Real wk = get_weight(km, kp);)
+#if CNS_USE_EB
+    AMREX_D_TERM(int im; int ip;, int jm; int jp;, int km; int kp;)
+    AMREX_D_TERM(get_idx(i, 0, all_regular, flags(i, j, k), im, ip);
+                 , get_idx(j, 1, all_regular, flags(i, j, k), jm, jp);
+                 , get_idx(k, 2, all_regular, flags(i, j, k), km, kp);)
+    AMREX_D_TERM(const amrex::Real wi = get_weight(im, ip);
+                 , const amrex::Real wj = get_weight(jm, jp);
+                 , const amrex::Real wk = get_weight(km, kp);)
+#else
     AMREX_D_TERM(int im = i - 1; int ip = i + 1; amrex::Real wi = 0.5;
                  , int jm = j - 1; int jp = j + 1; amrex::Real wj = 0.5;
                  , int km = k - 1; int kp = k + 1; amrex::Real wk = 0.5;)
+#endif
 
     AMREX_D_TERM(const amrex::Real xhi = dat(ip, j, k, URHO);
                  const amrex::Real xlo = dat(im, j, k, URHO);
@@ -527,41 +543,64 @@ void cns_dervelgrad(const Box& bx, FArrayBox& derfab, int dcomp, int /*ncomp*/,
   auto const dat = datafab.const_array();
   auto gradu = derfab.array(dcomp);
 
-  AMREX_D_TERM(const Real dx = geomdata.CellSize(0);
-               , const Real dy = geomdata.CellSize(1);
-               , const Real dz = geomdata.CellSize(2););
+  const amrex::Box& gbx = amrex::grow(bx, 1);
 
+  amrex::FArrayBox local(gbx, 3);
+  amrex::Elixir local_eli = local.elixir();
+  auto larr = local.array();
+
+#if CNS_USE_EB
+  const auto& flag_fab = amrex::getEBCellFlagFab(datafab);
+  const auto& typ = flag_fab.getType(bx);
+  if (typ == amrex::FabType::covered) {
+    // derfab.setVal<amrex::RunOn::Device>(0.0, bx);
+    amrex::ParallelFor(bx, [=] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {
+      gradu(i, j, k) = 0.0;
+    });
+    return;
+  }
+  const auto& flags = flag_fab.const_array();
+  const bool all_regular = typ == amrex::FabType::regular;
+#endif
+
+  // Convert momentum to velocity
+  amrex::ParallelFor(gbx, [=] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {
+    const amrex::Real rhoinv = 1.0 / dat(i, j, k, URHO);
+    AMREX_D_TERM(larr(i, j, k, 0) = dat(i, j, k, UMX) * rhoinv;
+                 , larr(i, j, k, 1) = dat(i, j, k, UMY) * rhoinv;
+                 , larr(i, j, k, 2) = dat(i, j, k, UMZ) * rhoinv;)
+  });
+
+  AMREX_D_TERM(const amrex::Real dx = geomdata.CellSize(0);
+               , const amrex::Real dy = geomdata.CellSize(1);
+               , const amrex::Real dz = geomdata.CellSize(2););
+
+  // Calculate velocity gradients
   amrex::ParallelFor(bx, [=] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {
-    AMREX_D_TERM(int im = i - 1; int ip = i + 1;, int jm = j - 1; int jp = j + 1;
-                 , int km = k - 1; int kp = k + 1;)
+#if CNS_USE_EB
+    AMREX_D_TERM(int im; int ip;, int jm; int jp;, int km; int kp;)
+    AMREX_D_TERM(get_idx(i, 0, all_regular, flags(i, j, k), im, ip);
+                 , get_idx(j, 1, all_regular, flags(i, j, k), jm, jp);
+                 , get_idx(k, 2, all_regular, flags(i, j, k), km, kp);)
+    AMREX_D_TERM(const amrex::Real wi = get_weight(im, ip);
+                 , const amrex::Real wj = get_weight(jm, jp);
+                 , const amrex::Real wk = get_weight(km, kp);)
+#else
+    AMREX_D_TERM(int im = i - 1; int ip = i + 1; amrex::Real wi = 0.5;
+                 , int jm = j - 1; int jp = j + 1; amrex::Real wj = 0.5;
+                 , int km = k - 1; int kp = k + 1; amrex::Real wk = 0.5;)
+#endif
 
-    AMREX_D_TERM(Real uhi = dat(ip, j, k, UMX) / dat(ip, j, k, URHO);
-                 Real ulo = dat(im, j, k, UMX) / dat(im, j, k, URHO);
-                 const Real dudx = 0.5 * (uhi - ulo) / dx;
-                 , uhi = dat(i, jp, k, UMX) / dat(i, jp, k, URHO);
-                 ulo = dat(i, jm, k, UMX) / dat(i, jm, k, URHO);
-                 Real vhi = dat(i, jp, k, UMY) / dat(i, jp, k, URHO);
-                 Real vlo = dat(i, jm, k, UMY) / dat(i, jm, k, URHO);
-                 const Real dudy = 0.5 * (uhi - ulo) / dy;
-                 const Real dvdy = 0.5 * (vhi - vlo) / dy;
-                 vhi = dat(ip, j, k, UMY) / dat(ip, j, k, URHO);
-                 vlo = dat(im, j, k, UMY) / dat(im, j, k, URHO);
-                 const Real dvdx = 0.5 * (vhi - vlo) / dx;
-                 , uhi = dat(i, j, kp, UMX) / dat(i, j, kp, URHO);
-                 ulo = dat(i, j, km, UMX) / dat(i, j, km, URHO);
-                 vhi = dat(i, j, kp, UMY) / dat(i, j, kp, URHO);
-                 vlo = dat(i, j, km, UMY) / dat(i, j, km, URHO);
-                 Real whi = dat(i, j, kp, UMZ) / dat(i, j, kp, URHO);
-                 Real wlo = dat(i, j, km, UMZ) / dat(i, j, km, URHO);
-                 const Real dudz = 0.5 * (uhi - ulo) / dz;
-                 const Real dvdz = 0.5 * (vhi - vlo) / dz;
-                 const Real dwdz = 0.5 * (whi - wlo) / dz;
-                 whi = dat(ip, j, k, UMZ) / dat(ip, j, k, URHO);
-                 wlo = dat(im, j, k, UMZ) / dat(im, j, k, URHO);
-                 const Real dwdx = 0.5 * (whi - wlo) / dx;
-                 whi = dat(i, jp, k, UMZ) / dat(i, jp, k, URHO);
-                 wlo = dat(i, jm, k, UMZ) / dat(i, jm, k, URHO);
-                 const Real dwdy = 0.5 * (whi - wlo) / dy;);
+    AMREX_D_TERM(
+      const Real dudx = wi * (larr(ip, j, k, 0) - larr(im, j, k, 0)) / dx;
+      , const Real dudy = wj * (larr(i, jp, k, 0) - larr(i, jm, k, 0)) / dy;
+      const Real dvdy = wj * (larr(i, jp, k, 1) - larr(i, jm, k, 1)) / dy;
+      const Real dvdx = wi * (larr(ip, j, k, 1) - larr(im, j, k, 1)) / dx;
+      , const Real dudz = wk * (larr(i, j, kp, 0) - larr(i, j, km, 0)) / dz;
+      const Real dvdz = wk * (larr(i, j, kp, 1) - larr(i, j, km, 1)) / dz;
+      const Real dwdz = wk * (larr(i, j, kp, 2) - larr(i, j, km, 2)) / dz;
+      const Real dwdx = wi * (larr(ip, j, k, 2) - larr(im, j, k, 2)) / dx;
+      const Real dwdy = wj * (larr(i, jp, k, 2) - larr(i, jm, k, 2)) / dy;)
 
     gradu(i, j, k) = sqrt(AMREX_D_TERM(
       dudx * dudx, +dudy * dudy + dvdx * dvdx + dvdy * dvdy,
@@ -569,12 +608,46 @@ void cns_dervelgrad(const Box& bx, FArrayBox& derfab, int dcomp, int /*ncomp*/,
   });
 }
 
-void cns_dermut(const Box& bx, FArrayBox& derfab, int dcomp, int /*ncomp*/,
-                const FArrayBox& datafab, const Geometry& geomdata, Real /*time*/,
-                const int* /*bcrec*/, int /*level*/)
+// void cns_dermut(const Box& bx, FArrayBox& derfab, int dcomp, int /*ncomp*/,
+//                 const FArrayBox& datafab, const Geometry& geomdata, Real /*time*/,
+//                 const int* /*bcrec*/, int /*level*/)
+// {
+//   auto const dat = datafab.const_array();
+//   auto mu_T = derfab.array(dcomp);
+
+//   const auto dxinv = geomdata.InvCellSizeArray();
+
+//   const amrex::Box& gbx = amrex::grow(bx, 1);
+//   amrex::FArrayBox local(gbx, AMREX_SPACEDIM + 1,
+//                          amrex::The_Async_Arena()); // [rho, u, v, w]
+//   auto larr = local.array();
+
+//   amrex::ParallelFor(gbx, [=] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {
+//     const amrex::Real rhoinv = 1.0 / dat(i, j, k, URHO);
+//     larr(i, j, k, QRHO) = dat(i, j, k, URHO);
+//     AMREX_D_TERM(larr(i, j, k, QU) = dat(i, j, k, UMX) * rhoinv;
+//                  , larr(i, j, k, QV) = dat(i, j, k, UMY) * rhoinv;
+//                  , larr(i, j, k, QW) = dat(i, j, k, UMZ) * rhoinv;)
+//   });
+
+//   amrex::ParallelFor(bx, [=] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {
+// #if AMREX_SPACEDIM == 2
+//     Real delta = 1.0 / std::sqrt(dxinv[0] * dxinv[1]);
+// #else
+//     Real delta = std::pow(dxinv[0]*dxinv[1]*dxinv[2], -1./3.);
+// #endif
+
+//     CNS::les_model->mu_T_cc(i, j, k, larr, dxinv, delta, CNS::Cs, mu_T(i, j, k));
+//   });
+// }
+
+void cns_derturbvisc(const Box& bx, FArrayBox& derfab, int dcomp, int /*ncomp*/,
+                     const FArrayBox& datafab, const Geometry& geomdata,
+                     Real /*time*/, const int* /*bcrec*/, int /*level*/)
 {
   auto const dat = datafab.const_array();
   auto mu_T = derfab.array(dcomp);
+  auto xi_T = derfab.array(dcomp + 1);
 
   const auto dxinv = geomdata.InvCellSizeArray();
 
@@ -599,5 +672,6 @@ void cns_dermut(const Box& bx, FArrayBox& derfab, int dcomp, int /*ncomp*/,
 #endif
 
     CNS::les_model->mu_T_cc(i, j, k, larr, dxinv, delta, CNS::Cs, mu_T(i, j, k));
+    CNS::les_model->xi_T_cc(i, j, k, larr, dxinv, delta, CNS::Cs, xi_T(i, j, k));
   });
 }

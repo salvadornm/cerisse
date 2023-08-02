@@ -41,9 +41,9 @@ void CNS::compute_dSdt_box(Box const& bx, Array4<const Real>& sarr,
     diff_coeff.resize(bxg2, LEN_COEF, The_Async_Arena());
 
     for (int nf = 0; nf <= NUM_FIELD; ++nf) {
-      auto const& qar_yin = qtmp.array(nf * NPRIM + QFS);
-      auto const& qar_Tin = qtmp.array(nf * NPRIM + QTEMP);
-      auto const& qar_rhoin = qtmp.array(nf * NPRIM + QRHO);
+      auto const& qar_yin = qtmp.const_array(nf * NPRIM + QFS);
+      auto const& qar_Tin = qtmp.const_array(nf * NPRIM + QTEMP);
+      auto const& qar_rhoin = qtmp.const_array(nf * NPRIM + QRHO);
       auto const& mu = diff_coeff.array(nf * NCOEF + CMU);
       auto const& xi = diff_coeff.array(nf * NCOEF + CXI);
       auto const& lambda = diff_coeff.array(nf * NCOEF + CLAM);
@@ -57,6 +57,34 @@ void CNS::compute_dSdt_box(Box const& bx, Array4<const Real>& sarr,
         trans.get_transport_coeffs(tbx, qar_yin, qar_Tin, qar_rhoin, rhoD, mu, xi,
                                    lambda, ltransparm);
       });
+
+      if (do_les) {
+        // Get LES transport coefs
+        BL_PROFILE("CNS::LES_transport_coeffs");
+
+        const auto dx = geom.CellSizeArray();
+        Real delta = std::pow(AMREX_D_TERM(dx[0], *dx[1], *dx[2]),
+                              1.0 / amrex::Real(AMREX_SPACEDIM));
+
+        amrex::ParallelFor(bxg2, [=] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {
+          Real mu_T, xi_T;
+          les_model->mu_T_cc(i, j, k, qar_rhoin, dxinv, delta, Cs, mu_T);
+          // les_model->xi_T_cc(i, j, k, qar_rhoin, dxinv, delta, C_I, xi_T);
+          xi_T =
+            0.0; // TODO: this divu is calculated at cell centre, not face centre
+
+          mu(i, j, k) += mu_T;
+          xi(i, j, k) += xi_T;
+
+          for (int n = 0; n < NUM_SPECIES; ++n) rhoD(i, j, k, n) += mu_T / Sc_T;
+
+          Real y[NUM_SPECIES], cp;
+          for (int n = 0; n < NUM_SPECIES; ++n) y[n] = qar_yin(i, j, k, n);
+          auto eos = pele::physics::PhysicsType::eos();
+          eos.RTY2Cp(qar_rhoin(i, j, k), qar_Tin(i, j, k), y, cp);
+          lambda(i, j, k) += cp * mu_T / Pr_T;
+        });
+      }
     }
   }
 

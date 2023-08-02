@@ -816,12 +816,14 @@ void CNS::read_params()
 
   pp.query("do_les", do_les);
   pp.query("do_pasr", do_pasr);
-  if (do_les) {
+  if (do_les || do_pasr) {
     if (AMREX_SPACEDIM == 1) amrex::Abort("CNS: LES not supporting 1D");
     pp.get("les_model", les_model_name);
     pp.query("Cs", Cs);
+    pp.query("C_I", C_I);
     pp.query("Pr_T", Pr_T);
     pp.query("Sc_T", Sc_T);
+    pp.query("Cm", Cm);
   }
 
 #if CNS_USE_EB

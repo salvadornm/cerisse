@@ -26,11 +26,11 @@ THREAD_SANITIZER = FALSE
 # PeleC
 Eos_Model := Fuego
 Transport_Model := Simple
-Custom_Chemistry_Model := Yetter
+Custom_Chemistry_Model := OConaire
 
 # CNS
-NUM_FIELD = 8
-NUM_AUX = 12
+# NUM_FIELD = 16
+NUM_AUX = 12 # for time averages
 
 # GNU Make
 include ./Make.package

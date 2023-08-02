@@ -33,23 +33,32 @@ WALE::mu_T_cc(const int i, const int j, const int k, const Array4<const Real>& q
 #endif
 
   const Real divu = AMREX_D_TERM(dUdx[0][0], +dUdx[1][1], +dUdx[2][2]);
-
-  Real Sijmag = 0;
-  Real Dijmag = 0;
+  Real dUdx2[3][3] = {{0.0}};
   for (int m = 0; m < AMREX_SPACEDIM; m++) {
     for (int n = 0; n < AMREX_SPACEDIM; n++) {
-      Sijmag += (0.5 * (dUdx[m][n] + dUdx[n][m])) *
+      dUdx2[m][n] =
+        dUdx[m][0] * dUdx[0][n] + dUdx[m][1] * dUdx[1][n] + dUdx[m][2] * dUdx[2][n];
+    }
+  }
+  // assert(divu * divu == dUdx2[0][0] + dUdx2[1][1] + dUdx2[2][2]); // tested true
+
+  Real SijSij = 0.0;
+  Real DijDij = 0.0;
+  for (int m = 0; m < AMREX_SPACEDIM; m++) {
+    for (int n = 0; n < AMREX_SPACEDIM; n++) {
+      SijSij += (0.5 * (dUdx[m][n] + dUdx[n][m])) *
                 (0.5 * (dUdx[m][n] + dUdx[n][m])); // Sij*Sij
-      Dijmag += (0.5 * (dUdx[m][n] * dUdx[m][n] + dUdx[n][m] * dUdx[n][m]) -
-                 Real(m == n) * divu * divu / 3) *
-                (0.5 * (dUdx[m][n] * dUdx[m][n] + dUdx[n][m] * dUdx[n][m]) -
-                 Real(m == n) * divu * divu / 3); // Dij*Dij
+      DijDij +=
+        (0.5 * (dUdx2[m][n] + dUdx2[n][m]) - Real(m == n) * divu * divu / 3) *
+        (0.5 * (dUdx2[m][n] + dUdx2[n][m]) -
+         Real(m == n) * divu * divu / 3); // Dij*Dij
     }
   }
 
   Real Cw = std::sqrt(10.6) * Cs;
-  mu_T = q(i, j, k, QRHO) * Cw * Cw * deltabar * deltabar * std::pow(Dijmag, 1.5) /
-         (std::pow(Sijmag, 2.5) + std::pow(Dijmag, 1.25));
+  mu_T = q(i, j, k, QRHO) * Cw * Cw * deltabar * deltabar * std::pow(DijDij, 1.5) /
+         (std::pow(SijSij, 2.5) + std::pow(DijDij, 1.25) +
+          std::numeric_limits<Real>::denorm_min());
 }
 
 /**
@@ -88,10 +97,11 @@ AMREX_GPU_DEVICE AMREX_FORCE_INLINE void WALE::mu_T_fc(
     for (int n = 0; n < AMREX_SPACEDIM; n++) {
       Sijmag += (0.5 * (dUdx[m][n] + dUdx[n][m])) *
                 (0.5 * (dUdx[m][n] + dUdx[n][m])); // Sij*Sij
-      Dijmag += (0.5 * (dUdx[m][n] * dUdx[m][n] + dUdx[n][m] * dUdx[n][m]) -
-                 Real(m == n) * divu * divu / 3) *
-                (0.5 * (dUdx[m][n] * dUdx[m][n] + dUdx[n][m] * dUdx[n][m]) -
-                 Real(m == n) * divu * divu / 3); // Dij*Dij
+      Dijmag +=
+        (0.5 * (dUdx[m][n] * dUdx[m][n] + dUdx[n][m] * dUdx[n][m]) -
+         Real(m == n) * divu * divu / 3) *
+        (0.5 * (dUdx[m][n] * dUdx[m][n] + dUdx[n][m] * dUdx[n][m]) -
+         Real(m == n) * divu * divu / 3); // Dij*Dij // TODO: Is this correct?
     }
   }
 

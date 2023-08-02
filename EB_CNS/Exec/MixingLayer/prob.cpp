@@ -14,6 +14,7 @@ void amrex_probinit(const int* /*init*/, const int* /*name*/, const int* /*namel
     pp.query("p", CNS::h_prob_parm->p);
     pp.query("vorticity_thickness", CNS::h_prob_parm->theta_w);
     pp.query("record_statistics", CNS::h_prob_parm->record_statistics);
+    pp.query("clean_aux_on_restart", CNS::h_prob_parm->clean_aux_on_restart);
   }
 
   // Fuel stream
@@ -44,8 +45,9 @@ void amrex_probinit(const int* /*init*/, const int* /*name*/, const int* /*namel
   CNS::h_prob_parm->uc =
     (c1 * CNS::h_prob_parm->u1 + c2 * CNS::h_prob_parm->u2) / (c1 + c2);
 
-  amrex::Gpu::copy(amrex::Gpu::hostToDevice, CNS::h_prob_parm, CNS::h_prob_parm + 1,
-                   CNS::d_prob_parm);
+  Gpu::copyAsync(Gpu::hostToDevice, CNS::h_prob_parm, CNS::h_prob_parm + 1,
+                 CNS::d_prob_parm);
+  Gpu::streamSynchronize();
 }
 }
 
@@ -63,7 +65,7 @@ void CNS::fill_ext_src(int i, int j, int k, amrex::Real time,
   const amrex::Real z = prob_lo[2] + (k + 0.5) * dx[2];
 
   const amrex::Real rsq =
-    AMREX_D_TERM((x - 4 * pp.theta_w) * (x - 4 * pp.theta_w), +y * y, +z * z);
+    AMREX_D_TERM((x - 4.0 * pp.theta_w) * (x - 4.0 * pp.theta_w), +y * y, +z * z);
   const amrex::Real theta_sq = pp.theta_w * pp.theta_w;
 
   if (rsq >= theta_sq) {

@@ -118,9 +118,9 @@ AMREX_GPU_DEVICE AMREX_FORCE_INLINE void prob_post_restart(
   amrex::GeometryData const& geomdata, Parm const& parm, ProbParm const& pp)
 {
   // Clear time avg
-  // for (int n = 0; n < NUM_AUX; ++n) {
-  //   state(i, j, k, UFA+n) = 0.0;
-  // }
+  if (pp.clean_aux_on_restart) {
+    for (int n = 0; n < NUM_AUX; ++n) { state(i, j, k, UFA + n) = 0.0; }
+  }
 }
 
 AMREX_GPU_DEVICE AMREX_FORCE_INLINE void prob_post_timestep(
@@ -149,24 +149,21 @@ AMREX_GPU_DEVICE AMREX_FORCE_INLINE void prob_post_timestep(
 
     // (u, T, Y_H2, Y_OH, Y_H2O, hrr)
     // Mean
-    AMREX_D_TERM(state(i, j, k, UFA + 0) += vx * dtlev;
-                 , // U
-                 state(i, j, k, UFA + 1) += vy * dtlev;
-                 ,                                       // V
-                 state(i, j, k, UFA + 2) += vz * dtlev;) // W
-    state(i, j, k, UFA + 3) += T * dtlev;                // T
-    state(i, j, k, UFA + 4) += massfrac[H2_ID] * dtlev;  // Y(H2)
-    state(i, j, k, UFA + 5) += massfrac[OH_ID] * dtlev;  // Y(OH)
-    state(i, j, k, UFA + 6) += massfrac[H2O_ID] * dtlev; // Y(H2O)
+    AMREX_D_TERM(state(i, j, k, UFA + 0) += vx * dtlev;    // U
+                 , state(i, j, k, UFA + 1) += vy * dtlev;  // V
+                 , state(i, j, k, UFA + 2) += vz * dtlev;) // W
+    state(i, j, k, UFA + 3) += T * dtlev;                  // T
+    state(i, j, k, UFA + 4) += massfrac[H2_ID] * dtlev;    // Y(H2)
+    state(i, j, k, UFA + 5) += massfrac[OH_ID] * dtlev;    // Y(OH)
+    state(i, j, k, UFA + 6) += massfrac[H2O_ID] * dtlev;   // Y(H2O)
     state(i, j, k, UFA + 7) +=
       reactions(i, j, k, NUM_SPECIES) * dtlev; // heat release rate
 
     // RMS^2
-    AMREX_D_TERM(state(i, j, k, UFA + 8) += vx * vx * dtlev;
-                 , // U
-                 state(i, j, k, UFA + 9) += vy * vy * dtlev;
-                 ,                                             // V
-                 state(i, j, k, UFA + 10) += vz * vz * dtlev;) // W
+    AMREX_D_TERM(state(i, j, k, UFA + 8) += vx * vx * dtlev;     // U
+                 , state(i, j, k, UFA + 9) += vy * vy * dtlev;   // V
+                 , state(i, j, k, UFA + 10) += vz * vz * dtlev;) // W
+    state(i, j, k, UFA + 11) += T * T * dtlev;                   // T
   }
 #endif
 }
@@ -195,7 +192,7 @@ prob_get_aux_name(amrex::Vector<std::string>& aux_name)
   aux_name[8] = "mean_squared_u";
   aux_name[9] = "mean_squared_v";
   aux_name[10] = "mean_squared_w";
-  aux_name[11] = "test_dW";
+  aux_name[11] = "mean_squared_T";
 }
 #endif
 

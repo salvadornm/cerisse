@@ -50,8 +50,8 @@ bool CNS::recon_char_var = false; // Reconstruct the thermodynamic variable (sos
                                   // gamma) to cell interfaces
 int CNS::char_sys = 0;            // Thermodynamic system used in characteristic
                                   // reconstruction. 0:speed of sound, 1:gamma
-int CNS::recon_scheme =
-  5; // 1: basic Godunov; 2: MUSCL; 3: WENO-Z3; 4: WENO-JS5; 5: WENO-Z5; 6: TENO5
+int CNS::recon_scheme = 5;        // 1: basic Godunov; 2: MUSCL; 3: WENO-Z3;
+                                  // 4: WENO-JS5; 5: WENO-Z5; 6: TENO5
 Real CNS::plm_theta = 2.0; // [1,2] 1: minmod; 2: van Leer's MC (higher sharper)
 
 bool CNS::do_restart_fields = false;
@@ -63,9 +63,11 @@ bool CNS::do_les = false;        // Eddy viscosity type subgrid-scale model
 bool CNS::do_pasr = false;       // Partially stirred reactor
 std::string CNS::les_model_name; // Avaliable models are "Smagorinsky" or "WALE"
 std::unique_ptr<LESModel> CNS::les_model;
-Real CNS::Cs = 0.1;   // Smagorinsky constant
-Real CNS::Pr_T = 0.7; // Turbulent Prandtl number = mu_T/(cp*kappa_T)
-Real CNS::Sc_T = 0.7; // Turbulent Schmidt number = mu_T/(rho*D_T)
+Real CNS::Cs = 0.1;     // Smagorinsky constant
+Real CNS::C_I = 0.0066; // Yoshizawa constant
+Real CNS::Pr_T = 0.7;   // Turbulent Prandtl number = mu_T/(cp*kappa_T)
+Real CNS::Sc_T = 0.7;   // Turbulent Schmidt number = mu_T/(rho*D_T)
+Real CNS::Cm = 0.1;     // PaSR mixing timescale coefficient
 
 #if CNS_USE_EB
 int CNS::eb_weights_type =

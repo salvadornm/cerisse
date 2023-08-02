@@ -392,11 +392,12 @@ void CNS::variableSetUp()
                  molefrac_names, cns_dermolefrac, DeriveRec::TheSameBox);
   derive_lst.addComponent("molefrac", desc_lst, State_Type, 0, LEN_STATE);
 
-  // LES model constants
+  // LES model
   if (do_les) {
-    derive_lst.add("mu_t", IndexType::TheCellType(), 1, cns_dermut,
-                   DeriveRec::GrowBoxByOne);
-    derive_lst.addComponent("mu_t", desc_lst, State_Type, URHO, NVAR);
+    Vector<std::string> turb_visc_names = {"mu_t", "xi_t"};
+    derive_lst.add("turb_viscosity", IndexType::TheCellType(), 2, turb_visc_names,
+                   cns_derturbvisc, DeriveRec::GrowBoxByOne);
+    derive_lst.addComponent("turb_viscosity", desc_lst, State_Type, URHO, NVAR);
   }
 
 #if NUM_FIELD > 0
