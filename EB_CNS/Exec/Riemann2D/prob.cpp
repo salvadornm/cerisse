@@ -50,8 +50,9 @@ void amrex_probinit(const int* /*init*/, const int* /*name*/, const int* /*namel
   eos.EY2T(e, massfrac, CNS::h_prob_parm->T_4);
   CNS::h_prob_parm->rhoe_4 = CNS::h_prob_parm->rho_4 * e;
 
-  amrex::Gpu::copy(amrex::Gpu::hostToDevice, CNS::h_prob_parm, CNS::h_prob_parm + 1,
-                   CNS::d_prob_parm);
+  Gpu::copyAsync(Gpu::hostToDevice, CNS::h_prob_parm, CNS::h_prob_parm + 1,
+                 CNS::d_prob_parm);
+  Gpu::streamSynchronize();
 }
 }
 

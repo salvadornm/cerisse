@@ -219,17 +219,15 @@ AMREX_GPU_DEVICE AMREX_FORCE_INLINE void prob_post_timestep(
     eos.Y2X(massfrac, X);
 
     // Mean
-    AMREX_D_TERM(state(i, j, k, UFA + 0) += vx * dtlev;
-                 , // U
-                 state(i, j, k, UFA + 1) += vy * dtlev;
-                 ,                                       // V
-                 state(i, j, k, UFA + 2) += vz * dtlev;) // W
-    state(i, j, k, UFA + 3) += T * dtlev;                // T
-    state(i, j, k, UFA + 4) += X[H2_ID] * dtlev;         // X(H2)
-    state(i, j, k, UFA + 5) += X[OH_ID] * dtlev;         // X(OH)
-    state(i, j, k, UFA + 6) += X[H2O_ID] * dtlev;        // X(H2O)
-    state(i, j, k, UFA + 7) += X[N2_ID] * dtlev;         // X(N2)
-    state(i, j, k, UFA + 8) += X[O2_ID] * dtlev;         // X(O2)
+    AMREX_D_TERM(state(i, j, k, UFA + 0) += vx * dtlev;    // U
+                 , state(i, j, k, UFA + 1) += vy * dtlev;  // V
+                 , state(i, j, k, UFA + 2) += vz * dtlev;) // W
+    state(i, j, k, UFA + 3) += T * dtlev;                  // T
+    state(i, j, k, UFA + 4) += X[H2_ID] * dtlev;           // X(H2)
+    state(i, j, k, UFA + 5) += X[OH_ID] * dtlev;           // X(OH)
+    state(i, j, k, UFA + 6) += X[H2O_ID] * dtlev;          // X(H2O)
+    state(i, j, k, UFA + 7) += X[N2_ID] * dtlev;           // X(N2)
+    state(i, j, k, UFA + 8) += X[O2_ID] * dtlev;           // X(O2)
     state(i, j, k, UFA + 9) +=
       reactions(i, j, k, NUM_SPECIES) * dtlev; // heat release rate
 

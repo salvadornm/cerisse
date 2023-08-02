@@ -22,8 +22,9 @@ void amrex_probinit(const int* /*init*/, const int* /*name*/, const int* /*namel
   eos.RYP2E(CNS::h_prob_parm->rho_r, CNS::h_prob_parm->massfrac_r.begin(),
             CNS::h_prob_parm->p_r, CNS::h_prob_parm->e_r);
 
-  amrex::Gpu::copy(amrex::Gpu::hostToDevice, CNS::h_prob_parm, CNS::h_prob_parm + 1,
-                   CNS::d_prob_parm);
+  Gpu::copyAsync(Gpu::hostToDevice, CNS::h_prob_parm, CNS::h_prob_parm + 1,
+                 CNS::d_prob_parm);
+  Gpu::streamSynchronize();
 }
 }
 

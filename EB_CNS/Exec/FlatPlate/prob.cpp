@@ -24,8 +24,9 @@ void amrex_probinit(const int* /*init*/, const int* /*name*/, const int* /*namel
   eos.RTY2Cs(CNS::h_prob_parm->rho, CNS::h_prob_parm->T, massfrac, c);
   CNS::h_prob_parm->u = M * c;
 
-  Gpu::copy(Gpu::hostToDevice, CNS::h_prob_parm, CNS::h_prob_parm + 1,
-            CNS::d_prob_parm);
+  Gpu::copyAsync(Gpu::hostToDevice, CNS::h_prob_parm, CNS::h_prob_parm + 1,
+                 CNS::d_prob_parm);
+  Gpu::streamSynchronize();
 
   auto& trans_parm = CNS::trans_parms.host_trans_parm();
   trans_parm.viscosity_mu_ref = CNS::h_prob_parm->rho * CNS::h_prob_parm->u * 20.5 /

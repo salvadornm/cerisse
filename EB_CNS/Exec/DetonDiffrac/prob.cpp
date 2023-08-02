@@ -52,8 +52,9 @@ void amrex_probinit(const int* /*init*/, const int* /*name*/, const int* /*namel
              CNS::h_prob_parm->rho_2, e);
   CNS::h_prob_parm->rhoe_2 = CNS::h_prob_parm->rho_2 * e;
 
-  amrex::Gpu::copy(amrex::Gpu::hostToDevice, CNS::h_prob_parm, CNS::h_prob_parm + 1,
-                   CNS::d_prob_parm);
+  Gpu::copyAsync(Gpu::hostToDevice, CNS::h_prob_parm, CNS::h_prob_parm + 1,
+                 CNS::d_prob_parm);
+  Gpu::streamSynchronize();
 }
 }
 

@@ -36,8 +36,9 @@ void amrex_probinit(const int* /*init*/, const int* /*name*/, const int* /*namel
                           CNS::h_prob_parm->u_tau / CNS::h_prob_parm->H /
                           CNS::h_prob_parm->rho_b;
 
-  amrex::Gpu::copy(amrex::Gpu::hostToDevice, CNS::h_prob_parm, CNS::h_prob_parm + 1,
-                   CNS::d_prob_parm);
+  Gpu::copyAsync(Gpu::hostToDevice, CNS::h_prob_parm, CNS::h_prob_parm + 1,
+                 CNS::d_prob_parm);
+  Gpu::streamSynchronize();
 
   // Use Sutherland law to approximate mu/mu_w = (T/T_w)^0.7
   auto& trans_parm = CNS::trans_parms.host_trans_parm();
