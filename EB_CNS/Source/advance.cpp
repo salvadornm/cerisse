@@ -284,11 +284,14 @@ void CNS::enforce_consistent_state()
 
 #if CNS_USE_EB
       const auto& flag = flags[mfi];
+      const auto& flag_arr = flags.const_array(mfi);
       if (flag.getType(bx) != FabType::covered)
 #endif
       {
         for (int nf = 0; nf <= NUM_FIELD; ++nf) {
           Array4 s_arr = S.array(mfi, nf * NVAR);
+          FArrayBox Temp(bx, 1, The_Async_Arena());
+          Array4 T = Temp.array();
           ParallelFor(bx, [=] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {
             const IntVect iv{AMREX_D_DECL(i, j, k)};
             const Real rhoOld = s_arr(iv, URHO);
@@ -310,6 +313,7 @@ void CNS::enforce_consistent_state()
                           << rhoNew << "! Fixed \n";
 
               rhoNew = d_parm->smallr;
+              // s_arr(iv, UFS + N2_ID) = rhoNew;
               for (int n = 0; n < NUM_SPECIES; n++) {
                 s_arr(iv, UFS + n) = rhoNew / NUM_SPECIES;
               }
@@ -322,33 +326,124 @@ void CNS::enforce_consistent_state()
               s_arr(iv, UMX + n) *= rhoNew * rhoinv;
             }
 
-            // Calculate temperature (!) this adds energy to the point but without
-            // removing the excess ke
+            // Calculate temperature
             rhoinv = 1.0 / rhoNew;
             Real Y[NUM_SPECIES];
             for (int n = 0; n < NUM_SPECIES; n++) {
               Y[n] = s_arr(iv, UFS + n) * rhoinv;
             }
-            Real ke = 0.5 * rhoinv *
+            const Real ke = 0.5 * rhoinv * rhoinv *
                       (AMREX_D_TERM(s_arr(iv, UMX) * s_arr(iv, UMX),
                                     +s_arr(iv, UMY) * s_arr(iv, UMY),
                                     +s_arr(iv, UMZ) * s_arr(iv, UMZ)));
-            Real ei = rhoinv * (s_arr(iv, UEDEN) - ke);
+            Real ei = rhoinv * s_arr(iv, UEDEN) - ke;
             auto eos = pele::physics::PhysicsType::eos();
-            Real T = 0.0;
-            eos.REY2T(rhoNew, ei, Y, T);
+            T(i, j, k) = 0.0;
+            eos.REY2T(rhoNew, ei, Y, T(i, j, k));
+          });
 
-            if (T < clip_temp) {
-              // Keep KE, add energy to increase T
+          ParallelFor(bx, [=] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {
+            const IntVect iv{AMREX_D_DECL(i, j, k)};
+
+            if (T(iv) < clip_temp) {            
+              // Find target temp by averaging over the neighbours
+              // Real target_temp = 0.0;
+              Real target_temp = clip_temp;
+              
+              // int n_neighbour = 0;
+              int n_neighbour = 1;
+              for (int ix = -1; ix <= 1; ++ix) {
+              for (int iy = -1; iy <= 1; ++iy) {
+              for (int iz = -1; iz <= 1; ++iz) {
+                Real T_neighbour = T(i+ix, j+iy, k+iz);
+                if ((T_neighbour > clip_temp) && (T_neighbour < 1e4) && flag_arr(i+ix, j+iy, k+iz).isRegular())
+                target_temp += T_neighbour;
+                n_neighbour += 1;
+              }
+              }
+              }
+              // if (n_neighbour > 0)
+                target_temp /= Real(n_neighbour);
+              // else
+              //   target_temp = clip_temp;
+
+              // Calculate temperature
+              const Real rhoNew = s_arr(iv, URHO);
+              const Real rhoinv = 1.0 / rhoNew;
+              Real Y[NUM_SPECIES];
+              for (int n = 0; n < NUM_SPECIES; n++) {
+                Y[n] = s_arr(iv, UFS + n) * rhoinv;
+              }
+              const Real ke = 0.5 * rhoinv * rhoinv *
+                        (AMREX_D_TERM(s_arr(iv, UMX) * s_arr(iv, UMX),
+                                      +s_arr(iv, UMY) * s_arr(iv, UMY),
+                                      +s_arr(iv, UMZ) * s_arr(iv, UMZ)));
+              Real ei = rhoinv * s_arr(iv, UEDEN) - ke;
+              auto eos = pele::physics::PhysicsType::eos();
+
+              // // Keep KE, add energy to increase T
+              // if (verbose > 1)
+              //   std::cout << "Energy added to cell " << iv
+              //             << "): T=" << T(iv) << "->" << target_temp << " rhoE "
+              //             << s_arr(iv, UEDEN);
+              // T(iv) = target_temp;
+              // s_arr(iv, UEDEN) -= ei * rhoNew;
+              // eos.RTY2E(rhoNew, T(iv), Y, ei);
+              // s_arr(iv, UEDEN) += ei * rhoNew;
+              // if (verbose > 1) std::cout << "->" << s_arr(iv, UEDEN) << std::endl;
+              
+              // // Keep total E, reduce vel
+              // if (verbose > 1)
+              //   std::cout << "Momentum removed from cell (" << i << "," << j << "," << k
+              //             << "): T " << T << "->" << clip_temp << '\n';
+              // // Correct
+              // Real ei_new;
+              // eos.RTY2E(rhoNew, clip_temp, Y, ei_new);
+              // Real frac = (std::sqrt(1.0 - (ei_new - ei) / ke)); // this may be negative
+              // AMREX_D_TERM(s_arr(iv, UMX) *= frac;,
+              //              s_arr(iv, UMY) *= frac;,
+              //              s_arr(iv, UMZ) *= frac;)
+
+              // // Check
+              // ke = 0.5 * rhoinv *
+              //         (AMREX_D_TERM(s_arr(iv, UMX) * s_arr(iv, UMX),
+              //                       +s_arr(iv, UMY) * s_arr(iv, UMY),
+              //                       +s_arr(iv, UMZ) * s_arr(iv, UMZ)));
+              // Real rE_new = rhoNew * (ei_new + ke);
+              // if (rE_new != s_arr(iv, UEDEN)) {
+              //   std::cout << rE_new << "<-" << s_arr(iv, UEDEN) << '\n';
+              //   amrex::Abort();
+              // }
+
+              // Keep total E, reduce vel
               if (verbose > 1)
-                std::cout << "Energy added to cell (" << i << "," << j << "," << k
-                          << "): T " << T << "->" << clip_temp << " rhoE "
-                          << s_arr(iv, UEDEN);
-              T = clip_temp;
-              s_arr(iv, UEDEN) -= ei * rhoNew;
-              eos.RTY2E(rhoNew, T, Y, ei);
-              s_arr(iv, UEDEN) += ei * rhoNew;
-              if (verbose > 1) std::cout << "->" << s_arr(iv, UEDEN) << std::endl;
+                std::cout << "Momentum removed from cell " << iv
+                          << ": T=" << T(iv) << "->" << target_temp << " rhoE=" << s_arr(iv, UEDEN);
+              // First take energy from KE
+              Real ei_new, diff_ei;
+              eos.RTY2E(rhoNew, target_temp, Y, ei_new);
+              diff_ei = ei_new - ei;
+              Real ctrl_parm = 1.0; // control param in [0,1] how much KE can be used to heat the cell
+              Real fac = std::sqrt(1.0 - amrex::min(diff_ei, ctrl_parm * ke) / ke);
+              AMREX_D_TERM(s_arr(iv, UMX) *= fac;,
+                           s_arr(iv, UMY) *= fac;,
+                           s_arr(iv, UMZ) *= fac;)
+              // If not enough, add energy
+              s_arr(iv, UEDEN) += rhoNew * amrex::max(diff_ei - ctrl_parm * ke, 0.0);
+              if (verbose > 1) std::cout << "->" << s_arr(iv, UEDEN) << '\n';
+
+              // // Check
+              // Real ke_new = 0.5 * rhoinv * rhoinv * 
+              //         (AMREX_D_TERM(s_arr(iv, UMX) * s_arr(iv, UMX),
+              //                       +s_arr(iv, UMY) * s_arr(iv, UMY),
+              //                       +s_arr(iv, UMZ) * s_arr(iv, UMZ)));
+              // Real ke_chk = ke - amrex::min(diff_ei, ctrl_parm * ke);
+              // Real ei_chk = rhoinv * s_arr(iv, UEDEN) - ke_new;
+              // if (std::abs(ei_chk - ei_new) > d_parm->smallr) { //std::numeric_limits<amrex::Real>::epsilon()
+              //   std::cout << "|ei_chk-ei_new|=" << std::abs(ei_chk - ei_new) << " ke " << ke << "->" << ke_new << '\n';
+              //   std::cout << "|ke_chk-ke_new|=" << std::abs(ke_chk - ke_new) << " fac=" << fac << '\n';
+              //   // amrex::Abort();
+              // }
             }
           });
         } // loop through NUM_FIELD

@@ -26,19 +26,6 @@ AMREX_GPU_DEVICE AMREX_FORCE_INLINE void
 cns_ctoprim(int i, int j, int k, int ns, amrex::Array4<amrex::Real const> const& u,
             amrex::Array4<amrex::Real> const& q, Parm const& /*parm*/) noexcept
 {
-  // std::ostringstream ss;
-  // amrex::Real sumRY = 0.0;
-  // ss << "@" << i << "," << j << "," << k << ": ns=" << ns << ": rho=" <<
-  // u(i,j,k,ns+URHO)
-  //    << " xmom=" << u(i,j,k,ns+UMX) << " ymom=" << u(i,j,k,ns+UMY) << " zmom=" <<
-  //    u(i,j,k,ns+UMZ) << " rhoE=" << u(i,j,k,ns+UEDEN) << std::endl;
-  // for (int n = 0; n < NUM_SPECIES; n++) {
-  //     ss << " rhoY" << n << "=" << u(i,j,k,ns+UFS+n) << " ";
-  //     sumRY += u(i,j,k,ns+UFS+n);
-  // }
-  // ss << " sum=" << sumRY << "\n";
-  // BL_BACKTRACE_PUSH(ss.str()); // PUSH takes std::string
-
   amrex::Real rho = u(i, j, k, ns + URHO);
   amrex::Real rhoinv = amrex::Real(1.0) / rho;
   AMREX_D_TERM(amrex::Real ux = u(i, j, k, ns + UMX) * rhoinv;
@@ -54,7 +41,7 @@ cns_ctoprim(int i, int j, int k, int ns, amrex::Array4<amrex::Real const> const&
   }
 
   auto eos = pele::physics::PhysicsType::eos();
-  amrex::Real T = 0, p, cs, gamma;
+  amrex::Real T = 0, p, cs = 0, gamma;
   eos.REY2T(rho, ei, massfrac, T);
   eos.RTY2P(rho, T, massfrac, p);
 
@@ -77,20 +64,22 @@ cns_ctoprim(int i, int j, int k, int ns, amrex::Array4<amrex::Real const> const&
 
   // // Monitor problem cell
   // std::ostringstream ss;
+  std::ostream& ss = std::cout;
 
-  // if ((T <= 0.0) || amrex::isnan(cs) || amrex::isnan(ux) || (rho <= 0.0) || (p <=
-  // 0.0)) {
-  //     ss << "@" << i << "," << j << "," << k << ": ns=" << ns << ": rho=" << rho
-  //     << " T=" << T << " p=" << p
-  //               << " u=" << ux << " rhoE=" << u(i,j,k,ns+UEDEN) << " ei=" << ei <<
-  //               std::endl; //why it bugs if I use "\n" instead?
-  //     for (int n = 0; n < NUM_SPECIES; n++) {
-  //         ss << " rhoY" << n << "=" << u(i,j,k,ns+UFS+n) << " ";
-  //     }
-  //     ss << "\n";
+  if ((T <= 0.0) || amrex::isnan(cs) || amrex::isnan(ux) || 
+      (rho <= 0.0) || (p <= 0.0)) {
+      ss << "@" << i << "," << j << "," << k << ": ns=" << ns << ": rho=" << rho
+      << " T=" << T << " p=" << p << " cs=" << cs << " gamma=" << gamma
+      << " u=" << ux << " rhoE=" << u(i,j,k,ns+UEDEN) << " ei=" << ei << '\n';
+      for (int n = 0; n < NUM_SPECIES; n++) {
+          ss << " rhoY" << n << "=" << u(i,j,k,ns+UFS+n) << " ";
+      }
+      ss << '\n';
+
+      // amrex::Abort();
 
   //     BL_BACKTRACE_PUSH(ss.str()); // PUSH takes std::string
-  // }
+  }
 }
 
 /**
@@ -210,8 +199,8 @@ cns_div(int i, int j, int k, int n, amrex::Array4<amrex::Real> const& dsdt,
                                   +dxinv[2] * (fz(i, j, k, n) - fz(i, j, k + 1, n)));
 
   // Monitor problem cell
-  if (isnan(dsdt(i, j, k, n)))
-    std::cout << "div(" << i << "," << j << "," << k << ") is nan" << std::endl;
+  // if (isnan(dsdt(i, j, k, n)))
+  //   std::cout << "div(" << i << "," << j << "," << k << ") is nan" << std::endl;
 }
 
 AMREX_GPU_DEVICE inline void riemann(
@@ -420,17 +409,17 @@ AMREX_GPU_DEVICE AMREX_FORCE_INLINE void hllc(
   } else {
     Real sstar = (pr - pl + rl * ul * (sl - ul) - rr * ur * (sr - ur)) /
                  (rl * (sl - ul) - rr * (sr - ur)); // contact wave speed
-    if (isnan(rl * (sl - ul) - rr * (sr - ur))) {
-      std::cout << "(rl*(sl-ul) - rr*(sr-ur)) is nan \n";
-      std::cout << rl << " " << sl << " " << ul << "  " << rr << " " << sr << " "
-                << ur << " " << std::endl;
-    }
+    // if (isnan(rl * (sl - ul) - rr * (sr - ur))) {
+    //   std::cout << "(rl*(sl-ul) - rr*(sr-ur)) is nan \n";
+    //   std::cout << rl << " " << sl << " " << ul << "  " << rr << " " << sr << " "
+    //             << ur << " " << std::endl;
+    // }
 
     if (sstar >= 0) { // parm.smallu*(amrex::Math::abs(ul) + amrex::Math::abs(ur)))
                       // {
       // flx_l* = flx_l + sl * (q_l* - q_l)
       Real frac = (sl - ul) / (sl - sstar) - 1.;
-      if (isnan(frac)) std::cout << "frac (sstar >= 0) is nan \n";
+      // if (isnan(frac)) std::cout << "frac (sstar >= 0) is nan \n";
 
       flxrho = 0.;
       AMREX_D_TERM(flxu = rl * ul * ul + pl + sl * rl * ((frac + 1.) * sstar - ul);
@@ -447,7 +436,7 @@ AMREX_GPU_DEVICE AMREX_FORCE_INLINE void hllc(
              // amrex::Math::abs(ur))) {
       // flx_r* = flx_r + sr * (q_r* - q_r)
       Real frac = (sr - ur) / (sr - sstar) - 1.;
-      if (isnan(frac)) std::cout << "frac (sstar < 0) is nan \n";
+      // if (isnan(frac)) std::cout << "frac (sstar < 0) is nan \n";
 
       flxrho = 0.;
       AMREX_D_TERM(flxu = rr * ur * ur + pr + sr * rr * ((frac + 1.) * sstar - ur);
@@ -623,7 +612,7 @@ AMREX_GPU_DEVICE AMREX_FORCE_INLINE void cns_riemann(
   Real cl = (recon_char_var && sys == 0) ? wl(iv, WTHER) : q(iv - iv_dir, QC);
   Real r = q(iv - iv_dir, QRHO);
   Real yl[NUM_SPECIES];
-  Real rl, AMREX_D_DECL(ul, ut1l, ut2l), pl, el;
+  Real rl, AMREX_D_DECL(ul, ut1l, ut2l), pl;
 
   Real sumY = 0.0;
   for (int n = 0; n < NUM_SPECIES; ++n) {
@@ -644,7 +633,7 @@ AMREX_GPU_DEVICE AMREX_FORCE_INLINE void cns_riemann(
   Real cr = (recon_char_var && sys == 0) ? wr(iv, WTHER) : q(iv, QC);
   r = q(iv, QRHO);
   Real yr[NUM_SPECIES];
-  Real rr, AMREX_D_DECL(ur, ut1r, ut2r), pr, er;
+  Real rr, AMREX_D_DECL(ur, ut1r, ut2r), pr;
 
   sumY = 0.0;
   for (int n = 0; n < NUM_SPECIES; ++n) {
@@ -660,20 +649,24 @@ AMREX_GPU_DEVICE AMREX_FORCE_INLINE void cns_riemann(
   cns_unpackchar(wr(iv, WRHO), wr(iv, WACO), wr(iv, WACO + 1), cr, r, g, rr, ur, pr,
                  sys, parm);
 
-  if (!isgreater(rl, 0.0) || !isgreater(rr, 0.0) || !isgreater(pl, 0.0) ||
-      !isgreater(pr, 0.0)) { // isgreater() returns false with nan
+  if (!isgreater(rl, 0.0) || !isgreater(pl, 0.0) || 
+      !isgreater(rr, 0.0) || !isgreater(pr, 0.0)) { // isgreater() returns false with nan
     // Revert to piecewise linear (Godunov) reconstruction
+    std::cout << "face " << i << "," << j << "," << k << " reverted to linear recon" << '\n';
+
     rl = q(iv - iv_dir, QRHO);
     AMREX_D_TERM(ul = q(iv - iv_dir, QUN);, ut1l = q(iv - iv_dir, QUT);
                  , ut2l = q(iv - iv_dir, QUTT););
     pl = q(iv - iv_dir, QPRES);
-    for (int n = 0; n < NUM_SPECIES; ++n) { yl[n] = q(iv - iv_dir, QFS + n); }
+    for (int n = 0; n < NUM_SPECIES; ++n) { yl[n] = q(iv - iv_dir, QFS + n); }    
+  
     rr = q(iv, QRHO);
     AMREX_D_TERM(ur = q(iv, QUN);, ut1r = q(iv, QUT);, ut2r = q(iv, QUTT););
     pr = q(iv, QPRES);
     for (int n = 0; n < NUM_SPECIES; ++n) { yr[n] = q(iv, QFS + n); }
   }
 
+  Real el, er;
   eos.RYP2E(rl, yl, pl, el);
   el += 0.5 * (AMREX_D_TERM(ul * ul, +ut1l * ut1l, +ut2l * ut2l));
   eos.RPY2Cs(rl, pl, yl, cl);
@@ -683,9 +676,16 @@ AMREX_GPU_DEVICE AMREX_FORCE_INLINE void cns_riemann(
   eos.RPY2Cs(rr, pr, yr, cr);
 
   if (isnan(cl) || isnan(cr)) {
-    std::cout << "l c=" << cl << " p=" << pl << " r=" << rl << " u=" << ul
-              << " r c=" << cr << " p=" << pr << " r=" << rr << " u=" << ur
-              << std::endl;
+    std::cout << "l c=" << cl << " p=" << pl << " r=" << rl << " u=" << ul << " yl=";
+    for (int n = 0; n < NUM_SPECIES; ++n) std::cout << yl[n] << " ";
+    std::cout << '\n'
+              << "r c=" << cr << " p=" << pr << " r=" << rr << " u=" << ur << " yr=";
+    for (int n = 0; n < NUM_SPECIES; ++n) std::cout << yr[n] << " ";    
+    std::cout << '\n';
+    std::cout << "qc=" << q(iv-iv_dir, QC) << "," << q(iv, QC) << " qg=" << q(iv-iv_dir, QG) << "," << q(iv, QG)<< '\n';
+
+    cl = q(iv-iv_dir, QC);
+    cr = q(iv, QC);
   }
 
   Real ry_flx[NUM_SPECIES] = {0.0};

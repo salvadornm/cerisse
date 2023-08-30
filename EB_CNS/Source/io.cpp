@@ -13,6 +13,8 @@ void CNS::restart(Amr& papa, std::istream& is, bool bReadSpecial)
   }
 
   buildMetrics();
+
+  Sborder.define(grids, dmap, LEN_STATE, NUM_GROW, MFInfo(), Factory());
 }
 
 void CNS::checkPoint(const std::string& dir, std::ostream& os, VisMF::How how,

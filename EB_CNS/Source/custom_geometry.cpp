@@ -45,7 +45,7 @@ void Combustor::build(const Geometry& geom, const int max_coarsening_level)
   auto pr = EB2::translate(EB2::lathe(polys), {lenx * 0.5, leny * 0.5, 0.});
 
   auto gshop = EB2::makeShop(pr);
-  EB2::Build(gshop, geom, max_coarsening_level, max_coarsening_level, 6, true);
+  EB2::Build(gshop, geom, max_coarsening_level, max_coarsening_level, 6, false);
 }
 
 void ConvergingNozzle::build(const Geometry& geom, const int max_coarsening_level)
@@ -202,5 +202,5 @@ void Triangles::build(const Geometry& geom, const int max_coarsening_level)
   auto alltri_extrude_IF = EB2::extrude(alltri_IF, 2); // along z
 
   auto gshop = EB2::makeShop(alltri_extrude_IF);
-  EB2::Build(gshop, geom, max_coarsening_level, max_coarsening_level, 6, true);
+  EB2::Build(gshop, geom, max_coarsening_level, max_coarsening_level, 6, false);
 }

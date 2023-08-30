@@ -233,8 +233,13 @@ void CNS::react_state(Real time, Real dt, bool init_react)
                   unpack_pasr(i, j, k, snew_arr, new_rho, sold_arr, rY, rYsrc, qarr,
                               muarr, dx, dxinv, dt);
                 } else {
+                  // amrex::Real min_rY = 0.0;
+                  // for (int n = 0; n < NUM_SPECIES; ++n) {
+                  //   min_rY = amrex::min(min_rY, rY(i, j, k, n));
+                  // }
                   for (int n = 0; n < NUM_SPECIES; ++n) {
                     snew_arr(i, j, k, UFS + n) = amrex::max(0.0, rY(i, j, k, n));
+                    // snew_arr(i, j, k, UFS + n) = rY(i, j, k, n) - min_rY;
                     new_rho += snew_arr(i, j, k, UFS + n);
                   }
                 }
@@ -249,6 +254,7 @@ void CNS::react_state(Real time, Real dt, bool init_react)
                 for (int n = 0; n < NUM_SPECIES; ++n) {
                   snew_arr(i, j, k, UFS + n) *= snew_arr(i, j, k, URHO) / new_rho;
                 }
+                // snew_arr(i, j, k, URHO) = new_rho;
               }
 
               // update drY/dt

@@ -343,6 +343,8 @@ void CNS::post_restart()
     if (use_typical_vals_chem) { set_typical_values_chem(); }
   }
 
+  MultiFab& S_new = get_new_data(State_Type);
+
 #if (NUM_FIELD > 0)
   // Initialise random number
   Vector<IntVect> ref_ratio;
@@ -350,9 +352,6 @@ void CNS::post_restart()
     ref_ratio.push_back(parent->refRatio(lv));
   }
   WienerProcess.init(AMREX_SPACEDIM, level, ref_ratio);
-#endif
-
-  MultiFab& S_new = get_new_data(State_Type);
 
   // Populate fields (when restarting from a different number of fields)
   if ((NUM_FIELD > 0) && do_restart_fields) {
@@ -377,6 +376,7 @@ void CNS::post_restart()
       }
     }
   }
+#endif
 
   Parm const* lparm = d_parm;
   ProbParm const* lprobparm = d_prob_parm;
@@ -593,7 +593,7 @@ void CNS::printTotalandCheckNan() const
 #endif
 
   // Nan detector for soft exit
-  if (isnan(tot[0]) || isnan(tot[4])) { signalStopJob = true; }
+  if (isnan(tot[0]) || isnan(tot[1]) || isnan(tot[2]) || isnan(tot[3]) || isnan(tot[4])) { signalStopJob = true; }
   amrex::ParallelDescriptor::ReduceBoolOr(signalStopJob);
 }
 
