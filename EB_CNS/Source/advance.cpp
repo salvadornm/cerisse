@@ -355,10 +355,15 @@ void CNS::enforce_consistent_state()
               for (int ix = -1; ix <= 1; ++ix) {
               for (int iy = -1; iy <= 1; ++iy) {
               for (int iz = -1; iz <= 1; ++iz) {
-                Real T_neighbour = T(i+ix, j+iy, k+iz);
-                if ((T_neighbour > clip_temp) && (T_neighbour < 1e4) && flag_arr(i+ix, j+iy, k+iz).isRegular())
-                target_temp += T_neighbour;
-                n_neighbour += 1;
+              Real T_neighbour = T(i+ix, j+iy, k+iz);
+              if ((T_neighbour > clip_temp) && (T_neighbour < 1e4) 
+#if CNS_USE_EB
+                  && flag_arr(i+ix, j+iy, k+iz).isRegular()
+#endif
+                ) {
+                  target_temp += T_neighbour;
+                  n_neighbour += 1;
+                }
               }
               }
               }
