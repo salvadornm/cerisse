@@ -1,0 +1,94 @@
+# ====================================================== #
+#                  CERISSE INPUT SCRIPT                  #
+# ====================================================== #
+max_step = 8000
+stop_time = 0.1
+amrex.fpe_trap_invalid = 1
+
+# ================ COMPUTATIONAL DOMAIN ================ #
+geometry.is_periodic = 0 0 0
+geometry.coord_sys   = 0  # 0: cart, 1: RZ, 2:spherical
+#geometry.prob_lo     = -34.29  -1.27  -1.905
+geometry.prob_hi     =  15.24   2.54   1.905
+#amr.n_cell           =  416     32     32
+geometry.prob_lo     = -7.62   -1.27  -1.905
+amr.n_cell           =  192     32     32
+
+eb2.geom_type = Scramjet
+cns.eb_no_slip = 1
+cns.eb_isothermal = 0
+
+# ================ BOUNDARY CONDITIONS ================= #
+# 0 = Interior             3 = Symmetry
+# 1 = Inflow / UserBC      4 = SlipWall = 3
+# 2 = Outflow (FOExtrap)   5 = NoSlipWall (adiabatic)
+cns.lo_bc = 1 1 5
+cns.hi_bc = 2 5 5
+
+# ==================== WHAT PHYSICS ==================== #
+cns.do_visc  = 1
+
+# ==================== WHAT NUMERICS =================== #
+cns.cfl = 0.3
+cns.dt_cutoff = 5.e-20
+cns.recon_scheme = 5   # 1: Godunov,  2: MUSCL,   3: WENO-Z3, 
+                       # 4: WENO-JS5, 5: WENO-Z5, 6: TENO-5
+cns.char_sys     = 0   # characteristic system, 0:sos, 1:gamma
+cns.recon_char_var = 0
+cns.clip_temp    = 50  # clip minimum temperature [K] (this is consistent with the chem mechanism)
+
+# ================== REACTION SETTINGS ================= #
+cns.do_react = 1
+cns.chem_integrator = "ReactorCvode"
+cvode.solve_type = "denseAJ_direct"
+ode.clean_init_massfrac = 1 # ensure 0 <= Y <= 1 before integration
+cns.use_typical_vals_chem = 0
+cns.min_react_temp = 700    # no reaction in cells below this temp (can reduce runtime in ReactorCvode)
+cns.update_heat_release = 1
+# cns.rk_reaction_iter = 0
+
+# ================ VERBOSITY & DIAGNOSIS =============== #
+cns.v = 1 # 0/1/2
+amr.v = 1
+ode.verbose = 0
+
+# ==================== LOAD BALANCE ==================== #
+amr.loadbalance_with_workestimates = 1 # loadbalance_int = regrid_int
+
+# =============== REFINEMENT / REGRIDDING ============== #
+amr.max_level       = 2     # maximum level number allowed
+amr.ref_ratio       = 2 2 2 # refinement ratio
+amr.regrid_int      = 50    # how often to regrid
+amr.blocking_factor = 8
+amr.max_grid_size   = 64
+amr.n_error_buf     = 2 2 2 # number of buffer cells in error est
+amr.grid_eff        = 0.9
+
+# ================== TAGGING CRITERIA ================== #
+cns.refine_dengrad = 5e-4
+cns.refine_dengrad_max_lev = 3
+
+cns.refine_magvort = 3e5
+cns.refine_magvort_max_lev = 3
+
+# ==================== OUTPUT FILES ==================== #
+amr.checkpoint_files_output = 1
+amr.check_file      = react3d/chk    # root name of checkpoint file
+amr.check_int       = 1000            # number of timesteps between checkpoints
+#amr.check_per # interval physical time between checkpoints
+
+amr.plot_files_output = 1
+amr.plot_file         = react3d/plt  # root name of plotfile
+amr.plot_int          = 100           # number of timesteps between plotfiles
+#amr.plot_per # interval physical time between plotfiles
+amr.derive_plot_vars  = ALL
+cns.plot_rhoy = 0
+cns.plot_molefrac = 0
+cns.plot_massfrac = 1
+cns.plot_fields = 0
+
+# ================= PROBLEM PARAMETERS ================= #
+prob.T0 = 1100 # total temperature [K]
+prob.spark = 1
+
+amr.restart = react3d/chk07000
