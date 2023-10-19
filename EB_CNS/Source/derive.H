@@ -88,12 +88,22 @@ void cns_dervary(const amrex::Box& bx, amrex::FArrayBox& derfab, int dcomp,
                  int ncomp, const amrex::FArrayBox& datafab,
                  const amrex::Geometry& geomdata, amrex::Real time, const int* bcrec,
                  int level);
+
+void cns_dervarp(const amrex::Box& bx, amrex::FArrayBox& derfab, int dcomp,
+                 int ncomp, const amrex::FArrayBox& datafab,
+                 const amrex::Geometry& geomdata, amrex::Real time, const int* bcrec,
+                 int level);
 #endif
 
 void cns_dervelgrad(const amrex::Box& bx, amrex::FArrayBox& derfab, int dcomp,
                     int ncomp, const amrex::FArrayBox& datafab,
                     const amrex::Geometry& geomdata, amrex::Real time,
                     const int* bcrec, int level);
+
+void cns_dershocksensor(const amrex::Box& bx, amrex::FArrayBox& derfab, int dcomp,
+                        int ncomp, const amrex::FArrayBox& datafab,
+                        const amrex::Geometry& geomdata, amrex::Real time,
+                        const int* bcrec, int level);
 
 // void cns_dermut(const amrex::Box& bx, amrex::FArrayBox& derfab, int dcomp, int
 // ncomp,

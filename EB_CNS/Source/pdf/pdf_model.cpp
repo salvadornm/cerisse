@@ -40,6 +40,7 @@ void CNS::compute_pdf_model(amrex::MultiFab& S, amrex::Real dt, int iteration)
   if (verbose > 0) {
     amrex::Print() << " >> Computing PDF source term:";
     if (do_psgs) amrex::Print() << " p_sgs";
+    if (do_psgs) amrex::Print() << " pressure-dilatation";
     if (do_vpdf) amrex::Print() << " VPDF";
     if (do_spdf) amrex::Print() << " SPDF";
     amrex::Print() << std::endl;
@@ -79,6 +80,8 @@ void CNS::compute_pdf_model(amrex::MultiFab& S, amrex::Real dt, int iteration)
         // The order of Langevin and IEM does not matter, as they act on different
         // variables The order of p_sgs and Langevin may matter, do not know
         if (do_psgs) { vpdf_psgs_model(bx, sarr, dt, dW, dx); }
+
+        if (do_pd_model) { vpdf_pd_model(bx, sarr, dt, dW, dx); }
 
         if (do_vpdf) { vpdf_langevin_model(bx, sarr, dt, dW, dx); }
 

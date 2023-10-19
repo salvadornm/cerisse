@@ -91,9 +91,15 @@ Real CNS::advance(Real time, Real dt, int iteration, int ncycle)
     MultiFab::Add(S_new, S_old, 0, 0, LEN_STATE, 0);
   }
 
+  enforce_consistent_state(); // Enforce rho = sum(rhoY)
+
 #if (NUM_FIELD > 0)
   computeAvg(S_new);
   FillPatch(*this, Sborder, 1, time + dt, State_Type, 0, LEN_STATE);
+  // compute_psgs_model(Sborder, dSdt_new, dt, fr_as_crse, fr_as_fine);
+  // MultiFab::Saxpy(S_new, dt, dSdt_new, 0, 0, LEN_STATE, 0);
+  // compute_pdf_model(S_new, dt, iteration);
+
   compute_pdf_model(Sborder, dt, iteration);
   MultiFab::Copy(S_new, Sborder, 0, 0, LEN_STATE, 0);
   computeAvg(S_new);

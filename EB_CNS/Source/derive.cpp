@@ -524,14 +524,48 @@ void cns_dervary(const Box& bx, FArrayBox& derfab, int dcomp, int /*ncomp*/,
   amrex::ParallelFor(bx, [=] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {
     for (int n = 0; n < NUM_SPECIES; ++n) {
       vary(i, j, k, n) = 0.0;
+      amrex::Real meany = dat(i, j, k, UFS + n) / dat(i, j, k, URHO);
       for (int nf = 1; nf < NUM_FIELD; ++nf) {
         amrex::Real y =
           dat(i, j, k, nf * NVAR + UFS + n) / dat(i, j, k, nf * NVAR + URHO);
-        vary(i, j, k, n) += y * y;
+        vary(i, j, k, n) += (y - meany) * (y - meany);
       }
-      amrex::Real meany = dat(i, j, k, UFS + n) / dat(i, j, k, URHO);
-      vary(i, j, k, n) = vary(i, j, k, n) / NUM_FIELD - meany * meany;
+      vary(i, j, k, n) /= amrex::Real(NUM_FIELD - 1);
     }
+  });
+}
+
+void cns_dervarp(const Box& bx, FArrayBox& derfab, int dcomp, int /*ncomp*/,
+                 const FArrayBox& datafab, const Geometry& /*geomdata*/,
+                 Real /*time*/, const int* /*bcrec*/, int /*level*/)
+{
+  auto const dat = datafab.const_array();
+  auto varp = derfab.array(dcomp);
+
+  amrex::ParallelFor(bx, [=] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {
+    varp(i, j, k) = 0.0;
+    amrex::Real p[NUM_FIELD+1];
+    for (int nf = 0; nf <= NUM_FIELD; ++nf) {
+      amrex::Real rho = dat(i, j, k, nf * NVAR + URHO);
+      amrex::Real rhoinv = 1.0 / rho;
+      AMREX_D_TERM(amrex::Real ux = dat(i, j, k, nf * NVAR + UMX) * rhoinv;
+                  , amrex::Real uy = dat(i, j, k, nf * NVAR + UMY) * rhoinv;
+                  , amrex::Real uz = dat(i, j, k, nf * NVAR + UMZ) * rhoinv;);
+      amrex::Real ei = dat(i, j, k, nf * NVAR + UEDEN) * rhoinv 
+                       - amrex::Real(0.5) * (AMREX_D_TERM(ux * ux, +uy * uy, +uz * uz));;
+      amrex::Real Y[NUM_SPECIES];
+      for (int n = 0; n < NUM_SPECIES; ++n)
+        Y[n] = dat(i, j, k, nf * NVAR + UFS + n) * rhoinv;
+
+      amrex::Real T = 0.0;
+      auto eos = pele::physics::PhysicsType::eos();
+      eos.REY2T(rho, ei, Y, T);
+      eos.RTY2P(rho, T, Y, p[nf]);
+
+      if (nf > 0) 
+        varp(i, j, k) += (p[nf] - p[0]) * (p[nf] - p[0]);
+    }
+    varp(i, j, k) /= amrex::Real(NUM_FIELD - 1);    
   });
 }
 #endif
@@ -605,6 +639,42 @@ void cns_dervelgrad(const Box& bx, FArrayBox& derfab, int dcomp, int /*ncomp*/,
     gradu(i, j, k) = sqrt(AMREX_D_TERM(
       dudx * dudx, +dudy * dudy + dvdx * dvdx + dvdy * dvdy,
       +dudz * dudz + dvdz * dvdz + dwdx * dwdx + dwdy * dwdy + dwdz * dwdz));
+  });
+}
+
+void cns_dershocksensor(const Box& bx, FArrayBox& derfab, int dcomp, int /*ncomp*/,
+                        const FArrayBox& datafab, const Geometry& geomdata, Real /*time*/,
+                        const int* /*bcrec*/, int /*level*/)
+{
+  auto const dat = datafab.const_array();
+  auto shock_sensor = derfab.array(dcomp);
+
+  amrex::ParallelFor(bx, [=] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {
+    amrex::IntVect iv(AMREX_D_DECL(i,j,k));
+    shock_sensor(iv) = 0.0;
+    for (int dir = 0; dir < AMREX_SPACEDIM; ++dir){
+      amrex::IntVect iv_dir = amrex::IntVect::TheDimensionVector(dir);
+      amrex::Real pp[3];
+        for (int i: {-1, 0, 1}) {
+          amrex::Real rho = dat(iv+i*iv_dir, URHO);
+          // pp[i+1]=rho;
+          amrex::Real rhoinv = 1.0 / rho;
+          AMREX_D_TERM(amrex::Real ux = dat(iv+i*iv_dir, UMX) * rhoinv;
+                      , amrex::Real uy = dat(iv+i*iv_dir, UMY) * rhoinv;
+                      , amrex::Real uz = dat(iv+i*iv_dir, UMZ) * rhoinv;);
+          amrex::Real ei = dat(iv+i*iv_dir, UEDEN) * rhoinv 
+                          - amrex::Real(0.5) * (AMREX_D_TERM(ux * ux, +uy * uy, +uz * uz));;
+          amrex::Real Y[NUM_SPECIES];
+          for (int n = 0; n < NUM_SPECIES; ++n)
+            Y[n] = dat(iv+i*iv_dir, UFS+n) * rhoinv;
+
+          amrex::Real T = 0.0;
+          auto eos = pele::physics::PhysicsType::eos();
+          eos.REY2T(rho, ei, Y, T);
+          eos.RTY2P(rho, T, Y, pp[i+1]);
+        }
+        shock_sensor(iv) = amrex::max(amrex::Math::abs(pp[2]-2*pp[1]+pp[0])/(pp[2]+2*pp[1]+pp[0]), shock_sensor(iv));
+    }
   });
 }
 

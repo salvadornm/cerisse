@@ -351,6 +351,10 @@ void CNS::variableSetUp()
                  DeriveRec::GrowBoxByOne);
   derive_lst.addComponent("divrho", desc_lst, State_Type, URHO, NVAR);
 
+  derive_lst.add("shock_sensor", IndexType::TheCellType(), 1, cns_dershocksensor,
+                 DeriveRec::GrowBoxByOne);
+  derive_lst.addComponent("shock_sensor", desc_lst, State_Type, URHO, NVAR);
+  
   // External source term
   // derive_lst.add("ext_src", IndexType::TheCellType(), 1,
   //                CNS::cns_derextsrc, DeriveRec::TheSameBox);
@@ -401,11 +405,22 @@ void CNS::variableSetUp()
   }
 
 #if NUM_FIELD > 0
-  // Derived variance of velocity, species, energy (turbulent stat??)
+  // Derived variance of velocity, species, pressure
   amrex::Vector<std::string> rs_names = {"R11", "R12", "R22", "R13", "R23", "R33"};
   derive_lst.add("reynolds_stress", IndexType::TheCellType(), AMREX_D_PICK(1, 3, 6),
                  rs_names, cns_dervaru, DeriveRec::TheSameBox);
   derive_lst.addComponent("reynolds_stress", desc_lst, State_Type, 0, LEN_STATE);
+
+  amrex::Vector<std::string> vary_names(NUM_SPECIES);
+  for (int i = 0; i < NUM_SPECIES; i++) {
+    vary_names[i] = "var_Y_" + spec_names[i];
+  }
+  derive_lst.add("var_Y", IndexType::TheCellType(), NUM_SPECIES,
+                 vary_names, cns_dervary, DeriveRec::TheSameBox);
+  derive_lst.addComponent("var_Y", desc_lst, State_Type, 0, LEN_STATE);
+
+  derive_lst.add("var_p", IndexType::TheCellType(), 1, cns_dervarp, DeriveRec::TheSameBox);
+  derive_lst.addComponent("var_p", desc_lst, State_Type, 0, LEN_STATE);
 #endif
   // //
   // // Dynamically generated error tagging functions

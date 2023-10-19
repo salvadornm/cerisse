@@ -218,6 +218,16 @@ protected:
                     amrex::YAFluxRegister* fr_as_fine,
 #endif
                     bool write_to_flux_register);
+                    
+//   void compute_psgs_model(const amrex::MultiFab& S, amrex::MultiFab& dSdt, amrex::Real dt,
+// #if CNS_USE_EB
+//                     amrex::EBFluxRegister* fr_as_crse,
+//                     amrex::EBFluxRegister* fr_as_fine
+// #else
+//                     amrex::YAFluxRegister* fr_as_crse,
+//                     amrex::YAFluxRegister* fr_as_fine
+// #endif
+//                     );
 
   void fill_ext_src(int i, int j, int k, amrex::Real time,
                     amrex::GeometryData const& geomdata,
@@ -323,6 +333,7 @@ protected:
 
   static bool do_restart_fields;
   static bool do_psgs;
+  static bool do_pd_model;
   static bool do_vpdf;
   static bool do_spdf;
 

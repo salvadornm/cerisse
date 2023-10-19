@@ -811,6 +811,7 @@ void CNS::read_params()
 
   pp.query("do_restart_fields", do_restart_fields);
   pp.query("do_psgs", do_psgs);
+  pp.query("do_pd_model", do_pd_model);
   pp.query("do_vpdf", do_vpdf);
   pp.query("do_spdf", do_spdf);
 

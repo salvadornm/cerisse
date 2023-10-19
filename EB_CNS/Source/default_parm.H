@@ -56,6 +56,7 @@ Real CNS::plm_theta = 2.0; // [1,2] 1: minmod; 2: van Leer's MC (higher sharper)
 
 bool CNS::do_restart_fields = false;
 bool CNS::do_psgs = false;
+bool CNS::do_pd_model = false;
 bool CNS::do_vpdf = false;
 bool CNS::do_spdf = false;
 
