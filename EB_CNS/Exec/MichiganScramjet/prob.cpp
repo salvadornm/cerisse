@@ -16,6 +16,8 @@ void amrex_probinit(const int* /*init*/, const int* /*name*/, const int* /*namel
     ParmParse pp("prob");
     pp.get("T0", T0); // total temperature [K]
     pp.get("spark", CNS::h_prob_parm->spark); // spark plug (modelled as heating wall)
+    pp.query("record_statistics", CNS::h_prob_parm->record_statistics);
+    pp.query("clean_aux_on_restart", CNS::h_prob_parm->clean_aux_on_restart);
   }
   CNS::h_prob_parm->Y[O2_ID] = 0.244;
   CNS::h_prob_parm->Y[N2_ID] = 0.671;
@@ -39,7 +41,7 @@ void amrex_probinit(const int* /*init*/, const int* /*name*/, const int* /*namel
   CNS::h_prob_parm->u = M * cs;
   
   // Fuel conditions
-  p0 = 845.0e4;
+  p0 = 845.0e4 + (755.e4 - 845.e4) * (T0 - 1100.0) / 300.0; // linearly varying
   M = 1.0;
   T0 = 288.0;
 

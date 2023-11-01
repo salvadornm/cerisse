@@ -18,6 +18,8 @@ struct ProbParm
   amrex::GpuArray<amrex::Real, NUM_SPECIES> Y_jet = {0.0};
 
   bool spark = false;
+  bool record_statistics = false;
+  bool clean_aux_on_restart = false;
 };
 
 #endif
