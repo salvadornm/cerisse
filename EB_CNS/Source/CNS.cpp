@@ -236,7 +236,7 @@ void CNS::computeNewDt(int finest_level, int /*sub_cycle*/, Vector<int>& n_cycle
 
 void CNS::post_regrid(int /*lbase*/, int /*new_finest*/)
 {
-  // enforce_consistent_state();
+  enforce_consistent_state();
 
   if (do_react && use_typical_vals_chem) { set_typical_values_chem(); }
 }
