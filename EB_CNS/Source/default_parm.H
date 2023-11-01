@@ -28,6 +28,8 @@ Vector<Real> CNS::refine_tke;
 // TaggingParm* CNS::tag_parm;
 // Vector<AMRErrorTag> CNS::errtagger;
 
+RealBox CNS::buffer_box;
+
 bool CNS::do_visc = true;    // diffusion is on by default
 bool CNS::do_ext_src = true; // call external source term in prob.cpp
 
@@ -36,8 +38,9 @@ std::string CNS::chem_integrator = "Reactor_Null";
 pele::physics::transport::TransportParams<pele::physics::PhysicsType::transport_type>
   CNS::trans_parms;
 amrex::Vector<std::string> CNS::spec_names;
-bool CNS::use_typical_vals_chem =
-  false;                              // tell chem_integrator typical value of Temp
+pele::physics::turbinflow::TurbInflow CNS::turb_inflow;
+
+bool CNS::use_typical_vals_chem = false; // tell chem_integrator typical value of Temp
 int CNS::reset_typical_vals_int = 10; // interval to reset the typical value
 int CNS::rk_reaction_iter = 0;        // iterate to tightly couple chemistry
 Real CNS::min_react_temp =
@@ -71,8 +74,7 @@ Real CNS::Sc_T = 0.7;   // Turbulent Schmidt number = mu_T/(rho*D_T)
 Real CNS::Cm = 0.1;     // PaSR mixing timescale coefficient
 
 #if CNS_USE_EB
-int CNS::eb_weights_type =
-  3; // [0,1,2,3] 0: weights are all 1; 1: eint; 2: cell mass; 3: volfrac
+amrex::Real CNS::eb_weight = 0.5;
 bool CNS::eb_no_slip = true;
 bool CNS::eb_isothermal = false;
 Real CNS::eb_wall_temp; // EB wall temperature

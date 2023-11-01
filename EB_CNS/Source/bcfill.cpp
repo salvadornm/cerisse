@@ -57,6 +57,7 @@ struct CnsFillExtDir
         for (int nc = 0; nc < numcomp; ++nc) { // Fill internal state data
           s_int[dcomp + nc] = dest(firs, dcomp + nc);
           s_refl[dcomp + nc] = dest(refl, dcomp + nc);
+          s_ext[dcomp + nc] = dest(iv, dcomp + nc); // this is needed for turbinflow
         }
 
         bcnormal(x, s_int, s_refl, s_ext, idir, 1, time, geom,
@@ -75,6 +76,7 @@ struct CnsFillExtDir
         for (int nc = 0; nc < numcomp; ++nc) {
           s_int[dcomp + nc] = dest(firs, dcomp + nc);
           s_refl[dcomp + nc] = dest(refl, dcomp + nc);
+          s_ext[dcomp + nc] = dest(iv, dcomp + nc); // this is needed for turbinflow
         }
 
         bcnormal(x, s_int, s_refl, s_ext, idir, -1, time, geom, *lprobparm);
@@ -111,6 +113,47 @@ void cns_bcfill(Box const& bx, FArrayBox& data, const int dcomp, const int numco
                 const int bcomp, const int scomp)
 {
   ProbParm const* lprobparm = CNS::d_prob_parm;
+
+  // Fill turb_inflow if requested (from PeleLM)
+  if (CNS::turb_inflow.is_initialized() && scomp < AMREX_SPACEDIM) {
+    for (int dir=0; dir<AMREX_SPACEDIM; ++dir) {
+      auto bndryBoxLO = amrex::Box(amrex::adjCellLo(geom.Domain(),dir) & bx);
+      if (bcr[1].lo()[dir] == BCType::ext_dir && bndryBoxLO.ok()) {
+        // Create box with ghost cells and set them to zero
+        amrex::IntVect growVect(amrex::IntVect::TheUnitVector());
+        int Grow = 4;     // Being conservative
+        for(int n=0;n<AMREX_SPACEDIM;n++) {
+          growVect[n] = Grow;
+        }
+        growVect[dir] = 0;
+        amrex::Box modDom = geom.Domain();
+        modDom.grow(growVect);
+        auto bndryBoxLO_ghost = amrex::Box(amrex::adjCellLo(modDom,dir,Grow) & bx);
+        for (int nf = 0; nf <= NUM_FIELD; ++nf) {
+          data.setVal<amrex::RunOn::Host>(0.0,bndryBoxLO_ghost,nf*NVAR+UMX,AMREX_SPACEDIM);
+          CNS::turb_inflow.add_turb(bndryBoxLO_ghost, data, nf*NVAR+UMX, geom, time, dir, amrex::Orientation::low);
+        }
+      }
+
+      auto bndryBoxHI = amrex::Box(amrex::adjCellHi(geom.Domain(),dir) & bx);
+      if (bcr[1].hi()[dir] == BCType::ext_dir && bndryBoxHI.ok()) {
+        //Create box with ghost cells and set them to zero
+        amrex::IntVect growVect(amrex::IntVect::TheUnitVector());
+        int Grow = 4;
+        for(int n=0;n<AMREX_SPACEDIM;n++) {
+          growVect[n] = Grow;
+        }
+        growVect[dir] = 0;
+        amrex::Box modDom = geom.Domain();
+        modDom.grow(growVect);
+        auto bndryBoxHI_ghost = amrex::Box(amrex::adjCellHi(modDom,dir,Grow) & bx);
+        for (int nf = 0; nf <= NUM_FIELD; ++nf) {
+          data.setVal<amrex::RunOn::Host>(0.0,bndryBoxHI_ghost,nf*NVAR+UMX,AMREX_SPACEDIM);
+          CNS::turb_inflow.add_turb(bndryBoxHI_ghost, data, nf*NVAR+UMX, geom, time, dir, amrex::Orientation::high);
+        }
+      }
+    }
+  }
 
   GpuBndryFuncFab<CnsFillExtDir> gpu_hyp_bndry_func(CnsFillExtDir{lprobparm});
   gpu_hyp_bndry_func(bx, data, dcomp, numcomp, geom, time, bcr, bcomp, scomp);

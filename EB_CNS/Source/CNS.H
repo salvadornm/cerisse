@@ -14,6 +14,7 @@
 
 #include <PelePhysics.H>
 #include <ReactorBase.H>
+#include <turbinflow.H>
 
 #include "LES.H"
 #include "index_macros.H"
@@ -181,10 +182,14 @@ public:
 
   static ProbParm* h_prob_parm;
   static ProbParm* d_prob_parm;
+#ifdef USE_PROB_PARM_HOST
+  static ProbParmHost* prob_parm_host;
+#endif
 
   static pele::physics::transport::TransportParams<
     pele::physics::PhysicsType::transport_type>
     trans_parms;
+  static pele::physics::turbinflow::TurbInflow turb_inflow;
 
   // Eddy viscosity type LES
 
@@ -234,6 +239,10 @@ protected:
                     amrex::Array4<const amrex::Real> const& state,
                     amrex::Array4<amrex::Real> const& ext_src, Parm const& parm,
                     ProbParm const& prob_parm);
+
+#ifdef USE_FULL_PROB_POST_TIMESTEP
+  void full_prob_post_timestep(int iteration);
+#endif
 
   CNS& getLevel(int lev) { return dynamic_cast<CNS&>(parent->getLevel(lev)); }
 
@@ -340,12 +349,18 @@ protected:
   // EB
 
 #if CNS_USE_EB
-  static int eb_weights_type; // this is deprecated. TODO: remove this
+  static amrex::Real eb_weight;
   static bool eb_no_slip;
   static bool eb_isothermal;
   static amrex::Real eb_wall_temp;
   static std::string redistribution_type;
 #endif
+
+  // Buffer layer
+
+  static amrex::RealBox buffer_box;
+
+  // AMR controls
 
   static int refine_cutcells;
   static int refine_cutcells_max_lev;

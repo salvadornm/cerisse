@@ -1,7 +1,7 @@
 CERISSE_HOME ?= ../../..
 AMREX_HOME = $(CERISSE_HOME)/Submodules/amrex
 PELE_PHYSICS_HOME = $(CERISSE_HOME)/Submodules/PelePhysics
-TOP ?=  ../..
+TOP ?=  $(CERISSE_HOME)/EB_CNS
 
 EBASE = Cerisse
 
@@ -9,6 +9,14 @@ ifeq ($(USE_EB), TRUE)
    DEFINES += -DCNS_USE_EB=1
 else
    USE_EB := FALSE
+endif
+
+ifeq ($(USE_FULL_PROB_POST_TIMESTEP), TRUE)
+   DEFINES += -DUSE_FULL_PROB_POST_TIMESTEP
+endif
+
+ifeq ($(USE_PROB_PARM_HOST), TRUE)
+   DEFINES += -DUSE_PROB_PARM_HOST
 endif
 
 USE_SUNDIALS = TRUE
@@ -55,7 +63,7 @@ ifeq ($(USE_EB), TRUE)
 endif
 
 # =============== PELE_PHYSICS ===============
-Pdirs := Source Eos Transport Reactions
+Pdirs := Source Eos Transport Reactions Utility/TurbInflow
 Ppack += $(foreach dir, $(Pdirs), $(PELE_PHYSICS_HOME)/$(dir)/Make.package)
 Plocs += $(foreach dir, $(Pdirs), $(PELE_PHYSICS_HOME)/$(dir))
 

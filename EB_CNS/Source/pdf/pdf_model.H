@@ -21,7 +21,7 @@ AMREX_FORCE_INLINE AMREX_GPU_DEVICE void vpdf_psgs_model(
   const amrex::Real dx[AMREX_SPACEDIM])
 {
   // Compute p
-  const Box& bxg = amrex::grow(bx, 2);
+  const Box& bxg = amrex::grow(bx, 1);
   FArrayBox pfab(bxg, NUM_FIELD+1, The_Async_Arena());
   auto const& p = pfab.array();
 
@@ -46,9 +46,9 @@ AMREX_FORCE_INLINE AMREX_GPU_DEVICE void vpdf_psgs_model(
       eos.RTY2P(rho, T, Y, pres);
       p(i, j, k, nf) = pres;
 
-      if (isnan(pres))
-        std::cout << i << "," << j << "," << k << ": p is nan!!! T=" << T
-                  << ", rho=" << rho << ", ei=" << ei << std::endl;
+      // if (isnan(pres))
+      //   std::cout << i << "," << j << "," << k << ": p is nan!!! T=" << T
+      //             << ", rho=" << rho << ", ei=" << ei << std::endl;
     }
   });
 
@@ -63,12 +63,6 @@ AMREX_FORCE_INLINE AMREX_GPU_DEVICE void vpdf_psgs_model(
       amrex::Real mean_dup = 0.0;
       amrex::Real dup[NUM_FIELD];
 
-      // amrex::Real w = 0.02;
-      // amrex::Real shock_sensor = amrex::Math::abs(p(iv-iv_dir,0) - 2*p(iv,0) + p(iv+iv_dir,0))
-      //                           / ((1-w)*(amrex::Math::abs(p(iv-iv_dir,0) - p(iv,0)) + amrex::Math::abs(p(iv+iv_dir,0) - p(iv,0))) 
-      //                           + w*(p(iv-iv_dir,0) + p(iv,0) + p(iv+iv_dir,0)) + 1e-16);
-
-      // if (shock_sensor > 0.01) {
       amrex::Real um, up, pm, pp;
       for (int nf = 1; nf <= NUM_FIELD; ++nf) {
         // cell {i-1}
@@ -80,30 +74,6 @@ AMREX_FORCE_INLINE AMREX_GPU_DEVICE void vpdf_psgs_model(
         up =
           s(iv + iv_dir, nf * NVAR + UMX + dir) / s(iv + iv_dir, nf * NVAR + URHO);
 
-        // amrex::Real stencils[3];
-        // stencils[0] = p(iv - iv_dir, nf - 1);
-        // stencils[1] = p(iv, nf - 1);
-        // stencils[2] = p(iv + iv_dir, nf - 1);
-        // muscl(stencils, pm, pp, 1);
-        // stencils[0] = s(iv - iv_dir, nf * NVAR + UMX + dir) / s(iv - iv_dir, nf * NVAR + URHO);
-        // stencils[1] = s(iv, nf * NVAR + UMX + dir) / s(iv, nf * NVAR + URHO);
-        // stencils[2] = s(iv + iv_dir, nf * NVAR + UMX + dir) / s(iv + iv_dir, nf * NVAR + URHO);
-        // muscl(stencils, um, up, 1);
-        
-        // amrex::Real stencils[5];
-        // stencils[0] = p(iv - 2*iv_dir, nf - 1);
-        // stencils[1] = p(iv - iv_dir, nf - 1);
-        // stencils[2] = p(iv, nf - 1);
-        // stencils[3] = p(iv + iv_dir, nf - 1);
-        // stencils[4] = p(iv + 2*iv_dir, nf - 1);
-        // wenoz5(stencils, pm, pp);
-        // stencils[0] = s(iv - 2*iv_dir, nf * NVAR + UMX + dir) / s(iv - 2*iv_dir, nf * NVAR + URHO);
-        // stencils[1] = s(iv - iv_dir, nf * NVAR + UMX + dir) / s(iv - iv_dir, nf * NVAR + URHO);
-        // stencils[2] = s(iv, nf * NVAR + UMX + dir) / s(iv, nf * NVAR + URHO);
-        // stencils[3] = s(iv + iv_dir, nf * NVAR + UMX + dir) / s(iv + iv_dir, nf * NVAR + URHO);
-        // stencils[4] = s(iv + 2*iv_dir, nf * NVAR + UMX + dir) / s(iv + 2*iv_dir, nf * NVAR + URHO);
-        // wenoz5(stencils, um, up);
-
         dp[nf - 1] = pp - pm; // p_{i+1} - p{i-1}
         mean_dp += dp[nf - 1];
 
@@ -113,154 +83,13 @@ AMREX_FORCE_INLINE AMREX_GPU_DEVICE void vpdf_psgs_model(
       mean_dp /= amrex::Real(NUM_FIELD); // or use mean calculated p?
       mean_dup /= amrex::Real(NUM_FIELD);
 
-      // pm = p(iv - iv_dir, 0);
-      // um = s(iv - iv_dir, UMX + dir) / s(iv - iv_dir, URHO);
-      // pp = p(iv + iv_dir, 0);
-      // up = s(iv + iv_dir, UMX + dir) / s(iv + iv_dir, URHO);
-      // mean_dp = pp - pm;
-      // mean_dup = up * pp - um * pm;
-
-      // Shock sensor
-      bool shock_sensor = false;
-      for (int nf = 0; nf <= NUM_FIELD; ++nf) {
-        amrex::Real pp[3];
-        // pp[0] = p(iv - iv_dir, nf);        
-        // pp[1] = p(iv, nf);        
-        // pp[2] = p(iv + iv_dir, nf);
-        // shock_sensor |= (amrex::Math::abs(pp[2]-2*pp[1]+pp[0])/(pp[2]+2*pp[1]+pp[0]) > 0.01);
-        pp[0] = s(iv - iv_dir, nf * NVAR + URHO);        
-        pp[1] = s(iv, nf * NVAR + URHO);        
-        pp[2] = s(iv + iv_dir, nf * NVAR + URHO);
-        shock_sensor |= (amrex::Math::abs(pp[2]-2*pp[1]+pp[0])/(pp[2]+2*pp[1]+pp[0]) > 0.0003);
-      }
-
-      // Limiter to prevent driving fields to negative T
-      amrex::Real limiter = 1.0;
-      // auto eos = pele::physics::PhysicsType::eos();
-      // for (int nf = 1; nf <= NUM_FIELD; ++nf) {
-      //   // Check each field
-      //   amrex::Real p_sgs = -0.5 * (mean_dp - dp[nf - 1]) / dx[dir] * dt;
-      //   amrex::Real pu_sgs = -0.5 * (mean_dup - dup[nf - 1]) / dx[dir] * dt;
-      //   amrex::Real u_sgs = s(iv, UMX + dir) - s(iv, nf * NVAR + UMX + dir);
-
-      //   if (p_sgs * u_sgs < 0) { // p_sgs moves fields away from mean, then prevent neg energy
-      //     amrex::Real rho = s(i, j, k, nf * NVAR + URHO);
-      //     amrex::Real rhoinv = 1.0 / rho;
-      //     amrex::Real ux = s(i, j, k, nf * NVAR + UMX) * rhoinv;
-      //     amrex::Real ei_old = s(i, j, k, nf * NVAR + UEDEN) * rhoinv - amrex::Real(0.5) * ux * ux;
-      //     amrex::Real Y[NUM_SPECIES];
-      //     for (int n = 0; n < NUM_SPECIES; ++n) Y[n] = s(i, j, k, nf * NVAR + UFS + n) * rhoinv;
-          
-      //     //// VERSION 1: limit with min T ////    
-      //     // amrex::Real ei_min;
-      //     // eos.RTY2E(rho, 1e-9, Y, ei_min);
-
-      //     // if ((ei_min - ei_old) > 0.0) amrex::Print() << "ei_old = " << ei_old << " ei_min = " << ei_min << '\n';          
-      //     // if (rho*(ei_min - ei_old) > pu_sgs - ux*p_sgs) amrex::Print() << "p_sgs making negative T!!!\n";
-                    
-      //     //// VERSION 2: limit with neighbour (like TVD) ////   
-      //     amrex::Real ei_l, ei_r;
-      //     {
-      //       int i = -1;
-      //       amrex::Real rho = s(iv + i*iv_dir, nf * NVAR + URHO);
-      //       amrex::Real rhoinv = 1.0 / rho;
-      //       amrex::Real ux = s(iv + i*iv_dir, nf * NVAR + UMX) * rhoinv;
-      //       ei_l = s(iv + i*iv_dir, nf * NVAR + UEDEN) * rhoinv - amrex::Real(0.5) * ux * ux;
-
-      //       i = 1;
-      //       rho = s(iv + i*iv_dir, nf * NVAR + URHO);
-      //       rhoinv = 1.0 / rho;
-      //       ux = s(iv + i*iv_dir, nf * NVAR + UMX) * rhoinv;
-      //       ei_r = s(iv + i*iv_dir, nf * NVAR + UEDEN) * rhoinv - amrex::Real(0.5) * ux * ux;
-      //     }
-      //     amrex::Real ei_min = amrex::min(amrex::min(ei_l, ei_r), ei_old);
-
-      //     assert(ux == s(i, j, k, nf * NVAR + UMX) / s(i, j, k, nf * NVAR + URHO));          
-      //     amrex::Real llimiter = (pu_sgs - ux*p_sgs - 0.5*p_sgs*p_sgs*rhoinv) >= 0.0 ? 1.0 : 
-      //                     amrex::min(rho*(ei_min - ei_old) / (pu_sgs - ux*p_sgs - 0.5*p_sgs*p_sgs*rhoinv), 1.0);
-          
-      //     // Take the strictest limiter
-      //     limiter = amrex::min(limiter, llimiter);
-      //   }
-      // }
-      // limiter = amrex::max(limiter, 0.0);
-      // if (limiter < 1.0)
-      //   amrex::Print() << "limiter = " << limiter << '\n';
-
-      if (shock_sensor) {
-      // Real dp_var = 0.0, dup_var = 0.0, ru_var = 0.0, re_var = 0.0;
-      // for (int nf = 1; nf <= NUM_FIELD; ++nf) {
-      //   dp_var += (mean_dp - dp[nf - 1]) * (mean_dp - dp[nf - 1]);
-      //   dup_var += (mean_dup - dup[nf - 1]) * (mean_dup - dup[nf - 1]);
-      //   ru_var += (s(iv, UMX + dir) - s(iv, nf * NVAR + UMX + dir)) * (s(iv, UMX + dir) - s(iv, nf * NVAR + UMX + dir));
-      //   re_var += (s(iv, UEDEN) - s(iv, nf * NVAR + UEDEN)) * (s(iv, UEDEN) - s(iv, nf * NVAR + UEDEN));
-      // }
-      // dp_var /= amrex::Real(NUM_FIELD-1);
-      // dup_var /= amrex::Real(NUM_FIELD-1);
-      // ru_var /= amrex::Real(NUM_FIELD-1);
-      // re_var /= amrex::Real(NUM_FIELD-1);
-
       for (int nf = 1; nf <= NUM_FIELD; ++nf) {
-        ////
-        // Real ru_sgs = s(iv, UMX + dir) - s(iv, nf * NVAR + UMX + dir);
-        // Real re_sgs = s(iv, UEDEN) - s(iv, nf * NVAR + UEDEN);
-        // Real p_sgs = 1.0 / (dt + 2.0*ru_var/amrex::max(1e-20, dp_var)*dx[dir]*dx[dir]*4) * ru_sgs * dt;
-        // Real pu_sgs = 1.0 / (dt + 2.0*re_var/amrex::max(1e-20, dup_var)*dx[dir]*dx[dir]*4) * re_sgs * dt;
+        Real p_sgs = -0.5 * (mean_dp - dp[nf - 1]) / dx[dir] * dt;
+        Real pu_sgs = -0.5 * (mean_dup - dup[nf - 1]) / dx[dir] * dt;
 
-        //// central difference for dpdx
-        // mom_sgs = -(mean_dp - dp[nf-1]) / 0.5*dx[dir] * dt
-        Real p_sgs = -0.5 * (mean_dp - dp[nf - 1]) / dx[dir] * dt; //* limiter;
-        Real pu_sgs = -0.5 * (mean_dup - dup[nf - 1]) / dx[dir] * dt; //* limiter;
-        // Real u_sgs = s(iv, UMX + dir) - s(iv, nf * NVAR + UMX + dir);
-        // Real e_sgs = s(iv, UEDEN) - s(iv, nf * NVAR + UEDEN);
-        // if (p_sgs * u_sgs >= 0) {
-        //   if (p_sgs >= 0) { // p_sgs moves fields towards mean, then prevent overshoot
-        //     p_sgs = amrex::min(p_sgs, u_sgs);
-        //   } else {
-        //     p_sgs = amrex::max(p_sgs, u_sgs);
-        //   }
-        // }
-        // else 
-        // if (p_sgs * u_sgs < 0) { // p_sgs moves fields away from mean, then prevent neg energy
-        // amrex::Real rho = s(i, j, k, nf * NVAR + URHO);
-        // amrex::Real rhoinv = 1.0 / rho;
-        // amrex::Real ux = s(i, j, k, nf * NVAR + UMX) * rhoinv;
-        // amrex::Real ei_old = s(i, j, k, nf * NVAR + UEDEN) * rhoinv -
-        //                      amrex::Real(0.5) * ux * ux;
-        // amrex::Real Y[NUM_SPECIES];
-        // for (int n = 0; n < NUM_SPECIES; ++n) Y[n] = s(i, j, k, nf * NVAR + UFS + n) * rhoinv;
-
-        // auto eos = pele::physics::PhysicsType::eos();
-        // amrex::Real ei_min;
-        // eos.RTY2E(rho, 1e-10, Y, ei_min);
-
-        // if (rho*(ei_min - ei_old) > pu_sgs - ux*p_sgs) amrex::Print() << "p_sgs making negative T!!!\n";
-
-        // // amrex::Real limiter = amrex::min(rho*(ei_min - ei_old) / amrex::min(pu_sgs - ux*p_sgs, -1e-16), 1.0);
-        // // amrex::Real limiter = amrex::max(amrex::min(rho*(ei_min - ei_old) / pu_sgs - ux*p_sgs, 1.0), 0.0);
-        // amrex::Real limiter = (pu_sgs - ux*p_sgs) >= 0.0 ? 1.0 : amrex::min(rho*(ei_min - ei_old) / (pu_sgs - ux*p_sgs), 1.0);
-        // amrex::Print() << "limiter = " << limiter << '\n';
-        // p_sgs *= limiter;
-        // pu_sgs *= limiter;
-        // }
         s(i, j, k, nf * NVAR + UMX + dir) += p_sgs;
         s(i, j, k, nf * NVAR + UEDEN) += pu_sgs;
-
-        // Real d = s(iv, nf * NVAR + UMX + dir) - s(iv, UMX + dir);
-        // s(i, j, k, nf * NVAR + UMX + dir) -=
-        //   (0.5 * (mean_dp - dp[nf - 1]) / dx[dir] * d * dt) / (1.0 + 0.5 * (mean_dp - dp[nf - 1]) / dx[dir] * d * dt);
-        // s(i, j, k, nf * NVAR + UEDEN) -=
-        //   (0.5 * (mean_dup - dup[nf - 1]) / dx[dir] * d * dt) / (1.0 + 0.5 * (mean_dup - dup[nf - 1]) / dx[dir] * d * dt);
-
-        // consistent e
-        // amrex::Real mean_u = s(i, j, k, UMX + dir) / s(i, j, k, URHO);
-        // s(i, j, k, nf * NVAR + UEDEN) -= mean_u * 0.5 * (mean_dp - dp[nf - 1]) /
-        // dx[dir] * dt; 
-        // amrex::Real u = s(i, j, k, nf * NVAR + UMX + dir) / s(i, j,
-        // k, nf * NVAR + URHO); s(i, j, k, nf * NVAR + UEDEN) -= u * 0.5 * (mean_dp
-        // - dp[nf - 1]) / dx[dir] * dt;
       }
-      } // shock sensor
     }
   });
 }
@@ -279,8 +108,8 @@ AMREX_FORCE_INLINE AMREX_GPU_DEVICE void vpdf_pd_model(
   const amrex::Box& bx, amrex::Array4<amrex::Real>& s, const amrex::Real dt,
   const amrex::Real dW[AMREX_SPACEDIM][NUM_FIELD],
   const amrex::Real dx[AMREX_SPACEDIM],  
-  const amrex::Real C_e=1.05,
-  const amrex::Real shock_threshold=0.02)
+  const amrex::Real C_e = 1.05,
+  const amrex::Real shock_threshold = 0.02)
 {
   amrex::ParallelFor(bx, [=] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {
     amrex::IntVect iv(AMREX_D_DECL(i,j,k));
@@ -319,21 +148,9 @@ AMREX_FORCE_INLINE AMREX_GPU_DEVICE void vpdf_pd_model(
       eos.REY2T(rho, ei, Y, T);
       eos.RTY2P(rho, T, Y, p[nf]);
       eos.RTY2G(rho, T, Y, gamma[nf]);
-      // if (isnan(T) || T <= 0.0) amrex::Print() << "T[" << nf << "] = " << T << '\n';
-      // if (isnan(p[nf]) || p[nf] <= 0.0) amrex::Print() << "p[" << nf << "] = " << p[nf] << '\n';
-      // if (isnan(rho) || rho <= 0.0) amrex::Print() << "rho[" << nf << "] = " << rho << '\n';
 
       if (nf == 0) {
         eos.RTY2Cs(rho, T, Y, cs_mean);
-        // if (isnan(cs_mean) || cs_mean <= 0.0) {
-        //   amrex::Print() << "T = " << T 
-        //    << " p = " << p[nf]
-        //    << " ei = " << ei
-        //    << " rho = " << rho << '\n';
-
-        //   // if (isnan(cs_mean) || cs_mean <= 0.0) 
-        //   amrex::Abort("cs_mean is nan");
-        // }
         ei_mean = ei;
       }
 
@@ -345,27 +162,26 @@ AMREX_FORCE_INLINE AMREX_GPU_DEVICE void vpdf_pd_model(
     // Compute shock sensor
     // bool shock_sensor[AMREX_SPACEDIM+1] = {true};
     bool shock_sensor[AMREX_SPACEDIM+1] = {false};
-    for (int dir = 0; dir < AMREX_SPACEDIM; ++dir){
+    for (int dir = 0; dir < AMREX_SPACEDIM; ++dir) {
       amrex::IntVect iv_dir = amrex::IntVect::TheDimensionVector(dir);
       for (int nf = 0; nf <= NUM_FIELD; ++nf) {
         amrex::Real pp[3];
-        for (int i: {-1, 0, 1}) {
-          amrex::Real rho = s(iv+i*iv_dir, nf*NVAR+URHO);
-          // pp[i+1]=rho;
+        for (int i_s: {-1, 0, 1}) {
+          amrex::Real rho = s(iv+i_s*iv_dir, nf*NVAR+URHO);
           amrex::Real rhoinv = 1.0 / rho;
-          AMREX_D_TERM(amrex::Real ux = s(iv+i*iv_dir, nf*NVAR+UMX) * rhoinv;
-                      , amrex::Real uy = s(iv+i*iv_dir, nf*NVAR+UMY) * rhoinv;
-                      , amrex::Real uz = s(iv+i*iv_dir, nf*NVAR+UMZ) * rhoinv;);
-          amrex::Real ei = s(iv+i*iv_dir, nf*NVAR+UEDEN) * rhoinv 
-                          - amrex::Real(0.5) * (AMREX_D_TERM(ux * ux, +uy * uy, +uz * uz));;
+          AMREX_D_TERM(amrex::Real ux = s(iv + i_s*iv_dir, nf*NVAR+UMX) * rhoinv;
+                      , amrex::Real uy = s(iv + i_s*iv_dir, nf*NVAR+UMY) * rhoinv;
+                      , amrex::Real uz = s(iv + i_s*iv_dir, nf*NVAR+UMZ) * rhoinv;);
+          amrex::Real ei = s(iv + i_s*iv_dir, nf*NVAR+UEDEN) * rhoinv 
+                          - amrex::Real(0.5) * (AMREX_D_TERM(ux * ux, +uy * uy, +uz * uz));
           amrex::Real Y[NUM_SPECIES];
           for (int n = 0; n < NUM_SPECIES; ++n)
-            Y[n] = s(iv+i*iv_dir, nf*NVAR+UFS+n) * rhoinv;
+            Y[n] = s(iv + i_s*iv_dir, nf*NVAR+UFS+n) * rhoinv;
 
           amrex::Real T = 0.0;
           auto eos = pele::physics::PhysicsType::eos();
           eos.REY2T(rho, ei, Y, T);
-          eos.RTY2P(rho, T, Y, pp[i+1]);
+          eos.RTY2P(rho, T, Y, pp[i_s+1]);
         }
         shock_sensor[dir] |= (amrex::Math::abs(pp[2]-2*pp[1]+pp[0])/(pp[2]+2*pp[1]+pp[0]) > shock_threshold);
       }
@@ -396,12 +212,10 @@ AMREX_FORCE_INLINE AMREX_GPU_DEVICE void vpdf_pd_model(
       }
       
       Real dp = 1.0 / (p_var / (Pi_d * p[0]) + dt) * (p[0] - p[nf]) * dt; 
-      if (!shock_sensor) {dp = 0.0;}
+      if (!shock_sensor[AMREX_SPACEDIM]) {dp = 0.0;}
       // dp += p[0] * sqrt(pe2 / tau_a / (1.0 - 1.0/gamma_mean) / (s(i, j, k, URHO)*s(i, j, k, URHO)*cs_mean*cs_mean) / ei_mean) * dW[dir][NUM_FIELD - nf - 1]; 
 
       s(iv, nf * NVAR + UEDEN) += dp / (gamma[nf] - 1.0);
-      // if (s(iv, nf * NVAR + UEDEN) <= 0.0)
-      //   amrex::Print() << "s(" << iv << ", " << nf << " * NVAR + UEDEN) = " << s(iv, nf * NVAR + UEDEN) << '\n';
     }
   });
 }
@@ -419,7 +233,8 @@ AMREX_FORCE_INLINE AMREX_GPU_DEVICE void vpdf_langevin_model(
   const amrex::Box& bx, amrex::Array4<amrex::Real>& s, const amrex::Real dt,
   const amrex::Real dW[AMREX_SPACEDIM][NUM_FIELD],
   const amrex::Real dx[AMREX_SPACEDIM], const amrex::Real C0 = 2.1,
-  const amrex::Real C_e = 1.05) // 1.05? or 0.53?
+  const amrex::Real C_e = 1.05,
+  const amrex::Real shock_threshold = 0.02)
 {
   amrex::ParallelFor(bx, [=] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {
     // Compute turbulent statistics
@@ -436,6 +251,36 @@ AMREX_FORCE_INLINE AMREX_GPU_DEVICE void vpdf_langevin_model(
                                  1.0 / amrex::Real(AMREX_SPACEDIM));
     amrex::Real eps = C_e * std::pow(tke, 1.5) / delta;
     tke = amrex::max(tke, std::numeric_limits<amrex::Real>::epsilon()); // prevent divide by 0
+
+    // Compute shock sensor
+    amrex::IntVect iv(AMREX_D_DECL(i,j,k));
+    bool shock_sensor[AMREX_SPACEDIM+1] = {false};
+    for (int dir = 0; dir < AMREX_SPACEDIM; ++dir){
+      amrex::IntVect iv_dir = amrex::IntVect::TheDimensionVector(dir);
+      for (int nf = 0; nf <= NUM_FIELD; ++nf) {
+        amrex::Real pp[3];
+        for (int i: {-1, 0, 1}) {
+          amrex::Real rho = s(iv+i*iv_dir, nf*NVAR+URHO);
+          // pp[i+1]=rho;
+          amrex::Real rhoinv = 1.0 / rho;
+          AMREX_D_TERM(amrex::Real ux = s(iv+i*iv_dir, nf*NVAR+UMX) * rhoinv;
+                      , amrex::Real uy = s(iv+i*iv_dir, nf*NVAR+UMY) * rhoinv;
+                      , amrex::Real uz = s(iv+i*iv_dir, nf*NVAR+UMZ) * rhoinv;);
+          amrex::Real ei = s(iv+i*iv_dir, nf*NVAR+UEDEN) * rhoinv 
+                          - amrex::Real(0.5) * (AMREX_D_TERM(ux * ux, +uy * uy, +uz * uz));;
+          amrex::Real Y[NUM_SPECIES];
+          for (int n = 0; n < NUM_SPECIES; ++n)
+            Y[n] = s(iv+i*iv_dir, nf*NVAR+UFS+n) * rhoinv;
+
+          amrex::Real T = 0.0;
+          auto eos = pele::physics::PhysicsType::eos();
+          eos.REY2T(rho, ei, Y, T);
+          eos.RTY2P(rho, T, Y, pp[i+1]);
+        }
+        shock_sensor[dir] |= (amrex::Math::abs(pp[2]-2*pp[1]+pp[0])/(pp[2]+2*pp[1]+pp[0]) > shock_threshold);
+      }
+      shock_sensor[AMREX_SPACEDIM] |= shock_sensor[dir];
+    }
     
     // Real M_turb = sqrt(2.0 * tke) / cs_mean; // turbulent Mach number
     // eps *= (1 + M_turb*M_turb);    
@@ -449,10 +294,14 @@ AMREX_FORCE_INLINE AMREX_GPU_DEVICE void vpdf_langevin_model(
         u = s(i, j, k, nf * NVAR + UMX + dir) / s(i, j, k, nf * NVAR + URHO);
 
         // Langevin Gij = (0.5 + 0.75*C0)*eps/tke; B = sqrt(C0*eps) need to /mean_rho?
-        u_sgs = (0.5 + 0.75 * C0) * eps / tke * (mean_u - u) * dt +
-                sqrt(C0 * eps) * dW[dir][nf - 1];
-        // u_sgs = (0.5 + 0.75 * C0) / (tke / eps + dt) * (mean_u - u) * dt +
+        // u_sgs = (0.5 + 0.75 * C0) * eps / tke * (mean_u - u) * dt +
         //         sqrt(C0 * eps) * dW[dir][nf - 1];
+        if (shock_sensor[dir]) {
+          u_sgs = 0.0; //(0.5 + 0.75 * C0) / (tke / eps + dt) * (mean_u - u) * dt;
+        } else {
+          u_sgs = (0.5 + 0.75 * C0) / (tke / eps + dt) * (mean_u - u) * dt +
+                  sqrt(C0 * eps) * dW[dir][nf - 1];
+        }
 
         s(i, j, k, nf * NVAR + UMX + dir) += s(i, j, k, nf * NVAR + URHO) * u_sgs;
         s(i, j, k, nf * NVAR + UEDEN) += 0.5 * s(i, j, k, nf * NVAR + URHO) * ((u + u_sgs) * (u + u_sgs) - u * u); // conservative formulation

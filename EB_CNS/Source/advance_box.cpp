@@ -37,52 +37,89 @@ void CNS::compute_dSdt_box(Box const& bx, Array4<const Real>& sarr,
 
   // Transport coef
   FArrayBox diff_coeff;
-  if (do_visc == 1) {
+  bool do_diffusion = do_visc || do_les || buffer_box.ok();
+  if (do_diffusion) {
     diff_coeff.resize(bxg2, LEN_COEF, The_Async_Arena());
+    diff_coeff.setVal<RunOn::Device>(0.0);
 
-    for (int nf = 0; nf <= NUM_FIELD; ++nf) {
-      auto const& qar_yin = qtmp.const_array(nf * NPRIM + QFS);
-      auto const& qar_Tin = qtmp.const_array(nf * NPRIM + QTEMP);
-      auto const& qar_rhoin = qtmp.const_array(nf * NPRIM + QRHO);
-      auto const& mu = diff_coeff.array(nf * NCOEF + CMU);
-      auto const& xi = diff_coeff.array(nf * NCOEF + CXI);
-      auto const& lambda = diff_coeff.array(nf * NCOEF + CLAM);
-      auto const& rhoD = diff_coeff.array(nf * NCOEF + CRHOD);
+    if (do_visc) {
+      for (int nf = 0; nf <= NUM_FIELD; ++nf) {
+        auto const& qar_yin = qtmp.const_array(nf * NPRIM + QFS);
+        auto const& qar_Tin = qtmp.const_array(nf * NPRIM + QTEMP);
+        auto const& qar_rhoin = qtmp.const_array(nf * NPRIM + QRHO);
+        auto const& mu = diff_coeff.array(nf * NCOEF + CMU);
+        auto const& xi = diff_coeff.array(nf * NCOEF + CXI);
+        auto const& lambda = diff_coeff.array(nf * NCOEF + CLAM);
+        auto const& rhoD = diff_coeff.array(nf * NCOEF + CRHOD);
 
-      // Get Transport coefs on GPU
-      BL_PROFILE("PelePhysics::get_transport_coeffs()");
-      auto const* ltransparm = trans_parms.device_trans_parm();
-      amrex::launch(bxg2, [=] AMREX_GPU_DEVICE(amrex::Box const& tbx) {
-        auto trans = pele::physics::PhysicsType::transport();
-        trans.get_transport_coeffs(tbx, qar_yin, qar_Tin, qar_rhoin, rhoD, mu, xi,
-                                   lambda, ltransparm);
+        // Get Transport coefs on GPU
+        BL_PROFILE("PelePhysics::get_transport_coeffs()");
+        auto const* ltransparm = trans_parms.device_trans_parm();
+        amrex::launch(bxg2, [=] AMREX_GPU_DEVICE(amrex::Box const& tbx) {
+          auto trans = pele::physics::PhysicsType::transport();
+          trans.get_transport_coeffs(tbx, qar_yin, qar_Tin, qar_rhoin, rhoD, mu, xi,
+                                    lambda, ltransparm);
+        });
+      }
+    }
+
+    if (do_les) {
+      // Get LES transport coefs
+      BL_PROFILE("CNS::LES_transport_coeffs");
+
+      const auto dx = geom.CellSizeArray();
+      Real delta = std::pow(AMREX_D_TERM(dx[0], *dx[1], *dx[2]),
+                            1.0 / amrex::Real(AMREX_SPACEDIM));
+      
+      auto const& qar_yin = qtmp.const_array(QFS);
+      auto const& qar_rhoin = qtmp.const_array(QRHO);
+      auto const& qar_Tin = qtmp.const_array(QTEMP);
+      auto const& mu = diff_coeff.array(CMU);
+      auto const& xi = diff_coeff.array(CXI);
+      auto const& lambda = diff_coeff.array(CLAM);
+      auto const& rhoD = diff_coeff.array(CRHOD);
+
+      amrex::ParallelFor(bxg2, [=] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {
+        Real mu_T, xi_T;
+        les_model->mu_T_cc(i, j, k, qar_rhoin, dxinv, delta, Cs, mu_T);
+        // les_model->xi_T_cc(i, j, k, qar_rhoin, dxinv, delta, C_I, xi_T);
+        xi_T =
+          0.0; // TODO: this divu is calculated at cell centre, not face centre
+
+        mu(i, j, k) += mu_T;
+        xi(i, j, k) += xi_T;
+
+        for (int n = 0; n < NUM_SPECIES; ++n) rhoD(i, j, k, n) += mu_T / Sc_T;
+
+        Real y[NUM_SPECIES], cp;
+        for (int n = 0; n < NUM_SPECIES; ++n) y[n] = qar_yin(i, j, k, n);
+        auto eos = pele::physics::PhysicsType::eos();
+        eos.RTY2Cp(qar_rhoin(i, j, k), qar_Tin(i, j, k), y, cp);
+        lambda(i, j, k) += cp * mu_T / Pr_T;
       });
+    }
 
-      if (do_les) {
-        // Get LES transport coefs
-        BL_PROFILE("CNS::LES_transport_coeffs");
+    if (buffer_box.ok()) {
+      const auto dx = geom.CellSizeArray();
+      const auto problo = geom.ProbLo();
 
-        const auto dx = geom.CellSizeArray();
-        Real delta = std::pow(AMREX_D_TERM(dx[0], *dx[1], *dx[2]),
-                              1.0 / amrex::Real(AMREX_SPACEDIM));
+      for (int nf = 0; nf <= NUM_FIELD; ++nf) {
+        auto const& mu = diff_coeff.array(nf * NCOEF + CMU); // dynamic viscosity
+        auto const& xi = diff_coeff.array(nf * NCOEF + CXI); // bulk viscosity
+        auto const& lambda =
+          diff_coeff.array(nf * NCOEF + CLAM); // thermal conductivity
+        auto const& rhoD = diff_coeff.array(
+          nf * NCOEF + CRHOD); // species diffusivity (multiplied by rho)
 
         amrex::ParallelFor(bxg2, [=] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {
-          Real mu_T, xi_T;
-          les_model->mu_T_cc(i, j, k, qar_rhoin, dxinv, delta, Cs, mu_T);
-          // les_model->xi_T_cc(i, j, k, qar_rhoin, dxinv, delta, C_I, xi_T);
-          xi_T =
-            0.0; // TODO: this divu is calculated at cell centre, not face centre
-
-          mu(i, j, k) += mu_T;
-          xi(i, j, k) += xi_T;
-
-          for (int n = 0; n < NUM_SPECIES; ++n) rhoD(i, j, k, n) += mu_T / Sc_T;
-
-          Real y[NUM_SPECIES], cp;
-          for (int n = 0; n < NUM_SPECIES; ++n) y[n] = qar_yin(i, j, k, n);
-          auto eos = pele::physics::PhysicsType::eos();
-          eos.RTY2Cp(qar_rhoin(i, j, k), qar_Tin(i, j, k), y, cp);
-          lambda(i, j, k) += cp * mu_T / Pr_T;
+          RealVect pos{AMREX_D_DECL((i + 0.5) * dx[0] + problo[0],
+                                    (j + 0.5) * dx[1] + problo[1],
+                                    (k + 0.5) * dx[2] + problo[2])};
+          if (buffer_box.contains(pos)) {            
+            mu(i, j, k) += 0.1;
+            xi(i, j, k) += 0.1;
+            lambda(i, j, k) += 1e5;
+          }
         });
       }
     }
@@ -141,7 +178,7 @@ void CNS::compute_dSdt_box(Box const& bx, Array4<const Real>& sarr,
       // #endif
 
       // Store viscous fluxes separately
-      if (do_visc) {
+      if (do_diffusion) {
         auto const& coefs = diff_coeff.array(nf * NCOEF);
         amrex::ParallelFor(
           flxbx, [=] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {
@@ -152,7 +189,7 @@ void CNS::compute_dSdt_box(Box const& bx, Array4<const Real>& sarr,
     } // for fields
 
 #if NUM_FIELD > 0
-    if (do_visc) {
+    if (do_diffusion) {
       auto const& flx_arr = flxfab[cdir]->array();
       amrex::ParallelFor(flxbx, [=] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {
         // Average the viscous fluxes
@@ -170,16 +207,15 @@ void CNS::compute_dSdt_box(Box const& bx, Array4<const Real>& sarr,
         for (int nf = 1; nf <= NUM_FIELD; ++nf) {
           rho = sarr(i, j, k, nf * NVAR + URHO);
 
-          // // <p>*rho/<rho>
           AMREX_D_TERM(flx_arr(i, j, k, nf * NVAR + UMX) +=
-                       rho / mean_rho * vflx_arr(i, j, k, UMX);
-                       , flx_arr(i, j, k, nf * NVAR + UMY) +=
-                         rho / mean_rho * vflx_arr(i, j, k, UMY);
-                       , flx_arr(i, j, k, nf * NVAR + UMZ) +=
-                         rho / mean_rho * vflx_arr(i, j, k, UMZ);)
+          rho / mean_rho * vflx_arr(i, j, k, UMX);
+          , flx_arr(i, j, k, nf * NVAR + UMY) +=
+          rho / mean_rho * vflx_arr(i, j, k, UMY);
+          , flx_arr(i, j, k, nf * NVAR + UMZ) +=
+          rho / mean_rho * vflx_arr(i, j, k, UMZ);)
           flx_arr(i, j, k, nf * NVAR + UEDEN) +=
-            rho / mean_rho * vflx_arr(i, j, k, UEDEN);
-          for (int n = 0; n < NUM_SPECIES; ++n) {
+          rho / mean_rho * vflx_arr(i, j, k, UEDEN);
+                    for (int n = 0; n < NUM_SPECIES; ++n) {
             flx_arr(i, j, k, nf * NVAR + UFS + n) +=
               rho / mean_rho * vflx_arr(i, j, k, UFS + n);
           }

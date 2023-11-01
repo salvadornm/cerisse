@@ -241,7 +241,7 @@ void CNS::post_regrid(int /*lbase*/, int /*new_finest*/)
   if (do_react && use_typical_vals_chem) { set_typical_values_chem(); }
 }
 
-void CNS::post_timestep(int /*iteration*/)
+void CNS::post_timestep(int iteration)
 {
   BL_PROFILE("CNS::post_timestep()");
 
@@ -265,6 +265,9 @@ void CNS::post_timestep(int /*iteration*/)
     getLevel(level + 1).resetFillPatcher();
   }
 
+#ifdef USE_FULL_PROB_POST_TIMESTEP
+  full_prob_post_timestep(iteration);
+#else
   MultiFab& S = get_new_data(State_Type);
   MultiFab& IR = get_new_data(Reactions_Type);
   Real curtime = state[State_Type].curTime();
@@ -280,6 +283,7 @@ void CNS::post_timestep(int /*iteration*/)
       prob_post_timestep(i, j, k, curtime, dtlev, sarrs[box_no], irarrs[box_no],
                          geomdata, *lparm, *lprobparm);
     });
+#endif
 
   enforce_consistent_state(); // enforce Y and T after avgDown and reflux
 
@@ -387,6 +391,8 @@ void CNS::post_restart()
       // Modify restarted data and/or add turbulence
       prob_post_restart(i, j, k, sarrs[box_no], geomdata, *lparm, *lprobparm);
     });
+
+  enforce_consistent_state();
 }
 
 void CNS::errorEst(TagBoxArray& tags, int /*clearval*/, int tagval, Real time,
@@ -797,6 +803,15 @@ void CNS::read_params()
 #endif
   }
 
+  if (
+    pp.queryarr("buffer_box_lo", refboxlo)) {
+    pp.getarr("buffer_box_hi", refboxhi);
+    buffer_box.setLo(refboxlo.data());
+    buffer_box.setHi(refboxhi.data());
+    if (!buffer_box.ok())
+      amrex::Abort("CNS: buffer_box has negative volume");
+  }
+
   pp.query("do_visc", do_visc);
   pp.query("do_ext_src", do_ext_src);
 
@@ -820,7 +835,7 @@ void CNS::read_params()
   if (do_les || do_pasr) {
     if (AMREX_SPACEDIM == 1) amrex::Abort("CNS: LES not supporting 1D");
     pp.get("les_model", les_model_name);
-    pp.query("Cs", Cs);
+    pp.query("C_s", Cs);
     pp.query("C_I", C_I);
     pp.query("Pr_T", Pr_T);
     pp.query("Sc_T", Sc_T);
@@ -828,13 +843,8 @@ void CNS::read_params()
   }
 
 #if CNS_USE_EB
-  // eb_weights_type: (TODO: deprecated)
-  //  0 -- weights = 1;            1 -- use_int_energy_as_eb_weights
-  //  2 -- use_mass_as_eb_weights; 3 -- use_volfrac_as_eb_weights
-  pp.query("eb_weights_type", eb_weights_type);
-  if (eb_weights_type < 0 || eb_weights_type > 3) {
-    amrex::Abort("CNS: eb_weights_type must be 0, 1, 2 or 3");
-  }
+  // eb_weight in redist
+  pp.query("eb_weight", eb_weight);
 
   pp.query("redistribution_type", redistribution_type);
   if (redistribution_type != "StateRedist" && redistribution_type != "FluxRedist" &&
