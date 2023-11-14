@@ -31,9 +31,9 @@ void amrex_probinit(const int* /*init*/, const int* /*name*/, const int* /*namel
   Real gamma = 1.313, rho, T, p;
 
   if (M > 1.0) {
-    // Isentropic relations
     // Iterate to find gamma
     for (int iter = 0; iter < 3; ++ iter) {
+      // Isentropic relations
       T = T0 / (1 + 0.5 * (gamma - 1) * M * M);
       p = p0 * std::pow(1 + 0.5 * (gamma - 1) * M * M, -gamma / (gamma - 1));
 
@@ -41,25 +41,23 @@ void amrex_probinit(const int* /*init*/, const int* /*name*/, const int* /*namel
       eos.RTY2G(rho, T, CNS::h_prob_parm->Y.begin(), gamma);
     }
   } else {
-    // Constant total enthaply
+    // Constant mass flow rate (constant area isolator)
+    // First, calculate conditions at nozzle outlet (1)
+    Real M1 = 2.2, p1, T1;
+    // Iterate to find gamma
+    for (int iter = 0; iter < 3; ++ iter) {
+      // Isentropic relations
+      T1 = T0 / (1 + 0.5 * (gamma - 1) * M1 * M1);
+      p1 = p0 * std::pow(1 + 0.5 * (gamma - 1) * M1 * M1, -gamma / (gamma - 1));
+      eos.PYT2R(p1, CNS::h_prob_parm->Y.begin(), T, rho);
+      eos.RTY2G(rho, T1, CNS::h_prob_parm->Y.begin(), gamma);
+    }
+    // Then, assume constant mass flow rate, knowing p and M
     {
       ParmParse pp("prob");
       pp.get("p", p);
     }
-    // Iterate to find gamma and cv
-    Real cv = 8.3163e+06, R; // guesses
-    T = T0 / 2; // guesses
-    for (int iter = 0; iter < 3; ++ iter) {
-      eos.PYT2R(p, CNS::h_prob_parm->Y.begin(), T, rho);
-
-      R = cv * (gamma - 1.0);
-      T = (rho * cv * T0 + p0 - p) / (cv + gamma * R * M * M);
-
-      eos.RTY2G(rho, T, CNS::h_prob_parm->Y.begin(), gamma);
-      eos.RTY2Cv(rho, T, CNS::h_prob_parm->Y.begin(), cv);
-
-      amrex::Print() << "Guess " << iter << ": (T, rho, gamma, cv) = " << T << ", " << rho << ", " << gamma << ", " << cv << '\n';
-    }
+    T = pow((p / p1) * (M / M1), 2) * T1;   
   }
   amrex::Print() << "Inflow (gamma, T, p) = " << gamma << ", " << T << ", " << p << '\n';
   // Real p = 55.410e4;
