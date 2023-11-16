@@ -3,6 +3,7 @@ nav:
   - Home: index.md
   - LES: les.md
   - PDF: pdf.md
+  - Quickrun: quickrun.md
   - Run: run.md
   - Examples: example.md
 extra_javascript:

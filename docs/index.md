@@ -14,7 +14,7 @@ version 0.0 November 2023
 ## Folder layout
 
     EB_CNS/         # main code
-    Submodules/     # reauired modules, AMREX, PelePhysics
+    Submodules/     # required modules: AMREX, PelePhysics
     docs/           # documentation folder
 
 
@@ -51,15 +51,24 @@ and check for more options
 
 ## Quick Installation
 
-Using latest version on the master branch
+Dowload the latest version on the master branch
 
-* `gh repo clone salvadornm/cerisse` - requites installing GitHub CLI
+Using GitHub CLI
+
+```
+$ gh repo clone salvadornm/cerisse
+```
+
+or Download the latest release from [GitHub](https://github.com/salvadornm/cerisse/releases)
 
 
 
 ### Documentation Editing
 For help editing the documentation visit [mkdocs.org](https://www.mkdocs.org). To generate the docs locally `mkdocs serve`
 and point the browser to [127.0.0.1.8000](http://127.0.0.1:8000)
+You will need to install Math extension for Python-markdown
 
-
+```
+$ pip install python-markdown math
+```
 

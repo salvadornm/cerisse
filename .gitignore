@@ -12,3 +12,7 @@ Build
 
 # vscode data
 .vscode/*
+
+# Submodules
+Submodules/amrex
+Submodules/PelePhysics
