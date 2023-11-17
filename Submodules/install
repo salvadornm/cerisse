@@ -1,29 +1,33 @@
 AMREXVERSION=23.11
-VERSION=v23.03
-SUNDIALVERSION=6.6.2
+PELEPVERSION=23.03
 case  $1 in
 	git )
 	echo " installing git versions .. "
 	gh repo clone AMReX-Combustion/PelePhysics
 	;;
 	safe )
-	echo " installing release version .." $AMREXVERSION
+        rm -rf amrex
+	echo " installing AMREX release version .." $AMREXVERSION
 	wget https://github.com/AMReX-Codes/amrex/archive/refs/tags/23.11.zip
 	unzip 23.11.zip
-    mv amrex-23.11 amrex
-
-	echo " installing release version .." $VERSION
-	wget https://github.com/AMReX-Combustion/PelePhysics/archive/refs/tags/v23.03.zip
-	unzip v23.03.zip
-	mv PelePhysics-23.03 PelePhysics
-
-	echo " installing release version .." $SUNDIALVERSION
-	wget https://github.com/LLNL/sundials/archive/refs/tags/v6.6.2.zip
-    unzip v6.6.2.zip
-	mv sundials-6.6.2 sundials
-	rm *.zip
+        mv amrex-23.11 amrex
+	rm 23.11.zip
+        rm -rf PelePhysics
+        echo " installing PelePhysics release version .." $PELEPVERSION
+        wget https://github.com/AMReX-Combustion/PelePhysics/archive/refs/tags/v$PELEPVERSION.zip
+        unzip v$PELEPVERSION.zip
+        mv PelePhysics-$PELEPVERSION PelePhysics
+        rm v$PELEPVERSION.zip
         ;;
-    *)
+	pelephys)
+	rm -rf PelePhysics
+        echo " installing PelePhysics release version .." $PELEPVERSION
+        wget https://github.com/AMReX-Combustion/PelePhysics/archive/refs/tags/v$PELEPVERSION.zip        
+        unzip v$PELEPVERSION.zip
+        mv PelePhysics-$PELEPVERSION PelePhysics 
+	rm v$PELEPVERSION.zip
+	;;
+    	*)
 	echo " no option selected [git/safe]"
     exit
 esac
