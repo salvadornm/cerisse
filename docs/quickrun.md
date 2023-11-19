@@ -38,7 +38,7 @@ Go to Exec folder and pick one example. In this Tutorial  we we will work with
 Sod1D
 
 ```
-$ cd cerisse/EB_CNS/Exec/Sod1D
+$ cd cerisse/EB_CNS/Exec/Test
 ```
 
 ### 2) Install SUNDIALS
@@ -58,12 +58,23 @@ $ make SUNDIALS
 $ make
 ```
 
+It will create a temporary directory 
+`$ tmp_build_dir` 
+
+and (if succeful) an executable
+`main3d.gnu.DEBUG.ex.`
+
 
 ### 4) Run
 
+```
+$ main3d.gnu.DEBUG.exe inputs
+```
 
-Screenshot
 
+Add a screenshot
+
+It will create files
 
 ### 5) See Results
 

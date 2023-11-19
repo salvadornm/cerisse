@@ -3,24 +3,71 @@
 This page explains how to run the code
 
 
-## GNUmakefile 
+### GNUmakefile 
 
-General option, usually modified once.
+General option, usually modified once and that are reuired for compiling the code.
+It is divided into sections
+
+**AMREX** options
+such as dimension of the problem (1/2/3), compiler (gnu/clang) and precision (single/double).
+
 
 ```
+# AMReX
 DIM = 1
 COMP = gnu
 PRECISION = DOUBLE
 ```
 
-## Make.package
-
-Add problems files
+**Profiling** options
 
 
-## Simulation set-up
+**Performance** options related to parallelization, using MPI/OMP/CUDA for GPU.
+This are passed to AMReX and PelePhysics
 
-Check examples
+```
+USE_MPI = TRUE
+USE_OMP = FALSE
+USE_CUDA = FALSE
+USE_HIP = FALSE
+USE_SYCL = FALSE
+```
+
+**Debugging** options
+
+```
+# Debugging
+DEBUG = FALSE
+FSANITIZER = FALSE
+THREAD_SANITIZER = FALSE
+```
+
+**PelePhysisc** options, related to thermodynamics models, transport and chemistry
+
+```
+# PelePhysics
+Eos_Model := GammaLaw
+Transport_Model := Constant
+Chemistry_Model := Null
+```
+
+**Makefile** options, related to files to add to makefile
+
+```
+# GNU Make
+include ./Make.package
+include ../Make.CNS%
+```
+
+### Make.package
+
+This file just add the names of the "problem" files to compile to headers and source files
+
+```
+CEXE_headers += prob.H prob_parm.H
+CEXE_sources += prob.cpp
+```
+
 
 ### input file
 

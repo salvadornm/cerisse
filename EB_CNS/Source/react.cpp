@@ -191,10 +191,11 @@ void CNS::react_state(Real time, Real dt, bool init_react)
                 constexpr bool get_mu = true;
                 constexpr bool get_lam = false;
                 constexpr bool get_Ddiag = false;
+                constexpr bool get_chi = false;
                 auto trans = pele::physics::PhysicsType::transport();
                 auto const* ltransparm = trans_parms.device_trans_parm();
-                trans.transport(get_xi, get_mu, get_lam, get_Ddiag, Tin, rhoin, yin,
-                                Ddiag, muloc, xiloc, lamloc, ltransparm);
+                trans.transport(get_xi, get_mu, get_lam, get_Ddiag, get_chi, Tin, rhoin, yin,
+                                nullptr, nullptr, muloc, xiloc, lamloc, ltransparm);
 
                 // Copy to output
                 mu(i, j, k) = muloc;

@@ -54,7 +54,7 @@ void CNS::compute_dSdt_box(Box const& bx, Array4<const Real>& sarr,
       auto const* ltransparm = trans_parms.device_trans_parm();
       amrex::launch(bxg2, [=] AMREX_GPU_DEVICE(amrex::Box const& tbx) {
         auto trans = pele::physics::PhysicsType::transport();
-        trans.get_transport_coeffs(tbx, qar_yin, qar_Tin, qar_rhoin, rhoD, mu, xi,
+        trans.get_transport_coeffs(tbx, qar_yin, qar_Tin, qar_rhoin, rhoD, amrex::Array4<amrex::Real>(), mu, xi,
                                    lambda, ltransparm);
       });
 
