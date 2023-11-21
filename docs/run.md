@@ -1,15 +1,19 @@
 # Running
 
-This page explains how to run the code
+This page explains details of the files needed to run the code, 
+It is advisable to check the quickrun tab before reading this page.
 
 
 ### GNUmakefile 
 
-General option, usually modified once and that are reuired for compiling the code.
+This files sets general options, usually modified once and that are required to compile the code.
 It is divided into sections
 
 **AMREX** options
-such as dimension of the problem (1/2/3), compiler (gnu/clang) and precision (single/double).
+such as dimension of the problem (1/2/3), compiler (gnu/intel/nvc/..) and precision (single/double).
+
+WARNING: Make sure that if gnu option is installed, g++ points to the right place. 
+This happens often in Mac-OS, where g++ points to native clang compiler (which is not supported).
 
 
 ```
@@ -22,7 +26,7 @@ PRECISION = DOUBLE
 **Profiling** options
 
 
-**Performance** options related to parallelization, using MPI/OMP/CUDA for GPU.
+**Performance** options related to parallelization, using MPI/OMP/CUDA for GPU, etc.
 This are passed to AMReX and PelePhysics
 
 ```
@@ -50,6 +54,14 @@ Eos_Model := GammaLaw
 Transport_Model := Constant
 Chemistry_Model := Null
 ```
+
+variable |  meaning  | options
+:----------- |:-------------:| -----------:
+Eos_Model       | Equation of State        | GammaLaw/Fuego
+Transport_Model     | Transport Model        | Constant/Simple
+Chemistry_Model        | Chemistry Mechanism    | Null/grimech30/LiDryer
+
+
 
 **Makefile** options, related to files to add to makefile
 
