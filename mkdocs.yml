@@ -6,6 +6,7 @@ nav:
   - Quickrun: quickrun.md
   - Run: run.md
   - Examples: example.md
+  - Tips: tips.md   
 extra_javascript:
   - https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.4/MathJax.js?config=TeX-AMS-MML_HTMLorMML
 markdown_extensions:

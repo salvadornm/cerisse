@@ -83,13 +83,14 @@ CEXE_sources += prob.cpp
 
 ### input file
 
-Frequent changes
+Frequent changes, in some files is divided into sections.
+Comments can be added by `#`
 
 
 ```
 max_step = 100
 stop_time = 0.2
-
+# ================ COMPUTATIONAL DOMAIN ================ #
 geometry.is_periodic = 0 0 0
 geometry.coord_sys   = 0  # 0 => cart, 1 => RZ  2=>spherical
 geometry.prob_lo     = 0.    0.     0.
@@ -103,9 +104,42 @@ variable | type | meaning
 :----------- |:-------------:| -----------:
 max_step       | integer        | number of steps of simulations
 stop_time       | real        | physical time to stop simulation
-geometry.is_periodic        | 3*integer       | indicates periodic direction
+geometry.is_periodic        | 3*integer       | indicates periodic direction 
 geometry.coord_sys  | integer |   cartesian cylindrical spherical
 geometry.prob_lo   |  3*real    | domain lowersize x, y, z
+geometry.prob_hi   |  3*real    | domain uppersize x, y, z
+amr.n_cell         |  3*integer |   mesh in x,y,z (coarsest level) |
+
+Self explanatory
+
+```
+# ================ BOUNDARY CONDITIONS ================= #
+# 0 = Interior             3 = Symmetry
+# 1 = Inflow / UserBC      4 = SlipWall =3
+# 2 = Outflow (FOExtrap)   5 = NoSlipWall (adiabatic)
+cns.lo_bc = 0 0 0
+cns.hi_bc = 0 0 0
+```
+
+variable | type | meaning
+:----------- |:-------------:| -----------:
+cns.lo_bc       | 3*integer        | bc flags lower boundaries in x,y,z
+cns.hi_bc       | 3*integer        | bc flags upper boundaries in x,y,z
+
+
+```
+# ==================== WHAT NUMERICS =================== #
+cns.cfl = 0.1
+cns.dt_cutoff = 5.e-20
+cns.recon_scheme = 6  # 1: Godunov,  2: MUSCL,   3: WENO-Z3, 
+                      # 4: WENO-JS5, 5: WENO-Z5, 6: TENO-5
+```
+
+variable | type | meaning
+:----------- |:-------------:| -----------:
+cns.cfl       | real        | Acoustic Courant Number 
+cns.dt_cutoff      | real        | bc flags upper boundaries in x,y,z
+
 
 
 ### prob.h
