@@ -1,11 +1,11 @@
-###
+#!/bin/bash
 case  $1 in
         clean )
 	tput setaf 2
 	echo " ... removing plt* *.tmp  files"
 	tput sgr0
-        rm -rf plt*
-        rm *.tmp
+    rm -rf plt*
+    rm *.tmp
 	rm *.visit
 	rm -rf Backtrace*
 	echo -e "\\033[1;32m  dir clean and ready to run \\033[0m"

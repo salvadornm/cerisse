@@ -108,7 +108,7 @@ geometry.is_periodic        | 3*integer       | indicates periodic direction
 geometry.coord_sys  | integer |   cartesian cylindrical spherical
 geometry.prob_lo   |  3*real    | domain lowersize x, y, z
 geometry.prob_hi   |  3*real    | domain uppersize x, y, z
-amr.n_cell         |  3*integer |   mesh in x,y,z (coarsest level) |
+amr.n_cell         |  3*integer |   mesh in x,y,z (coarsest level) 
 
 Self explanatory
 
@@ -139,7 +139,8 @@ variable | type | meaning
 :----------- |:-------------:| -----------:
 cns.cfl       | real        | Acoustic Courant Number 
 cns.dt_cutoff      | real        | bc flags upper boundaries in x,y,z
-
+cns.recon_scheme   |  integer   | numerical scheme 
+ 
 
 
 ### prob.h

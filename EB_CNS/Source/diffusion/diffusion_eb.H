@@ -581,14 +581,24 @@ AMREX_GPU_DEVICE AMREX_FORCE_INLINE void compute_diff_wallflux(
   if (eb_isothermal) {
     auto trans = pele::physics::PhysicsType::transport();
     auto const* ltransparm = CNS::trans_parms.device_trans_parm();
-    amrex::Real rho, dummy2, y[NUM_SPECIES];
+    amrex::Real rho, dummy2, dummy3, y[NUM_SPECIES];
+    
     for (int n = 0; n < NUM_SPECIES; ++n) y[n] = q(i, j, k, QFS + n);
 
     auto eos = pele::physics::PhysicsType::eos();
     eos.PYT2R(q(i, j, k, QPRES), y, eb_wall_temp, rho); // assume dp/dn ~ 0
 
-    trans.transport(1, 1, 1, 0, eb_wall_temp, rho, y, &dummy2, mu, xi, lam,
-                    ltransparm);
+  //  trans.transport(1, 1, 1, 0, eb_wall_temp, rho, y, &dummy2, mu, xi, lam,
+  //                 ltransparm);
+    //  SNM change call 
+    const bool get_xi = true, get_mu = true, get_lam = true,
+               get_Ddiag = false, get_chi = false;
+    trans.transport(
+      get_xi, get_mu, get_lam, get_Ddiag, get_chi, eb_wall_temp, rho, y, nullptr,
+      nullptr, mu, xi, lam, ltransparm);
+
+
+
   } else {
     // Adiabatic wall dT/dn ~ 0
     mu = coefs(i, j, k, CMU);

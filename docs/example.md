@@ -9,9 +9,12 @@ The following examples are tested to compile and run
 
 ## Test1-Sod1D
 
+
+Classical Riemann Problem
+
 tested | grid | comment
 :----------- |:-------------:| -----------:
-gcc 11.3       | 200        |  92 steps, no-AMR
+gcc 11.3       | 200        |  Euler,  92 steps, no-AMR
 
 Classic Riemann Problem
 
@@ -24,12 +27,12 @@ In progress
 
 ## Test2-Convective Vortex
 
-This is the classical convective vortex test case from Onera, which consists
+This is the classical two-dimensional convective vortex test case from Onera, which consists
 of an ideal gas under M=0.1, with periodic boundary conditions
 
 tested | grid | comment
 :----------- |:-------------:| -----------:
-gcc 11.3       | 64( 2 levels)        |  4500 steps, AMR,  2 cores
+gcc 11.3       | 64x64(2 levels)        |  Euler, TENO5 4500 steps, AMR,  2 cores
 
 After compiling
 ```
@@ -46,11 +49,46 @@ This assumes **yt** has been installed (check Tips).
 ![figure_test2](images/test2_plot.png)
 
 
-In Visit, the vorticty and mesh look like
+In Visit, the vorticty and mesh looks like:
 
 ![figure_test2visit](images/test2_visit.png)
 
-### DDT
+## Test3-Forward Step
+
+A Mach 3 supersonic flow over a forward-facing step. The domain consists of an inlet section followed by a forward-facing step of 20% the height of the section.
+It is solved using a Godunov first order scheme.
+
+
+Tested | grid | comment
+:----------- |:-------------:| -----------:
+gcc 11.3       | 120x40(3 levels)        |  Euler, Godunov,  2000 steps, AMR+EB,  2 cores
+
+In Visit, the denisty looks like:
+
+![figure_test3rho](images/test3_visit.png)
+
+
+
+**NOTE**
+Velocity in an Euler simulation shows a recirculation clsoe to surface, which is
+not present without EB. Maybe a numerical issue related to boundary treatement 
+
+
+### Sphere under hypersonic flow
+
+
+### Mixing Layer
+
+### TGV three dimensional
+
+Turbulence
+
+
+## Reactive Flow
+
+### Reactive Shock Tube
+
+
 
 
 
