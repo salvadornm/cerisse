@@ -134,6 +134,9 @@ cns.dt_cutoff = 5.e-20
 cns.recon_scheme = 6  # 1: Godunov,  2: MUSCL,   3: WENO-Z3, 
                       # 4: WENO-JS5, 5: WENO-Z5, 6: TENO-5
 ```
+Godunov is first order recontruction, MUSCL is second order, while the
+number represent the formal order of the reconstruction scheme.
+
 
 variable | type | meaning
 :----------- |:-------------:| -----------:

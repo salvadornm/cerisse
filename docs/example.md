@@ -14,7 +14,7 @@ Classical Riemann Problem
 
 tested | grid | comment
 :----------- |:-------------:| -----------:
-gcc 11.3       | 200        |  Euler,  92 steps, no-AMR
+gcc 11.3(Linux), gcc 13.1 (Mac)       | 200        |  Euler,  92 steps, no-AMR
 
 Classic Riemann Problem
 
@@ -68,25 +68,34 @@ In Visit, the denisty looks like:
 ![figure_test3rho](images/test3_visit.png)
 
 
-
 **NOTE**
 Velocity in an Euler simulation shows a recirculation clsoe to surface, which is
 not present without EB. Maybe a numerical issue related to boundary treatement 
 
 
-### Sphere under hypersonic flow
+### Test4- Cylinder under hypersonic flow (TODO)
 
 
-### Mixing Layer
+### Test5- Shock Reflection (TODO)
+
+
+### Test6- MMS (TODO)
+
+
+## Turbulence
+
 
 ### TGV three dimensional
-
-Turbulence
 
 
 ## Reactive Flow
 
+
 ### Reactive Shock Tube
+
+### Test7- Reactive Mixing Layer
+
+
 
 
 

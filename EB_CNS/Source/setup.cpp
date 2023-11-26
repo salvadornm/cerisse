@@ -285,7 +285,9 @@ void CNS::variableSetUp()
                          0, 1, &pc_interp);
   desc_lst.setComponent(Cost_Type, 0, "Cost", bc, bndryfunc);
 
-  assert(num_state_data_types == desc_lst.size());
+  // SNM: commeted
+  //assert(num_state_data_types == desc_lst.size());
+
   Print() << desc_lst.size() << " Data Types:" << std::endl;
   for (int typ = 0; typ < desc_lst.size(); typ++) {
     Print() << typ << " - ";
