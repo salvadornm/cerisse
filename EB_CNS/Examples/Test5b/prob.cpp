@@ -1,6 +1,4 @@
 #include "prob.H"
-#include "prob_parm.H"
-
 
 using namespace amrex;
 
@@ -9,22 +7,21 @@ void amrex_probinit(const int* /*init*/, const int* /*name*/, const int* /*namel
                     const amrex_real* /*problo*/, const amrex_real* /*probhi*/)
 {
   amrex::Real massfrac[NUM_SPECIES] = {1.0};
-  amrex::Real e, c;
+  amrex::Real e, T_r;
 
-  //  f(P,Y,T)---> rho,e -->rhoe
   auto eos = pele::physics::PhysicsType::eos();
-  eos.PYT2RE(CNS::h_prob_parm->p_l, massfrac, CNS::h_prob_parm->T_l,
-             CNS::h_prob_parm->rho_l, e);
+  eos.RYP2E(CNS::h_prob_parm->rho_l, massfrac, CNS::h_prob_parm->p_l, e);
+  // eos.EY2T(e, massfrac, CNS::h_prob_parm->T_l);
   CNS::h_prob_parm->rhoe_l = CNS::h_prob_parm->rho_l * e;
 
-  //  f(P,Y,T)---> c -->rhoe
-  eos.RTY2Cs(CNS::h_prob_parm->rho_l, CNS::h_prob_parm->T_l, massfrac, c);
-  CNS::h_prob_parm->u_l = CNS::h_prob_parm->Ma_oo * c;
+  eos.RYP2E(CNS::h_prob_parm->rho_r, massfrac, CNS::h_prob_parm->p_r, e);
+  eos.EY2T(e, massfrac, T_r);
+  CNS::h_prob_parm->rhoe_r = CNS::h_prob_parm->rho_r * e;
+  eos.RTY2Cs(CNS::h_prob_parm->rho_r, T_r, massfrac, CNS::h_prob_parm->c_r);
 
   Gpu::copyAsync(Gpu::hostToDevice, CNS::h_prob_parm, CNS::h_prob_parm + 1,
                  CNS::d_prob_parm);
   Gpu::streamSynchronize();
-
 }
 }
 

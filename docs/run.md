@@ -1,7 +1,7 @@
 # Running
 
 This page explains details of the files needed to run the code, 
-It is advisable to check the quickrun tab before reading this page.
+It is advisable to check the [Quickrun](quickrun.md)  before reading this page.
 
 
 ### GNUmakefile 
@@ -225,7 +225,40 @@ struct ProbParm
 #endif
 ```
 
-## Geometry
+## Geometry EB
+
+In **input** file
+
+```
+##---- GEOMETRY -----
+#eb2.geom_type = all_regular
+
+eb2.geom_type = cylinder
+eb2.cylinder_direction = 2
+eb2.cylinder_radius = 0.25
+eb2.cylinder_center = 1.0 2.0 0.0
+eb2.cylinder_has_fluid_inside = 0
+
+#eb2.sphere_radius = 0.5
+#eb2.sphere_center = 2.0 2.0  2.0
+#eb2.sphere_has_fluid_inside = 0
+
+#eb2.geom_type = box
+#eb2.box_lo = 0.75  1.75  0.0
+#eb2.box_hi = 1.25  2.25  0.0
+#eb2.box_has_fluid_inside = 0
+```
+
+There are several basic geometries that are available in AMReX that can be easily specified in the input file:
+- Box
+- Plane
+- Cylinder
+- Sphere
+
+Check [PeleC](https://amrex-combustion.github.io/PeleC/geometry/EB.html) 
+page about EB geometry 
+
+
 
 ## Options
 

@@ -12,9 +12,9 @@ The following examples are tested to compile and run
 
 Classical Riemann Problem
 
-tested | grid | comment
+tested       |      grid     | comment
 :----------- |:-------------:| -----------:
-gcc 11.3(Linux), gcc 13.1 (Mac)       | 200        |  Euler,  92 steps, no-AMR
+gcc 11.3(Linux), gcc 13.1 (Mac)       | **200**        |  Euler,  92 steps, no-AMR
 
 Classic Riemann Problem
 
@@ -32,7 +32,7 @@ of an ideal gas under M=0.1, with periodic boundary conditions
 
 tested | grid | comment
 :----------- |:-------------:| -----------:
-gcc 11.3       | 64x64(2 levels)        |  Euler, TENO5 4500 steps, AMR,  2 cores
+gcc 11.3       | **64x64**(2 levels)        |  Euler, TENO5 4500 steps, AMR,  2 cores
 
 After compiling
 ```
@@ -43,7 +43,7 @@ The results can be seen by
 ```
 $ python plt.py
 ```
-This assumes **yt** has been installed (check Tips).
+This assumes **yt** has been installed (check [Tips](tips.md)).
 
 
 ![figure_test2](images/test2_plot.png)
@@ -61,7 +61,7 @@ It is solved using a Godunov first order scheme.
 
 Tested | grid | comment
 :----------- |:-------------:| -----------:
-gcc 11.3       | 120x40(3 levels)        |  Euler, Godunov,  2000 steps, AMR+EB,  2 cores
+gcc 11.3       | **120x40**(3 levels)        |  Euler, Godunov,  2000 steps, AMR+EB,  2 cores
 
 In Visit, the denisty looks like:
 
@@ -73,10 +73,52 @@ Velocity in an Euler simulation shows a recirculation clsoe to surface, which is
 not present without EB. Maybe a numerical issue related to boundary treatement 
 
 
-### Test4- Cylinder under hypersonic flow (TODO)
+## Test4- Cylinder under hypersonic flow 
+
+A cylinder under Mach=6, conditions are similar to 20 km altitude. Created from files of 
+Test3.
 
 
-### Test5- Shock Reflection (TODO)
+Tested |      grid | comment
+:----------- |:-------------:| -----------:
+gcc 11.3       | **40x80**(3 levels)        |  Euler, Godunov,  2000 steps, AMR+EB,  2 cores
+
+In Visit, the Mach looks like:
+
+![figure_test4visit](images/test4_visit.png)
+
+**NOTE**
+Some high velocity occasionaly close to surface.
+The will start with `AMReX EB: Iter. 1 fixed 6 small cells` as some cells are too small.
+
+
+## Test5- Shock Reflection 
+
+A Mach 10 shock wave incident at 30 degrees. The initial conditions are given in [Berger & Colella (1989)](https://doi.org/10.1016/0021-9991(89)90035-1). The top boundary condition varies with time to follow the shock. The shock speed is given by 
+$$
+u_s = M c_s
+$$
+where $$M$$ and $$c_s$$ are Mach number and unshocked speed of sound, respectively. This version uses a tilted domain without EB.
+
+Tested       |          grid | comment
+:----------- |:-------------:| -----------:
+gcc 11.3       | **56x16**(3 levels)        |  Euler, TENO,  222 steps (t=0.2), AMR,  2 cores
+
+In Visit, the density iso-contours looks like:
+
+![figure_test5visit](images/test5_visit.png)
+
+
+
+### Test5b- Shock Reflection (EB)
+
+Same as previous, but using EB
+
+Tested       |          grid | comment
+:----------- |:-------------:| -----------:
+gcc 11.3       | **56x16**(3 levels)        |  Euler, TENO,  222 steps (t=0.2), AMR-EB,  2 cores
+
+
 
 
 ### Test6- MMS (TODO)

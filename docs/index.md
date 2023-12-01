@@ -27,22 +27,24 @@ Examples include **gcc > 8**, **clang >7**  and more
 2. **GNU Makefile** 
 It will usually be installed by default in most systems (Mac OS/Linux)
 
-3. **AMREX** 
-AMR libraries [AMREX](https://amrex-codes.github.io/amrex/)
-It will be installed if not present. Check Quickrun.
-
-4. **PelePhysics**
-Based on
-[PeleC](https://github.com/AMReX-Combustion/PeleC)
-It will be installed if not present. Check Quickrun.
-
-5. **MPI libraries** 
+3. **MPI libraries** 
 (optional) Rrequired for parallel simulations
 Similarly CUDA/OPenMPI may be required for more advanced parallelization strategies.
 
-6. **cmake** 
+4. **cmake** 
 (optional) reuired for some installation options (mostly related to GPU and chemistry). 
 Easy to install,  version reuired **>3.2**
+
+
+5. **AMREX** 
+AMR libraries [AMREX](https://amrex-codes.github.io/amrex/)
+It will be installed if not present. Check [Quickrun](quickrun.md) for installation within Cerisse (recommended)
+
+6. **PelePhysics**
+Based on
+[PeleC](https://github.com/AMReX-Combustion/PeleC)
+It will be installed if not present. Check [Quickrun](quickrun.md) for installation within Cerisse (recommended)
+
 
 7. **Visualization**
 Cerisse/AMREx/PeleC format is supported by

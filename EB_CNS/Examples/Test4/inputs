@@ -15,7 +15,7 @@ amr.n_cell           = 40   80
 cns.lo_bc       =  1 4
 cns.hi_bc       =  2 4
 
-cns.do_visc  = 1
+cns.do_visc  = 0
 cns.do_react = 0
 
 cns.cfl = 0.2
