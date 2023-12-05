@@ -1,7 +1,8 @@
-CERISSE_HOME ?= ../../..
-AMREX_HOME = $(CERISSE_HOME)/Submodules/amrex
-PELE_PHYSICS_HOME = $(CERISSE_HOME)/Submodules/PelePhysics
-TOP ?=  $(CERISSE_HOME)/EB_CNS
+CERISSE_HOME ?= $(abspath ../../..)
+AMREX_HOME        ?= $(CERISSE_HOME)/Submodules/amrex
+PELE_PHYSICS_HOME ?= $(CERISSE_HOME)/Submodules/PelePhysics
+SUNDIALS_HOME     ?= $(CERISSE_HOME)/Submodules/sundials
+TOP ?= $(CERISSE_HOME)/EB_CNS
 
 EBASE = Cerisse
 
@@ -24,8 +25,6 @@ USE_SUNDIALS_PP = TRUE
 LAZY = TRUE
 BL_NO_FORT = TRUE
 
-DEFINES += -DCRSEGRNDOMP # Coarse-grained OMP approach
-
 ifdef NUM_FIELD
    DEFINES += -DNUM_FIELD=$(NUM_FIELD)
    ifneq ($(NUM_FIELD), 0)
@@ -37,8 +36,11 @@ ifdef NUM_AUX
    DEFINES += -DNUM_AUX=$(NUM_AUX)
 endif
 
-ifeq ($(USE_CUDA),TRUE)
+ifeq ($(USE_CUDA), TRUE)
    CXXFLAGS+=-Xptxas --disable-optimizer-constants -Xcompiler=-std=c++17
+endif
+ifeq ($(USE_OMP), TRUE)
+   DEFINES += -DCRSEGRNDOMP # Coarse-grained OMP approach
 endif
 
 include $(AMREX_HOME)/Tools/GNUMake/Make.defs
@@ -112,14 +114,14 @@ ifdef Custom_Chemistry_Model
    VPATH_LOCATIONS   += $(CHEM_HOME)
 endif
 
-all: $(executable)
+all: SUNDIALS $(executable)
 	@echo SUCCESS: $(executable)
 
 include $(AMREX_HOME)/Tools/GNUMake/Make.rules
 
 SUNDIALS:
 	@echo "==> Building SUNDIALS library"
-	cd $(PELE_PHYSICS_HOME)/ThirdParty; $(MAKE) sundials AMREX_HOME=$(AMREX_HOME) USE_CUDA=$(USE_CUDA) USE_HIP=$(USE_HIP) PELE_USE_KLU=$(PELE_USE_KLU) PELE_USE_MAGMA=$(PELE_USE_MAGMA) DEBUG=$(DEBUG) COMP=$(COMP) NVCC=$(COMP) PRECISION=$(PRECISION)
+	cd $(PELE_PHYSICS_HOME)/ThirdParty; $(MAKE) sundials AMREX_HOME=$(AMREX_HOME) SUNDIALS_HOME=$(SUNDIALS_HOME) USE_CUDA=$(USE_CUDA) USE_HIP=$(USE_HIP) PELE_USE_KLU=$(PELE_USE_KLU) PELE_USE_MAGMA=$(PELE_USE_MAGMA) DEBUG=$(DEBUG) COMP=$(COMP) NVCC=$(COMP) PRECISION=$(PRECISION)
 
 SUNDIALSclean:
 	@echo "==> Removing SUNDIALS library"

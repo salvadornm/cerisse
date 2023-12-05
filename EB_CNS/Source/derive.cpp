@@ -410,10 +410,10 @@ void CNS::cns_dertranscoef(const amrex::Box& bx, amrex::FArrayBox& derfab, int d
 
     amrex::Real mu, xi, lam;
     amrex::Real Ddiag[NUM_SPECIES];
-    bool get_xi = true, get_mu = true, get_lam = true, get_Ddiag = true;
+    const bool get_xi = true, get_mu = true, get_lam = true, get_Ddiag = true, get_chi = false;
     auto trans = pele::physics::PhysicsType::transport();
-    trans.transport(get_xi, get_mu, get_lam, get_Ddiag, T, rho, massfrac, Ddiag, mu,
-                    xi, lam, ltransparm);
+    trans.transport(get_xi, get_mu, get_lam, get_Ddiag, get_chi, T, rho, massfrac, Ddiag, nullptr, 
+                    mu, xi, lam, ltransparm);
 
     mu_arr(i, j, k) = mu;
     xi_arr(i, j, k) = xi;

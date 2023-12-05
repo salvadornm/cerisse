@@ -105,8 +105,8 @@ void CNS::compute_dSdt_box_eb(
             for (int n = 0; n < NUM_SPECIES; ++n) { yin[n] = qar_yin(i, j, k, n); }
 
             auto trans = pele::physics::PhysicsType::transport();
-            trans.transport(wtr_get_xi, wtr_get_mu, wtr_get_lam, wtr_get_Ddiag,
-                            qar_Tin(i, j, k), qar_rhoin(i, j, k), yin, Ddiag, muloc,
+            trans.transport(wtr_get_xi, wtr_get_mu, wtr_get_lam, wtr_get_Ddiag, false,
+                            qar_Tin(i, j, k), qar_rhoin(i, j, k), yin, Ddiag, nullptr, muloc,
                             xiloc, lamloc, ltransparm);
 
             // Copy to output
