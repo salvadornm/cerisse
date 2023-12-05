@@ -48,7 +48,8 @@ public:
   /**
    * @brief Generate random numbers for a coarse step
    * @param sqrtdt_coarse sqrt(dt) of the coarest level
-   * @param rand_mode 0: unmodified random normal; 1: normalised randn; 2: [1,-1]
+   * @param rand_mode 0: unmodified random normal; 1: normalised randn; 2: [1,-1]; 
+   *                  3: generate N/2 randn and flip sign to produce the other half (antithetic sampling)
    * @param sync_mode 0: randomise at finest level, sum up to coarser levels; 1:
    * randomise at coarsest level, divide to finer levels
    */
@@ -101,6 +102,19 @@ public:
                 int swap_id = amrex::Random_int(NUM_FIELD - 2);
                 raw_data(s, d, NUM_FIELD - 1) = raw_data(s, d, swap_id);
                 raw_data(s, d, swap_id) = 0.0;
+              }
+            }
+          }
+        } else if (rand_mode == 3) {
+          AMREX_ALWAYS_ASSERT_WITH_MESSAGE(NUM_FIELD % 2 == 0, 
+                                           "ERROR: Antithetic sampling must have even NUM_FIELD");
+          // generate random normal //
+          for (int s = 0; s < _num_step; ++s) {
+            for (int d = 0; d < _num_rand; ++d) {
+              for (int nf = 0; nf < NUM_FIELD / 2; ++nf) {
+                amrex::Real rand = amrex::RandomNormal(0.0, sqrtdt);
+                raw_data(s, d, nf) = rand;
+                raw_data(s, d, NUM_FIELD / 2 + nf) = -rand;
               }
             }
           }
