@@ -77,7 +77,6 @@ Real CNS::advance(Real time, Real dt, int iteration, int ncycle)
                         0);
       }
     }
-
     enforce_consistent_state(); // Enforce rho = sum(rhoY) and clip temp
 
     // RK2 stage 2: U^{n+1} = U^n + 0.5*dt*(dUdt^n + dUdt^{n+1}) + dt*I_R^{n+1}
@@ -102,10 +101,9 @@ Real CNS::advance(Real time, Real dt, int iteration, int ncycle)
 
   compute_pdf_model(Sborder, dt, iteration);
   MultiFab::Copy(S_new, Sborder, 0, 0, LEN_STATE, 0);
+  enforce_consistent_state(); // Enforce rho = sum(rhoY)
   computeAvg(S_new);
 #endif
-
-  enforce_consistent_state(); // Enforce rho = sum(rhoY)
 
   if (do_react) {
     // Compute I_R^{n+1}(U^**) and do U^{n+1} = U^** + dt*I_R^{n+1}

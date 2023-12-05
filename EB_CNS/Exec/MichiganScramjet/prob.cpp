@@ -9,9 +9,9 @@ void amrex_probinit(const int* /*init*/, const int* /*name*/, const int* /*namel
   auto eos = pele::physics::PhysicsType::eos();
 
   // Calculate inflow conditions
-  Real p0 = 590e4; // total pressure [Ba]
-  Real M = 2.2; // inflow Mach number
-  Real T0;
+  amrex::Real p0 = 590e4; // total pressure [Ba]
+  amrex::Real M = 2.2; // inflow Mach number
+  amrex::Real T0;
   bool micka_fuel_cond = false; // use p0, T0 or p, T
   {
     ParmParse pp("prob");
@@ -23,41 +23,63 @@ void amrex_probinit(const int* /*init*/, const int* /*name*/, const int* /*namel
     pp.query("do_bl", CNS::h_prob_parm->do_bl);
     pp.query("make_bl_on_restart", CNS::h_prob_parm->make_bl_on_restart);
     pp.query("micka_fuel_cond", micka_fuel_cond);
+    pp.query("make_init_on_restart", CNS::h_prob_parm->make_init_on_restart);
+    if (CNS::h_prob_parm->make_init_on_restart)
+      pp.get("x_reset", CNS::h_prob_parm->x_reset);
   }
-  CNS::h_prob_parm->Y[O2_ID] = 0.244;
-  CNS::h_prob_parm->Y[N2_ID] = 0.671;
-  CNS::h_prob_parm->Y[H2O_ID] = 0.085;
+  if (CNS::h_prob_parm->make_bl_on_restart && CNS::h_prob_parm->do_bl) {
+    amrex::Print() << "Restarting with BL...\n";
+  }
+  if (CNS::h_prob_parm->make_init_on_restart) {
+    amrex::Print() << "Restarting and reinitialising data at x < " 
+                   << CNS::h_prob_parm->x_reset << "...\n";
+  }
 
-  Real gamma = 1.313, rho, T, p;
+  CNS::h_prob_parm->Y[H2O_ID] = 1.068e-7*T0*T0 - 6.72e-5*T0 + 2.986e-2; // closer to experiment
+  CNS::h_prob_parm->Y[O2_ID] = 4.0/15.0 * (1.0 - CNS::h_prob_parm->Y[H2O_ID]);
+  CNS::h_prob_parm->Y[N2_ID] = 11.0/15.0 * (1.0 - CNS::h_prob_parm->Y[H2O_ID]);
+
+  amrex::Real gamma = 1.313, rho, T, p;
 
   if (M > 1.0) {
     // Iterate to find gamma
-    for (int iter = 0; iter < 3; ++ iter) {
+    for (int iter = 0; iter < 10; ++ iter) {
       // Isentropic relations
       T = T0 / (1 + 0.5 * (gamma - 1) * M * M);
       p = p0 * std::pow(1 + 0.5 * (gamma - 1) * M * M, -gamma / (gamma - 1));
-
       eos.PYT2R(p, CNS::h_prob_parm->Y.begin(), T, rho);
       eos.RTY2G(rho, T, CNS::h_prob_parm->Y.begin(), gamma);
+      // amrex::Print() << "Iter " << iter << " (gamma, T, p) = " << gamma << ", " << T << ", " << p << '\n';
     }
   } else {
     // Constant mass flow rate (constant area isolator)
     // First, calculate conditions at nozzle outlet (1)
-    Real M1 = 2.2, p1, T1;
+    Real M1 = 2.2, p1, T1, gamma1 = 1.313;
     // Iterate to find gamma
-    for (int iter = 0; iter < 3; ++ iter) {
+    for (int iter = 0; iter < 10; ++ iter) {
       // Isentropic relations
-      T1 = T0 / (1 + 0.5 * (gamma - 1) * M1 * M1);
-      p1 = p0 * std::pow(1 + 0.5 * (gamma - 1) * M1 * M1, -gamma / (gamma - 1));
-      eos.PYT2R(p1, CNS::h_prob_parm->Y.begin(), T, rho);
-      eos.RTY2G(rho, T1, CNS::h_prob_parm->Y.begin(), gamma);
+      T1 = T0 / (1 + 0.5 * (gamma1 - 1) * M1 * M1);
+      p1 = p0 * std::pow(1 + 0.5 * (gamma1 - 1) * M1 * M1, -gamma1 / (gamma1 - 1));
+      eos.PYT2R(p1, CNS::h_prob_parm->Y.begin(), T1, rho);
+      eos.RTY2G(rho, T1, CNS::h_prob_parm->Y.begin(), gamma1);
+      // amrex::Print() << "Iter " << iter << " (gamma1, T1, p1) = " << gamma1 << ", " << T1 << ", " << p1 << '\n';
     }
-    // Then, assume constant mass flow rate, knowing p and M
+    
+    // Then, assume constant mass flow rate, knowing p and M    
     {
       ParmParse pp("prob");
       pp.get("p", p);
     }
-    T = pow((p / p1) * (M / M1), 2) * T1;   
+    // Iterate to find gamma
+    for (int iter = 0; iter < 10; ++ iter) {
+      T = pow((p / p1) * (M / M1), 2) * (gamma / gamma1) * T1;
+      eos.PYT2R(p, CNS::h_prob_parm->Y.begin(), T, rho);
+      eos.RTY2G(rho, T, CNS::h_prob_parm->Y.begin(), gamma);
+      // amrex::Print() << "Iter " << iter << " (gamma, T, rho) = " << gamma << ", " << T << ", " << rho << '\n';
+    }
+
+    eos.PYT2R(p, CNS::h_prob_parm->Y.begin(), T, rho);
+    eos.RTY2G(rho, T, CNS::h_prob_parm->Y.begin(), gamma);
   }
   amrex::Print() << "Inflow (gamma, T, p) = " << gamma << ", " << T << ", " << p << '\n';
   // Real p = 55.410e4;
@@ -66,8 +88,9 @@ void amrex_probinit(const int* /*init*/, const int* /*name*/, const int* /*namel
   CNS::h_prob_parm->cv_Tinf = cv * T;
 
   eos.PYT2RE(p, CNS::h_prob_parm->Y.begin(), T, CNS::h_prob_parm->rho, CNS::h_prob_parm->ei);
-
-  Real cs = std::sqrt(gamma * p / CNS::h_prob_parm->rho);
+  Real cs;
+  eos.RTY2Cs(CNS::h_prob_parm->rho, T, CNS::h_prob_parm->Y.begin(), cs);
+  // Real cs = std::sqrt(gamma * p / CNS::h_prob_parm->rho);
   CNS::h_prob_parm->u = M * cs;
   
   // Fuel conditions
@@ -78,7 +101,7 @@ void amrex_probinit(const int* /*init*/, const int* /*name*/, const int* /*namel
     M = 1.0;
     T0 = 288.0;
     gamma = 1.405;
-    for (int iter = 0; iter < 3; ++ iter) {
+    for (int iter = 0; iter < 10; ++ iter) {
       T = T0 / (1 + 0.5 * (gamma - 1));
       p = p0 * std::pow(1 + 0.5 * (gamma - 1), -gamma / (gamma - 1));
       eos.PYT2R(p, CNS::h_prob_parm->Y_jet.begin(), T, rho);

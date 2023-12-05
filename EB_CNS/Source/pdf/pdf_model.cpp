@@ -30,8 +30,7 @@ void CNS::computeAvg(MultiFab& S)
 }
 
 /**
- * \brief Compute modelled terms for Velocity-PDF (Langevin model) / Species-PDF (IEM
- * model)
+ * \brief Compute modelled terms for Velocity-PDF (Langevin) / Species-PDF (IEM)
  */
 void CNS::compute_pdf_model(amrex::MultiFab& S, amrex::Real dt, int iteration)
 {

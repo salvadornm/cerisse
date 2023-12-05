@@ -139,11 +139,10 @@ void CNS::initData()
   amrex::ParallelFor(
     S_new, [=] AMREX_GPU_DEVICE(int box_no, int i, int j, int k) noexcept {
       prob_initdata(i, j, k, sarrs[box_no], geomdata, *lparm, *lprobparm);
-      cns_check_species_sum_to_one(
-        i, j, k,
+      cns_check_species_sum_to_one(i, j, k,
         sarrs[box_no]); // Verify that the sum of (rho Y)_i = rho at every cell
     });
-  amrex::Gpu::synchronize();
+  enforce_consistent_state();
 
   get_new_data(Reactions_Type).setVal(0.0);
 
@@ -438,16 +437,16 @@ void CNS::errorEst(TagBoxArray& tags, int /*clearval*/, int tagval, Real time,
   }
 
   const MultiFab& S_new = get_new_data(State_Type);
-  MultiFab Sborder(grids, dmap, NVAR, 1, MFInfo(), Factory());
+  MultiFab Sg1(grids, dmap, NVAR, 1, MFInfo(), Factory());
   const Real cur_time = state[State_Type].curTime();
-  FillPatch(*this, Sborder, Sborder.nGrow(), cur_time, State_Type, URHO, NVAR, 0);
+  FillPatch(*this, Sg1, Sg1.nGrow(), cur_time, State_Type, URHO, NVAR, 0);
 
   auto const& tagma = tags.arrays();
 
   if (level < refine_dengrad_max_lev) {
     const Real threshold = refine_dengrad[level];
 
-    MultiFab rho(Sborder, amrex::make_alias, URHO, 1);
+    MultiFab rho(Sg1, amrex::make_alias, URHO, 1);
     auto const& rhoma = rho.const_arrays();
     const auto dxinv = geom.InvCellSizeArray();
 
@@ -465,7 +464,7 @@ void CNS::errorEst(TagBoxArray& tags, int /*clearval*/, int tagval, Real time,
 
       FArrayBox velgrad(bx, 1);
       const int* bc = 0; // dummy
-      cns_dervelgrad(bx, velgrad, 0, 1, Sborder[mfi], geom, cur_time, bc, level);
+      cns_dervelgrad(bx, velgrad, 0, 1, Sg1[mfi], geom, cur_time, bc, level);
 
       auto tagarr = tags.array(mfi);
       auto mvarr = velgrad.const_array();
@@ -484,7 +483,7 @@ void CNS::errorEst(TagBoxArray& tags, int /*clearval*/, int tagval, Real time,
 
       FArrayBox magvort(bx, 1);
       const int* bc = 0; // dummy
-      cns_dermagvort(bx, magvort, 0, 1, Sborder[mfi], geom, cur_time, bc, level);
+      cns_dermagvort(bx, magvort, 0, 1, Sg1[mfi], geom, cur_time, bc, level);
 
       auto tagarr = tags.array(mfi);
       auto mvarr = magvort.const_array();

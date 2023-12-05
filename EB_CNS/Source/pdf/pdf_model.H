@@ -17,7 +17,7 @@
  */
 AMREX_FORCE_INLINE AMREX_GPU_DEVICE void vpdf_psgs_model(
   const amrex::Box& bx, amrex::Array4<amrex::Real>& s, const amrex::Real dt,
-  const amrex::Real (*)[] /*dW[AMREX_SPACEDIM][NUM_FIELD]*/,
+  const amrex::Real (*)[NUM_FIELD] /*dW[AMREX_SPACEDIM][NUM_FIELD]*/,
   const amrex::Real dx[AMREX_SPACEDIM])
 {
   // Compute p
@@ -297,7 +297,7 @@ AMREX_FORCE_INLINE AMREX_GPU_DEVICE void vpdf_langevin_model(
         // u_sgs = (0.5 + 0.75 * C0) * eps / tke * (mean_u - u) * dt +
         //         sqrt(C0 * eps) * dW[dir][nf - 1];
         if (shock_sensor[dir]) {
-          u_sgs = 0.0; //(0.5 + 0.75 * C0) / (tke / eps + dt) * (mean_u - u) * dt;
+          u_sgs = (0.5 + 0.75 * C0) / (tke / eps + dt) * (mean_u - u) * dt;
         } else {
           u_sgs = (0.5 + 0.75 * C0) / (tke / eps + dt) * (mean_u - u) * dt +
                   sqrt(C0 * eps) * dW[dir][nf - 1];
@@ -321,7 +321,7 @@ AMREX_FORCE_INLINE AMREX_GPU_DEVICE void vpdf_langevin_model(
  */
 AMREX_FORCE_INLINE AMREX_GPU_DEVICE void spdf_iem_model(
   const amrex::Box& bx, amrex::Array4<amrex::Real>& s, const amrex::Real dt,
-  const amrex::Real (*)[] /*dW[AMREX_SPACEDIM][NUM_FIELD]*/,
+  const amrex::Real (*)[NUM_FIELD] /*dW[AMREX_SPACEDIM][NUM_FIELD]*/,
   const amrex::Real dx[AMREX_SPACEDIM], const amrex::Real C_E = 2.0,
   const amrex::Real C_Y = 2.0, const amrex::Real C_e = 1.05)
 {
@@ -348,8 +348,8 @@ AMREX_FORCE_INLINE AMREX_GPU_DEVICE void spdf_iem_model(
         // Species (Q = Y)
         mean_Q = s(i, j, k, UFS + ns) / s(i, j, k, URHO);
         Q = s(i, j, k, nf * NVAR + UFS + ns) / s(i, j, k, nf * NVAR + URHO);
-        Q_sgs = 0.5 * C_Y * eps / tke * (mean_Q - Q) * dt;
-        // Q_sgs = 0.5 * C_Y  / (tke / eps + dt) * (mean_Q - Q) * dt;
+        // Q_sgs = 0.5 * C_Y * eps / tke * (mean_Q - Q) * dt;
+        Q_sgs = 0.5 * C_Y  / (tke / eps + dt) * (mean_Q - Q) * dt;
         s(i, j, k, nf * NVAR + UFS + ns) += s(i, j, k, nf * NVAR + URHO) * Q_sgs;
       }
 
@@ -371,9 +371,18 @@ AMREX_FORCE_INLINE AMREX_GPU_DEVICE void spdf_iem_model(
                             + s(i, j, k, nf * NVAR + UMY) * s(i, j, k, nf * NVAR + UMY),
                             + s(i, j, k, nf * NVAR + UMZ) * s(i, j, k, nf * NVAR + UMZ))) 
                             / s(i, j, k, nf * NVAR + URHO) / s(i, j, k, nf * NVAR + URHO);
-      Q_sgs = 0.5 * C_E * eps / tke * (mean_Q - Q) * dt;
-      // Q_sgs = 0.5 * C_E / (tke / eps + dt) * (mean_Q - Q) * dt;
+      // Q_sgs = 0.5 * C_E * eps / tke * (mean_Q - Q) * dt;
+      Q_sgs = 0.5 * C_E / (tke / eps + dt) * (mean_Q - Q) * dt;
       s(i, j, k, nf * NVAR + UEDEN) += s(i, j, k, nf * NVAR + URHO) * Q_sgs;
+      
+      // Energy 3 (Q = Hi)
+      // auto eos = pele::physics::PhysicsType::eos();
+      // amrex::Real T = 0.0;
+      // amrex::Real Y[NUM_SPECIES];
+      // for (int n = 0; n < NUM_SPECIES; ++n) 
+      //   Y[n] = s(i, j, k, UFS + n) / s(i, j, k, URHO);
+      // eos.REY2T()
+      // eos.TY2H()
     }
   });
 }

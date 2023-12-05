@@ -1,9 +1,9 @@
 # ====================================================== #
 #                  CERISSE INPUT SCRIPT                  #
 # ====================================================== #
-max_step = 8000
+max_step = 20000
 stop_time = 0.1
-amrex.fpe_trap_invalid = 1
+amrex.fpe_trap_invalid = 0
 
 # ================ COMPUTATIONAL DOMAIN ================ #
 geometry.is_periodic = 0 0 0
@@ -17,6 +17,7 @@ amr.n_cell           =  192     32     32
 eb2.geom_type = Scramjet
 cns.eb_no_slip = 1
 cns.eb_isothermal = 0
+cns.redistribution_type = StateRedist #FluxRedist
 
 # ================ BOUNDARY CONDITIONS ================= #
 # 0 = Interior             3 = Symmetry
@@ -65,16 +66,20 @@ amr.n_error_buf     = 2 2 2 # number of buffer cells in error est
 amr.grid_eff        = 0.9
 
 # ================== TAGGING CRITERIA ================== #
-cns.refine_dengrad = 5e-4
-cns.refine_dengrad_max_lev = 3
+cns.refine_dengrad = 5e-4 1e-3
+cns.refine_dengrad_max_lev = 2
 
-cns.refine_magvort = 3e5
-cns.refine_magvort_max_lev = 3
+cns.refine_magvort = 3e5 6e5
+cns.refine_magvort_max_lev = 2
+
+cns.refine_box_lo_0 = -0.4  0.0 -0.25
+cns.refine_box_hi_0 =  0.5  0.5  0.25
+cns.refine_box_max_level_0 = 3
 
 # ==================== OUTPUT FILES ==================== #
 amr.checkpoint_files_output = 1
 amr.check_file      = react3d/chk    # root name of checkpoint file
-amr.check_int       = 1000            # number of timesteps between checkpoints
+amr.check_int       = 500            # number of timesteps between checkpoints
 #amr.check_per # interval physical time between checkpoints
 
 amr.plot_files_output = 1
@@ -89,6 +94,11 @@ cns.plot_fields = 0
 
 # ================= PROBLEM PARAMETERS ================= #
 prob.T0 = 1100 # total temperature [K]
-prob.spark = 1
+prob.spark = 0
+prob.micka_fuel_cond = 1
+prob.do_bl = 1
+prob.make_bl_on_restart = 0
+prob.record_statistics = 1
+prob.clean_aux_on_restart = 0
 
-amr.restart = react3d/chk07000
+#amr.restart = react3d/chk07000

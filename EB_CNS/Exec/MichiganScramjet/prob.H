@@ -1,6 +1,8 @@
 #ifndef CNS_PROB_H
 #define CNS_PROB_H
 
+#include <cmath>
+
 #include <AMReX_FArrayBox.H>
 #include <AMReX_Geometry.H>
 #include <AMReX_ParmParse.H>
@@ -21,6 +23,36 @@ public:
 
   void build(const Geometry& geom, const int max_coarsening_level) override;
 };
+
+AMREX_GPU_DEVICE AMREX_FORCE_INLINE void
+bl_profile(const amrex::Real y, const amrex::Real z, ProbParm const& pp, 
+           amrex::Real& rho, amrex::Real& u, amrex::Real& ei) {
+  // Make boundary layer
+  amrex::Real d_wall = amrex::min(y, 2.54 - y); // dist from upper and lower walls
+  d_wall = amrex::min(d_wall, 1.905 - amrex::Math::abs(z)); // dist from left and right walls
+  d_wall /= (0.1245 * 2.0); // d_wall/D
+  amrex::Real u_profile = (d_wall > 0.0) ? tanh(5.0 * d_wall) : 0.0; // u/u_inf
+  // amrex::Real u_profile = (d_wall > 0.68) ? 1.0 : 1.0085656 - exp(-7.0 * d_wall); // u/u_inf
+  u = pp.u * u_profile;
+  // assert((u_profile => 0.0) && (u_profile <= 1.0));
+
+  amrex::Real T_inf, p_inf;
+  amrex::Real Y[NUM_SPECIES];
+  for (int n = 0; n < NUM_SPECIES; ++n) { Y[n] = pp.Y[n]; }
+  auto eos = pele::physics::PhysicsType::eos();
+  ei = pp.ei;
+  eos.RYET2P(pp.rho, Y, ei, T_inf, p_inf); // get T, p_inf
+
+  amrex::Real T_profile = 1.0 + (0.5 * pp.u * pp.u) / pp.cv_Tinf * (1.0 - u_profile * u_profile); // T/T_inf
+  amrex::Real cv, cv_inf = pp.cv_Tinf / T_inf;
+  eos.TY2Cv(T_inf * T_profile, Y, cv);
+  T_profile *= cv_inf / cv;
+  // assert((T_profile => 0.0) && (T_profile <= 1.0));
+
+  rho = pp.rho / T_profile;
+  eos.RYP2E(rho, Y, p_inf, ei); // rho, p_inf -> ei
+  // assert(!isnan(ei));
+}
 
 /**
  * \brief Initialise state data.
@@ -45,73 +77,63 @@ prob_initdata(int i, int j, int k, amrex::Array4<amrex::Real> const& state,
   AMREX_D_TERM(const amrex::Real x = prob_lo[0] + (i + 0.5) * dx[0];
               , const amrex::Real y = prob_lo[1] + (j + 0.5) * dx[1];
               , const amrex::Real z = prob_lo[2] + (k + 0.5) * dx[2];)
-  const amrex::Real rsqr = AMREX_D_TERM(,x * x, + z * z);
+  // const amrex::Real rsqr = AMREX_D_TERM(,x * x, + z * z);
+  
+  amrex::Real rho = pp.rho;
+  amrex::Real u = pp.u;
+  amrex::Real ei = pp.ei;
+  if (pp.do_bl && pp.make_bl_on_restart) {
+    bl_profile(y, z, pp, rho, u, ei);
+  }
 
-  // if (rsqr > 0.1245 * 0.1245 || y > 0.0) {
-    // Ventilated air
-    for (int nf = 0; nf <= NUM_FIELD; ++nf) {
-      state(i, j, k, nf * NVAR + URHO) = pp.rho;
-      state(i, j, k, nf * NVAR + UMX) = pp.rho * pp.u * Real(y > -dx[1]);
-      state(i, j, k, nf * NVAR + UMY) = 0.0;
-      state(i, j, k, nf * NVAR + UMZ) = 0.0;
-      state(i, j, k, nf * NVAR + UEDEN) = pp.rho * pp.ei + 0.5 * pp.rho * pp.u * pp.u * Real(y > -dx[1]);
-      for (int n = 0; n < NUM_SPECIES; ++n)
-        state(i, j, k, nf * NVAR + UFS + n) = pp.rho * pp.Y[n];
-    }
-  // } else {
-  //   // Fuel
-  //   for (int nf = 0; nf <= NUM_FIELD; ++nf) {
-  //     state(i, j, k, nf * NVAR + URHO) = pp.rho_j;
-  //     state(i, j, k, nf * NVAR + UMX) = 0.0;
-  //     state(i, j, k, nf * NVAR + UMY) = pp.rho_j * pp.v_j;
-  //     state(i, j, k, nf * NVAR + UMZ) = 0.0;
-  //     state(i, j, k, nf * NVAR + UEDEN) = pp.rho_j * pp.ei_j + 0.5 * pp.rho_j * pp.v_j * pp.v_j;
-  //     for (int n = 0; n < NUM_SPECIES; ++n)
-  //       state(i, j, k, nf * NVAR + UFS + n) = pp.rho_j * pp.Y_jet[n];
-  //   }
-  // }
+  // Ventilated air
+  for (int nf = 0; nf <= NUM_FIELD; ++nf) {
+    state(i, j, k, nf * NVAR + URHO) = rho;
+    state(i, j, k, nf * NVAR + UMX) = rho * u * Real(y > -dx[1]);
+    state(i, j, k, nf * NVAR + UMY) = 0.0;
+    state(i, j, k, nf * NVAR + UMZ) = 0.0;
+    state(i, j, k, nf * NVAR + UEDEN) = rho * ei + 0.5 * rho * u * u * Real(y > -dx[1]);
+    for (int n = 0; n < NUM_SPECIES; ++n)
+      state(i, j, k, nf * NVAR + UFS + n) = rho * pp.Y[n];
+  }
 }
 
 AMREX_GPU_DEVICE AMREX_FORCE_INLINE void
-bcnormal(const amrex::Real x[AMREX_SPACEDIM], const amrex::Real s_int[LEN_STATE],
+bcnormal(const amrex::Real x[AMREX_SPACEDIM], const amrex::Real* /*s_int[LEN_STATE]*/,
          const amrex::Real s_refl[LEN_STATE], amrex::Real s_ext[LEN_STATE],
-         const int idir, const int sgn, const amrex::Real time,
-         amrex::GeometryData const& geomdata, ProbParm const& pp)
+         const int idir, const int /*sgn*/, const amrex::Real time,
+         amrex::GeometryData const& /*geomdata*/, ProbParm const& pp)
 {
   if (idir == 0) {
     // Inflow / Ventilated air
     amrex::Real rho = pp.rho;
     amrex::Real u = pp.u;
     amrex::Real ei = pp.ei;
-    if (pp.do_bl) { // TODO!
-      amrex::Real y = amrex::min(x[1], 2.54-x[1]); // y on upper and lower walls
-      y = amrex::min(y, 1.905-amrex::Math::abs(x[2])); // z on upper and lower walls
-      y = amrex::max(y, 0.0); // prevent solver from complaining
-      y /= (0.1245 * 2.0); // y/D      
-      amrex::Real bl_profile = bl_profile = y > 0.68 ? 1.0 : 1.0085656 - exp(-7.0 * y);
-
-      amrex::Real p, T = 0;
-      amrex::Real Y[NUM_SPECIES];
-      for (int n = 0; n < NUM_SPECIES; ++n) { Y[n] = pp.Y[n]; }
-      auto eos = pele::physics::PhysicsType::eos();
-      eos.RYET2P(pp.rho, Y, ei, T, p);
-      eos.RYP2E(rho, Y, p, ei);
-
-      rho = pp.rho / (1.0 + 0.5 * (pp.u * pp.u) / pp.cv_Tinf * (1.0 - bl_profile * bl_profile));
-      u = pp.u * bl_profile;
+    if (pp.do_bl) {
+      bl_profile(x[1], x[2], pp, rho, u, ei);
+      if (isnan(ei)) {
+        amrex::Print() << "ei is nan\n"; // WHY without this give NaN???
+      }
+      // if (isnan(rho)) {
+      //   amrex::Print() << "rho is nan\n";
+      // }
+      // if (isnan(u)) {
+      //   amrex::Print() << "u is nan\n";
+      // }
     }
     for (int nf = 0; nf <= NUM_FIELD; ++nf) {
       s_ext[nf * NVAR + URHO] = rho;
       s_ext[nf * NVAR + UMX] = rho * u;
       s_ext[nf * NVAR + UMY] = 0.0;
       s_ext[nf * NVAR + UMZ] = 0.0;
-      s_ext[nf * NVAR + UEDEN] = rho * ei + 0.5 * rho * pp.u * pp.u;
+      s_ext[nf * NVAR + UEDEN] = rho * ei + 0.5 * rho * u * u;
       for (int n = 0; n < NUM_SPECIES; ++n)
         s_ext[nf * NVAR + UFS + n] = rho * pp.Y[n];
     }
   } else if (idir == 1) {
     const amrex::Real rsqr = AMREX_D_TERM(,x[0] * x[0], + x[2] * x[2]);
     if (rsqr > 0.1245 * 0.1245) {
+      // Cavity wall
       const amrex::Real rsqr_spark = AMREX_D_TERM(,(x[0] - 6.99) * (x[0] - 6.99), + x[2] * x[2]);
       if (pp.spark && rsqr_spark < 1.0) {
         for (int nf = 0; nf <= NUM_FIELD; ++nf) 
@@ -126,10 +148,10 @@ bcnormal(const amrex::Real x[AMREX_SPACEDIM], const amrex::Real s_int[LEN_STATE]
       // amrex::Real damping = time > 2e-4 ? 1.0 : 1.0 - exp(-5.0 * time / 2e-4);
       amrex::Real damping = 1.0;
       amrex::Real jet_profile = 1.0;
-      if (pp.do_bl) {
-        amrex::Real r_over_D = sqrt(rsqr) / (0.1245 * 2.0);
-        jet_profile = r_over_D < 0.35 ? 1.0 : 1.0 - pow(6.67*(r_over_D-0.35), 2.5);
-      }
+      // if (pp.do_bl) {
+      //   amrex::Real r_over_D = sqrt(rsqr) / (0.1245 * 2.0);
+      //   jet_profile = r_over_D < 0.35 ? 1.0 : 1.0 - pow(6.67*(r_over_D-0.35), 2.5);
+      // }
       for (int nf = 0; nf <= NUM_FIELD; ++nf) {
         s_ext[nf * NVAR + URHO] = pp.rho_j;
         s_ext[nf * NVAR + UMX] = 0.0;
@@ -164,32 +186,51 @@ AMREX_GPU_DEVICE AMREX_FORCE_INLINE void prob_post_restart(
 
     if ((x < -0.5 + 0.2 * y * y) && (y > 0.0)) {
       // Make boundary layer
-      amrex::Real d_wall = amrex::min(y, 2.54-y); // dist from upper and lower walls
-      d_wall = amrex::min(d_wall, 1.905-amrex::Math::abs(z)); // dist from upper and lower walls
-      // d_wall = amrex::max(d_wall, 0.0); // prevent solver from complaining
-      d_wall /= (0.1245 * 2.0); // d_wall/D
-      amrex::Real bl_profile = d_wall > 0.68 ? 1.0 : 1.0085656 - exp(-7.0 * d_wall);
+      amrex::Real rho, u, ei;
+      bl_profile(y, z, pp, rho, u, ei);
+
       for (int nf = 0; nf <= NUM_FIELD; ++nf) {
-        state(i, j, k, nf * NVAR + URHO) = pp.rho / (1.0 + 0.5 * (pp.u * pp.u) / pp.cv_Tinf * (1.0 - bl_profile * bl_profile));;
-        state(i, j, k, nf * NVAR + UMX) = state(i, j, k, nf * NVAR + URHO) * pp.u * bl_profile;
+        state(i, j, k, nf * NVAR + URHO) = rho;
+        state(i, j, k, nf * NVAR + UMX) = rho * u;
         state(i, j, k, nf * NVAR + UMY) = 0.0;
         state(i, j, k, nf * NVAR + UMZ) = 0.0;
-        state(i, j, k, nf * NVAR + UEDEN) = pp.rho * pp.ei + 0.5 * pp.rho * pp.u * pp.u;
+        state(i, j, k, nf * NVAR + UEDEN) = rho * ei + 0.5 * rho * u * u;
         for (int n = 0; n < NUM_SPECIES; ++n)
-          state(i, j, k, nf * NVAR + UFS + n) = state(i, j, k, nf * NVAR + URHO) * pp.Y[n];
+          state(i, j, k, nf * NVAR + UFS + n) = rho * pp.Y[n];
       }
-    } else if ((rsqr <= 0.1245 * 0.1245) && (y < -0.5)) {
-      // Make jet profile
-      amrex::Real r_over_D = sqrt(rsqr) / (0.1245 * 2.0);
-      amrex::Real jet_profile = r_over_D < 0.35 ? 1.0 : 1.0 - pow(6.67*(r_over_D-0.35), 2.5);
+    // } else if ((rsqr <= 0.1245 * 0.1245) && (y < -0.5)) {
+    //   // Make jet profile
+    //   amrex::Real r_over_D = sqrt(rsqr) / (0.1245 * 2.0);
+    //   amrex::Real jet_profile = r_over_D < 0.35 ? 1.0 : 1.0 - pow(6.67*(r_over_D-0.35), 2.5);
+    //   for (int nf = 0; nf <= NUM_FIELD; ++nf) {
+    //     state(i, j, k, nf * NVAR + URHO) = pp.rho_j;
+    //     state(i, j, k, nf * NVAR + UMX) = 0.0;
+    //     state(i, j, k, nf * NVAR + UMY) = pp.rho_j * pp.v_j * jet_profile;
+    //     state(i, j, k, nf * NVAR + UMZ) = 0.0;
+    //     state(i, j, k, nf * NVAR + UEDEN) = pp.rho_j * pp.ei_j + 0.5 * pp.rho_j * pp.v_j * pp.v_j * jet_profile * jet_profile;
+    //     for (int n = 0; n < NUM_SPECIES; ++n)
+    //       state(i, j, k, nf * NVAR + UFS + n) = pp.rho_j * pp.Y_jet[n];
+    //   }
+    }
+  }
+
+  if (pp.make_init_on_restart) {
+    // Geometry
+    const amrex::Real* prob_lo = geomdata.ProbLo();
+    const amrex::Real* dx = geomdata.CellSize();
+    const amrex::Real x = prob_lo[0] + (i + 0.5) * dx[0];
+    const amrex::Real y = prob_lo[1] + (j + 0.5) * dx[1];
+    
+    if (x < pp.x_reset) {
+      // Reset to init states (without BL)
       for (int nf = 0; nf <= NUM_FIELD; ++nf) {
-        state(i, j, k, nf * NVAR + URHO) = pp.rho_j;
-        state(i, j, k, nf * NVAR + UMX) = 0.0;
-        state(i, j, k, nf * NVAR + UMY) = pp.rho_j * pp.v_j * jet_profile;
+        state(i, j, k, nf * NVAR + URHO) = pp.rho;
+        state(i, j, k, nf * NVAR + UMX) = pp.rho * pp.u * Real(y > -0.5*dx[1]);
+        state(i, j, k, nf * NVAR + UMY) = 0.0;
         state(i, j, k, nf * NVAR + UMZ) = 0.0;
-        state(i, j, k, nf * NVAR + UEDEN) = pp.rho_j * pp.ei_j + 0.5 * pp.rho_j * pp.v_j * pp.v_j * jet_profile * jet_profile;
+        state(i, j, k, nf * NVAR + UEDEN) = pp.rho * pp.ei + 0.5 * pp.rho * pp.u * pp.u * Real(y > -0.5*dx[1]);
         for (int n = 0; n < NUM_SPECIES; ++n)
-          state(i, j, k, nf * NVAR + UFS + n) = pp.rho_j * pp.Y_jet[n];
+          state(i, j, k, nf * NVAR + UFS + n) = pp.rho * pp.Y[n];
       }
     }
   }
@@ -226,11 +267,11 @@ AMREX_GPU_DEVICE AMREX_FORCE_INLINE void prob_post_timestep(
     state(i, j, k, UFA + 4) += p * dtlev;                  // p
     state(i, j, k, UFA + 5) += Y[H2_ID] * dtlev;           // Y_H2
     state(i, j, k, UFA + 6) += Y[OH_ID] * dtlev;           // Y_OH
-    state(i, j, k, UFA + 7) += Y[O2_ID] * dtlev;          // Y_O2
+    state(i, j, k, UFA + 7) += Y[O2_ID] * dtlev;           // Y_O2
     state(i, j, k, UFA + 8) += Y[HO2_ID] * dtlev;          // Y_HO2
     state(i, j, k, UFA + 9) +=
-      reactions(i, j, k, NUM_SPECIES) * dtlev; // heat release rate
-    state(i, j, k, UFA + 10) += p * p * dtlev; // p^2
+      reactions(i, j, k, NUM_SPECIES) * dtlev;  // heat release rate
+    state(i, j, k, UFA + 10) += p * p * dtlev;  // p^2
     state(i, j, k, UFA + 11) += 2 * ke * dtlev; // 2*k
   }
 #endif

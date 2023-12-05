@@ -134,7 +134,7 @@ public:
    * @param step AMRLevel::nStep()
    * @param out  output array
    */
-  void get_rand(int step, amrex::Real (&out)[][NUM_FIELD])
+  void get_rand(int step, amrex::Real out[][NUM_FIELD])
   {
     int cycle = step % _num_per_coarse_step;
 
@@ -187,7 +187,7 @@ public:
 
   void generate_new(amrex::Real sqrtdt_coarse, int rand_mode, int sync_mode) {}
 
-  void get_rand(int step, amrex::Real (&out)[][NUM_FIELD]) {}
+  void get_rand(int step, amrex::Real out[][NUM_FIELD]) {}
 
 private:
   static amrex::Vector<amrex::Real>
