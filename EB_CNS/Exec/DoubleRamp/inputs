@@ -48,16 +48,16 @@ cns.refine_velgrad_max_lev = 10
 eb2.geom_type = double_ramp
 cns.eb_weights_type = 3
 cns.eb_no_slip = 1
-cns.eb_isothermal = 0
+cns.eb_isothermal = 1
 cns.eb_wall_temp = 290.0
 
 # CHECKPOINT FILES
 amr.checkpoint_files_output = 1
-amr.check_file      = adia_ns/chk # root name of checkpoint file
+amr.check_file      = iso_ns/chk # root name of checkpoint file
 amr.check_int       = 50        # number of timesteps between checkpoints
 
 # PLOTFILES
 amr.plot_files_output = 1
-amr.plot_file         = adia_ns/plt # root name of plotfile
+amr.plot_file         = iso_ns/plt # root name of plotfile
 amr.plot_int          = 50         # number of timesteps between plotfiles
 amr.derive_plot_vars  = temp pressure x_velocity y_velocity z_velocity MachNumber divrho divu magvort cp cv transport_coef

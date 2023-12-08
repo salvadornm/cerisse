@@ -10,8 +10,8 @@ geometry.coord_sys   = 0
 geometry.prob_lo     = 0.0   0.0
 geometry.prob_hi     = 10.0  10.0
 #amr.n_cell           = 32    32
-#amr.n_cell           = 64    64
-amr.n_cell           = 128   128
+amr.n_cell           = 64    64
+#amr.n_cell           = 128   128
 #amr.n_cell           = 256   256
 eb2.geom_type = all_regular
 
@@ -47,30 +47,28 @@ amr.loadbalance_with_workestimates = 0 # for multi-level run, loadbalance_int = 
 #amr.loadbalance_max_fac    = 1.5      # default 1.5, what is this??
 
 # =============== REFINEMENT / REGRIDDING ============== #
-amr.max_level       = 0       # maximum level number allowed
+amr.max_level       = 1       # maximum level number allowed
 amr.ref_ratio       = 2       # refinement ratio
-amr.regrid_int      = 500     # how often to regrid
+amr.regrid_int      = 50      # how often to regrid
 amr.blocking_factor = 8
 amr.max_grid_size   = 16
 amr.n_error_buf     = 5       # number of buffer cells in error est
-amr.grid_eff        = 0.7
+amr.grid_eff        = 0.9
 
 # ================== TAGGING CRITERIA ================== #
-#cns.refine_magvort = 10
-#cns.refine_magvort_max_lev = 3
-#cns.refine_box_lo_0 = 0.0 -1.0 -1.0
-#cns.refine_box_hi_0 = 4.0  1.0  1.0
+cns.refine_magvort = 50
+cns.refine_magvort_max_lev = 3
 
 # ==================== OUTPUT FILES ==================== #
 amr.checkpoint_files_output = 1
-amr.check_file      = slow2/grid128/chk # root name of checkpoint file
-#amr.check_int       = 1e6  # number of timesteps between checkpoints
+amr.check_file      = slow3/chk # root name of checkpoint file
+amr.check_int       = 100000  # number of timesteps between checkpoints
 
 amr.plot_files_output = 1
-amr.plot_file         = slow2/grid128/plt  # root name of plotfile
-#amr.plot_int          = 1e5   # number of timesteps between plotfiles
+amr.plot_file         = slow3/plt  # root name of plotfile
+amr.plot_int          = 2000   # number of timesteps between plotfiles
 #amr.plot_per          = 0.0005762 # interval physical time between plotfiles
-amr.derive_plot_vars  = pressure temp x_velocity y_velocity MachNumber magvort #divrho divu z_velocity  cp cv transport_coef
+amr.derive_plot_vars  = pressure temp x_velocity y_velocity MachNumber magvort #divrho divu z_velocity cp cv transport_coef
 cns.plot_fields = 0
 cns.plot_rhoy = 0
 cns.plot_molefrac = 0
