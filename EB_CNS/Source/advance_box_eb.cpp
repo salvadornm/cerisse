@@ -342,11 +342,14 @@ void CNS::compute_dSdt_box_eb(
 
     auto const& divc_arr = divc.array();
 
-    amrex::ApplyRedistribution(bx, ncomp, dsdtarr, divc_arr, sarr, scratch, flag,
-                               AMREX_D_DECL(apx, apy, apz), vfrac,
-                               AMREX_D_DECL(fcx, fcy, fcz), bcent, &phys_bc, geom,
-                               dt, redistribution_type, use_wts_in_divnc,
-                               srd_max_order, target_volfrac, srd_update_scale);
+    {
+      BL_PROFILE("ApplyRedistribution()");
+      amrex::ApplyRedistribution(bx, ncomp, dsdtarr, divc_arr, sarr, scratch, flag,
+                                AMREX_D_DECL(apx, apy, apz), vfrac,
+                                AMREX_D_DECL(fcx, fcy, fcz), bcent, &phys_bc, geom,
+                                dt, redistribution_type, use_wts_in_divnc,
+                                srd_max_order, target_volfrac, srd_update_scale);
+    }
   }
 
   //////////////////////// END EB CALCULATIONS ////////////////////////

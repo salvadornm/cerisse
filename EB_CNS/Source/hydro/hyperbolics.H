@@ -375,12 +375,13 @@ AMREX_GPU_DEVICE AMREX_FORCE_INLINE void hllc(
   // Roe-average (Einfeldt's HLLE)
   Real rp = sqrt(rr / rl);
   Real uroe = (ul + ur * rp) / (1. + rp);
-  Real croe = (cl * cl + cr * cr * rp) / (1. + rp) +
-              0.5 * rp / (1. + rp) / (1. + rp) //(sqrt(rl)+sqrt(rr))
-                *
-                (AMREX_D_TERM((ul - ur) * (ul - ur), +(ut1l - ut1r) * (ut1l - ut1r),
-                              +(ut2l - ut2r) * (ut2l - ut2r)));
-  croe = sqrt(croe);
+  // Real croe = (cl * cl + cr * cr * rp) / (1. + rp) +
+  //             0.5 * rp / (1. + rp) / (1. + rp) //(sqrt(rl)+sqrt(rr))
+  //               *
+  //               (AMREX_D_TERM((ul - ur) * (ul - ur), +(ut1l - ut1r) * (ut1l - ut1r),
+  //                             +(ut2l - ut2r) * (ut2l - ut2r)));
+  // croe = sqrt(croe);
+  Real croe = (cl + cr * rp) / (1. + rp); // a more standard averaging
   sl = amrex::min(sl, uroe - croe);
   sr = amrex::max(sr, uroe + croe);
 
