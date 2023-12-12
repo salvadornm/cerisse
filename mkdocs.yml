@@ -1,13 +1,14 @@
 site_name: cerisse
 nav:
   - Home: index.md
-  - LES: les.md
-  - PDF: pdf.md
   - Quickrun: quickrun.md
   - Run: run.md
+  - LES: les.md
+  - PDF: pdf.md
   - Examples: example.md
   - Tips: tips.md   
 extra_javascript:
   - https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.4/MathJax.js?config=TeX-AMS-MML_HTMLorMML
 markdown_extensions:
   - mdx_math
+  - callouts
