@@ -1,5 +1,5 @@
 # AMReX
-DIM = 3
+DIM = 2
 COMP = gnu
 PRECISION = DOUBLE
 
@@ -23,13 +23,10 @@ DEBUG = FALSE
 FSANITIZER = FALSE
 THREAD_SANITIZER = FALSE
 
-# PeleC
+# PelePhysics
 Eos_Model := GammaLaw
 Transport_Model := Constant
 Chemistry_Model := Null
-
-# CNS
-NUM_FIELD = 8
 
 # GNU Make
 include ./Make.package

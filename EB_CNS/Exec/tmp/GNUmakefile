@@ -1,5 +1,5 @@
 # AMReX
-DIM = 3
+DIM = 2
 COMP = gnu
 PRECISION = DOUBLE
 
@@ -12,7 +12,7 @@ MEM_PROFILE = FALSE
 USE_GPROF = FALSE
 
 # Performance
-USE_MPI = FALSE
+USE_MPI = TRUE
 USE_OMP = FALSE
 USE_CUDA = FALSE
 USE_HIP = FALSE
@@ -23,13 +23,13 @@ DEBUG = FALSE
 FSANITIZER = FALSE
 THREAD_SANITIZER = FALSE
 
-# PeleC
+# PelePhysics
 Eos_Model := GammaLaw
 Transport_Model := Constant
 Chemistry_Model := Null
 
 # CNS
-NUM_FIELD = 8
+USE_EB = TRUE
 
 # GNU Make
 include ./Make.package

@@ -1,0 +1,49 @@
+# ====================================================== #
+#                CERISSE TEST INPUT SCRIPT               #
+# ====================================================== #
+max_step = 200000
+stop_time = 0.1444 # 5
+
+geometry.is_periodic = 1 1 1
+geometry.coord_sys   = 0
+geometry.prob_lo     = 0.0   0.0   0.0
+geometry.prob_hi     = 10.0  10.0  1.25
+amr.n_cell           = 64    64    1
+eb2.geom_type = all_regular
+cns.lo_bc = 0 0 0
+cns.hi_bc = 0 0 0
+
+cns.do_visc  = 0
+
+cns.cfl = 0.3
+cns.dt_cutoff = 5.e-20
+cns.recon_scheme = 6
+
+cns.do_react = 0
+
+cns.v = 0
+amr.v = 1
+
+amr.loadbalance_with_workestimates = 0 
+
+amr.max_level       = 1 
+amr.ref_ratio       = 2
+amr.regrid_int      = 10
+amr.blocking_factor = 8
+amr.max_grid_size   = 32
+amr.n_error_buf     = 2
+amr.grid_eff        = 0.99
+
+cns.refine_magvort = 10
+cns.refine_magvort_max_lev = 3
+
+amr.plot_files_output = 1
+amr.plot_file         = plt 
+amr.plot_int          = 10
+amr.derive_plot_vars  = ALL
+cns.plot_rhoy = 0
+cns.plot_molefrac = 0
+cns.plot_massfrac = 0
+
+prob.mach = 0.05
+prob.beta = 0.02

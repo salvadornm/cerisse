@@ -90,24 +90,33 @@ void CNS::compute_dSdt_box_eb(
         auto const& rhoD = diff_coeff.array(
           nf * NCOEF + CRHOD); // species diffusivity (multiplied by rho)
 
-        // Get Transport coefs (on GPU?)
-        auto const* ltransparm = trans_parms.device_trans_parm();
-        constexpr bool wtr_get_xi = true;
-        constexpr bool wtr_get_mu = true;
-        constexpr bool wtr_get_lam = true;
-        constexpr bool wtr_get_Ddiag = true;
-        amrex::ParallelFor(bxg4, [=](int i, int j, int k) {
-          if (!flag(i, j, k).isCovered()) {
-            // Copy to input
-            Real muloc, xiloc, lamloc;
-            Real Ddiag[NUM_SPECIES] = {0.0};
-            Real yin[NUM_SPECIES] = {0.0};
-            for (int n = 0; n < NUM_SPECIES; ++n) { yin[n] = qar_yin(i, j, k, n); }
+      // Get Transport coefs (on GPU?)
+      auto const* ltransparm = trans_parms.device_trans_parm();
+      const bool wtr_get_xi = true;
+      const bool wtr_get_mu = true;
+      const bool wtr_get_lam = true;
+      const bool wtr_get_Ddiag = true;
+      const bool wtr_get_chi = false;
 
-            auto trans = pele::physics::PhysicsType::transport();
-            trans.transport(wtr_get_xi, wtr_get_mu, wtr_get_lam, wtr_get_Ddiag, false,
-                            qar_Tin(i, j, k), qar_rhoin(i, j, k), yin, Ddiag, nullptr, muloc,
-                            xiloc, lamloc, ltransparm);
+      amrex::ParallelFor(bxg4, [=](int i, int j, int k) {
+        if (!flag(i, j, k).isCovered()) {
+          // Copy to input
+          amrex::Real muloc, xiloc, lamloc;
+          amrex::Real Ddiag[NUM_SPECIES] = {0.0};
+          amrex::Real yin[NUM_SPECIES] = {0.0};
+          amrex::Real* dummy_chi_mix = nullptr;
+      
+          for (int n = 0; n < NUM_SPECIES; ++n) { yin[n] = qar_yin(i, j, k, n); }
+
+          auto trans = pele::physics::PhysicsType::transport();
+       //   trans.transport(wtr_get_xi, wtr_get_mu, wtr_get_lam, wtr_get_Ddiag,
+       //                   qar_Tin(i, j, k), qar_rhoin(i, j, k), yin, Ddiag, muloc,
+       //                   xiloc, lamloc, ltransparm);
+
+          // SNM 
+          trans.transport(
+      wtr_get_xi, wtr_get_mu, wtr_get_lam, wtr_get_Ddiag, wtr_get_chi, qar_Tin(i, j, k),
+     qar_rhoin(i, j, k), yin, Ddiag, dummy_chi_mix, muloc, xiloc, lamloc,ltransparm);
 
             // Copy to output
             for (int n = 0; n < NUM_SPECIES; ++n) { rhoD(i, j, k, n) = Ddiag[n]; }

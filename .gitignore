@@ -5,6 +5,14 @@ EB_CNS/Exec/**/chk*
 EB_CNS/Exec/**/*.visit
 EB_CNS/Exec/**/Backtrace*
 EB_CNS/Exec/**/tmp_build_dir
+# same in Examples folder
+EB_CNS/Examples/**/*.ex*
+EB_CNS/Examples/**/plt*
+EB_CNS/Examples/**/chk*
+EB_CNS/Examples/**/*.visit
+EB_CNS/Examples/**/Backtrace*
+EB_CNS/Examples/**/tmp_build_dir
+
 
 # data in Build
 Build
@@ -12,3 +20,12 @@ Build
 
 # vscode data
 .vscode/*
+
+# Submodules
+Submodules/amrex
+Submodules/PelePhysics
+
+#Mac development
+.DS_Store
+EB_CNS/.DS_Store
+EB_CNS/**/.DS_Store

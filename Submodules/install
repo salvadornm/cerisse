@@ -1,0 +1,36 @@
+AMREXVERSION=23.11
+PELEPVERSION=23.03
+case  $1 in
+	git )
+	echo " installing git versions .. "
+	gh repo clone AMReX-Combustion/PelePhysics
+	;;
+	safe )
+        rm -rf amrex
+	echo " installing AMREX release version .." $AMREXVERSION
+	wget https://github.com/AMReX-Codes/amrex/archive/refs/tags/23.11.zip
+	unzip 23.11.zip
+        mv amrex-23.11 amrex
+	rm 23.11.zip
+        rm -rf PelePhysics
+        echo " installing PelePhysics release version .." $PELEPVERSION
+        wget https://github.com/AMReX-Combustion/PelePhysics/archive/refs/tags/v$PELEPVERSION.zip
+        unzip v$PELEPVERSION.zip
+        mv PelePhysics-$PELEPVERSION PelePhysics
+        rm v$PELEPVERSION.zip
+        ;;
+	pelephys)
+	rm -rf PelePhysics
+        echo " installing PelePhysics release version .." $PELEPVERSION
+        wget https://github.com/AMReX-Combustion/PelePhysics/archive/refs/tags/v$PELEPVERSION.zip        
+        unzip v$PELEPVERSION.zip
+        mv PelePhysics-$PELEPVERSION PelePhysics 
+	rm v$PELEPVERSION.zip
+	;;
+    	*)
+	echo " no option selected [git/safe]"
+    exit
+esac
+echo -e "\\033[1;32m  Installation done \\033[0m"
+
+
