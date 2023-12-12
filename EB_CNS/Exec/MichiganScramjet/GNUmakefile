@@ -30,6 +30,8 @@ Chemistry_Model := LiDryer
 
 # CNS
 USE_EB = TRUE
+NUM_AUX = 12
+#NUM_FIELD = 8
 
 # GNU Make
 include ./Make.package

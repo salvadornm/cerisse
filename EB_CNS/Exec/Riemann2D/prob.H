@@ -41,8 +41,6 @@ prob_initdata(int i, int j, int k, amrex::Array4<amrex::Real> const& state,
     state(i, j, k, UEDEN) = prob_parm.rhoe_1 + 0.5 * prob_parm.rho_1 *
                                                  (prob_parm.u_1 * prob_parm.u_1 +
                                                   prob_parm.v_1 * prob_parm.v_1);
-    // state(i, j, k, UEINT) = prob_parm.rhoe_1;
-    // state(i, j, k, UTEMP) = prob_parm.T_1;
     state(i, j, k, UFS) = prob_parm.rho_1;
   } else if (x < 0.5 && y >= 0.5) {
     state(i, j, k, URHO) = prob_parm.rho_2;
@@ -52,8 +50,6 @@ prob_initdata(int i, int j, int k, amrex::Array4<amrex::Real> const& state,
     state(i, j, k, UEDEN) = prob_parm.rhoe_2 + 0.5 * prob_parm.rho_2 *
                                                  (prob_parm.u_2 * prob_parm.u_2 +
                                                   prob_parm.v_2 * prob_parm.v_2);
-    // state(i, j, k, UEINT) = prob_parm.rhoe_2;
-    // state(i, j, k, UTEMP) = prob_parm.T_2;
     state(i, j, k, UFS) = prob_parm.rho_2;
   } else if (x < 0.5 && y < 0.5) {
     state(i, j, k, URHO) = prob_parm.rho_3;
@@ -63,8 +59,6 @@ prob_initdata(int i, int j, int k, amrex::Array4<amrex::Real> const& state,
     state(i, j, k, UEDEN) = prob_parm.rhoe_3 + 0.5 * prob_parm.rho_3 *
                                                  (prob_parm.u_3 * prob_parm.u_3 +
                                                   prob_parm.v_3 * prob_parm.v_3);
-    // state(i, j, k, UEINT) = prob_parm.rhoe_3;
-    // state(i, j, k, UTEMP) = prob_parm.T_3;
     state(i, j, k, UFS) = prob_parm.rho_3;
   } else {
     state(i, j, k, URHO) = prob_parm.rho_4;
@@ -74,8 +68,6 @@ prob_initdata(int i, int j, int k, amrex::Array4<amrex::Real> const& state,
     state(i, j, k, UEDEN) = prob_parm.rhoe_4 + 0.5 * prob_parm.rho_4 *
                                                  (prob_parm.u_4 * prob_parm.u_4 +
                                                   prob_parm.v_4 * prob_parm.v_4);
-    // state(i, j, k, UEINT) = prob_parm.rhoe_4;
-    // state(i, j, k, UTEMP) = prob_parm.T_4;
     state(i, j, k, UFS) = prob_parm.rho_4;
   }
 }

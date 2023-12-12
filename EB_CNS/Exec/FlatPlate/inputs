@@ -4,7 +4,7 @@ stop_time = 0.008
 geometry.is_periodic = 0 0
 geometry.coord_sys   = 0  # 0 => cart, 1 => RZ  2=>spherical
 geometry.prob_lo     = 0.0   0.0  -0.25
-geometry.prob_hi     = 21.   4.0   0.25
+geometry.prob_hi     = 16.   4.0   0.25
 amr.n_cell           = 64    64    8
 
 # >>>>>>>>>>>>> BC FLAGS <<<<<<<<<<<<<<<<
@@ -31,7 +31,7 @@ amr.v = 1
 amr.loadbalance_with_workestimates = 1
 
 # REFINEMENT / REGRIDDING
-amr.max_level       = 5       # maximum level number allowed
+amr.max_level       = 4       # maximum level number allowed
 amr.ref_ratio       = 2 2 2 2 # refinement ratio
 amr.regrid_int      = 100     # how often to regrid
 amr.blocking_factor = 8
@@ -49,11 +49,11 @@ prob.Tw = 300.0
 
 # CHECKPOINT FILES
 amr.checkpoint_files_output = 1
-amr.check_file      = WENOZ48/chk    # root name of checkpoint file
+amr.check_file      = chk    # root name of checkpoint file
 amr.check_int       = 1000   # number of timesteps between checkpoints
 
 # PLOTFILES
 amr.plot_files_output = 1
-amr.plot_file         = WENOZ48/plt  # root name of plotfile
+amr.plot_file         = plt  # root name of plotfile
 amr.plot_int          = 500  # number of timesteps between plotfiles
 amr.derive_plot_vars  = temp pressure x_velocity y_velocity z_velocity MachNumber magvort cp cv transport_coef

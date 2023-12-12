@@ -29,8 +29,8 @@ Transport_Model := Simple
 Chemistry_Model := LiDryer
 
 # CNS
-NUM_FIELD = 0
-NUM_AUX = 16
+#NUM_FIELD = 8
+#NUM_AUX = 16
 
 # GNU Make
 include ./Make.package

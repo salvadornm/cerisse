@@ -11,7 +11,11 @@
 
 *Inflow boundary layer is not applied because it is too thin to be resolved 
 
-Reference: [D. J. Micka, *Combustion Stabilization, Structure, and Spreading in a Laboratory Dual-Mode Scramjet Combustor*, PhD Thesis, 2010.](https://deepblue.lib.umich.edu/handle/2027.42/76012)
+![](fig.png)
+
+Reference: 
+- [D. J. Micka, *Combustion Stabilization, Structure, and Spreading in a Laboratory Dual-Mode Scramjet Combustor*, PhD Thesis, 2010.](https://deepblue.lib.umich.edu/handle/2027.42/76012)
+- [F. H. E. Ribeiro, *Numerical Simulation of Turbulent Combustion in Situations Relevant to Scramjet Engine Propulsion*, PhD Thesis, 2019.](https://theses.hal.science/tel-02082214)
 
 <!-- 
 | Parameter                | Case 1C          | Case 2C           |

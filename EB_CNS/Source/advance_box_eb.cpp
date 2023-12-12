@@ -71,22 +71,24 @@ void CNS::compute_dSdt_box_eb(
 
   // Transport coef
   FArrayBox diff_coeff;
-  if (do_visc == 1) {
-    BL_PROFILE("PelePhysics::get_transport_coeffs()");
-
+  bool do_diffusion = do_visc || do_les || buffer_box.ok();
+  if (do_diffusion) {
     diff_coeff.resize(bxg4, LEN_COEF, The_Async_Arena());
     diff_coeff.setVal<RunOn::Device>(0.0);
 
-    for (int nf = 0; nf <= NUM_FIELD; ++nf) {
-      auto const& qar_yin = qtmp.array(nf * NPRIM + QFS);
-      auto const& qar_Tin = qtmp.array(nf * NPRIM + QTEMP);
-      auto const& qar_rhoin = qtmp.array(nf * NPRIM + QRHO);
-      auto const& mu = diff_coeff.array(nf * NCOEF + CMU); // dynamic viscosity
-      auto const& xi = diff_coeff.array(nf * NCOEF + CXI); // bulk viscosity
-      auto const& lambda =
-        diff_coeff.array(nf * NCOEF + CLAM); // thermal conductivity
-      auto const& rhoD = diff_coeff.array(
-        nf * NCOEF + CRHOD); // species diffusivity (multiplied by rho)
+    if (do_visc) {
+      BL_PROFILE("PelePhysics::get_transport_coeffs()");
+
+      for (int nf = 0; nf <= NUM_FIELD; ++nf) {
+        auto const& qar_yin = qtmp.array(nf * NPRIM + QFS);
+        auto const& qar_Tin = qtmp.array(nf * NPRIM + QTEMP);
+        auto const& qar_rhoin = qtmp.array(nf * NPRIM + QRHO);
+        auto const& mu = diff_coeff.array(nf * NCOEF + CMU); // dynamic viscosity
+        auto const& xi = diff_coeff.array(nf * NCOEF + CXI); // bulk viscosity
+        auto const& lambda =
+          diff_coeff.array(nf * NCOEF + CLAM); // thermal conductivity
+        auto const& rhoD = diff_coeff.array(
+          nf * NCOEF + CRHOD); // species diffusivity (multiplied by rho)
 
       // Get Transport coefs (on GPU?)
       auto const* ltransparm = trans_parms.device_trans_parm();
@@ -116,15 +118,41 @@ void CNS::compute_dSdt_box_eb(
       wtr_get_xi, wtr_get_mu, wtr_get_lam, wtr_get_Ddiag, wtr_get_chi, qar_Tin(i, j, k),
      qar_rhoin(i, j, k), yin, Ddiag, dummy_chi_mix, muloc, xiloc, lamloc,ltransparm);
 
-          // Copy to output
-          for (int n = 0; n < NUM_SPECIES; ++n) { rhoD(i, j, k, n) = Ddiag[n]; }
-          mu(i, j, k) = muloc;
-          xi(i, j, k) = xiloc;
-          lambda(i, j, k) = lamloc;
-        }
-      });
+            // Copy to output
+            for (int n = 0; n < NUM_SPECIES; ++n) { rhoD(i, j, k, n) = Ddiag[n]; }
+            mu(i, j, k) = muloc;
+            xi(i, j, k) = xiloc;
+            lambda(i, j, k) = lamloc;
+          }
+        });
+      }
+    }
 
-      if (do_les) { amrex::Abort("LES for EB not implemented yet. Abort"); }
+    if (do_les) { amrex::Abort("LES for EB not implemented yet. Abort"); }
+
+    if (buffer_box.ok()) {
+      const auto dx = geom.CellSizeArray();
+      const auto problo = geom.ProbLo();
+      
+      for (int nf = 0; nf <= NUM_FIELD; ++nf) {
+        auto const& mu = diff_coeff.array(nf * NCOEF + CMU); // dynamic viscosity
+        auto const& xi = diff_coeff.array(nf * NCOEF + CXI); // bulk viscosity
+        auto const& lambda =
+          diff_coeff.array(nf * NCOEF + CLAM); // thermal conductivity
+        auto const& rhoD = diff_coeff.array(
+          nf * NCOEF + CRHOD); // species diffusivity (multiplied by rho)
+
+        amrex::ParallelFor(bxg2, [=] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {
+          RealVect pos{AMREX_D_DECL((i + 0.5) * dx[0] + problo[0],
+                                    (j + 0.5) * dx[1] + problo[1],
+                                    (k + 0.5) * dx[2] + problo[2])};
+          if (buffer_box.contains(pos)) {            
+            mu(i, j, k) += 0.1;
+            xi(i, j, k) += 0.1;
+            lambda(i, j, k) += 1e5;
+          }
+        });
+      }
     }
   }
 
@@ -195,7 +223,7 @@ void CNS::compute_dSdt_box_eb(
       });
       // #endif
       // Store viscous fluxes separately
-      if (do_visc == 1) {
+      if (do_diffusion) {
         auto const& coefs = diff_coeff.array(nf * NCOEF);
         amrex::ParallelFor(flxbx,
                            [=] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {
@@ -207,7 +235,7 @@ void CNS::compute_dSdt_box_eb(
     } // loop for fields
 
 #if (NUM_FIELD > 0)
-    if (do_visc == 1) {
+    if (do_diffusion) {
       auto const& flx_arr = flxfab[cdir]->array();
       amrex::ParallelFor(flxbx, [=] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {
         // Average the viscous fluxes
@@ -226,14 +254,14 @@ void CNS::compute_dSdt_box_eb(
           rho = sarr(i, j, k, nf * NVAR + URHO);
 
           AMREX_D_TERM(flx_arr(i, j, k, nf * NVAR + UMX) +=
-                       rho / mean_rho * vflx_arr(i, j, k, UMX);
-                       , flx_arr(i, j, k, nf * NVAR + UMY) +=
-                         rho / mean_rho * vflx_arr(i, j, k, UMY);
-                       , flx_arr(i, j, k, nf * NVAR + UMZ) +=
-                         rho / mean_rho * vflx_arr(i, j, k, UMZ);)
+          rho / mean_rho * vflx_arr(i, j, k, UMX);
+          , flx_arr(i, j, k, nf * NVAR + UMY) +=
+          rho / mean_rho * vflx_arr(i, j, k, UMY);
+          , flx_arr(i, j, k, nf * NVAR + UMZ) +=
+          rho / mean_rho * vflx_arr(i, j, k, UMZ);)
           flx_arr(i, j, k, nf * NVAR + UEDEN) +=
-            rho / mean_rho * vflx_arr(i, j, k, UEDEN);
-          for (int n = 0; n < NUM_SPECIES; ++n) {
+          rho / mean_rho * vflx_arr(i, j, k, UEDEN);
+                    for (int n = 0; n < NUM_SPECIES; ++n) {
             flx_arr(i, j, k, nf * NVAR + UFS + n) +=
               rho / mean_rho * vflx_arr(i, j, k, UFS + n);
           }
@@ -299,9 +327,7 @@ void CNS::compute_dSdt_box_eb(
       redistwgt(i, j, k) = vfrac(i, j, k);
       // }
 
-      srd_update_scale(i, j, k) =
-        1.0; // this affects stablity, why?
-             // = 1.0 more stable for detondiff, = 0.5 for airfoil
+      srd_update_scale(i, j, k) = eb_weight; // = 1.0 more stable for detondiff, = 0.5 for airfoil. Why?
     });
 
     constexpr int ncomp =
@@ -325,11 +351,14 @@ void CNS::compute_dSdt_box_eb(
 
     auto const& divc_arr = divc.array();
 
-    amrex::ApplyRedistribution(bx, ncomp, dsdtarr, divc_arr, sarr, scratch, flag,
-                               AMREX_D_DECL(apx, apy, apz), vfrac,
-                               AMREX_D_DECL(fcx, fcy, fcz), bcent, &phys_bc, geom,
-                               dt, redistribution_type, use_wts_in_divnc,
-                               srd_max_order, target_volfrac, srd_update_scale);
+    {
+      BL_PROFILE("ApplyRedistribution()");
+      amrex::ApplyRedistribution(bx, ncomp, dsdtarr, divc_arr, sarr, scratch, flag,
+                                AMREX_D_DECL(apx, apy, apz), vfrac,
+                                AMREX_D_DECL(fcx, fcy, fcz), bcent, &phys_bc, geom,
+                                dt, redistribution_type, use_wts_in_divnc,
+                                srd_max_order, target_volfrac, srd_update_scale);
+    }
   }
 
   //////////////////////// END EB CALCULATIONS ////////////////////////

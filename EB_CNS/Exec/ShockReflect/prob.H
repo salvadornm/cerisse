@@ -43,8 +43,6 @@ void prob_initdata(int i, int j, int k, amrex::Array4<amrex::Real> const& state,
         prob_parm.rhoe_l +
         0.5 * prob_parm.rho_l *
           (prob_parm.u_l * prob_parm.u_l + prob_parm.v_l * prob_parm.v_l);
-      // state(i, j, k, nf*NVAR + UEINT) = prob_parm.rhoe_l;
-      // state(i, j, k, nf*NVAR + UTEMP) = prob_parm.T_l;
       state(i, j, k, nf * NVAR + UFS) = prob_parm.rho_l;
     } else {
       state(i, j, k, nf * NVAR + URHO) = prob_parm.rho_r;
@@ -52,8 +50,6 @@ void prob_initdata(int i, int j, int k, amrex::Array4<amrex::Real> const& state,
       state(i, j, k, nf * NVAR + UMY) = 0.0;
       state(i, j, k, nf * NVAR + UMZ) = 0.0;
       state(i, j, k, nf * NVAR + UEDEN) = prob_parm.rhoe_r;
-      // state(i, j, k, nf*NVAR + UEINT) = prob_parm.rhoe_r;
-      // state(i, j, k, nf*NVAR + UTEMP) = prob_parm.T_r;
       state(i, j, k, nf * NVAR + UFS) = prob_parm.rho_r;
     }
   }
@@ -94,8 +90,6 @@ void bcnormal(const amrex::Real x[AMREX_SPACEDIM],
         prob_parm.rhoe_l +
         0.5 * prob_parm.rho_l *
           (prob_parm.u_l * prob_parm.u_l + prob_parm.v_l * prob_parm.v_l);
-      // s_ext[nf*NVAR + UEINT] = prob_parm.rhoe_l;
-      // s_ext[nf*NVAR + UTEMP] = prob_parm.T_l;
       s_ext[nf * NVAR + UFS] = prob_parm.rho_l;
     } else if (idir == 1) {
       if (sgn == 1) { // ylo
@@ -134,8 +128,6 @@ void bcnormal(const amrex::Real x[AMREX_SPACEDIM],
             prob_parm.rhoe_l +
             0.5 * prob_parm.rho_l *
               (prob_parm.u_l * prob_parm.u_l + prob_parm.v_l * prob_parm.v_l);
-          // s_ext[nf*NVAR + UEINT] = prob_parm.rhoe_l;
-          // s_ext[nf*NVAR + UTEMP] = prob_parm.T_l;
           s_ext[nf * NVAR + UFS] = prob_parm.rho_l;
         } else {
           s_ext[nf * NVAR + URHO] = prob_parm.rho_r;
@@ -143,8 +135,6 @@ void bcnormal(const amrex::Real x[AMREX_SPACEDIM],
           s_ext[nf * NVAR + UMY] = 0.0;
           s_ext[nf * NVAR + UMZ] = 0.0;
           s_ext[nf * NVAR + UEDEN] = prob_parm.rhoe_r;
-          // s_ext[nf*NVAR + UEINT] = prob_parm.rhoe_r;
-          // s_ext[nf*NVAR + UTEMP] = prob_parm.T_r;
           s_ext[nf * NVAR + UFS] = prob_parm.rho_r;
         }
       }

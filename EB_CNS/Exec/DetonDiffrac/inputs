@@ -3,7 +3,7 @@
 # ====================================================== #
 max_step = 200
 stop_time = 0.1
-amrex.fpe_trap_invalid = 1
+amrex.fpe_trap_invalid = 0
 
 # ================ COMPUTATIONAL DOMAIN ================ #
 geometry.is_periodic = 0 0 0
@@ -26,16 +26,17 @@ eb2.geom_type = triangles
 triangles.num_tri = 2
 triangles.tri_0_point_0 = -1.0  1.0
 triangles.tri_0_point_1 = -1.0 -1.0
-triangles.tri_0_point_2 =  1.5 -1.0
+triangles.tri_0_point_2 =  1.0 -1.0
 
 triangles.tri_1_point_0 = -1.0  1.0
-triangles.tri_1_point_1 =  1.5 -1.0
-triangles.tri_1_point_2 =  1.5  1.0
+triangles.tri_1_point_1 =  1.0 -1.0
+triangles.tri_1_point_2 =  1.0  1.0
 # triangles.tri_1_point_2 =  1.484375  .9765625
 
 cns.eb_no_slip = 0
 cns.eb_isothermal = 0
 # cns.eb_weights_type = 0 #old
+cns.redistribution_type = StateRedist
 
 # ==================== WHAT PHYSICS ==================== #
 cns.do_visc    = 0
@@ -47,14 +48,14 @@ cns.rk_order = 2
 cns.cfl = 0.3
 # cns.fixed_dt = 8e-8
 cns.dt_cutoff = 5.e-20
-cns.recon_scheme = 2  # 1: Godunov, 2: MUSCL, 3: WENO-Z3,
+cns.recon_scheme = 5  # 1: Godunov, 2: MUSCL, 3: WENO-Z3,
                       # 4: WENO-JS5, 5: WENO-Z5, 6: TENO5
 cns.char_sys       = 0
-cns.recon_char_var = 0
-cns.clip_temp    = 200  # clip minimum temperature [K]
-cns.do_psgs      = 1   # enable p_sgs correction
-cns.do_vpdf      = 1   # enable Lagevin model
-cns.do_spdf      = 1   # enable IEM model
+cns.recon_char_var = 1
+cns.clip_temp      = 90  # clip minimum temperature [K]
+# cns.do_psgs      = 1   # enable p_sgs correction
+# cns.do_vpdf      = 1   # enable Lagevin model
+# cns.do_spdf      = 1   # enable IEM model
 
 # ================== REACTION SETTINGS ================= #
 cns.chem_integrator = "ReactorCvode"
@@ -88,7 +89,9 @@ cns.refine_dengrad = 0.01
 cns.refine_dengrad_max_lev = 10
 
 # ==================== OUTPUT FILES ==================== #
-amr.checkpoint_files_output = 0
+amr.checkpoint_files_output = 1
+amr.check_file = 90deg/chk
+amr.check_int  = 50
 
 amr.plot_files_output = 1
 amr.plot_int  = 10         # number of timesteps between plotfiles

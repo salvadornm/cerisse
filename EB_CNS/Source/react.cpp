@@ -46,7 +46,7 @@ void CNS::react_state(Real time, Real dt, bool init_react)
   // State Fabs
   MultiFab Sold(grids, dmap, LEN_STATE, 1, MFInfo(),
                 Factory()); //= get_old_data(State_Type);
-  FillPatch(*this, Sold, 1, time, State_Type, 0, LEN_STATE);
+  if (!init_react) FillPatch(*this, Sold, 1, time, State_Type, 0, LEN_STATE);
   MultiFab& Snew = get_new_data(State_Type);
   MultiFab& I_R = get_new_data(Reactions_Type);
   I_R.setVal(0.0);
@@ -179,7 +179,7 @@ void CNS::react_state(Real time, Real dt, bool init_react)
               bx, [=] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {
                 // Copy to input
                 Real muloc;
-                Real xiloc, lamloc, Ddiag[NUM_SPECIES]; // not used
+                Real xiloc, lamloc; // not used
                 Real Tin = T(i, j, k);
                 Real rhoin = sold_arr(i, j, k, URHO);
                 Real yin[NUM_SPECIES];

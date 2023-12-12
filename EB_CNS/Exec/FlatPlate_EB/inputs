@@ -64,7 +64,6 @@ prob.M = 6.85
 prob.Re = 5e5
 prob.Pr = 0.72
 prob.ang = 0.0
-# prob.Tw = 300.0
 
 # CHECKPOINT FILES
 amr.checkpoint_files_output = 1

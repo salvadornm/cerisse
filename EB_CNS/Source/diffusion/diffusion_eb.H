@@ -973,8 +973,8 @@ AMREX_GPU_DEVICE AMREX_FORCE_INLINE void compute_diff_wallflux(
     auto eos = pele::physics::PhysicsType::eos();
     eos.PYT2R(q(i, j, k, QPRES), y, eb_wall_temp, rho); // assume dp/dn ~ 0
 
-    trans.transport(1, 1, 1, 0, eb_wall_temp, rho, y, &dummy2, mu, xi, lam,
-                    ltransparm);
+    trans.transport(true, true, true, false, false, eb_wall_temp, rho, y, 
+                    nullptr, nullptr, mu, xi, lam, ltransparm);
   } else {
     // Adiabatic wall dT/dn ~ 0
     mu = coefs(i, j, k, CMU);

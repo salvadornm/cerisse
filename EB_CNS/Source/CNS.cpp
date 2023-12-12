@@ -139,11 +139,10 @@ void CNS::initData()
   amrex::ParallelFor(
     S_new, [=] AMREX_GPU_DEVICE(int box_no, int i, int j, int k) noexcept {
       prob_initdata(i, j, k, sarrs[box_no], geomdata, *lparm, *lprobparm);
-      cns_check_species_sum_to_one(
-        i, j, k,
+      cns_check_species_sum_to_one(i, j, k,
         sarrs[box_no]); // Verify that the sum of (rho Y)_i = rho at every cell
     });
-  amrex::Gpu::synchronize();
+  enforce_consistent_state();
 
   get_new_data(Reactions_Type).setVal(0.0);
 
@@ -236,12 +235,12 @@ void CNS::computeNewDt(int finest_level, int /*sub_cycle*/, Vector<int>& n_cycle
 
 void CNS::post_regrid(int /*lbase*/, int /*new_finest*/)
 {
-  // enforce_consistent_state();
+  enforce_consistent_state();
 
   if (do_react && use_typical_vals_chem) { set_typical_values_chem(); }
 }
 
-void CNS::post_timestep(int /*iteration*/)
+void CNS::post_timestep(int iteration)
 {
   BL_PROFILE("CNS::post_timestep()");
 
@@ -265,6 +264,9 @@ void CNS::post_timestep(int /*iteration*/)
     getLevel(level + 1).resetFillPatcher();
   }
 
+#ifdef USE_FULL_PROB_POST_TIMESTEP
+  full_prob_post_timestep(iteration);
+#else
   MultiFab& S = get_new_data(State_Type);
   MultiFab& IR = get_new_data(Reactions_Type);
   Real curtime = state[State_Type].curTime();
@@ -280,6 +282,7 @@ void CNS::post_timestep(int /*iteration*/)
       prob_post_timestep(i, j, k, curtime, dtlev, sarrs[box_no], irarrs[box_no],
                          geomdata, *lparm, *lprobparm);
     });
+#endif
 
   enforce_consistent_state(); // enforce Y and T after avgDown and reflux
 
@@ -387,6 +390,8 @@ void CNS::post_restart()
       // Modify restarted data and/or add turbulence
       prob_post_restart(i, j, k, sarrs[box_no], geomdata, *lparm, *lprobparm);
     });
+
+  enforce_consistent_state();
 }
 
 void CNS::errorEst(TagBoxArray& tags, int /*clearval*/, int tagval, Real time,
@@ -432,16 +437,16 @@ void CNS::errorEst(TagBoxArray& tags, int /*clearval*/, int tagval, Real time,
   }
 
   const MultiFab& S_new = get_new_data(State_Type);
-  MultiFab Sborder(grids, dmap, NVAR, 1, MFInfo(), Factory());
+  MultiFab Sg1(grids, dmap, NVAR, 1, MFInfo(), Factory());
   const Real cur_time = state[State_Type].curTime();
-  FillPatch(*this, Sborder, Sborder.nGrow(), cur_time, State_Type, URHO, NVAR, 0);
+  FillPatch(*this, Sg1, Sg1.nGrow(), cur_time, State_Type, URHO, NVAR, 0);
 
   auto const& tagma = tags.arrays();
 
   if (level < refine_dengrad_max_lev) {
     const Real threshold = refine_dengrad[level];
 
-    MultiFab rho(Sborder, amrex::make_alias, URHO, 1);
+    MultiFab rho(Sg1, amrex::make_alias, URHO, 1);
     auto const& rhoma = rho.const_arrays();
     const auto dxinv = geom.InvCellSizeArray();
 
@@ -459,7 +464,7 @@ void CNS::errorEst(TagBoxArray& tags, int /*clearval*/, int tagval, Real time,
 
       FArrayBox velgrad(bx, 1);
       const int* bc = 0; // dummy
-      cns_dervelgrad(bx, velgrad, 0, 1, Sborder[mfi], geom, cur_time, bc, level);
+      cns_dervelgrad(bx, velgrad, 0, 1, Sg1[mfi], geom, cur_time, bc, level);
 
       auto tagarr = tags.array(mfi);
       auto mvarr = velgrad.const_array();
@@ -478,7 +483,7 @@ void CNS::errorEst(TagBoxArray& tags, int /*clearval*/, int tagval, Real time,
 
       FArrayBox magvort(bx, 1);
       const int* bc = 0; // dummy
-      cns_dermagvort(bx, magvort, 0, 1, Sborder[mfi], geom, cur_time, bc, level);
+      cns_dermagvort(bx, magvort, 0, 1, Sg1[mfi], geom, cur_time, bc, level);
 
       auto tagarr = tags.array(mfi);
       auto mvarr = magvort.const_array();
@@ -797,6 +802,15 @@ void CNS::read_params()
 #endif
   }
 
+  if (
+    pp.queryarr("buffer_box_lo", refboxlo)) {
+    pp.getarr("buffer_box_hi", refboxhi);
+    buffer_box.setLo(refboxlo.data());
+    buffer_box.setHi(refboxhi.data());
+    if (!buffer_box.ok())
+      amrex::Abort("CNS: buffer_box has negative volume");
+  }
+
   pp.query("do_visc", do_visc);
   pp.query("do_ext_src", do_ext_src);
 
@@ -820,7 +834,7 @@ void CNS::read_params()
   if (do_les || do_pasr) {
     if (AMREX_SPACEDIM == 1) amrex::Abort("CNS: LES not supporting 1D");
     pp.get("les_model", les_model_name);
-    pp.query("Cs", Cs);
+    pp.query("C_s", Cs);
     pp.query("C_I", C_I);
     pp.query("Pr_T", Pr_T);
     pp.query("Sc_T", Sc_T);
@@ -828,13 +842,8 @@ void CNS::read_params()
   }
 
 #if CNS_USE_EB
-  // eb_weights_type: (TODO: deprecated)
-  //  0 -- weights = 1;            1 -- use_int_energy_as_eb_weights
-  //  2 -- use_mass_as_eb_weights; 3 -- use_volfrac_as_eb_weights
-  pp.query("eb_weights_type", eb_weights_type);
-  if (eb_weights_type < 0 || eb_weights_type > 3) {
-    amrex::Abort("CNS: eb_weights_type must be 0, 1, 2 or 3");
-  }
+  // eb_weight in redist
+  pp.query("eb_weight", eb_weight);
 
   pp.query("redistribution_type", redistribution_type);
   if (redistribution_type != "StateRedist" && redistribution_type != "FluxRedist" &&

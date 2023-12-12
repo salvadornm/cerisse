@@ -38,8 +38,6 @@ prob_initdata(int i, int j, int k, amrex::Array4<amrex::Real> const& state,
     state(i, j, k, UMZ) = 0.0;
     state(i, j, k, UEDEN) =
       prob_parm.rhoe_l + 0.5 * prob_parm.rho_l * prob_parm.u_l * prob_parm.u_l;
-    // state(i, j, k, UEINT) = prob_parm.rhoe_l;
-    // state(i, j, k, UTEMP) = prob_parm.T_l;
     state(i, j, k, UFS) = prob_parm.rho_l;
   } else {
     state(i, j, k, URHO) = prob_parm.rho_r;
@@ -47,8 +45,6 @@ prob_initdata(int i, int j, int k, amrex::Array4<amrex::Real> const& state,
     state(i, j, k, UMY) = 0.0;
     state(i, j, k, UMZ) = 0.0;
     state(i, j, k, UEDEN) = prob_parm.rhoe_r;
-    // state(i, j, k, UEINT) = prob_parm.rhoe_r;
-    // state(i, j, k, UTEMP) = prob_parm.T_r;
     state(i, j, k, UFS) = prob_parm.rho_r;
   }
 }
@@ -82,34 +78,8 @@ bcnormal(const amrex::Real x[AMREX_SPACEDIM], const amrex::Real s_int[LEN_STATE]
     s_ext[UMZ] = 0.0;
     s_ext[UEDEN] =
       prob_parm.rhoe_l + 0.5 * prob_parm.rho_l * prob_parm.u_l * prob_parm.u_l;
-    // s_ext[UEINT] = prob_parm.rhoe_l;
-    // s_ext[UTEMP] = prob_parm.T_l;
     s_ext[UFS] = prob_parm.rho_l;
   }
-  // else if (idir == 1 && sgn == -1) { //yhi
-  //     moving shock conditions
-  //     amrex::Real us = 10. * prob_parm.c_r; //shock speed
-  //     if (x[0] - us*time < 0.5) {
-  //         s_ext[URHO] = prob_parm.rho_l;
-  //         s_ext[UMX] = prob_parm.rho_l * prob_parm.u_l;
-  //         s_ext[UMY] = 0.0;
-  //         s_ext[UMZ] = 0.0;
-  //         s_ext[UEDEN] = prob_parm.rhoe_l + 0.5 * prob_parm.rho_l * prob_parm.u_l
-  //         * prob_parm.u_l;
-  //         // s_ext[UEINT] = prob_parm.rhoe_l;
-  //         // s_ext[UTEMP] = prob_parm.T_l;
-  //         s_ext[UFS] = prob_parm.rho_l;
-  //     } else {
-  //         s_ext[URHO] = prob_parm.rho_r;
-  //         s_ext[UMX] = 0.0;
-  //         s_ext[UMY] = 0.0;
-  //         s_ext[UMZ] = 0.0;
-  //         s_ext[UEDEN] = prob_parm.rhoe_r;
-  //         // s_ext[UEINT] = prob_parm.rhoe_r;
-  //         // s_ext[UTEMP] = prob_parm.T_r;
-  //         s_ext[UFS] = prob_parm.rho_r;
-  //     }
-  // }
 }
 
 /**

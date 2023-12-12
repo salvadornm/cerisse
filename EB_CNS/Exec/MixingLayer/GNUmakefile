@@ -23,14 +23,14 @@ DEBUG = FALSE
 FSANITIZER = FALSE
 THREAD_SANITIZER = FALSE
 
-# PeleC
+# PelePhysics
 Eos_Model := Fuego
 Transport_Model := Simple
 Custom_Chemistry_Model := OConaire
 
 # CNS
-# NUM_FIELD = 16
-NUM_AUX = 12 # for time averages
+#NUM_FIELD = 16
+#NUM_AUX = 12 # for time averages
 
 # GNU Make
 include ./Make.package

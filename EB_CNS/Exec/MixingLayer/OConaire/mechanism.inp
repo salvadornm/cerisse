@@ -11,7 +11,7 @@ REACTIONS
 ! A comprehensive modeling study of hydrogen oxidation. 
 ! Int. J. Chem. Kin. 36, 603–622 (2004).
 !
-! ------------------ k = A*T**b exp(-E/RT)) ------------------
+! ------------------ k = A*T**b exp(-E/RT) -------------------
 !                                       A        b        E
 O2+H=OH+O                           1.91E+14    0.0    16440.0
 H2+O=OH+H                           5.08E+04    2.67    6292.0

@@ -67,59 +67,128 @@ bc_isothermal_wall(amrex::Real s_ext[NVAR], const amrex::Real s_int[NVAR],
 }
 
 /**
- * @brief Helper function to generate ghost cell states for subsonic pressure outlet.
- *        It returns to FOExtrap when local Mach number >= 1.
+ * @brief Helper function to generate states downstream a normal shock. 
+ *        Assume constant gamma equals to that upstream.
  *
- * @param[out] s_ext output ghost cell states.
- * @param s_int    input near-wall states.
- * @param p_ext    far field pressure.
- * @param dir      direction, 0:x, 1:y, 2:z.
+ * @param[out] s_ext output downstream states.
+ * @param s_int      input upstream states.
+ * @param Ms         shock Mach number (if Ms = M upstream, the shock will be stationary).
+ * @param dir        direction, 0:x, 1:y, 2:z.
  */
-AMREX_GPU_DEVICE AMREX_FORCE_INLINE void bc_pressure_outlet(
-  amrex::Real s_ext[NVAR], const amrex::Real s_int[NVAR], amrex::Real p_ext, int dir)
+AMREX_GPU_DEVICE AMREX_FORCE_INLINE void normal_shock_relations(
+  amrex::Real s_ext[NVAR], const amrex::Real s_int[NVAR], amrex::Real Ms, int dir=0)
 {
   auto eos = pele::physics::PhysicsType::eos();
 
-  // Fluid states
+  // Upstream states
   amrex::Real rhoinv = 1.0 / s_int[URHO];
-  amrex::Real y[NUM_SPECIES], T = 0.0, cs;
+  amrex::Real y[NUM_SPECIES], T = 0.0, p, g;
   for (int n = 0; n < NUM_SPECIES; ++n) y[n] = s_int[UFS + n] * rhoinv;
   amrex::Real ke = 0.5 * rhoinv * rhoinv *
                    (AMREX_D_TERM(s_int[UMX] * s_int[UMX], +s_int[UMY] * s_int[UMY],
                                  +s_int[UMZ] * s_int[UMZ]));
   amrex::Real ei = rhoinv * s_int[UEDEN] - ke;
-  eos.REY2T(s_int[URHO], ei, y, T);
-  eos.RTY2Cs(s_int[URHO], T, y, cs);
-  amrex::Real M = std::sqrt(2 * ke) / cs; // lcoal Mach number
+  eos.RYET2P(s_int[URHO], y, ei, T, p);
+  eos.RTY2G(s_int[URHO], T, y, g);
 
-  // Ghost states
-  if (M >= 1) {
-    for (int n = 0; n < NVAR; ++n) s_ext[n] = s_int[n]; // FOExtrap
-  } else {
-    amrex::Real gamma, p_int, cs_ext;
-    eos.RTY2G(s_int[URHO], T, y, gamma);
-    eos.RTY2P(s_int[URHO], T, y, p_int);
-    amrex::Real rhog = s_int[URHO] * std::pow(p_ext / p_int, 1.0 / gamma);
-    eos.RPY2Cs(rhog, p_int, y, cs_ext);
-    amrex::Real eg;
-    eos.RYP2E(rhog, y, p_ext, eg);
+  // Shocked states
+  s_ext[URHO] = s_int[URHO] * (g + 1.0) * Ms * Ms / (2.0 + (g - 1.0) * Ms * Ms);
+  amrex::Real u_r = s_int[UMX + dir] / s_int[URHO] * (2.0 + (g - 1.0) * Ms * Ms) / ((g + 1.0) * Ms * Ms);
+  amrex::Real p_r = p * (1.0 + (2.0 * g / (g + 1.0)) * (Ms * Ms - 1.0));
 
-    // amrex::Real p_int;
-    // eos.RTY2P(s_int[URHO], T, y, p_int);
-    // amrex::Real rhog = s_int[URHO] * p_ext / p_int;
-    // amrex::Real eg;
-    // eos.RYP2E(rhog, y, p_ext, eg);
-
-    // eos.PYT2E(p_ext, y, T, eg); // set p_ghost = p_ext
-
-    s_ext[URHO] = rhog;
-    s_ext[UMX] = rhog * rhoinv * (dir == 0 ? std::abs(s_int[UMX]) : s_int[UMX]);
-    s_ext[UMY] = rhog * rhoinv * (dir == 1 ? std::abs(s_int[UMY]) : s_int[UMY]);
-    s_ext[UMZ] = rhog * rhoinv * (dir == 2 ? std::abs(s_int[UMZ]) : s_int[UMZ]);
-    s_ext[UEDEN] = rhog * (eg + ke);
-    for (int n = 0; n < NUM_SPECIES; ++n) s_ext[UFS + n] = rhog * y[n];
-  }
+  // Convert back to conservative states
+  s_ext[UMX] = (dir == 0) ? s_ext[URHO] * u_r : s_int[UMX];
+  s_ext[UMY] = (dir == 1) ? s_ext[URHO] * u_r : s_int[UMY];
+  s_ext[UMZ] = (dir == 2) ? s_ext[URHO] * u_r : s_int[UMZ];
+  amrex::Real ei_r;
+  eos.RYP2E(s_ext[URHO], y, p_r, ei_r);
+  s_ext[UEDEN] = s_ext[URHO] * ei_r + 0.5 / s_ext[URHO] *
+                   (AMREX_D_TERM(s_ext[UMX] * s_ext[UMX], +s_ext[UMY] * s_ext[UMY],
+                                 +s_ext[UMZ] * s_ext[UMZ]));
+  for (int n = 0; n < NUM_SPECIES; ++n) s_ext[UFS + n] = s_ext[URHO] * y[n];
 }
+
+// AMREX_GPU_DEVICE AMREX_FORCE_INLINE void
+// bl_profile(const amrex::Real y, const amrex::Real z, ProbParm const& pp, 
+//            amrex::Real rho, amrex::Real u, amrex::Real ei) {
+//   // Make boundary layer
+//   amrex::Real d_wall = amrex::min(y, 2.54 - y); // dist from upper and lower walls
+//   d_wall = amrex::min(d_wall, 1.905-amrex::Math::abs(z)); // dist from upper and lower walls
+//   d_wall /= (0.1245 * 2.0); // d_wall/D
+//   amrex::Real u_profile = d_wall > 0.0 ? tanh(5.0 * d_wall) : 0.0; // u/u_inf
+//   u = pp.u * u_profile;
+
+//   amrex::Real T_inf, p_inf;
+//   amrex::Real Y[NUM_SPECIES];
+//   for (int n = 0; n < NUM_SPECIES; ++n) { Y[n] = pp.Y[n]; }
+//   auto eos = pele::physics::PhysicsType::eos();
+//   ei = pp.ei;
+//   eos.RYET2P(pp.rho, Y, ei, T_inf, p_inf); // get T, p_inf
+
+//   amrex::Real T_profile = d_wall > 0.0 ? 1.0 + (0.5 * pp.u * pp.u) / pp.cv_Tinf * (1.0 - u_profile * u_profile) : 1.0; // T/T_inf
+
+//   amrex::Real cv, cv_inf = pp.cv_Tinf / T_inf;
+//   eos.TY2Cv(T_inf * T_profile, Y, cv);
+//   T_profile *= cv_inf / cv;
+
+//   rho = pp.rho / T_profile;
+//   eos.RYP2E(rho, Y, p_inf, ei); // rho, p_inf -> ei
+// }
+
+// /**
+//  * @brief Helper function to generate ghost cell states for subsonic pressure outlet.
+//  *        It returns to FOExtrap when local Mach number >= 1.
+//  *
+//  * @param[out] s_ext output ghost cell states.
+//  * @param s_int    input near-wall states.
+//  * @param p_ext    far field pressure.
+//  * @param dir      direction, 0:x, 1:y, 2:z.
+//  */
+// AMREX_GPU_DEVICE AMREX_FORCE_INLINE void bc_pressure_outlet(
+//   amrex::Real s_ext[NVAR], const amrex::Real s_int[NVAR], amrex::Real p_ext, int dir)
+// {
+//   auto eos = pele::physics::PhysicsType::eos();
+
+//   // Fluid states
+//   amrex::Real rhoinv = 1.0 / s_int[URHO];
+//   amrex::Real y[NUM_SPECIES], T = 0.0, cs;
+//   for (int n = 0; n < NUM_SPECIES; ++n) y[n] = s_int[UFS + n] * rhoinv;
+//   amrex::Real ke = 0.5 * rhoinv * rhoinv *
+//                    (AMREX_D_TERM(s_int[UMX] * s_int[UMX], +s_int[UMY] * s_int[UMY],
+//                                  +s_int[UMZ] * s_int[UMZ]));
+//   amrex::Real ei = rhoinv * s_int[UEDEN] - ke;
+//   eos.REY2T(s_int[URHO], ei, y, T);
+//   eos.RTY2Cs(s_int[URHO], T, y, cs);
+//   amrex::Real M = std::sqrt(2 * ke) / cs; // lcoal Mach number
+
+//   // Ghost states
+//   if (M >= 1) {
+//     for (int n = 0; n < NVAR; ++n) s_ext[n] = s_int[n]; // FOExtrap
+//   } else {
+//     amrex::Real gamma, p_int, cs_ext;
+//     eos.RTY2G(s_int[URHO], T, y, gamma);
+//     eos.RTY2P(s_int[URHO], T, y, p_int);
+//     amrex::Real rhog = s_int[URHO] * std::pow(p_ext / p_int, 1.0 / gamma);
+//     eos.RPY2Cs(rhog, p_int, y, cs_ext);
+//     amrex::Real eg;
+//     eos.RYP2E(rhog, y, p_ext, eg);
+
+//     // amrex::Real p_int;
+//     // eos.RTY2P(s_int[URHO], T, y, p_int);
+//     // amrex::Real rhog = s_int[URHO] * p_ext / p_int;
+//     // amrex::Real eg;
+//     // eos.RYP2E(rhog, y, p_ext, eg);
+
+//     // eos.PYT2E(p_ext, y, T, eg); // set p_ghost = p_ext
+
+//     s_ext[URHO] = rhog;
+//     s_ext[UMX] = rhog * rhoinv * (dir == 0 ? std::abs(s_int[UMX]) : s_int[UMX]);
+//     s_ext[UMY] = rhog * rhoinv * (dir == 1 ? std::abs(s_int[UMY]) : s_int[UMY]);
+//     s_ext[UMZ] = rhog * rhoinv * (dir == 2 ? std::abs(s_int[UMZ]) : s_int[UMZ]);
+//     s_ext[UEDEN] = rhog * (eg + ke);
+//     for (int n = 0; n < NUM_SPECIES; ++n) s_ext[UFS + n] = rhog * y[n];
+//   }
+// }
 
 // TODO: Riemann invariant based in/outlet, NSCBC
 

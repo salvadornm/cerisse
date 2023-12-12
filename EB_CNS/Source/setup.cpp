@@ -11,6 +11,9 @@ Parm* CNS::h_parm = nullptr;
 Parm* CNS::d_parm = nullptr;
 ProbParm* CNS::h_prob_parm = nullptr;
 ProbParm* CNS::d_prob_parm = nullptr;
+#ifdef USE_PROB_PARM_HOST
+ProbParmHost* CNS::prob_parm_host = nullptr;
+#endif
 
 using BndryFunc = StateDescriptor::BndryFunc;
 
@@ -90,11 +93,16 @@ void CNS::variableSetUp()
 {
   h_parm = new Parm{};          // This lives on host
   h_prob_parm = new ProbParm{}; // This lives on host
+#ifdef USE_PROB_PARM_HOST
+  prob_parm_host = new ProbParmHost{}; // This lives on host
+#endif
   d_parm =
     (Parm*)The_Arena()->alloc(sizeof(Parm)); // static_cast, This lives on device
   d_prob_parm =
     (ProbParm*)The_Arena()->alloc(sizeof(ProbParm)); // This lives on device
-  trans_parms.allocate();                            // PelePhysics trans_parms
+
+  trans_parms.allocate();              // PelePhysics trans_parms
+  turb_inflow.init(DefaultGeometry()); // PelePhysics turb_inflow
 
   read_params();
 
@@ -495,6 +503,9 @@ void CNS::variableCleanUp()
   delete h_prob_parm;
   The_Arena()->free(d_parm);
   The_Arena()->free(d_prob_parm);
+#ifdef USE_PROB_PARM_HOST
+  delete prob_parm_host;
+#endif
   desc_lst.clear();
   derive_lst.clear();
 

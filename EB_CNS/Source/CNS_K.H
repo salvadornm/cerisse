@@ -73,11 +73,10 @@ AMREX_GPU_DEVICE AMREX_FORCE_INLINE amrex::Real cns_estdt_visc(
   eos.RTY2Cv(rho, T, massfrac, cv);
 
   amrex::Real mu, xi, lam;
-  amrex::Real* Ddiag = nullptr;
   bool get_xi = false, get_mu = true, get_lam = true, get_Ddiag = false, get_chi = false;
   auto trans = pele::physics::PhysicsType::transport();
-  trans.transport(get_xi, get_mu, get_lam, get_Ddiag, get_chi,T, rho, massfrac, nullptr, nullptr, mu,
-                  xi, lam, trans_parm);
+  trans.transport(get_xi, get_mu, get_lam, get_Ddiag, get_chi, T, rho, massfrac, 
+                  nullptr, nullptr, mu, xi, lam, trans_parm);
 
 
   amrex::Real D =
