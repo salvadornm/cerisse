@@ -100,6 +100,13 @@ target_sources(${exe_name}
     ${PELE_PHYSICS_SRC_DIR}/Reactions/ReactorUtils.H
     ${PELE_PHYSICS_SRC_DIR}/Reactions/ReactorUtils.cpp
 )
+target_compile_definitions(${exe_name} PRIVATE PELE_COMPILE_AJACOBIAN)
+
+# TurbInflow
+target_include_directories(${exe_name} SYSTEM PRIVATE ${PELE_PHYSICS_SRC_DIR}/Utility/TurbInflow)
+target_sources(${exe_name} PRIVATE
+    ${PELE_PHYSICS_SRC_DIR}/Utility/TurbInflow/turbinflow.H
+    ${PELE_PHYSICS_SRC_DIR}/Utility/TurbInflow/turbinflow.cpp)
 
 # Sundials
 target_include_directories(${exe_name} PRIVATE ${AMREX_DIR}/Src/Extern/SUNDIALS)

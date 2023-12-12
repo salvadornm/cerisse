@@ -1,5 +1,5 @@
 # AMReX
-DIM = 3
+DIM = 2
 COMP = gnu
 PRECISION = DOUBLE
 
@@ -24,13 +24,12 @@ FSANITIZER = FALSE
 THREAD_SANITIZER = FALSE
 
 # PelePhysics
-Eos_Model := Fuego
-Transport_Model := Simple
-Chemistry_Model := LiDryer
+Eos_Model := GammaLaw
+Transport_Model := Sutherland
+Custom_Chemistry_Model := ../FlatPlate/Null2
 
 # CNS
-#NUM_FIELD = 8
-#NUM_AUX = 16
+USE_EB = TRUE
 
 # GNU Make
 include ./Make.package

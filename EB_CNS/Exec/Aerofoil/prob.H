@@ -3,9 +3,12 @@
 
 #include <AMReX_FArrayBox.H>
 #include <AMReX_Geometry.H>
+#include <AMReX_ParmParse.H>
 #include <AMReX_REAL.H>
 
 #include "CNS.H"
+#include "PelePhysics.H"
+#include "bc_util.H"
 #include "prob_parm.H"
 
 /**
@@ -25,22 +28,14 @@ prob_initdata(int i, int j, int k, amrex::Array4<amrex::Real> const& state,
               amrex::GeometryData const& geomdata, Parm const& /*parm*/,
               ProbParm const& prob_parm)
 {
-  // Geometry
-  const amrex::Real* prob_lo = geomdata.ProbLo();
-  const amrex::Real* dx = geomdata.CellSize();
-  const amrex::Real x = prob_lo[0] + (i + 0.5) * dx[0];
-  // const amrex::Real y = prob_lo[1] + (j + 0.5) * dx[1];
-
-  // Set the states
-  for (int nf = 0; nf <= NUM_FIELD; ++nf) {
-    state(i, j, k, nf*NVAR + URHO) = prob_parm.rho_l;
-    state(i, j, k, nf*NVAR + UMX) = prob_parm.rho_l * prob_parm.u_l;
-    state(i, j, k, nf*NVAR + UMY) = 0.0;
-    state(i, j, k, nf*NVAR + UMZ) = 0.0;
-    state(i, j, k, nf*NVAR + UEDEN) = 
-      prob_parm.rhoe_l + 0.5 * prob_parm.rho_l * prob_parm.u_l * prob_parm.u_l;
-    state(i, j, k, nf*NVAR + UFS) = prob_parm.rho_l;
-  }
+  state(i, j, k, URHO) = prob_parm.rho;
+  state(i, j, k, UMX) = prob_parm.rho * prob_parm.u;
+  state(i, j, k, UMY) = prob_parm.rho * prob_parm.v;
+  state(i, j, k, UMZ) = 0.0;
+  state(i, j, k, UEDEN) =
+    prob_parm.rhoe +
+    0.5 * prob_parm.rho * (prob_parm.u * prob_parm.u + prob_parm.v * prob_parm.v);
+  state(i, j, k, UFS) = prob_parm.rho;
 }
 
 /**
@@ -64,16 +59,19 @@ bcnormal(const amrex::Real x[AMREX_SPACEDIM], const amrex::Real s_int[LEN_STATE]
          const int idir, const int sgn, const amrex::Real time,
          amrex::GeometryData const& /*geomdata*/, ProbParm const& prob_parm)
 {
-  if (idir == 0 && sgn == 1) { // xlo
-    for (int nf = 0; nf <= NUM_FIELD; ++nf) { 
-      s_ext[nf*NVAR + URHO] = prob_parm.rho_l;
-      s_ext[nf*NVAR + UMX] = prob_parm.rho_l * prob_parm.u_l;
-      s_ext[nf*NVAR + UMY] = 0.0;
-      s_ext[nf*NVAR + UMZ] = 0.0;
-      s_ext[nf*NVAR + UEDEN] =
-        prob_parm.rhoe_l + 0.5 * prob_parm.rho_l * prob_parm.u_l * prob_parm.u_l;
-      s_ext[nf*NVAR + UFS] = prob_parm.rho_l;
-    }
+  if (sgn == 1) {
+    // Inlet
+    s_ext[URHO] = prob_parm.rho;
+    s_ext[UMX] = prob_parm.rho * prob_parm.u;
+    s_ext[UMY] = prob_parm.rho * prob_parm.v;
+    s_ext[UMZ] = 0.0;
+    s_ext[UEDEN] =
+      prob_parm.rhoe +
+      0.5 * prob_parm.rho * (prob_parm.u * prob_parm.u + prob_parm.v * prob_parm.v);
+    s_ext[UFS] = prob_parm.rho;
+  } else {
+    // Pressure outlet
+    // bc_pressure_outlet(s_ext, s_int, prob_parm.p, idir);
   }
 }
 
@@ -105,7 +103,7 @@ AMREX_GPU_DEVICE AMREX_FORCE_INLINE void prob_post_timestep(
 
 AMREX_GPU_DEVICE AMREX_FORCE_INLINE void prob_tag_error(
   int i, int j, int k, amrex::Array4<char> const& tagarr,
-  amrex::Array4<const amrex::Real> const& /*sarr*/, int level, char tagval,
+  amrex::Array4<const amrex::Real> const& sarr, int /*level*/, char tagval,
   const amrex::Real /*time*/, amrex::GeometryData const& geomdata,
   Parm const& /*parm*/, ProbParm const& /*pp*/)
 {
