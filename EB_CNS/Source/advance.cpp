@@ -108,9 +108,9 @@ Real CNS::advance(Real time, Real dt, int iteration, int ncycle)
   if (do_react) {
     // Compute I_R^{n+1}(U^**) and do U^{n+1} = U^** + dt*I_R^{n+1}
     react_state(time, dt);
+    
+    enforce_consistent_state(); // Enforce rho = sum(rhoY)
   }
-
-  enforce_consistent_state(); // Enforce rho = sum(rhoY)
 
   // Iterate to couple chemistry
   if (do_react && (rk_reaction_iter > 1)) {

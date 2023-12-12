@@ -1,7 +1,7 @@
 # ====================================================== #
 #                  CERISSE INPUT SCRIPT                  #
 # ====================================================== #
-max_step = 2000
+max_step = 5000
 stop_time = 0.1
 
 # ================ COMPUTATIONAL DOMAIN ================ #
@@ -9,9 +9,7 @@ geometry.is_periodic = 0 0 0
 geometry.coord_sys   = 0  # 0: cart, 1: RZ, 2:spherical
 geometry.prob_lo     = 0.    -3.54  -3.54
 geometry.prob_hi     = 17.7   3.54   3.54
-amr.n_cell           = 80     32     32
-#geometry.prob_hi     = 3.54   3.54   3.54
-#amr.n_cell           = 64    128    128
+amr.n_cell           = 160    64     64
 eb2.geom_type = all_regular
 
 # ================ BOUNDARY CONDITIONS ================= #
@@ -24,17 +22,7 @@ cns.hi_bc = 2 2 2
 # ==================== WHAT PHYSICS ==================== #
 cns.do_visc  = 1
 
-# ==================== WHAT NUMERICS =================== #
-cns.cfl = 0.3
-cns.dt_cutoff = 5.e-20
-cns.recon_scheme = 5  # 1: Godunov,  2: MUSCL,   3: WENO-Z3, 
-                      # 4: WENO-JS5, 5: WENO-Z5, 6: TENO-5
-cns.do_psgs      = 0  # enable p_sgs correction
-cns.do_vpdf      = 0  # enable Lagevin model
-cns.do_spdf      = 0  # enable IEM model
-cns.clip_temp    = 50 # clip minimum temperature [K]
-
-# ================== REACTION SETTINGS ================= #
+# Reaction
 cns.do_react = 1
 cns.chem_integrator = "ReactorCvode"
 cvode.solve_type = "denseAJ_direct"
@@ -46,6 +34,17 @@ cns.min_react_temp = 600    # no reaction in cells below this temp (can reduce r
 cns.update_heat_release = 1
 cns.rk_reaction_iter = 0
 
+# ==================== WHAT NUMERICS =================== #
+cns.cfl = 0.3
+cns.dt_cutoff = 5.e-20
+cns.recon_scheme = 5  # 1: Godunov,  2: MUSCL,   3: WENO-Z3, 
+                      # 4: WENO-JS5, 5: WENO-Z5, 6: TENO-5
+cns.recon_char_var = 1
+cns.do_psgs      = 1  # enable p_sgs correction
+cns.do_vpdf      = 1  # enable Lagevin model
+cns.do_spdf      = 1  # enable IEM model
+cns.clip_temp    = 50 # clip minimum temperature [K]
+
 # ================ VERBOSITY & DIAGNOSIS =============== #
 cns.v = 1
 amr.v = 1
@@ -55,13 +54,13 @@ ode.verbose = 0
 amr.loadbalance_with_workestimates = 1 # for multi-level run, loadbalance_int = regrid_int
 
 # =============== REFINEMENT / REGRIDDING ============== #
-amr.max_level       = 3     # maximum level of refinement
+amr.max_level       = 2     # maximum level of refinement
 amr.ref_ratio       = 2 2 2 # refinement ratio
 amr.regrid_int      = 50   # how often to regrid
 amr.blocking_factor = 8
 amr.max_grid_size   = 64
 amr.n_error_buf     = 0 0 0 # number of buffer cells in error est
-amr.grid_eff        = 0.7
+amr.grid_eff        = 0.9
 
 # ================== TAGGING CRITERIA ================== #
 #cns.refine_dengrad = 2e-4 2e-4 3e-4
@@ -87,14 +86,14 @@ cns.refine_magvort_max_lev = 3
 
 # ==================== OUTPUT FILES ==================== #
 amr.checkpoint_files_output = 1
-amr.check_file      = out2/chk   # root name of checkpoint file
-amr.check_int       = 200        # number of timesteps between checkpoints
+amr.check_file      = chk   # root name of checkpoint file
+amr.check_int       = 500        # number of timesteps between checkpoints
 
 amr.plot_files_output = 1
-amr.plot_file         = out2/plt # root name of plotfile
+amr.plot_file         = plt # root name of plotfile
 amr.plot_int          = 100      # number of timesteps between plotfiles
 #amr.plot_per # interval physical time between plotfiles
-amr.derive_plot_vars  = temp pressure x_velocity y_velocity z_velocity MachNumber divrho divu magvort cv cp transport_coef #reynolds_stress
+amr.derive_plot_vars  = temp pressure x_velocity y_velocity z_velocity MachNumber divrho divu magvort cv cp transport_coef reynolds_stress
 cns.plot_rhoy = 0
 cns.plot_molefrac = 0
 cns.plot_massfrac = 1

@@ -32,29 +32,15 @@ prob_initdata(int i, int j, int k, amrex::Array4<amrex::Real> const& state,
   // const amrex::Real y = prob_lo[1] + (j + 0.5) * dx[1];
 
   // Set the states
-  // if ((x < 1.0 /*&& y > 0.2/**/) /*|| (x <= 0.5-y && y <= 0.2)*/) {
-  state(i, j, k, URHO) = prob_parm.rho_l;
-  state(i, j, k, UMX) = prob_parm.rho_l * prob_parm.u_l;
-  state(i, j, k, UMY) = 0.0;
-  state(i, j, k, UMZ) = 0.0;
-  state(i, j, k, UEDEN) =
-    prob_parm.rhoe_l + 0.5 * prob_parm.rho_l * prob_parm.u_l * prob_parm.u_l;
-  state(i, j, k, UFS) = prob_parm.rho_l;
-  /*} else if (x > 0.5-y && y <= 0.2) {
-      state(i, j, k, URHO) = prob_parm.rho_l;
-      state(i, j, k, UMX) = 0.0;
-      state(i, j, k, UMY) = 0.25 * prob_parm.rho_l * prob_parm.u_l;
-      state(i, j, k, UMZ) = 0.0;
-      state(i, j, k, UEDEN) = prob_parm.rhoe_l + 0.5 * 0.125 * prob_parm.rho_l *
-     prob_parm.u_l * prob_parm.u_l; state(i, j, k, UFS) = prob_parm.rho_l;*/
-  // } else {
-  //     state(i, j, k, URHO) = prob_parm.rho_r;
-  //     state(i, j, k, UMX) = 0.0;
-  //     state(i, j, k, UMY) = 0.0;
-  //     state(i, j, k, UMZ) = 0.0;
-  //     state(i, j, k, UEDEN) = prob_parm.rhoe_r;
-  //     state(i, j, k, UFS) = prob_parm.rho_r;
-  // }
+  for (int nf = 0; nf <= NUM_FIELD; ++nf) {
+    state(i, j, k, nf*NVAR + URHO) = prob_parm.rho_l;
+    state(i, j, k, nf*NVAR + UMX) = prob_parm.rho_l * prob_parm.u_l;
+    state(i, j, k, nf*NVAR + UMY) = 0.0;
+    state(i, j, k, nf*NVAR + UMZ) = 0.0;
+    state(i, j, k, nf*NVAR + UEDEN) = 
+      prob_parm.rhoe_l + 0.5 * prob_parm.rho_l * prob_parm.u_l * prob_parm.u_l;
+    state(i, j, k, nf*NVAR + UFS) = prob_parm.rho_l;
+  }
 }
 
 /**
@@ -79,23 +65,15 @@ bcnormal(const amrex::Real x[AMREX_SPACEDIM], const amrex::Real s_int[LEN_STATE]
          amrex::GeometryData const& /*geomdata*/, ProbParm const& prob_parm)
 {
   if (idir == 0 && sgn == 1) { // xlo
-    // if (x[1] > 0.5) {
-    // inlet: post shock conditions
-    s_ext[URHO] = prob_parm.rho_l;
-    s_ext[UMX] = prob_parm.rho_l * prob_parm.u_l;
-    s_ext[UMY] = 0.0;
-    s_ext[UMZ] = 0.0;
-    s_ext[UEDEN] =
-      prob_parm.rhoe_l + 0.5 * prob_parm.rho_l * prob_parm.u_l * prob_parm.u_l;
-    s_ext[UFS] = prob_parm.rho_l;
-    // } else {
-    //     s_ext[URHO] = prob_parm.rho_r;
-    //     s_ext[UMX] = 0.0;
-    //     s_ext[UMY] = 0.0;
-    //     s_ext[UMZ] = 0.0;
-    //     s_ext[UEDEN] = prob_parm.rhoe_r;
-    //     s_ext[UFS] = prob_parm.rho_r;
-    // }
+    for (int nf = 0; nf <= NUM_FIELD; ++nf) { 
+      s_ext[nf*NVAR + URHO] = prob_parm.rho_l;
+      s_ext[nf*NVAR + UMX] = prob_parm.rho_l * prob_parm.u_l;
+      s_ext[nf*NVAR + UMY] = 0.0;
+      s_ext[nf*NVAR + UMZ] = 0.0;
+      s_ext[nf*NVAR + UEDEN] =
+        prob_parm.rhoe_l + 0.5 * prob_parm.rho_l * prob_parm.u_l * prob_parm.u_l;
+      s_ext[nf*NVAR + UFS] = prob_parm.rho_l;
+    }
   }
 }
 

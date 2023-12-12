@@ -203,6 +203,7 @@ cns_div(int i, int j, int k, int n, amrex::Array4<amrex::Real> const& dsdt,
   //   std::cout << "div(" << i << "," << j << "," << k << ") is nan" << std::endl;
 }
 
+/// \brief Original Riemann solver in CNS example (not used)
 AMREX_GPU_DEVICE inline void riemann(
   const amrex::Real rl, const amrex::Real ul, const amrex::Real ut1l,
   const amrex::Real ut2l, const amrex::Real pl, const amrex::Real cl,
@@ -410,17 +411,10 @@ AMREX_GPU_DEVICE AMREX_FORCE_INLINE void hllc(
   } else {
     Real sstar = (pr - pl + rl * ul * (sl - ul) - rr * ur * (sr - ur)) /
                  (rl * (sl - ul) - rr * (sr - ur)); // contact wave speed
-    // if (isnan(rl * (sl - ul) - rr * (sr - ur))) {
-    //   std::cout << "(rl*(sl-ul) - rr*(sr-ur)) is nan \n";
-    //   std::cout << rl << " " << sl << " " << ul << "  " << rr << " " << sr << " "
-    //             << ur << " " << std::endl;
-    // }
 
-    if (sstar >= 0) { // parm.smallu*(amrex::Math::abs(ul) + amrex::Math::abs(ur)))
-                      // {
+    if (sstar >= 0) {
       // flx_l* = flx_l + sl * (q_l* - q_l)
       Real frac = (sl - ul) / (sl - sstar) - 1.;
-      // if (isnan(frac)) std::cout << "frac (sstar >= 0) is nan \n";
 
       flxrho = 0.;
       AMREX_D_TERM(flxu = rl * ul * ul + pl + sl * rl * ((frac + 1.) * sstar - ul);
@@ -433,11 +427,9 @@ AMREX_GPU_DEVICE AMREX_FORCE_INLINE void hllc(
         flxrho += flxrhoy[n];
       }
 
-    } else { // if (sstar < -parm.smallu*(amrex::Math::abs(ul) +
-             // amrex::Math::abs(ur))) {
+    } else {
       // flx_r* = flx_r + sr * (q_r* - q_r)
       Real frac = (sr - ur) / (sr - sstar) - 1.;
-      // if (isnan(frac)) std::cout << "frac (sstar < 0) is nan \n";
 
       flxrho = 0.;
       AMREX_D_TERM(flxu = rr * ur * ur + pr + sr * rr * ((frac + 1.) * sstar - ur);
@@ -449,105 +441,6 @@ AMREX_GPU_DEVICE AMREX_FORCE_INLINE void hllc(
         flxrhoy[n] = rr * ur * yr[n] + sr * rr * frac * yr[n];
         flxrho += flxrhoy[n];
       }
-
-      // } else {
-      //     //sstar ~ 0, return to central scheme
-      //     Real rc = 0.5 * (rl + rr);
-      //     Real uc = 0.5 * (ul + ur);
-      //     Real pc = 0.5 * (pl + pr);
-      //     flxrho = 0.;
-      //     AMREX_D_TERM(
-      //         flxu = rc*uc*uc + pc; ,
-      //         flxut  = rc*uc*0.5*(ut1l+ut1r); ,
-      //         flxutt = rc*uc*0.5*(ut2l+ut2r););
-      //     flxrhoe = uc*(rc*0.5*(el+er) + pc);
-      //     for (int n = 0; n < NUM_SPECIES; ++n) {
-      //         flxrhoy[n] = rc*uc*0.5*(yl[n]+yr[n]);
-      //         flxrho += flxrhoy[n];
-      //     }
-    }
-  }
-
-  // // Dellacherie's low Mach correction
-  // Real Ml = sqrt(AMREX_D_TERM(ul*ul, +ut1l*ut1l, +ut2l*ut2l)) / cl;
-  // Real Mr = sqrt(AMREX_D_TERM(ur*ur, +ut1r*ut1r, +ut2r*ut2r)) / cr;
-  // Real thetaM = amrex::min( amrex::max(Ml, Mr), 1.0 ) - 1.0; // = (Mmax - 1), Xie
-  // // Real thetaM = amrex::min( amrex::Math::abs(uroe)/croe, 1.0 ) - 1.0; //
-  // Dellacherie Real rroe = sqrt(rl*rr); AMREX_D_TERM(
-  //     flxu += thetaM*rroe*croe*0.5*(ul-ur); ,
-  //     flxut  += thetaM*rroe*croe*0.5*(ut1l-ut1r); ,
-  //     flxutt += thetaM*rroe*croe*0.5*(ut2l-ut2r););
-}
-
-AMREX_GPU_DEVICE AMREX_FORCE_INLINE void hll(
-  const amrex::Real rl,
-  AMREX_D_DECL(const amrex::Real ul, const amrex::Real ut1l, const amrex::Real ut2l),
-  const amrex::Real pl, const amrex::Real cl, const amrex::Real el,
-  amrex::Real yl[NUM_SPECIES], const amrex::Real rr,
-  AMREX_D_DECL(const amrex::Real ur, const amrex::Real ut1r, const amrex::Real ut2r),
-  const amrex::Real pr, const amrex::Real cr, const amrex::Real er,
-  amrex::Real yr[NUM_SPECIES], amrex::Real& flxrho,
-  AMREX_D_DECL(amrex::Real& flxu, amrex::Real& flxut, amrex::Real& flxutt),
-  amrex::Real& flxrhoe, amrex::Real flxrhoy[NUM_SPECIES], Parm const& parm) noexcept
-{
-  using amrex::Real;
-
-  // Estimate wave speeds
-  // Arithmetic average (Davis)
-  Real sl = amrex::min(ul - cl, ur - cr);
-  Real sr = amrex::max(ul + cl, ur + cr);
-  // Roe-average (Einfeldt's HLLE)
-  // Real rp = sqrt(rr / rl);
-  // Real uroe = (ul + ur*rp)/(1. + rp);
-  // Real croe = (cl*cl + cr*cr*rp)/(1. + rp) + 0.5*rp/(1. + rp)/(sqrt(rl)+sqrt(rr))
-  //             *(AMREX_D_TERM((ul-ur)*(ul-ur), +(ut1l-ut1r)*(ut1l-ut1r),
-  //             +(ut2l-ut2r)*(ut2l-ut2r)));
-  // croe = sqrt(croe);
-  // sl = amrex::min(sl, uroe-croe);
-  // sr = amrex::max(sr, uroe+croe);
-
-  if (sl > 0) {
-    // flx_l
-    flxrho = 0.;
-    AMREX_D_TERM(flxu = rl * ul * ul + pl;, flxut = rl * ul * ut1l;
-                 , flxutt = rl * ul * ut2l;);
-    flxrhoe = ul * (rl * el + pl);
-    for (int n = 0; n < NUM_SPECIES; ++n) {
-      flxrhoy[n] = rl * ul * yl[n];
-      flxrho += flxrhoy[n];
-    }
-
-  } else if (sr < 0) {
-    // flx_r
-    flxrho = 0.;
-    AMREX_D_TERM(flxu = rr * ur * ur + pr;, flxut = rr * ur * ut1r;
-                 , flxutt = rr * ur * ut2r;);
-    flxrhoe = ur * (rr * er + pr);
-    for (int n = 0; n < NUM_SPECIES; ++n) {
-      flxrhoy[n] = rr * ur * yr[n];
-      flxrho += flxrhoy[n];
-    }
-
-  } else {
-    Real inv_diff_s = 1.0 / (sr - sl);
-    flxrho = 0.;
-    AMREX_D_TERM(flxu = (sr * (rl * ul * ul + pl) - sl * (rr * ur * ur + pr) +
-                         sl * sr * (rr * ur - rl * ul)) *
-                        inv_diff_s;
-                 , flxut = (sr * rl * ul * ut1l - sl * rr * ur * ut1r +
-                            sl * sr * (rr * ut1r - rl * ut1l)) *
-                           inv_diff_s;
-                 , flxutt = (sr * rl * ul * ut2l - sl * rr * ur * ut2r +
-                             sl * sr * (rr * ut2r - rl * ut2l)) *
-                            inv_diff_s;)
-    flxrhoe = (sr * ul * (rl * el + pl) - sl * ur * (rr * er + pr) +
-               sl * sr * (rr * er - rl * el)) *
-              inv_diff_s;
-    for (int n = 0; n < NUM_SPECIES; ++n) {
-      flxrhoy[n] = (sr * rl * ul * yl[n] - sl * rr * ur * yr[n] +
-                    sl * sr * (rr * yr[n] - rl * yl[n])) *
-                   inv_diff_s;
-      flxrho += flxrhoy[n];
     }
   }
 }
@@ -698,10 +591,8 @@ AMREX_GPU_DEVICE AMREX_FORCE_INLINE void cns_riemann(
        adv_flx(i, j, k, UEDEN), ry_flx, parm);
   // riemann(rl, ul, ut1l, 0.0, pl, cl, el, yl,
   //      rr, ur, ut1r, 0.0, pr, cr, er, yr,
-  //      adv_flx(i,j,k,URHO),
-  //      adv_flx(i,j,k,UMN), adv_flx(i,j,k,UMT), adv_flx(i,j,k,UMTT),
-  //      adv_flx(i,j,k,UEDEN), ry_flx,
-  //      parm);
+  //      adv_flx(i,j,k,URHO), adv_flx(i,j,k,UMN), adv_flx(i,j,k,UMT), adv_flx(i,j,k,UMTT),
+  //      adv_flx(i,j,k,UEDEN), ry_flx, parm);
 
   for (int n = 0; n < NUM_SPECIES; ++n) { adv_flx(i, j, k, UFS + n) = ry_flx[n]; }
 }
