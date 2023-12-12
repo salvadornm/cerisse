@@ -1,7 +1,17 @@
-# CERISSE
 **A high-order adaptive mesh refinement solver for compressible turbulent reactive flows**
 
+Created by:
+
+**Enson Un**
+
+**Salvador Navarro-Martinez**
+
+
 ## Getting started
+
+(NOTE: these lines could be deleted)
+
+
 1. Clone the repository with all submodules
     ```bash
     git clone --recursive git@github.com:salvadornm/cerisse.git
@@ -23,8 +33,3 @@
     ```bash
     mpiexec -np 8 ./Cerisse2d.xxx.xxx.ex inputs
     ```
-
-## TODO List
-- [] NSCBC (See aerofoil example, especially at high angle of attacks where vortex is shedded downstream)
-- [] BC on EB
-- [] LES: turbulent bulk viscosuty

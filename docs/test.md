@@ -2,19 +2,13 @@
 
 Test are temporarely under `Exec/`
 
-The following examples are tested to compile and run
 
+--8<-- "EB_CNS/Exec/Riemann2D/README.md"
 
+![](images/Riemann2D.png)
 
-## Riemann-2D
+--8<-- "EB_CNS/Exec/DetonDiffrac/README.md"
 
-Standard Rieman Problem in two
-
-| grid | comment
-|:-------------:| -----------:
-| **64x64**(3 levels)        |  Euler, TENO5 
-
-
-
+![](images/step200.png)
 
 

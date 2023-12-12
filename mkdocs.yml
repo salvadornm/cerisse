@@ -8,12 +8,23 @@ nav:
   - Examples: example.md
   - Test: test.md
   - Tips: tips.md   
-  - Exec:
-    - 'Riemann2D': exec/riemann2d.md
-    - 'Double Mach': exec/doublemach.md
-    - 'Detona Difrac': exec/DetonDiffrac.md
-    - 'Hypersonic BL': exec/FlatPlate.md
 extra_javascript:
   - https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.4/MathJax.js?config=TeX-AMS-MML_HTMLorMML
 markdown_extensions:
   - mdx_math
+  - pymdownx.arithmatex
+  - pymdownx.magiclink
+  - pymdownx.details # Allowing hidden expandable regions denoted by ???
+  - pymdownx.highlight
+  - pymdownx.inlinehilite
+  - pymdownx.superfences # Seems to enable syntax highlighting when used with the Material theme.
+  - pymdownx.tasklist:
+      custom_checkbox: true
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.snippets:
+      check_paths: true
+  - toc:
+      permalink: "¤" # Adds a clickable permalink to each section heading
+      toc_depth: 4
+

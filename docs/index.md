@@ -1,14 +1,7 @@
 # Cerisse Documentation
 
-AMREX-based Navier-Stokes Reactive compressible LES code 
 
-Created by:
-
-Enson Un
-
-Salvador Navarro-Martinez
-
-version 0.0 November 2023
+--8<-- "README.md"
 
 
 ## Folder layout
@@ -73,5 +66,10 @@ You will need to install Math extension for Python-markdown
 
 ```
 $ pip install python-markdown math
+```
+as well as the extension (for snippet)
+
+```
+$ pip install pymdown-extensions
 ```
 
