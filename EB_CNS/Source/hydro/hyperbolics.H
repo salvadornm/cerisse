@@ -546,7 +546,8 @@ AMREX_GPU_DEVICE AMREX_FORCE_INLINE void cns_riemann(
   if (!isgreater(rl, 0.0) || !isgreater(pl, 0.0) || 
       !isgreater(rr, 0.0) || !isgreater(pr, 0.0)) { // isgreater() returns false with nan
     // Revert to piecewise linear (Godunov) reconstruction
-    std::cout << "face " << i << "," << j << "," << k << " reverted to linear recon" << '\n';
+    // SNM
+    //  std::cout << "face " << i << "," << j << "," << k << " reverted to linear recon" << '\n';
 
     rl = q(iv - iv_dir, QRHO);
     AMREX_D_TERM(ul = q(iv - iv_dir, QUN);, ut1l = q(iv - iv_dir, QUT);

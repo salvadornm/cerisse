@@ -4,6 +4,3 @@
 [submodule "Submodules/PelePhysics"]
 	path = Submodules/PelePhysics
 	url = https://github.com/AMReX-Combustion/PelePhysics.git	
-[submodule "Submodules/sundials"]
-	path = Submodules/sundials
-	url = https://github.com/LLNL/sundials.git

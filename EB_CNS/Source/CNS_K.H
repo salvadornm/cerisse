@@ -78,6 +78,7 @@ AMREX_GPU_DEVICE AMREX_FORCE_INLINE amrex::Real cns_estdt_visc(
   trans.transport(get_xi, get_mu, get_lam, get_Ddiag, get_chi, T, rho, massfrac, 
                   nullptr, nullptr, mu, xi, lam, trans_parm);
 
+
   amrex::Real D =
     amrex::max(mu, lam / cv); // no need to check lam/cp because cv < cp
 
