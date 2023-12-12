@@ -6,7 +6,13 @@ nav:
   - Quickrun: quickrun.md
   - Run: run.md
   - Examples: example.md
+  - Test: test.md
   - Tips: tips.md   
+  - Exec:
+    - 'Riemann2D': exec/riemann2d.md
+    - 'Double Mach': exec/doublemach.md
+    - 'Detona Difrac': exec/DetonDiffrac.md
+    - 'Hypersonic BL': exec/FlatPlate.md
 extra_javascript:
   - https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.4/MathJax.js?config=TeX-AMS-MML_HTMLorMML
 markdown_extensions:
