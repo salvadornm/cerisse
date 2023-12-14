@@ -1,30 +1,16 @@
 site_name: cerisse
 nav:
   - Home: index.md
-  - LES: les.md
-  - PDF: pdf.md
   - Quickrun: quickrun.md
   - Run: run.md
+  - LES: les.md
+  - PDF: pdf.md
   - Examples: example.md
-  - Test: test.md
+  - Input options: input-options.md
   - Tips: tips.md   
 extra_javascript:
   - https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.4/MathJax.js?config=TeX-AMS-MML_HTMLorMML
 markdown_extensions:
   - mdx_math
-  - pymdownx.arithmatex
-  - pymdownx.magiclink
-  - pymdownx.details # Allowing hidden expandable regions denoted by ???
-  - pymdownx.highlight
-  - pymdownx.inlinehilite
-  - pymdownx.superfences # Seems to enable syntax highlighting when used with the Material theme.
-  - pymdownx.tasklist:
-      custom_checkbox: true
-  - pymdownx.tabbed:
-      alternate_style: true
-  - pymdownx.snippets:
-      check_paths: true
-  - toc:
-      permalink: "¤" # Adds a clickable permalink to each section heading
-      toc_depth: 4
-
+  - callouts
+  - footnotes

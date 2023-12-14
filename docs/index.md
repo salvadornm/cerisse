@@ -1,15 +1,21 @@
 # Cerisse Documentation
 
+AMReX-based Navier-Stokes Reactive compressible LES code 
 
 --8<-- "README.md"
-
 
 ## Folder layout
 
     EB_CNS/         # main code
-    Submodules/     # required modules: AMREX, PelePhysics
+    ├───Examples/      # simple example cases
+    ├───Exec/          # more advanced test cases
+    ├───Source/        # source code
+    └───Tools/         # useful tools
+    Submodules/     # required modules
+    ├───amrex/         # AMR data structure, backends
+    ├───PelePhysics    # EoS, transport, reaction
+    └───sundials/      # chemical integrators
     docs/           # documentation folder
-
 
 ## Pre-requisites
 
@@ -26,18 +32,15 @@ Similarly CUDA/OPenMPI may be required for more advanced parallelization strateg
 
 4. **cmake** 
 (optional) reuired for some installation options (mostly related to GPU and chemistry). 
-Easy to install,  version reuired **>3.2**
+Easy to install, version reuired **>3.2**
 
-
-5. **AMREX** 
+5. **AMReX** 
 AMR libraries [AMREX](https://amrex-codes.github.io/amrex/)
 It will be installed if not present. Check [Quickrun](quickrun.md) for installation within Cerisse (recommended)
 
 6. **PelePhysics**
-Based on
-[PeleC](https://github.com/AMReX-Combustion/PeleC)
+Based on [PeleC](https://github.com/AMReX-Combustion/PeleC)
 It will be installed if not present. Check [Quickrun](quickrun.md) for installation within Cerisse (recommended)
-
 
 7. **Visualization**
 Cerisse/AMREx/PeleC format is supported by
@@ -51,25 +54,19 @@ and check for more options
 
 Download the latest version on the master branch using GitHub CLI
 
-```
+```bash
 $ gh repo clone salvadornm/cerisse
 ```
 
 or Download the latest release from [GitHub](https://github.com/salvadornm/cerisse/releases)
 
+## Documentation Editing
 
-
-### Documentation Editing
 For help editing the documentation visit [mkdocs.org](https://www.mkdocs.org). To generate the docs locally `mkdocs serve`
 and point the browser to [127.0.0.1.8000](http://127.0.0.1:8000)
-You will need to install Math extension for Python-markdown
 
-```
-$ pip install python-markdown math
-```
-as well as the extension (for snippet)
+You will need to install the `python-markdown-math` extension for rendering equations and the `markdown-callouts` extension for correctly displaying the warning and note blocks. All requirements can be installed automatically using
 
+```bash
+$ pip install -r docs/requirements.txt
 ```
-$ pip install pymdown-extensions
-```
-
