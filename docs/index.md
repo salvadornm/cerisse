@@ -10,7 +10,6 @@ Salvador Navarro-Martinez
 
 version 0.0 November 2023
 
-
 ## Folder layout
 
     EB_CNS/         # main code
@@ -23,7 +22,6 @@ version 0.0 November 2023
     ├───PelePhysics    # EoS, transport, reaction
     └───sundials/      # chemical integrators
     docs/           # documentation folder
-
 
 ## Pre-requisites
 
@@ -58,24 +56,23 @@ Cerisse/AMREx/PeleC format is supported by
 and check for more options
 [AMReX Visualization](https://amrex-codes.github.io/amrex/docs_html/Visualization.html)
 
-
 ## Installation
 
 Download the latest version on the master branch using GitHub CLI
 
-```
+```bash
 $ gh repo clone salvadornm/cerisse
 ```
 
 or Download the latest release from [GitHub](https://github.com/salvadornm/cerisse/releases)
 
-
 ## Documentation Editing
+
 For help editing the documentation visit [mkdocs.org](https://www.mkdocs.org). To generate the docs locally `mkdocs serve`
 and point the browser to [127.0.0.1.8000](http://127.0.0.1:8000)
-You will need to install the `python-markdown-math` extension for rendering equations and the `markdown-callouts` extension for correctly displaying the warning and notes blocks.
 
-```
-$ pip install python-markdown-math
-$ pip install markdown-callouts
+You will need to install the `python-markdown-math` extension for rendering equations and the `markdown-callouts` extension for correctly displaying the warning and note blocks. All requirements can be installed automatically using
+
+```bash
+$ pip install -r docs/requirements.txt
 ```
