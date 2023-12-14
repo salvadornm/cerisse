@@ -91,7 +91,19 @@ cns.hi_bc = 2 5 0
 
 If option "0" is selected, the corresponding `geometry.is_periodic` must also be set.
 
-If option "1" is selected, the `bcnormal` in `prob.H` routine will be activated.
+If option "1" is selected, the `bcnormal` function in `prob.H` will be activated.
+
+There are also 3 options to control the BC for embedded boundaries, `cns.eb_no_slip` (default true), `cns.eb_isothermal` (default false), and a real number `cns.eb_wall_temp` if isothermal wall is selected.
+
+### Physics
+
+| Option                      | Type          | Default | Description                                                  |
+| --------------------------- | ------------- | ------- | ------------------------------------------------------------ |
+| cns.do_visc                 | Bool          | 1       | Compute viscous fluxes or not (note that no-slip walls and isothermal walls require `do_visc`)
+| cns.do_ext_src              | Bool          | 1       | Add the external source term specified in `prob.cpp`
+| cns.do_react                | Bool          | 0       | Compute chemical reaction source term
+
+See also the "Reaction options" section below.
 
 ### Numerics
 
@@ -110,12 +122,39 @@ Option             | Type             | Default   | Meaning
 :------------------|:-----------------|:---------:|:--------------------------------
 cns.cfl            | Real             | 0.3       | Acoustic Courant number
 cns.dt_cutoff      | Real             | 5.e-20    | Minimum timestep size allowed
-cns.recon_scheme   | Integer (1-6)    | 5         | Reconstruction scheme 
-cns.char_sys       | 0 or 1           | 0 (sos)   | System for characteristic variable conversion
-cns.recon_char_var | 0 or 1           | 0         | Reconstruct characteristic system variable or not
+cns.recon_scheme   | Int (1 to 6)     | 5         | Reconstruction scheme 
+cns.char_sys       | Int (0 or 1)     | 0 (sos)   | System for characteristic variable conversion
+cns.recon_char_var | Int (0 or 1)     | 0         | Reconstruct characteristic system variable or not
 cns.limiter_theta  | Real             | 2.0       | Parameter in MUSCL limiter, between 1 and 2; 1: minmod, 2: van Leer's MC (higher sharper) 
+cns.rk_order       | Int (1 or 2)     | 1         | Switch between forward Euler and 2nd-order Runge-Kutta (note that WENO is not stable with forward Euler)
+cns.clip_temp      | Real             | [C++ epsilon](https://en.cppreference.com/w/cpp/types/numeric_limits/epsilon) | The `enforce_consistent_state()` routine adds energy to cells below this temperature to enforce non-negative temperature |
 
-### Derived & plot variables
+### LES models
+
+Two types of LES models are available, traditional eddy-viscosity type and stochastic fields. (In practice, they can be used simultaneously, but why would someone want to do that?)
+
+| Option                      | Type          | Default | Description                                                  |
+| --------------------------- | ------------- |:-------:| ------------------------------------------------------------ |
+| cns.do_les                  | Bool          | 0       | Use eddy viscosity type subgrid-scale model or not           |
+| cns.do_pasr                 | Bool          | 0       | Use partially stirred reactor in reaction or not             |
+| cns.les_model_name          | String        |         | Avaliable models are "Smagorinsky" or "WALE"                 |
+| cns.C_s                     | Real          | 0.1     | Smagorinsky constant                                         |
+| cns.C_I                     | Real          | 0.0066  | Yoshizawa constant (not used currently)                      |
+| cns.Pr_T                    | Real          | 0.7     | Turbulent Prandtl number = mu_T/(cp*kappa_T)                 |
+| cns.Sc_T                    | Real          | 0.7     | Turbulent Schmidt number = mu_T/(rho*D_T)                    |
+| cns.Cm                      | Real          | 0.1     | PaSR mixing timescale coefficient                            |
+
+For using stochastic fields, the number of fields must be decided at compile time using the `NUM_FIELD` option in `GNUmakefile`. The following options are available to control the runtime behaviour:
+
+| Option                      | Type          | Default | Description                                                  |
+| --------------------------- | ------------- |:-------:| ------------------------------------------------------------ |
+| cns.do_psgs                 | Bool          | 0       | Apply the pressure correction term
+| cns.do_pd_model             | Bool          | 0       | Apply the pressure-dilatation model
+| cns.do_vpdf                 | Bool          | 0       | Apply the simplified Langevin model
+| cns.do_spdf                 | Bool          | 0       | Apply the IEM model
+| cns.do_restart_fields       | Bool          | 0       | To copy the mean field to all fields during restart, useful for restarting from a single-field run
+
+### Derived plot variables
 
 | Name                               | Meaning                                                      |
 | ---------------------------------- | ------------------------------------------------------------ |
@@ -133,16 +172,16 @@ cns.limiter_theta  | Real             | 2.0       | Parameter in MUSCL limiter, 
 | transport_coef                     | Transport coefficients. Note that species diffusivities are multipled by density (rho*D) |
 | massfrac                           | Mass fractions                                               |
 | molefrac                           | Mole fractions                                               |
-| turb_viscosity                     | LES model turbulent viscosity (must have `do_les = 1`)       |
+| turb_viscosity                     | LES model turbulent viscosity (must run with `cns.do_les = 1`) |
 | reynolds_stress                    | Subgrid velcoity variance (must compile with `NUM_FIELD > 0`)|
 | var_Y                              | Subgrid species mass fraction variance (must compile with `NUM_FIELD > 0`) |
 | var_p                              | Subgrid pressure variance (must compile with `NUM_FIELD > 0`)|
 
 WARNING: By default, Cerisse plots all the conservative variables and reaction source terms, including all fields. This generates a huge plotfile. To disable this behaviour, set `cns.plot_fields = 0`.
 
-Users can toggle the reaction source terms outputs using `cns.plot_rho_omega` and `cns.update_heat_release` options. Similarly for the cost estimate used for load balancing, use `cns.plot_cost`. One may also want to set `cns.plot_rhoy = 0` to avoid plotting species' partial mass when `massfrac` or `molefrac` are already plotted.
+Users can toggle the reaction source terms outputs using the `cns.plot_rho_omega` and `cns.update_heat_release` options. Similarly for the cost estimate used for load balancing, use `cns.plot_cost`. One may also want to set `cns.plot_rhoy = 0` to avoid plotting species' partial mass when `massfrac` or `molefrac` are already plotted.
 
-### Geometry EB
+## Geometry EB options
 
 In **input** file
 
@@ -177,8 +216,31 @@ page about EB geometry
 
 
 
-## Options
+## Reaction options
 
+Four chemical integrators are supplied by PelePhysics:
 
+* "Reactor_Null" - does absolutely nothing
+* "Reactor_RK64" - an explicit 6-step 4th-order Runge-Kutta integrator
+* "Reactor_Cvode" - an adaptive implicit integrator with dense or matrix-free options
+    * "direct_dense"
+    * "direct_AJdense"
+    * "GMERES"
+    * "preGMRES"
+* "Reactor_Arkode" - an adaptive explicit Runge-Kutta integrator
 
+| Option                      | Type          | Default | Description                                                  |
+| --------------------------- | ------------- |:-------:| ------------------------------------------------------------ |
+| cns.chem_integrator         | String        | "Reactor_Null" | Select the chemical integrator
 
+std::string CNS::chem_integrator = ;
+pele::physics::transport::TransportParams<pele::physics::PhysicsType::transport_type>
+  CNS::trans_parms;
+amrex::Vector<std::string> CNS::spec_names;
+pele::physics::turbinflow::TurbInflow CNS::turb_inflow;
+
+bool CNS::use_typical_vals_chem = false; // tell chem_integrator typical value of Temp
+int CNS::reset_typical_vals_int = 10; // interval to reset the typical value
+int CNS::rk_reaction_iter = 0;        // iterate to tightly couple chemistry
+Real CNS::min_react_temp =
+  300.0; // turn off reactor below this temperature (only work with CVODE)

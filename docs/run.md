@@ -280,6 +280,24 @@ It usually contains the `amrex::ParmParse` to parse input file options.
 
 NOTE: Some examples use `Gpu::copyAsync()` followed by `Gpu::streamSynchronize()`. This is the same as `Gpu::copy()`, which implicitly runs `Gpu::streamSynchronize()`. If one wants to copy more than one object to/from GPU, the `Gpu::copyAsync()` followed by `Gpu::streamSynchronize()` method is preferred as only synchronization will be called.
 
+The `fill_ext_src` function is called if the `cns.do_ext_src` option is true. It can be used to add gravity or ignition.
+
+```cpp
+void CNS::fill_ext_src(int i, int j, int k, amrex::Real time,
+                       amrex::GeometryData const& geomdata,
+                       amrex::Array4<const amrex::Real> const& state,
+                       amrex::Array4<amrex::Real> const& ext_src,
+                       Parm const& /*parm*/, ProbParm const& pp)
+{
+  // Add some source term here, e.g.
+  Real uz = state(i, j, k, UMZ) / state(i, j, k, URHO);
+  ext_src(i, j, k, UMZ) += g;
+  ext_src(i, j, k, UEDEN) += uz * g;
+}
+```
+
+DANGER: The `ext_src` array is already filled with hydrodynamic and viscous sources. Make sure you use `+=` instead of `=` when adding external sources. This design is intended to give developers more control, e.g. can add source terms as a function of the time derivative of the states.
+
 ## prob_param.H
 
 This header file defines the `ProbParm` class which holds all the problem-specific data for initialization, boundary conditions, etc. As mentioned before, it is accessible to both Host and Device, so all data must be GPU-safe. For example, use `amrex::GpuArray` instead of pointer-type `amrex::Real []` for storing arries.
