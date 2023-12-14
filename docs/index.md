@@ -70,3 +70,16 @@ You will need to install the `python-markdown-math` extension for rendering equa
 ```bash
 $ pip install -r docs/requirements.txt
 ```
+
+You may need to install
+
+```bash
+$ pip install pip-tools
+```
+
+if you add new markdown extensions, edit the requirements.in
+
+```bash
+$ pip-compile requirements.in
+```
+

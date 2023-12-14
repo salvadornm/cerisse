@@ -45,13 +45,13 @@ $ cd cerisse/EB_CNS/Exec/Test
 
 The directory wil lconatin the following files
 
-```
+```bash
 $ ls
 GNUmakefile  inputs  Make.package  prob.cpp  prob.H  prob_parm.H
 ```
 
 A detail explanation of the files is in the Run tab, but basically inpt is your simulation comntrol files
-(mesh sieze, number of steps, etc..), while `prob.*` files determine the problem to solve.
+(mesh size, number of steps, etc..), while `prob.*` files determine the problem to solve.
 
 ### 2) Install SUNDIALS
 
@@ -64,13 +64,17 @@ It is a 30 M install done within PelePhysics. It has only to be done once.
 $ make SUNDIALS
 ```
 
+NOTE This is not needed anymore
+
 ### 3) Compile code
 
 To compile use
 
-```
+```bash
 $ make
 ```
+
+(use `$make -j4`` if possible)
 
 It will take a while the first time, once finished it will create a temporary directory 
 `$ tmp_build_dir` 
@@ -83,7 +87,7 @@ the name will change depending on the compiler and problem dimension
 
 To run type
 
-```
+```bash
 $ ./Cerisse2d.gnu.ex inputs
 ```
 It will run very quickly for 92 steps, and the output should be like this
@@ -92,7 +96,7 @@ It will run very quickly for 92 steps, and the output should be like this
 
 It will create files
 
-```
+```bash
 $ ls
 Cerisse2d.gnu.ex  Make.package  plt00020  plt00050  plt00080  prob.cpp     tmp_build_dir
 GNUmakefile       plt00000      plt00030  plt00060  plt00090  prob.H
@@ -113,7 +117,7 @@ If the instant 0 is open, the results for denisty will look like
 
 Alternatively you can use the script **cerisse_help**, to open all directories at the same time (to make an animation for example)
 
-```
+``` bash
 $ ./cerisse_help visit
 ```
 

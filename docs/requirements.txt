@@ -14,6 +14,7 @@ markdown==3.5.1
     # via
     #   markdown-callouts
     #   mkdocs
+    #   pymdown-extensions
     #   python-markdown-math
 markdown-callouts==0.3.0
     # via -r requirements.in
@@ -31,6 +32,8 @@ pathspec==0.12.1
     # via mkdocs
 platformdirs==4.1.0
     # via mkdocs
+pymdown-extensions==10.5
+    # via -r requirements.in
 python-dateutil==2.8.2
     # via ghp-import
 python-markdown-math==0.8
@@ -38,6 +41,7 @@ python-markdown-math==0.8
 pyyaml==6.0.1
     # via
     #   mkdocs
+    #   pymdown-extensions
     #   pyyaml-env-tag
 pyyaml-env-tag==0.1
     # via mkdocs

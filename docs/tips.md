@@ -45,4 +45,3 @@ where the `/home/snm/...`coresponds to the installation dir
 
 What are numeric defaults?
 
-
