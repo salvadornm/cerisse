@@ -22,7 +22,7 @@
  */
 AMREX_GPU_DEVICE
 AMREX_FORCE_INLINE
-void cns_initdata(int i, int j, int k, amrex::Array4<amrex::Real> const& state,
+void prob_initdata(int i, int j, int k, amrex::Array4<amrex::Real> const& state,
                   amrex::GeometryData const& geomdata, Parm const& /*parm*/,
                   ProbParm const& prob_parm)
 {
@@ -39,8 +39,6 @@ void cns_initdata(int i, int j, int k, amrex::Array4<amrex::Real> const& state,
     state(i, j, k, UMZ) = 0.0;
     state(i, j, k, UEDEN) =
       prob_parm.rhoe_l + 0.5 * prob_parm.rho_l * prob_parm.u_l * prob_parm.u_l;
-    // state(i, j, k, UEINT) = prob_parm.rhoe_l;
-    // state(i, j, k, UTEMP) = prob_parm.T_l;
     state(i, j, k, UFS) = prob_parm.rho_l;
   } else {
     state(i, j, k, URHO) = prob_parm.rho_r;
@@ -49,8 +47,6 @@ void cns_initdata(int i, int j, int k, amrex::Array4<amrex::Real> const& state,
     state(i, j, k, UMZ) = 0.0;
     state(i, j, k, UEDEN) =
       prob_parm.rhoe_r + 0.5 * prob_parm.rho_r * prob_parm.u_r * prob_parm.u_r;
-    // state(i, j, k, UEINT) = prob_parm.rhoe_r;
-    // state(i, j, k, UTEMP) = prob_parm.T_r;
     state(i, j, k, UFS) = prob_parm.rho_r;
   }
 }
@@ -97,6 +93,22 @@ AMREX_FORCE_INLINE
 void prob_post_restart(int i, int j, int k, amrex::Array4<amrex::Real> const& state,
                        amrex::GeometryData const& geomdata, Parm const& parm,
                        ProbParm const& prob_parm)
+{
+}
+
+AMREX_GPU_DEVICE AMREX_FORCE_INLINE void prob_post_timestep(
+  int i, int j, int k, const amrex::Real /*curtime*/, const amrex::Real dtlev,
+  amrex::Array4<amrex::Real> const& state,
+  amrex::Array4<const amrex::Real> const& reactions,
+  amrex::GeometryData const& /*geomdata*/, Parm const& /*parm*/, ProbParm const& pp)
+{
+}
+
+AMREX_GPU_DEVICE AMREX_FORCE_INLINE void prob_tag_error(
+  int i, int j, int k, amrex::Array4<char> const& tagarr,
+  amrex::Array4<const amrex::Real> const& /*sarr*/, int level, char tagval,
+  const amrex::Real /*time*/, amrex::GeometryData const& geomdata,
+  Parm const& /*parm*/, ProbParm const& /*pp*/)
 {
 }
 
