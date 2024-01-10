@@ -306,6 +306,10 @@ void CNS::postCoarseTimeStep(Real time)
 
   AmrLevel::postCoarseTimeStep(time);
 
+#ifdef USE_PROB_POST_COARSETIMESTEP
+  prob_post_coarsetimestep(time);
+#endif
+
   printTotalandCheckNan(); // must do because this checks for nan as well
 }
 

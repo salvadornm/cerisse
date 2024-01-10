@@ -257,6 +257,10 @@ protected:
   void full_prob_post_timestep(int iteration);
 #endif
 
+#ifdef USE_PROB_POST_COARSETIMESTEP
+  void prob_post_coarsetimestep(amrex::Real time);
+#endif
+
   CNS& getLevel(int lev) { return dynamic_cast<CNS&>(parent->getLevel(lev)); }
 
   void printTotalandCheckNan() const;

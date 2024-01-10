@@ -1,0 +1,44 @@
+# AMReX
+DIM = 3
+COMP = gnu
+PRECISION = DOUBLE
+
+# Profiling
+PROFILE = FALSE
+TINY_PROFILE = FALSE
+COMM_PROFILE = FALSE
+TRACE_PROFILE = FALSE
+MEM_PROFILE = FALSE
+USE_GPROF = FALSE
+
+# Performance
+USE_MPI = TRUE
+USE_OMP = FALSE
+USE_CUDA = FALSE
+USE_HIP = FALSE
+USE_SYCL = FALSE
+
+# Debugging
+TEST = TRUE
+DEBUG = FALSE
+FSANITIZER = FALSE
+THREAD_SANITIZER = FALSE
+
+# PelePhysics
+Eos_Model := GammaLaw
+Transport_Model := Constant
+Chemistry_Model := Null
+
+# CNS
+USE_PROB_POST_COARSETIMESTEP = TRUE
+
+# MASA
+MASA_HOME = $(abspath masa-0.50.0/install)
+INCLUDE_LOCATIONS += ${MASA_HOME}/include ${MASA_HOME}/lib
+LIBRARY_LOCATIONS += ${MASA_HOME}/lib
+LIBRARIES += -Wl,-rpath,${MASA_HOME}/lib -lmasa
+
+# GNU Make
+CEXE_headers += prob.H prob_parm.H
+CEXE_sources += prob.cpp
+include ../Make.CNS
