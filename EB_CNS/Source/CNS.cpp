@@ -134,11 +134,19 @@ void CNS::initData()
   ProbParm const* lprobparm =
     d_prob_parm; // <T> const* = pointer to constant <T>; const <T>* == <T> const*
   const auto geomdata = geom.data();
+#ifdef USE_PMFDATA
+  pele::physics::PMF::PmfData::DataContainer const* lpmfdata = pmf_data.getDeviceData();
+#endif
 
   auto const& sarrs = S_new.arrays();
   amrex::ParallelFor(
     S_new, [=] AMREX_GPU_DEVICE(int box_no, int i, int j, int k) noexcept {
-      prob_initdata(i, j, k, sarrs[box_no], geomdata, *lparm, *lprobparm);
+      prob_initdata(i, j, k, sarrs[box_no], geomdata, *lparm, *lprobparm
+#ifdef USE_PMFDATA
+      , lpmfdata
+#endif
+      );
+
       cns_check_species_sum_to_one(i, j, k,
         sarrs[box_no]); // Verify that the sum of (rho Y)_i = rho at every cell
     });
@@ -840,6 +848,12 @@ void CNS::read_params()
     pp.query("Sc_T", Sc_T);
     pp.query("Cm", Cm);
   }
+
+  pp.query("do_nscbc", do_nscbc);
+  pp.query("nscbc_relax_p", nscbc_relax_p);
+  pp.query("nscbc_relax_u", nscbc_relax_u);
+  pp.query("nscbc_relax_T", nscbc_relax_T);
+  pp.query("ambient_p", ambient_p);
 
 #if CNS_USE_EB
   // eb_weight in redist

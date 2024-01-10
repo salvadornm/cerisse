@@ -5,6 +5,8 @@
 
 #include "index_macros.H"
 
+#include "nscbc.H"
+
 /**
  * @brief Helper function to generate ghost cell states for adiabatic wall.
  *

@@ -509,6 +509,9 @@ void CNS::variableCleanUp()
   desc_lst.clear();
   derive_lst.clear();
 
+  trans_parms.deallocate();
+  pmf_data.deallocate();
+
 #ifdef AMREX_USE_GPU
   The_Arena()->free(dp_refine_boxes);
 #endif

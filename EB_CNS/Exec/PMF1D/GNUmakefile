@@ -16,7 +16,7 @@ USE_MPI = TRUE
 USE_OMP = FALSE
 USE_CUDA = FALSE
 USE_HIP = FALSE
-USE_DPCPP = FALSE
+USE_SYCL = FALSE
 
 # Debugging
 DEBUG = FALSE
@@ -26,10 +26,12 @@ THREAD_SANITIZER = FALSE
 # PelePhysics
 Eos_Model := Fuego
 Transport_Model := Simple
-Chemistry_Model := grimech30
+Chemistry_Model := drm19
 
 # CNS
 NUM_FIELD = 0
+USE_EB = FALSE
+USE_PMFDATA = TRUE
 
 # GNU Make
 include ./Make.package

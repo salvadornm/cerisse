@@ -11,10 +11,10 @@
 #include <AMReX_YAFluxRegister.H>
 #endif
 // #include <AMReX_ErrorList.H>
-
 #include <PelePhysics.H>
 #include <ReactorBase.H>
 #include <turbinflow.H>
+#include <PMFData.H>
 
 #include "LES.H"
 #include "index_macros.H"
@@ -160,6 +160,9 @@ public:
 
   void enforce_consistent_state();
 
+  static void apply_nscbc(const amrex::Box& bx, const amrex::Array4<amrex::Real>& data,
+                          int start_comp, const amrex::Geometry& geom, int dir, int lo_hi, int bc_type);
+
   // These derive functions need to access variables in the class
   static void cns_dertranscoef(const amrex::Box& bx, amrex::FArrayBox& derfab,
                                int dcomp, int ncomp, const amrex::FArrayBox& datafab,
@@ -190,6 +193,7 @@ public:
     pele::physics::PhysicsType::transport_type>
     trans_parms;
   static pele::physics::turbinflow::TurbInflow turb_inflow;
+  static pele::physics::PMF::PmfData pmf_data;
 
   // Eddy viscosity type LES
 
@@ -202,6 +206,15 @@ public:
   static amrex::Real Sc_T;
   static std::unique_ptr<LESModel> les_model;
   static amrex::Real Cm;
+
+  // NSCBC
+
+  static bool do_nscbc;
+  static amrex::Real nscbc_relax_p;
+  static amrex::Real nscbc_relax_u;
+  static amrex::Real nscbc_relax_T;
+  static amrex::Real ambient_p;
+  static amrex::BCRec phys_bc; // this has to be public for cns_bcfill to access
 
 protected:
   ////////////////////////////////////////////////////////////////////////////
@@ -270,8 +283,6 @@ protected:
     Cost_Type,
     num_state_data_types
   };
-
-  static amrex::BCRec phys_bc;
 
   //
   // Advance related

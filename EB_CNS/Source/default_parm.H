@@ -39,6 +39,13 @@ pele::physics::transport::TransportParams<pele::physics::PhysicsType::transport_
   CNS::trans_parms;
 amrex::Vector<std::string> CNS::spec_names;
 pele::physics::turbinflow::TurbInflow CNS::turb_inflow;
+pele::physics::PMF::PmfData CNS::pmf_data;
+
+bool CNS::do_nscbc = false;
+amrex::Real CNS::nscbc_relax_p = 0.25; // see https://github.com/AMReX-Combustion/PeleC/blob/48f1b3d3720771351a4475051c63da5ae6eb01e9/Docs/sphinx/BoundaryConditions.rst
+amrex::Real CNS::nscbc_relax_u = 0.2;
+amrex::Real CNS::nscbc_relax_T = 0.2;
+amrex::Real CNS::ambient_p = 1013250.0; // for outflow
 
 bool CNS::use_typical_vals_chem = false; // tell chem_integrator typical value of Temp
 int CNS::reset_typical_vals_int = 10; // interval to reset the typical value
