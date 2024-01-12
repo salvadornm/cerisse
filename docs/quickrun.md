@@ -115,9 +115,9 @@ If the instant 0 is open, the results for denisty will look like
 
 ![figure3](images/visitres.png)
 
-Alternatively you can use the script **cerisse_help**, to open all directories at the same time (to make an animation for example)
+Alternatively you can use the script **cerisse**, to open all directories at the same time (to make an animation for example)
 
 ``` bash
-$ ./cerisse_help visit
+$ ./cerisse visit
 ```
 

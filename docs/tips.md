@@ -21,15 +21,14 @@ $ conda install --channel conda-forge yt
 Beware of Python **3.9** and **yt** use newer or older, **>3.11** recommended.
 Check [yt Website](https://yt-project.org) for details and tutorials.
 
-### Use cerisse_help script
+### Use cerisse script
 
-Script file to clean directories, create backups, create visit file for movies.
-Useful for day to day running and avoid file creep-up.
+The **cerisse** script can help to clean directories, create backups, create visit files for movies quickly. It is useful for day to day running and avoid file creep-up.
 Is installed in `EB_CNS/Tools/scripts`
 and can be used by  
 
 ```
-$ ../../Tools/scripts/cerisse_help [options]
+$ ../../Tools/scripts/cerisse [options]
 ```
 
 or by setting the path in `.bashrc` or `.profile` by adding the line at the end

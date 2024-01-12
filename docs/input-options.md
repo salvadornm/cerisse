@@ -122,6 +122,7 @@ Option             | Type             | Default   | Meaning
 :------------------|:-----------------|:---------:|:--------------------------------
 cns.cfl            | Real             | 0.3       | Acoustic Courant number
 cns.dt_cutoff      | Real             | 5.e-20    | Minimum timestep size allowed
+cns.fixed_dt       | Real             | 0         | Run with constant dt
 cns.recon_scheme   | Int (1 to 6)     | 5         | Reconstruction scheme 
 cns.char_sys       | Int (0 or 1)     | 0 (sos)   | System for characteristic variable conversion
 cns.recon_char_var | Int (0 or 1)     | 0         | Reconstruct characteristic system variable or not

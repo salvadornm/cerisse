@@ -1,6 +1,5 @@
 # Cerisse Documentation
 
-AMReX-based Navier-Stokes Reactive compressible LES code 
 
 --8<-- "README.md"
 

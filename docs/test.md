@@ -1,14 +1,14 @@
 # Test
 
-Test are temporarely under `Test/`
+This set of classic/regression test-cases are located under `Tests/`
+The code will be tested periodically against these regression test to validate merges, versions, etc.
 
-TODO, Dec 2023
 
 | Test                        |  Type          | Description                                                  |
 | --------------------------- | ---------------|    --------------------------------------------------------- |
-| Test1                       | 1D             |   Classic Test,shock structure                               |
+| Test1                       | 1D             |   Sod's tube                              |
 | Test2                       | 1D             |   Shu-Osher                                                  |
-| Test3                       | 2D             |   Rimeann 2D (multiple)                                      |
+| Test3                       | 2D             |   Riemann 2D (multiple)                                      |
 | Test4                       | 2D             |   Step                                                       |
 | Test5                       | 2D             |   Flat Plate Hypersonic                                      |
 | Test6                       | 2D             |   Cylinder                                                   |
@@ -21,4 +21,6 @@ TODO, Dec 2023
 | Test13                      | 1D             |   Premixed flame                                               |
 
 
+## Test 1
 
+--8<-- "EB_CNS/Tests/Test1/README.md"

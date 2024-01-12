@@ -1,27 +1,9 @@
 # Examples
 
-Examples are under `Examples/`
+The following examples are under `Examples/`
 
-Example codes are stand-alone examples that demonstrate how to use different parts of the AMReX functionality, see [AMRex Tutorials](https://amrex-codes.github.io/amrex/tutorials_html/)
-
-The following examples are tested to compile and run
-
-
-## Test1-Sod1D
-
-
-Classical Riemann Problem
-
-tested       |      grid     | comment
-:----------- |:-------------:| -----------:
-gcc 11.3(Linux), gcc 13.1 (Mac)       | **200**        |  Euler,  92 steps, no-AMR
-
-Classic Riemann Problem
-
-Results
-
-In progress 
-
+These case codes are stand-alone examples that demonstrate how to use different parts of the AMReX functionality, see [AMRex Tutorials](https://amrex-codes.github.io/amrex/tutorials_html/)
+These examples can change over time as new functionalities are added. They are different than those in [Tests](test.md), which are more resilient and can be ued as regressions test.
 
 
 

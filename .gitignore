@@ -12,7 +12,13 @@ EB_CNS/Examples/**/chk*
 EB_CNS/Examples/**/*.visit
 EB_CNS/Examples/**/Backtrace*
 EB_CNS/Examples/**/tmp_build_dir
-
+# same in Examples folder
+EB_CNS/Tests/**/*.ex*
+EB_CNS/Tests/**/plt*
+EB_CNS/Tests/**/chk*
+EB_CNS/Tests/**/*.visit
+EB_CNS/Tests/**/Backtrace*
+EB_CNS/Tests/**/tmp_build_dir
 
 # data in Build
 Build

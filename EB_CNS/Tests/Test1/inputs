@@ -1,4 +1,4 @@
-max_step = 100
+max_step = 200
 stop_time = 0.2
 
 geometry.is_periodic = 0 0 0
@@ -18,8 +18,9 @@ cns.hi_bc       =  2 3 3
 cns.do_visc  = 0
 cns.do_react = 0
 
-cns.cfl = 0.3
-cns.dt_cutoff = 5.e-20
+#cns.cfl = 0.6
+#cns.dt_cutoff = 5.e-20
+cns.fixed_dt = 0.001
 
 cns.v = 2
 amr.v = 1
@@ -50,5 +51,5 @@ amr.check_int       = 100        # number of timesteps between checkpoints
 # PLOTFILES
 amr.plot_files_output = 1
 amr.plot_file         = plt      # root name of plotfile
-amr.plot_int          = 10       # number of timesteps between plotfiles
+amr.plot_int          = 100       # number of timesteps between plotfiles
 amr.derive_plot_vars  = pressure x_velocity MachNumber divrho divu magvort
