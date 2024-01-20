@@ -126,7 +126,8 @@ public:
 
   void compute_dSdt_box(const amrex::Box& bx, amrex::Array4<amrex::Real const>& Sfab,
                         amrex::Array4<amrex::Real>& dSdtfab,
-                        const std::array<FArrayBox*, AMREX_SPACEDIM>& flux);
+                        const std::array<FArrayBox*, AMREX_SPACEDIM>& flux,
+                        amrex::Array4<const amrex::Real>& shock_sensor);
 
 #if CNS_USE_EB
   void compute_dSdt_box_eb(
@@ -216,7 +217,9 @@ public:
   static amrex::Real ambient_p;
   static amrex::BCRec phys_bc; // this has to be public for cns_bcfill to access
 
+#ifndef AMREX_USE_CUDA
 protected:
+#endif
   ////////////////////////////////////////////////////////////////////////////
   //    Protected functions                                                 //
   ////////////////////////////////////////////////////////////////////////////
@@ -235,17 +238,7 @@ protected:
                     amrex::YAFluxRegister* fr_as_crse,
                     amrex::YAFluxRegister* fr_as_fine,
 #endif
-                    bool write_to_flux_register);
-                    
-//   void compute_psgs_model(const amrex::MultiFab& S, amrex::MultiFab& dSdt, amrex::Real dt,
-// #if CNS_USE_EB
-//                     amrex::EBFluxRegister* fr_as_crse,
-//                     amrex::EBFluxRegister* fr_as_fine
-// #else
-//                     amrex::YAFluxRegister* fr_as_crse,
-//                     amrex::YAFluxRegister* fr_as_fine
-// #endif
-//                     );
+                    bool write_to_flux_register = true);
 
   void fill_ext_src(int i, int j, int k, amrex::Real time,
                     amrex::GeometryData const& geomdata,
@@ -299,6 +292,7 @@ protected:
 
   amrex::MultiFab Sborder; // A state array with ghost zones. It is put here inside
                            // the class so alloc overhead only happen once.
+  amrex::MultiFab shock_sensor_mf;
 
   //
   // EB related
@@ -330,6 +324,7 @@ protected:
   static amrex::Real fixed_dt;
   static amrex::Real dt_cutoff;
   static int rk_order;
+  static int amr_interp_order;
   static int verbose;
   static bool do_reflux;
   static bool do_load_balance;
@@ -352,6 +347,7 @@ protected:
   static int char_sys;
   static amrex::Real plm_theta;
   static int recon_scheme;
+  static bool use_hybrid_scheme;
 
   // LES-PDF stochastic fields
 

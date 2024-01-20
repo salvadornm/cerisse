@@ -8,6 +8,7 @@ Real CNS::cfl = 0.3;
 Real CNS::fixed_dt = -1;
 Real CNS::dt_cutoff = 5.e-20;
 int CNS::rk_order = 2;
+int CNS::amr_interp_order = 2;
 
 bool CNS::do_reflux = true;
 bool CNS::do_load_balance = true;
@@ -63,6 +64,7 @@ int CNS::char_sys = 0;            // Thermodynamic system used in characteristic
 int CNS::recon_scheme = 5;        // 1: basic Godunov; 2: MUSCL; 3: WENO-Z3;
                                   // 4: WENO-JS5; 5: WENO-Z5; 6: TENO5
 Real CNS::plm_theta = 2.0; // [1,2] 1: minmod; 2: van Leer's MC (higher sharper)
+bool CNS::use_hybrid_scheme = false; // use central scheme in smooth region
 
 bool CNS::do_restart_fields = false;
 bool CNS::do_psgs = false;

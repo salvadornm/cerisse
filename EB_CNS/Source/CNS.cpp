@@ -41,6 +41,10 @@ CNS::CNS(Amr& papa, int lev, const Geometry& level_geom, const BoxArray& bl,
   buildMetrics();
 
   Sborder.define(grids, dmap, LEN_STATE, NUM_GROW, MFInfo(), Factory());
+  shock_sensor_mf.define(grids, dmap, 1, 3, MFInfo(), Factory());
+  if (!use_hybrid_scheme) {
+    shock_sensor_mf.setVal(1.0); // default to shock-capturing scheme
+  }
 
   // Initialize reaction
   get_new_data(Reactions_Type).setVal(0.0);
@@ -674,10 +678,6 @@ void CNS::read_params()
   pp.query("cfl", cfl);
   pp.query("fixed_dt", fixed_dt);
   pp.query("dt_cutoff", dt_cutoff);
-  pp.query("rk_order", rk_order); // 1 or 2
-  if (rk_order != 1 && rk_order != 2) {
-    amrex::Abort("CNS: rk_order must be 1 or 2");
-  }
 
   pp.query("recon_char_var", recon_char_var);
   pp.query("char_sys", char_sys);
@@ -692,6 +692,7 @@ void CNS::read_params()
   // option to users
   pp.query("limiter_theta", plm_theta); // MUSCL specific parameter
   // }
+  pp.query("use_hybrid_scheme", use_hybrid_scheme);
 
   Vector<int> lo_bc(AMREX_SPACEDIM), hi_bc(AMREX_SPACEDIM);
   pp.getarr("lo_bc", lo_bc, 0, AMREX_SPACEDIM);
@@ -840,6 +841,18 @@ void CNS::read_params()
   pp.query("do_pd_model", do_pd_model);
   pp.query("do_vpdf", do_vpdf);
   pp.query("do_spdf", do_spdf);
+
+  pp.query("amr_interp_order", amr_interp_order);
+  if (amr_interp_order == 3 && amrex::SpaceDim == 1) {
+    amrex::Abort("CNS: quadratic_interp does not support 1D.");
+  }
+  pp.query("rk_order", rk_order); // 1-4
+  if (rk_order != 1 && rk_order != 2) {
+    // amrex::Abort("CNS: rk_order must be 1 or 2");
+    if (do_react || do_psgs || do_pd_model || do_vpdf || do_spdf) {
+      amrex::Abort("CNS: rk_order must be 1 or 2 for reaction and/or SF");
+    }
+  }
 
   pp.query("do_les", do_les);
   pp.query("do_pasr", do_pasr);

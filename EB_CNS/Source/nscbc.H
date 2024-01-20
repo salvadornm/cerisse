@@ -83,6 +83,13 @@ extrap_prim(amrex::IntVect iv, amrex::IntVect iv_dir, int index, int isign,
     105 * q(iv - 2 * iv_dir, index) + 70 * q(iv - 3 * iv_dir, index) -
     31.5 * q(iv - 4 * iv_dir, index) + 8.4 * q(iv - 5 * iv_dir, index) +
     42 * isign * dq;
+
+  // q(iv - iv_dir, index) = q(iv, index) - isign * dq;
+  // q(iv - 2 * iv_dir, index) = q(iv, index) - 2 * isign * dq;
+  // q(iv - 3 * iv_dir, index) = q(iv, index) - 3 * isign * dq;
+  // q(iv - 4 * iv_dir, index) = q(iv, index) - 4 * isign * dq;
+  // q(iv - 5 * iv_dir, index) = q(iv, index) - 5 * isign * dq;
+  // q(iv - 6 * iv_dir, index) = q(iv, index) - 6 * isign * dq;
 }
 
 AMREX_GPU_DEVICE AMREX_FORCE_INLINE void

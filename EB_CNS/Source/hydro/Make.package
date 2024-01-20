@@ -1,5 +1,4 @@
-CEXE_headers += hyperbolics.H 
-CEXE_headers += recon.H
+CEXE_headers += hyperbolics.H recon.H central_scheme.H
 
 ifeq ($(USE_EB), TRUE)
   CEXE_headers += recon_eb.H

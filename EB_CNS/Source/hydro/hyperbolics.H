@@ -41,9 +41,10 @@ cns_ctoprim(int i, int j, int k, int ns, amrex::Array4<amrex::Real const> const&
   }
 
   auto eos = pele::physics::PhysicsType::eos();
-  amrex::Real T = 0, p, cs = 0, gamma;
+  amrex::Real T = 0, p, cs = 0, gamma, wbar;
   eos.REY2T(rho, ei, massfrac, T);
   eos.RTY2P(rho, T, massfrac, p);
+  eos.Y2WBAR(massfrac, wbar);
 
   // ss << "@" << i << "," << j << "," << k << ": ns=" << ns << ": rho=" << rho << "
   // T=" << T << " p=" << p; for (int n = 0; n < NUM_SPECIES; n++) {
@@ -61,6 +62,7 @@ cns_ctoprim(int i, int j, int k, int ns, amrex::Array4<amrex::Real const> const&
   q(i, j, k, QG) = gamma;
   q(i, j, k, QEINT) = ei;
   q(i, j, k, QTEMP) = T;
+  q(i, j, k, QWBAR) = wbar;
 
   // // Monitor problem cell
   // std::ostringstream ss;

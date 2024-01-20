@@ -21,7 +21,7 @@ void CNS::apply_nscbc(const amrex::Box& bx, const amrex::Array4<amrex::Real>& da
 {
   BL_PROFILE("CNS::apply_nscbc()");
 
-  // assert(lo_hi == 1 || lo_hi == -1);
+  assert(lo_hi == 1 || lo_hi == -1);
 
   // Prepare geometry data
   const auto dx = geom.CellSizeArray(); // cell size
@@ -43,7 +43,7 @@ void CNS::apply_nscbc(const amrex::Box& bx, const amrex::Array4<amrex::Real>& da
   const auto bxqfill = amrex::Box(bxq & bx); // only need to fill interior cells
   amrex::FArrayBox qfab(bxq, NPRIM, The_Async_Arena());
   auto const& q = qfab.array();
-  amrex::ParallelFor(bxqfill, [=] AMREX_GPU_DEVICE(int i, int j, int k) /*noexcept*/ {
+  amrex::ParallelFor(bxqfill, [=] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {
     nscbc_c2prim(i, j, k, start_comp, data, q);
   });
 
@@ -122,10 +122,10 @@ void CNS::apply_nscbc(const amrex::Box& bx, const amrex::Array4<amrex::Real>& da
           lo_hi == 1 ? 4 : 0; // modify the right running wave if we are on the low
                               // side, otherwise, modify the left running wave
         amrex::Real beta = 1.0; // std::sqrt(Msqr); // controls how much transverse term is added
-        L[phi] =
+        L[phi] = 
           CNS::nscbc_relax_p * c * (1.0 - Msqr) / domain_len * (q(iv, QPRES) - CNS::ambient_p) - (1.0 - beta) * Ts[phi];
-        
-        if (lo_hi * u < 0.0) { L[phi] = 0.0; } // prevent backflow
+
+        // if (lo_hi * u < 0.0) { L[phi] = 0.0; } // prevent backflow
       } 
       else if (bc_type == 1) { // inflow
         int phi = lo_hi == 1 ? 4 : 0;
@@ -164,8 +164,11 @@ void CNS::apply_nscbc(const amrex::Box& bx, const amrex::Array4<amrex::Real>& da
       dq[3] = L[3];
       dq[4] = (L[4] + L[0]) / 2;
 
-      // amrex::Print() << "dq = " << dq[0] << ", " << dq[1] << ", " << dq[2] << ", " << dq[3] << ", " << dq[4] << "\n"; 
-      // amrex::Print() << drho << ", " << dun << ", " << dut << ", " << dutt << ", " << dp << "\n";
+      // if (lo_hi == -1 && dir == 0) {
+      //   amrex::AllPrint() << "q = " << rho << ", " << u << ", " << v << ", " << 0.0 << ", " << p << "\n"; 
+      //   amrex::AllPrint() << drho << ", " << dun << ", " << dut << ", " << dutt << ", " << dp << "\n";
+      //   amrex::AllPrint() << "dq = " << dq[0] << ", " << dq[1] << ", " << dq[2] << ", " << dq[3] << ", " << dq[4] << "\n"; 
+      // }
 
       // if (bc_type == 1) {
       //   assert(dq[0] == drho);
@@ -187,7 +190,7 @@ void CNS::apply_nscbc(const amrex::Box& bx, const amrex::Array4<amrex::Real>& da
     lo_hi == 1 ? amrex::Box(amrex::adjCellLo(geom.Domain(), dir, ng) & bx)
                : amrex::Box(amrex::adjCellHi(geom.Domain(), dir, ng) & bx);
   amrex::ParallelFor(bx_ghost,
-                     [=] AMREX_GPU_DEVICE(int i, int j, int k) /*noexcept*/ {
+                     [=] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {
                        nscbc_p2cons(i, j, k, start_comp, data, q);
                      });
 

@@ -4,6 +4,7 @@
 #endif
 
 #include "CNS.H"
+#include "derive.H"
 
 using namespace amrex;
 
@@ -60,75 +61,86 @@ Real CNS::advance(Real time, Real dt, int iteration, int ncycle)
 
   if (fr_as_crse) { fr_as_crse->reset(); }
 
-  // Start time-stepping
-  // RK2 stage 1: U^* = U^n + dt*dUdt^n + dt*I_R^n
-  if (verbose > 1)
-    amrex::Print() << " >> AMR Cycle " << iteration << " of " << ncycle << std::endl;
-  if (verbose > 0)
-    amrex::Print() << " >> RK Step 1: Computing dSdt^{n}" << std::endl;
-  FillPatch(*this, Sborder, NUM_GROW, time, State_Type, 0, LEN_STATE);
-  compute_dSdt(Sborder, dSdt_old, 0.5 * dt, fr_as_crse, fr_as_fine, true);
-  MultiFab::LinComb(S_new, 1.0, Sborder, 0, dt, dSdt_old, 0, 0, LEN_STATE, 0);
-
-  if (rk_order == 2) {
-    if (do_react) {
-      for (int nf = 0; nf <= NUM_FIELD; ++nf) {
-        MultiFab::Saxpy(S_new, dt, I_R, nf * NREACT, nf * NVAR + UFS, NUM_SPECIES,
-                        0);
-      }
-    }
-    enforce_consistent_state(); // Enforce rho = sum(rhoY) and clip temp
-
-    // RK2 stage 2: U^{n+1} = U^n + 0.5*dt*(dUdt^n + dUdt^{n+1}) + dt*I_R^{n+1}
+  if (rk_order <= 2) {
+    // Predictor-corrector RK2
+    // RK2 stage 1: U^* = U^n + dt*dUdt^n + dt*I_R^n
+    if (verbose > 1)
+      amrex::Print() << " >> AMR Cycle " << iteration << " of " << ncycle << std::endl;
     if (verbose > 0)
-      amrex::Print() << " >> RK Step 2: Computing dSdt^{n+1}" << std::endl;
-    FillPatch(*this, Sborder, NUM_GROW, time + dt, State_Type, 0, LEN_STATE);
-    compute_dSdt(Sborder, dSdt_new, 0.5 * dt, fr_as_crse, fr_as_fine,
-                 (rk_reaction_iter < 1));
-    MultiFab::LinComb(S_new, 0.5 * dt, dSdt_new, 0, 0.5 * dt, dSdt_old, 0, 0,
-                      LEN_STATE, 0);
-    MultiFab::Add(S_new, S_old, 0, 0, LEN_STATE, 0);
-  }
+      amrex::Print() << " >> RK Step 1: Computing dSdt^{n}" << std::endl;
+    FillPatch(*this, Sborder, NUM_GROW, time, State_Type, 0, LEN_STATE);
+    compute_dSdt(Sborder, dSdt_old, 0.5 * dt, fr_as_crse, fr_as_fine, true);
+    MultiFab::LinComb(S_new, 1.0, Sborder, 0, dt, dSdt_old, 0, 0, LEN_STATE, 0);
 
-  enforce_consistent_state(); // Enforce rho = sum(rhoY)
-
-#if (NUM_FIELD > 0)
-  computeAvg(S_new);
-  FillPatch(*this, Sborder, 1, time + dt, State_Type, 0, LEN_STATE);
-  // compute_psgs_model(Sborder, dSdt_new, dt, fr_as_crse, fr_as_fine);
-  // MultiFab::Saxpy(S_new, dt, dSdt_new, 0, 0, LEN_STATE, 0);
-  // compute_pdf_model(S_new, dt, iteration);
-
-  compute_pdf_model(Sborder, dt, iteration);
-  MultiFab::Copy(S_new, Sborder, 0, 0, LEN_STATE, 0);
-  enforce_consistent_state(); // Enforce rho = sum(rhoY)
-  computeAvg(S_new);
-#endif
-
-  if (do_react) {
-    // Compute I_R^{n+1}(U^**) and do U^{n+1} = U^** + dt*I_R^{n+1}
-    react_state(time, dt);
-    
-    enforce_consistent_state(); // Enforce rho = sum(rhoY)
-  }
-
-  // Iterate to couple chemistry
-  if (do_react && (rk_reaction_iter > 1)) {
-    for (int iter = 1; iter < rk_reaction_iter; ++iter) {
-      if (verbose > 0) {
-        amrex::Print() << " >> Re-computing dSdt^{n+1}" << std::endl;
+    if (rk_order == 2) {
+      if (do_react) {
+        for (int nf = 0; nf <= NUM_FIELD; ++nf) {
+          MultiFab::Saxpy(S_new, dt, I_R, nf * NREACT, nf * NVAR + UFS, NUM_SPECIES,
+                          0);
+        }
       }
+      enforce_consistent_state(); // Enforce rho = sum(rhoY) and clip temp
+
+      // RK2 stage 2: U^{n+1} = U^n + 0.5*dt*(dUdt^n + dUdt^{n+1}) + dt*I_R^{n+1}
+      if (verbose > 0)
+        amrex::Print() << " >> RK Step 2: Computing dSdt^{n+1}" << std::endl;
       FillPatch(*this, Sborder, NUM_GROW, time + dt, State_Type, 0, LEN_STATE);
       compute_dSdt(Sborder, dSdt_new, 0.5 * dt, fr_as_crse, fr_as_fine,
-                   (iter == rk_reaction_iter));
-
+                  (rk_reaction_iter < 1));
       MultiFab::LinComb(S_new, 0.5 * dt, dSdt_new, 0, 0.5 * dt, dSdt_old, 0, 0,
                         LEN_STATE, 0);
       MultiFab::Add(S_new, S_old, 0, 0, LEN_STATE, 0);
-      react_state(time, dt);
+    }
 
+    enforce_consistent_state(); // Enforce rho = sum(rhoY)
+
+#if (NUM_FIELD > 0)
+    computeAvg(S_new);
+    FillPatch(*this, Sborder, 1, time + dt, State_Type, 0, LEN_STATE);
+    // compute_psgs_model(Sborder, dSdt_new, dt, fr_as_crse, fr_as_fine);
+    // MultiFab::Saxpy(S_new, dt, dSdt_new, 0, 0, LEN_STATE, 0);
+    // compute_pdf_model(S_new, dt, iteration);
+
+    compute_pdf_model(Sborder, dt, iteration);
+    MultiFab::Copy(S_new, Sborder, 0, 0, LEN_STATE, 0);
+    enforce_consistent_state(); // Enforce rho = sum(rhoY)
+    computeAvg(S_new);
+#endif
+
+    if (do_react) {
+      // Compute I_R^{n+1}(U^**) and do U^{n+1} = U^** + dt*I_R^{n+1}
+      react_state(time, dt);
+      
       enforce_consistent_state(); // Enforce rho = sum(rhoY)
     }
+
+    // Iterate to couple chemistry
+    if (do_react && (rk_reaction_iter > 1)) {
+      for (int iter = 1; iter < rk_reaction_iter; ++iter) {
+        if (verbose > 0) {
+          amrex::Print() << " >> Re-computing dSdt^{n+1}" << std::endl;
+        }
+        FillPatch(*this, Sborder, NUM_GROW, time + dt, State_Type, 0, LEN_STATE);
+        compute_dSdt(Sborder, dSdt_new, 0.5 * dt, fr_as_crse, fr_as_fine,
+                    (iter == rk_reaction_iter));
+
+        MultiFab::LinComb(S_new, 0.5 * dt, dSdt_new, 0, 0.5 * dt, dSdt_old, 0, 0,
+                          LEN_STATE, 0);
+        MultiFab::Add(S_new, S_old, 0, 0, LEN_STATE, 0);
+        react_state(time, dt);
+
+        enforce_consistent_state(); // Enforce rho = sum(rhoY)
+      }
+    }
+  } else {
+    // Use AMRLevel RK (no reaction, no SF for now)
+    RK(rk_order, State_Type, time, dt, iteration, ncycle,
+      [&](int stage, MultiFab& dSdt, MultiFab const& S, Real /*t*/, Real dtsub) {
+        if (verbose > 0) amrex::Print() << " >> AMRLevel::RK Step " << stage << '\n';
+        compute_dSdt(S, dSdt, dtsub, fr_as_crse, fr_as_fine);
+      });
+      
+    enforce_consistent_state();
   }
 
   return dt;
@@ -152,6 +164,10 @@ void CNS::compute_dSdt(const MultiFab& S, MultiFab& dSdt, Real dt,
 
   int as_crse = (fr_as_crse != nullptr);
   int as_fine = (fr_as_fine != nullptr);
+
+  // if (use_hybrid_scheme) {
+  //   this->derive("shock_sensor", 0.0, shock_sensor_mf, 0);
+  // }
 
 #if CNS_USE_EB
   auto const& fact = dynamic_cast<EBFArrayBoxFactory const&>(S.Factory());
@@ -182,14 +198,23 @@ void CNS::compute_dSdt(const MultiFab& S, MultiFab& dSdt, Real dt,
           flux[idim].setVal<RunOn::Device>(0.);
         }
 
+        if (use_hybrid_scheme) {
+          Real time = state[State_Type].curTime();
+          int* bcrec_dummy;
+          cns_dershocksensor(amrex::grow(bx, 2), shock_sensor_mf[mfi], 0, 1, S[mfi], geom, time,
+                             bcrec_dummy, level);
+        }
+
 #if CNS_USE_EB
         if (flag.getType(amrex::grow(bx, 2)) == FabType::regular) {
 #endif
           Array4<const Real> s_arr = S.array(mfi);
           Array4<Real> dsdt_arr = dSdt.array(mfi);
+          Array4<const Real> ss_arr = shock_sensor_mf.array(mfi);
 
           compute_dSdt_box(bx, s_arr, dsdt_arr,
-                           {AMREX_D_DECL(&flux[0], &flux[1], &flux[2])});
+                           {AMREX_D_DECL(&flux[0], &flux[1], &flux[2])},
+                           ss_arr);
 
           if (write_to_flux_register) {
             if (fr_as_crse) {
