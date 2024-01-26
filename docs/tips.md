@@ -18,7 +18,7 @@ or using conda environments
 $ conda install --channel conda-forge yt
 ```
 
-Beware of Python **3.9** and **yt** use newer or older, **>3.11** recommended.
+Beware of the combination  Python **3.9** and **yt**. It is recommended to use newer or older Python, **>3.11** recommended.
 Check [yt Website](https://yt-project.org) for details and tutorials.
 
 ### Use cerisse script
@@ -39,8 +39,4 @@ PATH="/home/snm/work/cerisse/EB_CNS/Tools/scripts:$PATH"
 
 where the `/home/snm/...`coresponds to the installation dir
 
-
-### Defaults
-
-What are numeric defaults?
 

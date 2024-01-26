@@ -24,3 +24,8 @@ The code will be tested periodically against these regression test to validate m
 ## Test 1
 
 --8<-- "EB_CNS/Tests/Test1/README.md"
+
+
+## Test 3
+
+--8<-- "EB_CNS/Tests/Test3/README.md"

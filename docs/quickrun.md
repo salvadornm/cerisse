@@ -111,13 +111,13 @@ To load the data, open header files of a particular directory
 
 ![figure2](images/visitopen.png)
 
-If the instant 0 is open, the results for denisty will look like 
+If the instant 0 is open, the results for density will look like 
 
 ![figure3](images/visitres.png)
 
-Alternatively you can use the script **cerisse**, to open all directories at the same time (to make an animation for example)
+Alternatively you can use the script **cerisse**, to open all directories at the same time (to make an animation for example). See  [Tips](tips.md) to set-up the script.
 
 ``` bash
-$ ./cerisse visit
+$ cerisse visit
 ```
 

@@ -15,7 +15,7 @@ The exact solution is calculated using [ToroExact](https://github.com/tahandy/To
 
 After compiling using `make` to run type
 ```
-$ ./Cerisse1d.gnu.ex input
+$ ./Cerisse1d.gnu.ex inputs
 ```
 It should run very fast (5 secs, depending on machine)
 The results can be seen by
