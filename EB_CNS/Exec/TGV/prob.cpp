@@ -43,29 +43,11 @@ void amrex_probinit(const int* /*init*/, const int* /*name*/, const int* /*namel
     trans_parm.const_viscosity * cp / CNS::h_prob_parm->prandtl;
   CNS::trans_parms.sync_to_device();
 
-  // // Output IC
+  // Output IC
   amrex::Print() << "V0 = " << CNS::h_prob_parm->v0
                  << " p0 = " << CNS::h_prob_parm->p0
                  << " rho0 = " << CNS::h_prob_parm->rho0
                  << " T0 = " << CNS::h_prob_parm->T0 << std::endl;
-
-  // std::ofstream ofs("ic.txt", std::ofstream::out);
-  // amrex::Print(ofs) << "L, rho0, v0, p0, T0, gamma, mu, k, c_s0, Reynolds, "
-  //                      "Mach, Prandtl, omega_x, omega_y, omega_z"
-  //                   << std::endl;
-  // amrex::Print(ofs).SetPrecision(17)
-  //   << CNS::h_prob_parm->L << "," << CNS::h_prob_parm->rho0
-  //   << "," << CNS::h_prob_parm->v0 << ","
-  //   << CNS::h_prob_parm->p0 << "," << CNS::h_prob_parm->T0
-  //   << "," << eos.gamma << "," << trans_parm.const_viscosity << ","
-  //   << trans_parm.const_conductivity << "," << cs << ","
-  //   << CNS::h_prob_parm->reynolds << ","
-  //   << CNS::h_prob_parm->mach << ","
-  //   << CNS::h_prob_parm->prandtl << ","
-  //   << CNS::h_prob_parm->omega_x << ","
-  //   << CNS::h_prob_parm->omega_y << ","
-  //   << CNS::h_prob_parm->omega_z << std::endl;
-  // ofs.close();
 
   Gpu::copyAsync(Gpu::hostToDevice, CNS::h_prob_parm, CNS::h_prob_parm + 1,
                  CNS::d_prob_parm);
@@ -79,4 +61,89 @@ void CNS::fill_ext_src(int i, int j, int k, amrex::Real /*time*/,
                        amrex::Array4<amrex::Real> const& ext_src,
                        Parm const& /*parm*/, ProbParm const& /*prob_parm*/)
 {
+}
+
+
+void CNS::full_prob_post_timestep(int /*iteration*/)
+{
+  // Sum kinetic energy and incompressible enstrophy
+
+  int finest_level = parent->finestLevel();
+  amrex::Real time = state[State_Type].curTime();
+  amrex::Real kinetic_e = 0.0;
+  amrex::Real enstrophy = 0.0;
+
+  if (level == 0) {
+    if (amrex::ParallelDescriptor::IOProcessor()) {
+      amrex::Print() << "... Calculating sum of quantities" << std::endl;
+    }
+
+    for (int lev = 0; lev <= finest_level; lev++) {
+      CNS& cns_lev = getLevel(lev);
+
+      // Sum kinetic energy
+      amrex::MultiFab& S_new = cns_lev.get_new_data(State_Type);
+      amrex::iMultiFab ifine_mask(cns_lev.grids, cns_lev.dmap, 1, 0);
+      if (lev < parent->finestLevel()) {
+        // mask out fine covered cells, do not sum
+        ifine_mask = makeFineMask(cns_lev.grids, cns_lev.dmap, parent->boxArray(lev + 1), cns_lev.fine_ratio, 1, 0);
+      } else {
+        ifine_mask.setVal(1);
+      }
+      amrex::MultiFab volume(cns_lev.grids, cns_lev.dmap, 1, 0);
+      cns_lev.geom.GetVolume(volume);
+      auto mf = cns_lev.derive("magvort", time, 0);
+      amrex::MultiFab magvort(cns_lev.grids, cns_lev.dmap, 1, 0);
+      amrex::MultiFab::Copy(magvort, *mf, 0, 0, 1, 0);
+
+      const auto geomdata = cns_lev.geom.data();
+      auto const& sarrs = S_new.const_arrays();
+      auto const& marrs = ifine_mask.const_arrays();
+      auto const& volarr = volume.const_arrays();
+      auto const& vortarrs = magvort.const_arrays();
+
+      auto reduce_tuple = amrex::ParReduce(
+        TypeList<ReduceOpSum, ReduceOpSum>{}, TypeList<Real, Real>{}, S_new, IntVect(0),
+        [=] AMREX_GPU_DEVICE(int box_no, int i, int j, int k) -> GpuTuple<Real, Real> {
+          const amrex::Real rho = sarrs[box_no](i, j, k, URHO);
+          const amrex::Real rhoinv = 1.0 / rho;
+          const amrex::Real mx = sarrs[box_no](i, j, k, UMX);
+          const amrex::Real my = sarrs[box_no](i, j, k, UMY);
+          const amrex::Real mz = sarrs[box_no](i, j, k, UMZ);
+          const amrex::Real mask = amrex::Real(marrs[box_no](i, j, k));
+          const amrex::Real vol = volarr[box_no](i, j, k);
+          const amrex::Real mvt = vortarrs[box_no](i, j, k);
+
+          amrex::Real ke = mask * vol * 0.5 * rhoinv * (mx * mx + my * my + mz * mz);
+          amrex::Real en = mask * vol * 0.5 * rho * (mvt * mvt); // 0.5 * rho * omega^2
+          return {ke, en};
+        });
+      kinetic_e += amrex::get<0>(reduce_tuple);
+      enstrophy += amrex::get<1>(reduce_tuple);
+    }
+
+    // Reductions
+    amrex::ParallelDescriptor::ReduceRealSum(
+      &kinetic_e, 1, amrex::ParallelDescriptor::IOProcessorNumber());
+    amrex::ParallelDescriptor::ReduceRealSum(
+      &enstrophy, 1, amrex::ParallelDescriptor::IOProcessorNumber());
+
+    if (amrex::ParallelDescriptor::IOProcessor()) {
+      amrex::Print() << "TIME = " << time << '\n'
+                     << " SUM KE        = " << kinetic_e << '\n'
+                     << " SUM ENSTROPHY = " << enstrophy << '\n';
+
+      // Write the quantities at this time
+      const int log_index = 0;
+      std::ostream& data_log = parent->DataLog(log_index);
+      const int datwidth = 14;
+      const int datprecision = 6;
+      data_log << std::setw(datwidth) << time;
+      data_log << std::setw(datwidth) << std::setprecision(datprecision)
+                << kinetic_e;
+      data_log << std::setw(datwidth) << std::setprecision(datprecision)
+                << enstrophy;
+      data_log << std::endl;      
+    }
+  }
 }
