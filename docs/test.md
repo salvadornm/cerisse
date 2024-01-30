@@ -6,9 +6,9 @@ The code will be tested periodically against these regression test to validate m
 
 | Test                        |  Type          | Description                                                  |
 | --------------------------- | ---------------|    --------------------------------------------------------- |
-| Test1                       | 1D             |   Sod's tube                              |
+| Test1                       | 1D             |   **Sod's tube**                              |
 | Test2                       | 1D             |   Shu-Osher                                                  |
-| Test3                       | 2D             |   Riemann 2D (multiple)                                      |
+| Test3                       | 2D             |   **Riemann 2D** (multiple)                                      |
 | Test4                       | 2D             |   Step                                                       |
 | Test5                       | 2D             |   Flat Plate Hypersonic                                      |
 | Test6                       | 2D             |   Cylinder                                                   |
@@ -24,6 +24,10 @@ The code will be tested periodically against these regression test to validate m
 ## Test 1
 
 --8<-- "EB_CNS/Tests/Test1/README.md"
+
+## Test 2
+
+--8<-- "EB_CNS/Tests/Test2/README.md"
 
 
 ## Test 3

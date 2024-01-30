@@ -259,7 +259,8 @@ Four chemical integrators are supplied by PelePhysics:
 | cns.min_react_temp          | Real          | 300.0          | Turn off reactor below this temperature
 
 Some useful `ode` options
+
 | Option                      | Type          | Default | Description                                                  |
 | --------------------------- | ------------- |:-------:| ------------------------------------------------------------ |
 | ode.verbose                 | Bool          | 0       | Print out runtime info
-| ode.clean_init_massfrac     | Bool        | 0 | Normalise mass fractions to sum to 1.0 at the beginning of the reactor solve
+| ode.clean_init_massfrac     | Bool          | 0        | Normalise mass fractions to sumY=1 at the beginning of reactor solver

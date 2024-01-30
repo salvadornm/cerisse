@@ -1,11 +1,8 @@
-# Tutorial
-
 This page explains how to run the code after download
-
 
 ## Instal Pre-requisites
 
-Install auxiliar packages 
+Install auxiliar packages, **AMReX** and **PelePhysics**
 
 ```
 $ cd cerisse/Submodules/
@@ -14,7 +11,6 @@ $ ./install safe
 It will connect to Github and download the required packages.
 `$ ./install git`, will intall latest release commit in the **development** branch
 of AMReX
-
 
 ### AMReX
 
@@ -25,12 +21,12 @@ option will install version **23.11**
 
 ### PelePhysics
 
-This is the library that control chemistry
-Is an approx 30 MB download, it wil expand to a folder 146 M, the install safe
+This is the library that control chemistry integartion and reading chemistry.
+It is an approx 30 MB download, it wil expand to a folder 146 M, the install safe
 option will install version **23.03**
 
 
-## Tutorial 1
+## Tutorial
 
 ### 1) Go to Problem Folder
 
@@ -53,20 +49,8 @@ GNUmakefile  inputs  Make.package  prob.cpp  prob.H  prob_parm.H
 A detail explanation of the files is in the Run tab, but basically inpt is your simulation comntrol files
 (mesh size, number of steps, etc..), while `prob.*` files determine the problem to solve.
 
-### 2) Install SUNDIALS
 
-SUNDIALS - a SUite of Nonlinear and DIfferential/ALgebraic equation Solvers.
-
-controlled by AMREX Options so it can be targeted. Do it once unless toying with chemistry.
-It is a 30 M install done within PelePhysics. It has only to be done once.
-
-```
-$ make SUNDIALS
-```
-
-NOTE This is not needed anymore
-
-### 3) Compile code
+### 2) Compile code
 
 To compile use
 
@@ -74,12 +58,11 @@ To compile use
 $ make
 ```
 
-(use `$make -j4`` if possible)
-
-It will take a while the first time, once finished it will create a temporary directory 
+TIP: use `$make -j4` if possible, it will compile faster. This step will be slow, depending on your computer, but most of the time it has to be done only once.
+Once finished it will create a temporary directory 
 `$ tmp_build_dir` 
 
-and (if succeful) an executable will be created named
+and (if succesful) an executable will be created named
 `Cerisse2d.gnu.ex`
 the name will change depending on the compiler and problem dimension
 
@@ -90,7 +73,7 @@ To run type
 ```bash
 $ ./Cerisse2d.gnu.ex inputs
 ```
-It will run very quickly for 92 steps, and the output should be like this
+It will run very quickly for 92 steps, and the output should be like this (exact numbers can change machine to machine)
 
 ![figure1](images/quickrun.png)
 
