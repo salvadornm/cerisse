@@ -382,6 +382,8 @@ protected:
   static int refine_dengrad_max_lev;
   static amrex::Vector<amrex::Real> refine_velgrad;
   static int refine_velgrad_max_lev;
+  static amrex::Vector<amrex::Real> refine_presgrad;
+  static int refine_presgrad_max_lev;
   static amrex::Vector<amrex::Real> refine_magvort;
   static int refine_magvort_max_lev;
   static amrex::Vector<amrex::Real> refine_tke;

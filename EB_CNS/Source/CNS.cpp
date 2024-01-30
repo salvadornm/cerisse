@@ -349,6 +349,12 @@ void CNS::post_restart()
   std::memcpy(CNS::d_prob_parm, CNS::h_prob_parm, sizeof(ProbParm));
 #endif
 
+  Sborder.define(grids, dmap, LEN_STATE, NUM_GROW, MFInfo(), Factory());
+  shock_sensor_mf.define(grids, dmap, 1, 3, MFInfo(), Factory());
+  if (!use_hybrid_scheme) {
+    shock_sensor_mf.setVal(1.0); // default to shock-capturing scheme
+  }
+
   // Initialize reactor
   if (do_react) {
     if (chem_integrator == "ReactorNull") {
@@ -458,13 +464,13 @@ void CNS::errorEst(TagBoxArray& tags, int /*clearval*/, int tagval, Real time,
   FillPatch(*this, Sg1, Sg1.nGrow(), cur_time, State_Type, URHO, NVAR, 0);
 
   auto const& tagma = tags.arrays();
+  const auto dxinv = geom.InvCellSizeArray();
 
   if (level < refine_dengrad_max_lev) {
     const Real threshold = refine_dengrad[level];
 
     MultiFab rho(Sg1, amrex::make_alias, URHO, 1);
     auto const& rhoma = rho.const_arrays();
-    const auto dxinv = geom.InvCellSizeArray();
 
     ParallelFor(rho, [=] AMREX_GPU_DEVICE(int box_no, int i, int j, int k) noexcept {
       cns_tag_grad(i, j, k, tagma[box_no], rhoma[box_no], dxinv, threshold, tagval);
@@ -486,6 +492,25 @@ void CNS::errorEst(TagBoxArray& tags, int /*clearval*/, int tagval, Real time,
       auto mvarr = velgrad.const_array();
       ParallelFor(bx, [=] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {
         cns_tag_error(i, j, k, tagarr, mvarr, threshold, tagval);
+      });
+    }
+    // Gpu::streamSynchronize();
+  }
+
+  if (level < refine_presgrad_max_lev) {
+    const Real threshold = refine_presgrad[level];
+
+    for (MFIter mfi(tags, TilingIfNotGPU()); mfi.isValid(); ++mfi) {
+      const Box& bx = mfi.tilebox();
+
+      FArrayBox pres(bx, 1);
+      const int* bc = 0; // dummy
+      cns_derpres(bx, pres, 0, 1, Sg1[mfi], geom, cur_time, bc, level);
+
+      auto tagarr = tags.array(mfi);
+      auto parr = pres.const_array();
+      ParallelFor(bx, [=] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {
+        cns_tag_grad(i, j, k, tagarr, parr, dxinv, threshold, tagval);
       });
     }
     // Gpu::streamSynchronize();
@@ -614,7 +639,7 @@ void CNS::printTotalandCheckNan() const
 #endif
 
   // Nan detector for soft exit
-  if (isnan(tot[0]) || isnan(tot[1]) || isnan(tot[2]) || isnan(tot[3]) || isnan(tot[4])) { signalStopJob = true; }
+  if (isnan(tot[0]) || AMREX_D_TERM(isnan(tot[1]), || isnan(tot[2]), || isnan(tot[3])) || isnan(tot[4])) { signalStopJob = true; }
   amrex::ParallelDescriptor::ReduceBoolOr(signalStopJob);
 }
 
@@ -748,6 +773,25 @@ void CNS::read_params()
       }
       for (; lev < max_level; ++lev) {
         refine_velgrad[lev] = refine_tmp[numvals - 1];
+      }
+    }
+  }
+
+  pp.query("refine_presgrad_max_lev", refine_presgrad_max_lev);
+  numvals = pp.countval("refine_presgrad");
+  if (numvals > 0) {
+    if (numvals == max_level) {
+      pp.queryarr("refine_presgrad", refine_presgrad);
+    } else if (max_level > 0) {
+      refine_presgrad.resize(max_level);
+      Vector<Real> refine_tmp;
+      pp.queryarr("refine_presgrad", refine_tmp);
+      int lev = 0;
+      for (; lev < std::min<int>(numvals, max_level); ++lev) {
+        refine_presgrad[lev] = refine_tmp[lev];
+      }
+      for (; lev < max_level; ++lev) {
+        refine_presgrad[lev] = refine_tmp[numvals - 1];
       }
     }
   }

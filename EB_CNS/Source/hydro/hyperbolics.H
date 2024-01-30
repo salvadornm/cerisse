@@ -546,10 +546,11 @@ AMREX_GPU_DEVICE AMREX_FORCE_INLINE void cns_riemann(
                  sys, parm);
 
   if (!isgreater(rl, 0.0) || !isgreater(pl, 0.0) || 
-      !isgreater(rr, 0.0) || !isgreater(pr, 0.0)) { // isgreater() returns false with nan
+      !isgreater(rr, 0.0) || !isgreater(pr, 0.0) || 
+      isnan(AMREX_D_TERM(ul+ur, +ut1l+ut1r, +ut2l+ut2r)) ) { // isgreater() returns false with nan
     // Revert to piecewise linear (Godunov) reconstruction
     // SNM
-    //  std::cout << "face " << i << "," << j << "," << k << " reverted to linear recon" << '\n';
+    // std::cout << "face " << i << "," << j << "," << k << " reverted to linear recon" << '\n';
 
     rl = q(iv - iv_dir, QRHO);
     AMREX_D_TERM(ul = q(iv - iv_dir, QUN);, ut1l = q(iv - iv_dir, QUT);
@@ -573,10 +574,10 @@ AMREX_GPU_DEVICE AMREX_FORCE_INLINE void cns_riemann(
   eos.RPY2Cs(rr, pr, yr, cr);
 
   if (isnan(cl) || isnan(cr)) {
-    std::cout << "l c=" << cl << " p=" << pl << " r=" << rl << " u=" << ul << " yl=";
+    std::cout << "l c=" << cl << "->" << q(iv-iv_dir, QC) << " p=" << pl << " r=" << rl << " u=" << ul << " yl=";
     for (int n = 0; n < NUM_SPECIES; ++n) std::cout << yl[n] << " ";
     std::cout << '\n'
-              << "r c=" << cr << " p=" << pr << " r=" << rr << " u=" << ur << " yr=";
+              << "r c=" << "->" << q(iv, QC) << cr << " p=" << pr << " r=" << rr << " u=" << ur << " yr=";
     for (int n = 0; n < NUM_SPECIES; ++n) std::cout << yr[n] << " ";    
     std::cout << '\n';
     std::cout << "qc=" << q(iv-iv_dir, QC) << "," << q(iv, QC) << " qg=" << q(iv-iv_dir, QG) << "," << q(iv, QG)<< '\n';

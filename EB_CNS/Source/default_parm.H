@@ -22,6 +22,8 @@ int CNS::refine_dengrad_max_lev = -1;
 Vector<Real> CNS::refine_dengrad;
 int CNS::refine_velgrad_max_lev = -1;
 Vector<Real> CNS::refine_velgrad;
+int CNS::refine_presgrad_max_lev = -1;
+Vector<Real> CNS::refine_presgrad;
 int CNS::refine_magvort_max_lev = -1;
 Vector<Real> CNS::refine_magvort;
 int CNS::refine_tke_max_lev = -1;

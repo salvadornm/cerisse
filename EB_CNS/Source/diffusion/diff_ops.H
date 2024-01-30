@@ -33,10 +33,14 @@ AMREX_GPU_DEVICE AMREX_FORCE_INLINE amrex::Real normal_diff<4>(
   // Note that the normal stencil is [-1.5, -0.5, 0.5, 1.5]*dx
   //  i-2,  i-1  |  i,  i+1
   //             ^ we calculate dqdn at this interface
-  Real w1 = -1.0 / 24.0;
-  Real w2 = 27.0 / 24.0;
-  Real w3 = -27.0 / 24.0;
-  Real w4 = 1.0 / 24.0;
+  // Real w1 = -1.0 / 24.0;
+  // Real w2 = 27.0 / 24.0;
+  // Real w3 = -27.0 / 24.0;
+  // Real w4 = 1.0 / 24.0;
+  Real w1 = -1.0 / 12.0; // only second order is "exact"
+  Real w2 = 5.0 / 4.0;
+  Real w3 = -5.0 / 4.0;
+  Real w4 = 1.0 / 12.0;
 
   return (w1 * q(iv + ivn, comp) + w2 * q(iv, comp) + w3 * q(iv - ivn, comp) +
           w4 * q(iv - 2 * ivn, comp)) *
@@ -78,14 +82,14 @@ tangent_diff<4>(amrex::IntVect iv, int idir, int tdir, int comp,
 
   // // Note that the transverse stencil is [-2, -1, 1, 2]*dx
   // // weights for derivatives
-  // Real w1 = 0.0;
-  // Real w2 = 0.5;
-  // Real w3 = -0.5;
-  // Real w4 = 0.0;
-  Real w1 = -1.0 / 12.0;
-  Real w2 = 8.0 / 12.0;
-  Real w3 = -8.0 / 12.0;
-  Real w4 = 1.0 / 12.0;
+  // Real w1 = -1.0 / 12.0;
+  // Real w2 = 8.0 / 12.0;
+  // Real w3 = -8.0 / 12.0;
+  // Real w4 = 1.0 / 12.0;
+  Real w1 = 0.0;
+  Real w2 = 0.5;
+  Real w3 = -0.5;
+  Real w4 = 0.0;
 
   Real d4 = w1 * q(iv + ivn + 2 * ivt, comp) + w2 * q(iv + ivn + ivt, comp) +
             w3 * q(iv + ivn - ivt, comp) + w4 * q(iv + ivn - 2 * ivt, comp);
@@ -100,6 +104,31 @@ tangent_diff<4>(amrex::IntVect iv, int idir, int tdir, int comp,
   Real i2 = 9.0 / 16.0;
 
   return (i1 * d1 + i2 * d2 + i2 * d3 + i1 * d4) * dxinv[tdir];
+
+  // Real fac = std::sqrt(14) / 36.0 - 1.0 / 72.0;
+  // Real rt78 = std::sqrt(7.0 / 8.0);
+
+  // Real w1 = -fac;
+  // Real w2 = 8 * fac;
+  // Real w3 = -8 * fac;
+  // Real w4 = fac;
+  // Real d3 = w1 * q(iv + 2 * ivt, comp) + w2 * q(iv + ivt, comp) +
+  //           w3 * q(iv - ivt, comp) + w4 * q(iv - 2 * ivt, comp);
+  // Real d2 = w1 * q(iv - ivn + 2 * ivt, comp) + w2 * q(iv - ivn + ivt, comp) +
+  //           w3 * q(iv - ivn - ivt, comp) + w4 * q(iv - ivn - 2 * ivt, comp);
+
+  // w1 *= rt78;
+  // w2 *= rt78;
+  // w3 *= rt78;
+  // w4 *= rt78;
+  // Real d4 = w1 * q(iv + ivn + 2 * ivt, comp) + w2 * q(iv + ivn + ivt, comp) +
+  //           w3 * q(iv + ivn - ivt, comp) + w4 * q(iv + ivn - 2 * ivt, comp);
+  // Real d1 = w1 * q(iv - 2 * ivn + 2 * ivt, comp) + w2 * q(iv - 2 * ivn + ivt, comp) +
+  //           w3 * q(iv - 2 * ivn - ivt, comp) + w4 * q(iv - 2 * ivn - 2 * ivt, comp); 
+
+  // Real i1 = -1.0 / (16.0 * rt78 - 2.0);
+  // Real i2 = 8.0 * rt78 / (16.0 * rt78 - 2.0);
+  // return (i1 * d1 + i2 * d2 + i2 * d3 + i1 * d4) * dxinv[tdir];
 }
 
 //// Interpolation with variable order using polynomial. ////

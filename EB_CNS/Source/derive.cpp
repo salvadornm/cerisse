@@ -679,7 +679,61 @@ void cns_dervelgrad(const Box& bx, FArrayBox& derfab, int dcomp, int /*ncomp*/,
 //   });
 // }
 
-// Larsson shock sensor 
+// // Larsson shock sensor 
+// void cns_dershocksensor(const Box& bx, FArrayBox& derfab, int dcomp, int /*ncomp*/,
+//                         const FArrayBox& datafab, const Geometry& geomdata, Real time,
+//                         const int* bcrec, int level)
+// {
+//   // Get divu and magvort
+//   FArrayBox divu_fab(bx, 1, amrex::The_Async_Arena());
+//   FArrayBox magvort_fab(bx, 1, amrex::The_Async_Arena());
+//   cns_derdivu(bx, divu_fab, 0, 1, datafab, geomdata, time, bcrec, level);
+//   cns_dermagvort(bx, magvort_fab, 0, 1, datafab, geomdata, time, bcrec, level);
+  
+//   FArrayBox tmp_fab(amrex::grow(bx, 2), 1, amrex::The_Async_Arena());
+//   tmp_fab.setVal(0.0);
+//   auto const dat = datafab.const_array();  
+//   auto const divu = divu_fab.const_array();
+//   auto const magvort = magvort_fab.const_array();
+//   auto const& tmp = tmp_fab.array(); // store shock sensor before adding buffer
+//   amrex::ParallelFor(bx, [=] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {
+//     // Get speed of sound and dx
+//     const Real rho = dat(i, j, k, URHO);
+//     const Real rhoinv = 1.0 / rho;
+//     const Real ei = dat(i, j, k, UEDEN) * rhoinv -
+//                     0.5 * rhoinv * rhoinv *
+//                       (AMREX_D_TERM(dat(i, j, k, UMX) * dat(i, j, k, UMX),
+//                                     +dat(i, j, k, UMY) * dat(i, j, k, UMY),
+//                                     +dat(i, j, k, UMZ) * dat(i, j, k, UMZ)));
+//     Real Y[NUM_SPECIES];
+//     for (int n = 0; n < NUM_SPECIES; ++n) { Y[n] = dat(i, j, k, UFS + n) * rhoinv; }
+//     amrex::Real T, cs;
+//     auto eos = pele::physics::PhysicsType::eos();
+//     eos.REY2T(rho, ei, Y, T);
+//     eos.RTY2Cs(rho, T, Y, cs);
+//     const Real dx = std::pow(AMREX_D_TERM(geomdata.CellSize(0), *geomdata.CellSize(1),
+//                                     *geomdata.CellSize(2)), 1.0 / amrex::SpaceDim);
+    
+//     // Get shock sensor
+//     tmp(i, j, k) = -divu(i, j, k) / amrex::max(0.05 * cs / dx, 5.0 * magvort(i, j, k));
+//   });
+
+//   // Add 2 cell buffer
+//   auto shock_sensor = derfab.array(dcomp);
+//   amrex::ParallelFor(bx, [=] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {
+//     Real max_neighbour = amrex::max(tmp(i, j, k), tmp(i + 1, j, k), tmp(i - 1, j, k), tmp(i + 2, j, k), tmp(i - 3, j, k));
+// #if AMREX_SPACEDIM >= 2
+//     max_neighbour = amrex::max(max_neighbour, tmp(i, j + 1, k), tmp(i, j - 1, k), tmp(i, j + 2, k), tmp(i, j - 2, k), tmp(i + 1, j + 1, k), tmp(i + 1, j - 1, k), tmp(i - 1, j + 1, k), tmp(i - 1, j - 1, k));
+// #endif
+// #if AMREX_SPACEDIM == 3
+//     max_neighbour = amrex::max(max_neighbour, tmp(i, j, k + 1), tmp(i, j, k - 1));
+// #endif
+//     shock_sensor(i, j, k) = (max_neighbour >= 1.0) ? 1.0 : 0.0;
+//     // shock_sensor(i, j, k) = (tmp(i, j, k) >= 1.0) ? 1.0 : 0.0;
+//   });
+// }
+
+// Ducros shock sensor 
 void cns_dershocksensor(const Box& bx, FArrayBox& derfab, int dcomp, int /*ncomp*/,
                         const FArrayBox& datafab, const Geometry& geomdata, Real time,
                         const int* bcrec, int level)
@@ -690,46 +744,13 @@ void cns_dershocksensor(const Box& bx, FArrayBox& derfab, int dcomp, int /*ncomp
   cns_derdivu(bx, divu_fab, 0, 1, datafab, geomdata, time, bcrec, level);
   cns_dermagvort(bx, magvort_fab, 0, 1, datafab, geomdata, time, bcrec, level);
   
-  FArrayBox tmp_fab(amrex::grow(bx, 2), 1, amrex::The_Async_Arena());
-  tmp_fab.setVal(0.0);
-  auto const dat = datafab.const_array();  
   auto const divu = divu_fab.const_array();
   auto const magvort = magvort_fab.const_array();
-  auto const& tmp = tmp_fab.array(); // store shock sensor before adding buffer
-  amrex::ParallelFor(bx, [=] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {
-    // Get speed of sound and dx
-    const Real rho = dat(i, j, k, URHO);
-    const Real rhoinv = 1.0 / rho;
-    const Real ei = dat(i, j, k, UEDEN) * rhoinv -
-                    0.5 * rhoinv * rhoinv *
-                      (AMREX_D_TERM(dat(i, j, k, UMX) * dat(i, j, k, UMX),
-                                    +dat(i, j, k, UMY) * dat(i, j, k, UMY),
-                                    +dat(i, j, k, UMZ) * dat(i, j, k, UMZ)));
-    Real Y[NUM_SPECIES];
-    for (int n = 0; n < NUM_SPECIES; ++n) { Y[n] = dat(i, j, k, UFS + n) * rhoinv; }
-    amrex::Real T, cs;
-    auto eos = pele::physics::PhysicsType::eos();
-    eos.REY2T(rho, ei, Y, T);
-    eos.RTY2Cs(rho, T, Y, cs);
-    const Real dx = std::pow(AMREX_D_TERM(geomdata.CellSize(0), *geomdata.CellSize(1),
-                                    *geomdata.CellSize(2)), 1.0 / amrex::SpaceDim);
-    
-    // Get shock sensor
-    tmp(i, j, k) = -divu(i, j, k) / amrex::max(0.05 * cs / dx, 5.0 * magvort(i, j, k));
-  });
-
-  // Add 2 cell buffer
   auto shock_sensor = derfab.array(dcomp);
   amrex::ParallelFor(bx, [=] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {
-    Real max_neighbour = amrex::max(tmp(i, j, k), tmp(i + 1, j, k), tmp(i - 1, j, k), tmp(i + 2, j, k), tmp(i - 3, j, k));
-#if AMREX_SPACEDIM >= 2
-    max_neighbour = amrex::max(max_neighbour, tmp(i, j + 1, k), tmp(i, j - 1, k), tmp(i, j + 2, k), tmp(i, j - 2, k), tmp(i + 1, j + 1, k), tmp(i + 1, j - 1, k), tmp(i - 1, j + 1, k), tmp(i - 1, j - 1, k));
-#endif
-#if AMREX_SPACEDIM == 3
-    max_neighbour = amrex::max(max_neighbour, tmp(i, j, k + 1), tmp(i, j, k - 1));
-#endif
-    shock_sensor(i, j, k) = (max_neighbour >= 1.0) ? 1.0 : 0.0;
-    // shock_sensor(i, j, k) = (tmp(i, j, k) >= 1.0) ? 1.0 : 0.0;
+    Real divu2 = divu(i, j, k) * divu(i, j, k);
+    Real magvort2 = magvort(i, j, k) * magvort(i, j, k);
+    shock_sensor(i, j, k) = divu2 / amrex::max(divu2 + magvort2, 1e-3);
   });
 }
 

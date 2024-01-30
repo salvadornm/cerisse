@@ -129,6 +129,7 @@ void CNS::compute_dSdt_box(Box const& bx, Array4<const Real>& sarr,
 
   // A fab to store the viscous fluxes in VPDF or VSPDF
   FArrayBox vflux_fab;
+  FArrayBox hybflux_fab; // to store hybrid flux
   // FArrayBox pflux_fab; // unused
 
   for (int cdir = 0; cdir < AMREX_SPACEDIM; ++cdir) { // Loop through space direction
@@ -144,6 +145,8 @@ void CNS::compute_dSdt_box(Box const& bx, Array4<const Real>& sarr,
 
     uint num_scheme_switch = 1;
     if (use_hybrid_scheme) {
+      hybflux_fab.resize(flxbx, NVAR, The_Async_Arena());
+
       ReduceOps<ReduceOpMin, ReduceOpMax> reduce_op;
       ReduceData<Real, Real> reduce_data(reduce_op);
       using ReduceTuple = typename decltype(reduce_data)::Type;
@@ -163,6 +166,7 @@ void CNS::compute_dSdt_box(Box const& bx, Array4<const Real>& sarr,
                                // central scheme in smooth region
       }
     }
+    auto const& hybflx_arr = hybflux_fab.array();
 
     for (int nf = 0; nf <= NUM_FIELD; ++nf) { // Loop through fields
       auto const& q = qtmp.array(nf * NPRIM);
@@ -200,11 +204,19 @@ void CNS::compute_dSdt_box(Box const& bx, Array4<const Real>& sarr,
         // amrex::Print() << "Overwriting with central scheme in smooth region" << std::endl;
         amrex::ParallelFor(
           flxbx, [=] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {
-            if (shock_sensor_arr(i, j, k) == 0.0 &&
-                shock_sensor_arr(IntVect(AMREX_D_DECL(i, j, k)) - IntVect::TheDimensionVector(cdir)) == 0.0) {
-              cns_KEEP4(i, j, k, cdir, flx_arr, q);
+            Real ss_face = // shock sensor at face
+              amrex::max(shock_sensor_arr(i, j, k),
+                         shock_sensor_arr(IntVect(AMREX_D_DECL(i, j, k)) -
+                                          IntVect::TheDimensionVector(cdir)));
+            if (ss_face < 1.0) {
+              cns_KEEP4(i, j, k, cdir, hybflx_arr, q);
+              
+              for (int n = 0; n < NVAR; ++n) {
+                flx_arr(i, j, k, n) = ss_face * flx_arr(i, j, k, n) +
+                                      (1.0 - ss_face) * hybflx_arr(i, j, k, n);
+              }
             }
-        });
+          });
       }
 
       // Store viscous fluxes separately
