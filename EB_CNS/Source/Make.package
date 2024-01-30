@@ -8,6 +8,7 @@ CEXE_headers += default_parm.H
 CEXE_headers += bcfill.H
 CEXE_headers += bc_util.H
 CEXE_headers += file_io.H
+CEXE_headers += nscbc.H
 
 CEXE_sources += main.cpp
 CEXE_sources += advance.cpp
@@ -20,6 +21,7 @@ CEXE_sources += io.cpp
 CEXE_sources += setup.cpp
 CEXE_sources += react.cpp
 CEXE_sources += file_io.cpp
+CEXE_sources += nscbc.cpp
 
 ifeq ($(USE_EB), TRUE)
   CEXE_headers += custom_geometry.H

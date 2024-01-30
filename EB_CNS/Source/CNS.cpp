@@ -41,6 +41,10 @@ CNS::CNS(Amr& papa, int lev, const Geometry& level_geom, const BoxArray& bl,
   buildMetrics();
 
   Sborder.define(grids, dmap, LEN_STATE, NUM_GROW, MFInfo(), Factory());
+  shock_sensor_mf.define(grids, dmap, 1, 3, MFInfo(), Factory());
+  if (!use_hybrid_scheme) {
+    shock_sensor_mf.setVal(1.0); // default to shock-capturing scheme
+  }
 
   // Initialize reaction
   get_new_data(Reactions_Type).setVal(0.0);
@@ -134,11 +138,19 @@ void CNS::initData()
   ProbParm const* lprobparm =
     d_prob_parm; // <T> const* = pointer to constant <T>; const <T>* == <T> const*
   const auto geomdata = geom.data();
+#ifdef USE_PMFDATA
+  pele::physics::PMF::PmfData::DataContainer const* lpmfdata = pmf_data.getDeviceData();
+#endif
 
   auto const& sarrs = S_new.arrays();
   amrex::ParallelFor(
     S_new, [=] AMREX_GPU_DEVICE(int box_no, int i, int j, int k) noexcept {
-      prob_initdata(i, j, k, sarrs[box_no], geomdata, *lparm, *lprobparm);
+      prob_initdata(i, j, k, sarrs[box_no], geomdata, *lparm, *lprobparm
+#ifdef USE_PMFDATA
+      , lpmfdata
+#endif
+      );
+
       cns_check_species_sum_to_one(i, j, k,
         sarrs[box_no]); // Verify that the sum of (rho Y)_i = rho at every cell
     });
@@ -298,6 +310,10 @@ void CNS::postCoarseTimeStep(Real time)
 
   AmrLevel::postCoarseTimeStep(time);
 
+#ifdef USE_PROB_POST_COARSETIMESTEP
+  prob_post_coarsetimestep(time);
+#endif
+
   printTotalandCheckNan(); // must do because this checks for nan as well
 }
 
@@ -332,6 +348,12 @@ void CNS::post_restart()
 #else
   std::memcpy(CNS::d_prob_parm, CNS::h_prob_parm, sizeof(ProbParm));
 #endif
+
+  Sborder.define(grids, dmap, LEN_STATE, NUM_GROW, MFInfo(), Factory());
+  shock_sensor_mf.define(grids, dmap, 1, 3, MFInfo(), Factory());
+  if (!use_hybrid_scheme) {
+    shock_sensor_mf.setVal(1.0); // default to shock-capturing scheme
+  }
 
   // Initialize reactor
   if (do_react) {
@@ -442,13 +464,13 @@ void CNS::errorEst(TagBoxArray& tags, int /*clearval*/, int tagval, Real time,
   FillPatch(*this, Sg1, Sg1.nGrow(), cur_time, State_Type, URHO, NVAR, 0);
 
   auto const& tagma = tags.arrays();
+  const auto dxinv = geom.InvCellSizeArray();
 
   if (level < refine_dengrad_max_lev) {
     const Real threshold = refine_dengrad[level];
 
     MultiFab rho(Sg1, amrex::make_alias, URHO, 1);
     auto const& rhoma = rho.const_arrays();
-    const auto dxinv = geom.InvCellSizeArray();
 
     ParallelFor(rho, [=] AMREX_GPU_DEVICE(int box_no, int i, int j, int k) noexcept {
       cns_tag_grad(i, j, k, tagma[box_no], rhoma[box_no], dxinv, threshold, tagval);
@@ -470,6 +492,25 @@ void CNS::errorEst(TagBoxArray& tags, int /*clearval*/, int tagval, Real time,
       auto mvarr = velgrad.const_array();
       ParallelFor(bx, [=] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {
         cns_tag_error(i, j, k, tagarr, mvarr, threshold, tagval);
+      });
+    }
+    // Gpu::streamSynchronize();
+  }
+
+  if (level < refine_presgrad_max_lev) {
+    const Real threshold = refine_presgrad[level];
+
+    for (MFIter mfi(tags, TilingIfNotGPU()); mfi.isValid(); ++mfi) {
+      const Box& bx = mfi.tilebox();
+
+      FArrayBox pres(bx, 1);
+      const int* bc = 0; // dummy
+      cns_derpres(bx, pres, 0, 1, Sg1[mfi], geom, cur_time, bc, level);
+
+      auto tagarr = tags.array(mfi);
+      auto parr = pres.const_array();
+      ParallelFor(bx, [=] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {
+        cns_tag_grad(i, j, k, tagarr, parr, dxinv, threshold, tagval);
       });
     }
     // Gpu::streamSynchronize();
@@ -598,7 +639,7 @@ void CNS::printTotalandCheckNan() const
 #endif
 
   // Nan detector for soft exit
-  if (isnan(tot[0]) || isnan(tot[1]) || isnan(tot[2]) || isnan(tot[3]) || isnan(tot[4])) { signalStopJob = true; }
+  if (isnan(tot[0]) || AMREX_D_TERM(isnan(tot[1]), || isnan(tot[2]), || isnan(tot[3])) || isnan(tot[4])) { signalStopJob = true; }
   amrex::ParallelDescriptor::ReduceBoolOr(signalStopJob);
 }
 
@@ -662,10 +703,6 @@ void CNS::read_params()
   pp.query("cfl", cfl);
   pp.query("fixed_dt", fixed_dt);
   pp.query("dt_cutoff", dt_cutoff);
-  pp.query("rk_order", rk_order); // 1 or 2
-  if (rk_order != 1 && rk_order != 2) {
-    amrex::Abort("CNS: rk_order must be 1 or 2");
-  }
 
   pp.query("recon_char_var", recon_char_var);
   pp.query("char_sys", char_sys);
@@ -680,6 +717,7 @@ void CNS::read_params()
   // option to users
   pp.query("limiter_theta", plm_theta); // MUSCL specific parameter
   // }
+  pp.query("use_hybrid_scheme", use_hybrid_scheme);
 
   Vector<int> lo_bc(AMREX_SPACEDIM), hi_bc(AMREX_SPACEDIM);
   pp.getarr("lo_bc", lo_bc, 0, AMREX_SPACEDIM);
@@ -735,6 +773,25 @@ void CNS::read_params()
       }
       for (; lev < max_level; ++lev) {
         refine_velgrad[lev] = refine_tmp[numvals - 1];
+      }
+    }
+  }
+
+  pp.query("refine_presgrad_max_lev", refine_presgrad_max_lev);
+  numvals = pp.countval("refine_presgrad");
+  if (numvals > 0) {
+    if (numvals == max_level) {
+      pp.queryarr("refine_presgrad", refine_presgrad);
+    } else if (max_level > 0) {
+      refine_presgrad.resize(max_level);
+      Vector<Real> refine_tmp;
+      pp.queryarr("refine_presgrad", refine_tmp);
+      int lev = 0;
+      for (; lev < std::min<int>(numvals, max_level); ++lev) {
+        refine_presgrad[lev] = refine_tmp[lev];
+      }
+      for (; lev < max_level; ++lev) {
+        refine_presgrad[lev] = refine_tmp[numvals - 1];
       }
     }
   }
@@ -829,6 +886,18 @@ void CNS::read_params()
   pp.query("do_vpdf", do_vpdf);
   pp.query("do_spdf", do_spdf);
 
+  pp.query("amr_interp_order", amr_interp_order);
+  if (amr_interp_order == 3 && amrex::SpaceDim == 1) {
+    amrex::Abort("CNS: quadratic_interp does not support 1D.");
+  }
+  pp.query("rk_order", rk_order); // 1-4
+  if (rk_order != 1 && rk_order != 2) {
+    // amrex::Abort("CNS: rk_order must be 1 or 2");
+    if (do_react || do_psgs || do_pd_model || do_vpdf || do_spdf) {
+      amrex::Abort("CNS: rk_order must be 1 or 2 for reaction and/or SF");
+    }
+  }
+
   pp.query("do_les", do_les);
   pp.query("do_pasr", do_pasr);
   if (do_les || do_pasr) {
@@ -840,6 +909,12 @@ void CNS::read_params()
     pp.query("Sc_T", Sc_T);
     pp.query("Cm", Cm);
   }
+
+  pp.query("do_nscbc", do_nscbc);
+  pp.query("nscbc_relax_p", nscbc_relax_p);
+  pp.query("nscbc_relax_u", nscbc_relax_u);
+  pp.query("nscbc_relax_T", nscbc_relax_T);
+  pp.query("ambient_p", ambient_p);
 
 #if CNS_USE_EB
   // eb_weight in redist

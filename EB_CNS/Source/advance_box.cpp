@@ -2,13 +2,14 @@
 #include "diffusion.H"
 #include "hyperbolics.H"
 #include "recon.H"
-// #include "char_recon.H"
+#include "central_scheme.H"
 
 using namespace amrex;
 
 void CNS::compute_dSdt_box(Box const& bx, Array4<const Real>& sarr,
                            Array4<Real>& dsdtarr,
-                           std::array<FArrayBox*, AMREX_SPACEDIM> const& flxfab)
+                           std::array<FArrayBox*, AMREX_SPACEDIM> const& flxfab,
+                           Array4<const Real>& shock_sensor_arr)
 {
   BL_PROFILE("CNS::compute_dSdt_box()");
 
@@ -128,6 +129,7 @@ void CNS::compute_dSdt_box(Box const& bx, Array4<const Real>& sarr,
 
   // A fab to store the viscous fluxes in VPDF or VSPDF
   FArrayBox vflux_fab;
+  FArrayBox hybflux_fab; // to store hybrid flux
   // FArrayBox pflux_fab; // unused
 
   for (int cdir = 0; cdir < AMREX_SPACEDIM; ++cdir) { // Loop through space direction
@@ -141,42 +143,81 @@ void CNS::compute_dSdt_box(Box const& bx, Array4<const Real>& sarr,
     }
     auto const& vflx_arr = vflux_fab.array();
 
+    uint num_scheme_switch = 1;
+    if (use_hybrid_scheme) {
+      hybflux_fab.resize(flxbx, NVAR, The_Async_Arena());
+
+      ReduceOps<ReduceOpMin, ReduceOpMax> reduce_op;
+      ReduceData<Real, Real> reduce_data(reduce_op);
+      using ReduceTuple = typename decltype(reduce_data)::Type;
+      reduce_op.eval(bxg2, reduce_data,
+                     [=] AMREX_GPU_DEVICE(int i, int j, int k) -> ReduceTuple {
+                       return {shock_sensor_arr(i, j, k), shock_sensor_arr(i, j, k)};
+                     });
+      Real min_shock_sensor = amrex::get<0>(reduce_data.value());
+      Real max_shock_sensor = amrex::get<1>(reduce_data.value());
+
+      if (max_shock_sensor == 0.0) {
+        num_scheme_switch = 0; // all smooth, use central scheme directly
+      } else if (min_shock_sensor == 1.0) {
+        num_scheme_switch = 1; // all shock, use shock-capture scheme directly
+      } else {
+        num_scheme_switch = 2; // do shock-capturing first, then overwrite with
+                               // central scheme in smooth region
+      }
+    }
+    auto const& hybflx_arr = hybflux_fab.array();
+
     for (int nf = 0; nf <= NUM_FIELD; ++nf) { // Loop through fields
-      // Convert primitive to characteristic
       auto const& q = qtmp.array(nf * NPRIM);
       auto const& flx_arr = flxfab[cdir]->array(nf * NVAR);
-      // auto const& p_arr = pflux_fab.array(nf*NVAR);
-
-      // #ifdef CNS_TRUE_CHAR_RECON
-      //       // Reconstruction
-      //       amrex::ParallelFor(reconbox,
-      //       [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept {
-      //         char_recon(i, j, k, cdir, q, wl, wr, recon_scheme, plm_theta,
-      //         char_sys, *lparm);
-      //       });
-
-      //       // Riemann solver
-      //       amrex::ParallelFor(flxbx,
-      //       [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept {
-      //         pure_riemann(i, j, k, cdir, flx_arr, wl, wr, *lparm);
-      //       });
-      // #else
-      amrex::ParallelFor(bxg3, [=] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {
-        cns_ctochar(i, j, k, cdir, q, w, char_sys);
-      });
-
-      // Reconstruction
-      amrex::ParallelFor(
-        reconbox, NCHAR, [=] AMREX_GPU_DEVICE(int i, int j, int k, int n) noexcept {
-          cns_recon(i, j, k, n, cdir, w, wl, wr, recon_scheme, plm_theta);
+      
+      if (num_scheme_switch == 0) {
+        // Central scheme
+        // amrex::Print() << "Using central scheme" << std::endl;
+        amrex::ParallelFor(flxbx, [=] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {
+          cns_KEEP4(i, j, k, cdir, flx_arr, q);
         });
+      } else {
+        // Shock-capturing scheme
+        // amrex::Print() << "Using shock-capturing scheme" << std::endl;
+        // 1. Convert primitive to characteristic
+        amrex::ParallelFor(bxg3, [=] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {
+          cns_ctochar(i, j, k, cdir, q, w, char_sys);
+        });
+        // 2. Reconstruction
+        amrex::ParallelFor(
+          reconbox, NCHAR,
+          [=] AMREX_GPU_DEVICE(int i, int j, int k, int n) noexcept {
+            cns_recon(i, j, k, n, cdir, w, wl, wr, recon_scheme, plm_theta);
+          });
+        // 3. Solve Riemann problem, store advection and pressure fluxes to flx_arr
+        amrex::ParallelFor(flxbx,
+                           [=] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {
+                             cns_riemann(i, j, k, cdir, flx_arr, q, wl, wr, char_sys,
+                                         recon_char_var, *lparm);
+                           });
+      } // num_scheme_switch
 
-      // Solve Riemann problem, store advection and pressure fluxes to flx_arr
-      amrex::ParallelFor(flxbx, [=] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {
-        cns_riemann(i, j, k, cdir, flx_arr, q, wl, wr, char_sys, recon_char_var,
-                    *lparm);
-      });
-      // #endif
+      if (num_scheme_switch == 2) {
+        // Overwrite with central scheme in smooth region
+        // amrex::Print() << "Overwriting with central scheme in smooth region" << std::endl;
+        amrex::ParallelFor(
+          flxbx, [=] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {
+            Real ss_face = // shock sensor at face
+              amrex::max(shock_sensor_arr(i, j, k),
+                         shock_sensor_arr(IntVect(AMREX_D_DECL(i, j, k)) -
+                                          IntVect::TheDimensionVector(cdir)));
+            if (ss_face < 1.0) {
+              cns_KEEP4(i, j, k, cdir, hybflx_arr, q);
+              
+              for (int n = 0; n < NVAR; ++n) {
+                flx_arr(i, j, k, n) = ss_face * flx_arr(i, j, k, n) +
+                                      (1.0 - ss_face) * hybflx_arr(i, j, k, n);
+              }
+            }
+          });
+      }
 
       // Store viscous fluxes separately
       if (do_diffusion) {

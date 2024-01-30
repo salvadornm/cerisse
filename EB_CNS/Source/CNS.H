@@ -11,10 +11,10 @@
 #include <AMReX_YAFluxRegister.H>
 #endif
 // #include <AMReX_ErrorList.H>
-
 #include <PelePhysics.H>
 #include <ReactorBase.H>
 #include <turbinflow.H>
+#include <PMFData.H>
 
 #include "LES.H"
 #include "index_macros.H"
@@ -126,7 +126,8 @@ public:
 
   void compute_dSdt_box(const amrex::Box& bx, amrex::Array4<amrex::Real const>& Sfab,
                         amrex::Array4<amrex::Real>& dSdtfab,
-                        const std::array<FArrayBox*, AMREX_SPACEDIM>& flux);
+                        const std::array<FArrayBox*, AMREX_SPACEDIM>& flux,
+                        amrex::Array4<const amrex::Real>& shock_sensor);
 
 #if CNS_USE_EB
   void compute_dSdt_box_eb(
@@ -160,6 +161,9 @@ public:
 
   void enforce_consistent_state();
 
+  static void apply_nscbc(const amrex::Box& bx, const amrex::Array4<amrex::Real>& data,
+                          int start_comp, const amrex::Geometry& geom, int dir, int lo_hi, int bc_type);
+
   // These derive functions need to access variables in the class
   static void cns_dertranscoef(const amrex::Box& bx, amrex::FArrayBox& derfab,
                                int dcomp, int ncomp, const amrex::FArrayBox& datafab,
@@ -190,6 +194,7 @@ public:
     pele::physics::PhysicsType::transport_type>
     trans_parms;
   static pele::physics::turbinflow::TurbInflow turb_inflow;
+  static pele::physics::PMF::PmfData pmf_data;
 
   // Eddy viscosity type LES
 
@@ -203,7 +208,18 @@ public:
   static std::unique_ptr<LESModel> les_model;
   static amrex::Real Cm;
 
+  // NSCBC
+
+  static bool do_nscbc;
+  static amrex::Real nscbc_relax_p;
+  static amrex::Real nscbc_relax_u;
+  static amrex::Real nscbc_relax_T;
+  static amrex::Real ambient_p;
+  static amrex::BCRec phys_bc; // this has to be public for cns_bcfill to access
+
+#ifndef AMREX_USE_CUDA
 protected:
+#endif
   ////////////////////////////////////////////////////////////////////////////
   //    Protected functions                                                 //
   ////////////////////////////////////////////////////////////////////////////
@@ -222,17 +238,7 @@ protected:
                     amrex::YAFluxRegister* fr_as_crse,
                     amrex::YAFluxRegister* fr_as_fine,
 #endif
-                    bool write_to_flux_register);
-                    
-//   void compute_psgs_model(const amrex::MultiFab& S, amrex::MultiFab& dSdt, amrex::Real dt,
-// #if CNS_USE_EB
-//                     amrex::EBFluxRegister* fr_as_crse,
-//                     amrex::EBFluxRegister* fr_as_fine
-// #else
-//                     amrex::YAFluxRegister* fr_as_crse,
-//                     amrex::YAFluxRegister* fr_as_fine
-// #endif
-//                     );
+                    bool write_to_flux_register = true);
 
   void fill_ext_src(int i, int j, int k, amrex::Real time,
                     amrex::GeometryData const& geomdata,
@@ -242,6 +248,10 @@ protected:
 
 #ifdef USE_FULL_PROB_POST_TIMESTEP
   void full_prob_post_timestep(int iteration);
+#endif
+
+#ifdef USE_PROB_POST_COARSETIMESTEP
+  void prob_post_coarsetimestep(amrex::Real time);
 #endif
 
   CNS& getLevel(int lev) { return dynamic_cast<CNS&>(parent->getLevel(lev)); }
@@ -271,8 +281,6 @@ protected:
     num_state_data_types
   };
 
-  static amrex::BCRec phys_bc;
-
   //
   // Advance related
 
@@ -284,6 +292,7 @@ protected:
 
   amrex::MultiFab Sborder; // A state array with ghost zones. It is put here inside
                            // the class so alloc overhead only happen once.
+  amrex::MultiFab shock_sensor_mf;
 
   //
   // EB related
@@ -315,6 +324,7 @@ protected:
   static amrex::Real fixed_dt;
   static amrex::Real dt_cutoff;
   static int rk_order;
+  static int amr_interp_order;
   static int verbose;
   static bool do_reflux;
   static bool do_load_balance;
@@ -337,6 +347,7 @@ protected:
   static int char_sys;
   static amrex::Real plm_theta;
   static int recon_scheme;
+  static bool use_hybrid_scheme;
 
   // LES-PDF stochastic fields
 
@@ -371,6 +382,8 @@ protected:
   static int refine_dengrad_max_lev;
   static amrex::Vector<amrex::Real> refine_velgrad;
   static int refine_velgrad_max_lev;
+  static amrex::Vector<amrex::Real> refine_presgrad;
+  static int refine_presgrad_max_lev;
   static amrex::Vector<amrex::Real> refine_magvort;
   static int refine_magvort_max_lev;
   static amrex::Vector<amrex::Real> refine_tke;

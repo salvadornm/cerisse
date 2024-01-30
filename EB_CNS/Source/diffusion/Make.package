@@ -1,4 +1,4 @@
-CEXE_headers += diffusion.H
+CEXE_headers += diffusion.H diff_ops.H
 
 ifeq ($(USE_EB), TRUE)
   CEXE_headers += diffusion_eb.H

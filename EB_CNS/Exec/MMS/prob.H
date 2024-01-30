@@ -6,6 +6,7 @@
 #include <AMReX_GpuMemory.H>
 #include <AMReX_ParmParse.H>
 #include <AMReX_REAL.H>
+#include <masa.h>
 
 #include <cmath>
 
@@ -25,34 +26,20 @@ prob_initdata(int i, int j, int k, amrex::Array4<amrex::Real> const& state,
   const amrex::Real* dx = geomdata.CellSize();
   const amrex::Real x = prob_lo[0] + (i + 0.5) * dx[0];
   const amrex::Real y = prob_lo[1] + (j + 0.5) * dx[1];
-#if AMREX_SPACEDIM == 3
   const amrex::Real z = prob_lo[2] + (k + 0.5) * dx[2];
-#else
-  const amrex::Real z = 1.0;
-#endif
 
-  // TG functions
-  amrex::Real u[3] = {0.0};
-  u[0] = prob_parm.v0 * sin(prob_parm.omega_x * x / prob_parm.L) *
-         cos(prob_parm.omega_y * y / prob_parm.L) *
-         cos(prob_parm.omega_z * z / prob_parm.L);
-  u[1] = -prob_parm.v0 * cos(prob_parm.omega_x * x / prob_parm.L) *
-         sin(prob_parm.omega_y * y / prob_parm.L) *
-         cos(prob_parm.omega_z * z / prob_parm.L);
-  if (prob_parm.convecting) {
-    u[0] += prob_parm.v0;
-    u[1] += prob_parm.v0;
-  }
-  const amrex::Real p =
-    prob_parm.p0 + prob_parm.rho0 * prob_parm.v0 * prob_parm.v0 / 16.0 *
-                     (cos(2.0 * prob_parm.omega_x * x / prob_parm.L) +
-                      cos(2.0 * prob_parm.omega_y * y / prob_parm.L)) *
-                     (cos(2.0 * prob_parm.omega_z * z / prob_parm.L) + 2.0);
-  amrex::Real rho, eint;
+  // Get state from MASA
+  const amrex::Real rho = masa_eval_3d_exact_rho(x, y, z);
+  const amrex::Real u[AMREX_SPACEDIM] = {masa_eval_3d_exact_u(x, y, z),
+                                         masa_eval_3d_exact_v(x, y, z),
+                                         masa_eval_3d_exact_w(x, y, z)};
+  const amrex::Real p = masa_eval_3d_exact_p(x, y, z);
   amrex::Real massfrac[NUM_SPECIES] = {1.0};
-  auto eos = pele::physics::PhysicsType::eos();
-  eos.PYT2RE(p, massfrac, prob_parm.T0, rho, eint);
 
+  amrex::Real eint, T;
+  auto eos = pele::physics::PhysicsType::eos();
+  eos.RYP2E(rho, massfrac, p, eint);
+  
   // Set the state
   for (int nf = 0; nf <= NUM_FIELD; ++nf) {
     state(i, j, k, nf * NVAR + URHO) = rho;
@@ -80,13 +67,13 @@ AMREX_GPU_DEVICE AMREX_FORCE_INLINE void prob_post_restart(
 {
 }
 
-// AMREX_GPU_DEVICE AMREX_FORCE_INLINE void prob_post_timestep(
-//   int i, int j, int k, const amrex::Real /*curtime*/, const amrex::Real dtlev,
-//   amrex::Array4<amrex::Real> const& state,
-//   amrex::Array4<const amrex::Real> const& reactions,
-//   amrex::GeometryData const& /*geomdata*/, Parm const& /*parm*/, ProbParm const& pp)
-// {
-// }
+AMREX_GPU_DEVICE AMREX_FORCE_INLINE void prob_post_timestep(
+  int i, int j, int k, const amrex::Real /*curtime*/, const amrex::Real dtlev,
+  amrex::Array4<amrex::Real> const& state,
+  amrex::Array4<const amrex::Real> const& reactions,
+  amrex::GeometryData const& /*geomdata*/, Parm const& /*parm*/, ProbParm const& pp)
+{
+}
 
 AMREX_GPU_DEVICE AMREX_FORCE_INLINE void prob_tag_error(
   int i, int j, int k, amrex::Array4<char> const& tagarr,

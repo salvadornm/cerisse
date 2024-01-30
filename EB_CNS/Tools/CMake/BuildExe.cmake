@@ -149,6 +149,7 @@ target_sources(${exe_name}
       ${SRC_DIR}/default_parm.H
       ${SRC_DIR}/bcfill.H
       ${SRC_DIR}/bc_util.H
+      ${SRC_DIR}/nscbc.H
       ${SRC_DIR}/main.cpp
       ${SRC_DIR}/advance.cpp
       ${SRC_DIR}/advance_box.cpp
@@ -159,9 +160,12 @@ target_sources(${exe_name}
       ${SRC_DIR}/io.cpp
       ${SRC_DIR}/setup.cpp
       ${SRC_DIR}/react.cpp
+      ${SRC_DIR}/react.cpp
       ${SRC_DIR}/diffusion/diffusion.H
+      ${SRC_DIR}/diffusion/diff_ops.H
       ${SRC_DIR}/hydro/hyperbolics.H 
       ${SRC_DIR}/hydro/recon.H
+      ${SRC_DIR}/hydro/central_scheme.H
       ${SRC_DIR}/pdf/pdf_model.H 
       ${SRC_DIR}/pdf/pdf_model.cpp
       ${SRC_DIR}/pdf/random.H        

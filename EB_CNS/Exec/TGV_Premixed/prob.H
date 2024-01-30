@@ -33,25 +33,18 @@ prob_initdata(int i, int j, int k, amrex::Array4<amrex::Real> const& state,
 
   // TG functions
   amrex::Real u[3] = {0.0};
-  u[0] = prob_parm.v0 * sin(prob_parm.omega_x * x / prob_parm.L) *
-         cos(prob_parm.omega_y * y / prob_parm.L) *
-         cos(prob_parm.omega_z * z / prob_parm.L);
-  u[1] = -prob_parm.v0 * cos(prob_parm.omega_x * x / prob_parm.L) *
-         sin(prob_parm.omega_y * y / prob_parm.L) *
-         cos(prob_parm.omega_z * z / prob_parm.L);
-  if (prob_parm.convecting) {
-    u[0] += prob_parm.v0;
-    u[1] += prob_parm.v0;
-  }
+  u[0] = prob_parm.v0 * sin(2.0 * M_PI * x / prob_parm.L) *
+         cos(2.0 * M_PI * y / prob_parm.L) * cos(2.0 * M_PI * z / prob_parm.L);
+  u[1] = -prob_parm.v0 * cos(2.0 * M_PI * x / prob_parm.L) *
+         sin(2.0 * M_PI * y / prob_parm.L) * cos(2.0 * M_PI * z / prob_parm.L);
   const amrex::Real p =
     prob_parm.p0 + prob_parm.rho0 * prob_parm.v0 * prob_parm.v0 / 16.0 *
-                     (cos(2.0 * prob_parm.omega_x * x / prob_parm.L) +
-                      cos(2.0 * prob_parm.omega_y * y / prob_parm.L)) *
-                     (cos(2.0 * prob_parm.omega_z * z / prob_parm.L) + 2.0);
+                     (cos(2.0 * 2.0 * M_PI * x / prob_parm.L) +
+                      cos(2.0 * 2.0 * M_PI * y / prob_parm.L)) *
+                     (cos(2.0 * 2.0 * M_PI * z / prob_parm.L) + 2.0);
   amrex::Real rho, eint;
-  amrex::Real massfrac[NUM_SPECIES] = {1.0};
   auto eos = pele::physics::PhysicsType::eos();
-  eos.PYT2RE(p, massfrac, prob_parm.T0, rho, eint);
+  eos.PYT2RE(p, prob_parm.Y.begin(), prob_parm.T0, rho, eint);
 
   // Set the state
   for (int nf = 0; nf <= NUM_FIELD; ++nf) {
@@ -62,7 +55,7 @@ prob_initdata(int i, int j, int k, amrex::Array4<amrex::Real> const& state,
     state(i, j, k, nf * NVAR + UEDEN) =
       rho * (eint + 0.5 * (u[0] * u[0] + u[1] * u[1] + u[2] * u[2]));
     for (int n = 0; n < NUM_SPECIES; n++)
-      state(i, j, k, nf * NVAR + UFS + n) = rho * massfrac[n];
+      state(i, j, k, nf * NVAR + UFS + n) = rho * prob_parm.Y[n];
   }
 }
 

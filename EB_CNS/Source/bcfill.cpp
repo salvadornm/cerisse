@@ -10,6 +10,7 @@ using namespace amrex;
 struct CnsFillExtDir
 {
   ProbParm const* lprobparm;
+  pele::physics::PMF::PmfData::DataContainer const* lpmfdata;
 
   /**
    * \param iv    index of the ghost cell
@@ -60,8 +61,12 @@ struct CnsFillExtDir
           s_ext[dcomp + nc] = dest(iv, dcomp + nc); // this is needed for turbinflow
         }
 
-        bcnormal(x, s_int, s_refl, s_ext, idir, 1, time, geom,
-                 *lprobparm); // Call bcnormal from prob.H
+        bcnormal(x, s_int, s_refl, s_ext, idir, 1, time, geom, *lprobparm
+#ifdef USE_PMFDATA
+                 ,
+                 lpmfdata
+#endif
+        ); // Call bcnormal from prob.H
 
         for (int nc = 0; nc < numcomp; ++nc) {
           dest(iv, dcomp + nc) =
@@ -79,7 +84,12 @@ struct CnsFillExtDir
           s_ext[dcomp + nc] = dest(iv, dcomp + nc); // this is needed for turbinflow
         }
 
-        bcnormal(x, s_int, s_refl, s_ext, idir, -1, time, geom, *lprobparm);
+        bcnormal(x, s_int, s_refl, s_ext, idir, -1, time, geom, *lprobparm
+#ifdef USE_PMFDATA
+                 ,
+                 lpmfdata
+#endif
+        );
 
         for (int nc = 0; nc < numcomp; ++nc) {
           dest(iv, dcomp + nc) = s_ext[dcomp + nc];
@@ -113,50 +123,82 @@ void cns_bcfill(Box const& bx, FArrayBox& data, const int dcomp, const int numco
                 const int bcomp, const int scomp)
 {
   ProbParm const* lprobparm = CNS::d_prob_parm;
+  pele::physics::PMF::PmfData::DataContainer const* lpmfdata = nullptr;
+#ifdef USE_PMFDATA
+  lpmfdata = CNS::pmf_data.getDeviceData();
+#endif
 
   // Fill turb_inflow if requested (from PeleLM)
   if (CNS::turb_inflow.is_initialized() && scomp < AMREX_SPACEDIM) {
-    for (int dir=0; dir<AMREX_SPACEDIM; ++dir) {
-      auto bndryBoxLO = amrex::Box(amrex::adjCellLo(geom.Domain(),dir) & bx);
+    for (int dir = 0; dir < AMREX_SPACEDIM; ++dir) {
+      auto bndryBoxLO = amrex::Box(amrex::adjCellLo(geom.Domain(), dir) & bx);
       if (bcr[1].lo()[dir] == BCType::ext_dir && bndryBoxLO.ok()) {
         // Create box with ghost cells and set them to zero
         amrex::IntVect growVect(amrex::IntVect::TheUnitVector());
-        int Grow = 4;     // Being conservative
-        for(int n=0;n<AMREX_SPACEDIM;n++) {
-          growVect[n] = Grow;
-        }
+        int Grow = 4; // Being conservative
+        for (int n = 0; n < AMREX_SPACEDIM; n++) { growVect[n] = Grow; }
         growVect[dir] = 0;
         amrex::Box modDom = geom.Domain();
         modDom.grow(growVect);
-        auto bndryBoxLO_ghost = amrex::Box(amrex::adjCellLo(modDom,dir,Grow) & bx);
+        auto bndryBoxLO_ghost = amrex::Box(amrex::adjCellLo(modDom, dir, Grow) & bx);
         for (int nf = 0; nf <= NUM_FIELD; ++nf) {
-          data.setVal<amrex::RunOn::Host>(0.0,bndryBoxLO_ghost,nf*NVAR+UMX,AMREX_SPACEDIM);
-          CNS::turb_inflow.add_turb(bndryBoxLO_ghost, data, nf*NVAR+UMX, geom, time, dir, amrex::Orientation::low);
+          data.setVal<amrex::RunOn::Host>(0.0, bndryBoxLO_ghost, nf * NVAR + UMX,
+                                          AMREX_SPACEDIM);
+          CNS::turb_inflow.add_turb(bndryBoxLO_ghost, data, nf * NVAR + UMX, geom,
+                                    time, dir, amrex::Orientation::low);
         }
       }
 
-      auto bndryBoxHI = amrex::Box(amrex::adjCellHi(geom.Domain(),dir) & bx);
+      auto bndryBoxHI = amrex::Box(amrex::adjCellHi(geom.Domain(), dir) & bx);
       if (bcr[1].hi()[dir] == BCType::ext_dir && bndryBoxHI.ok()) {
-        //Create box with ghost cells and set them to zero
+        // Create box with ghost cells and set them to zero
         amrex::IntVect growVect(amrex::IntVect::TheUnitVector());
         int Grow = 4;
-        for(int n=0;n<AMREX_SPACEDIM;n++) {
-          growVect[n] = Grow;
-        }
+        for (int n = 0; n < AMREX_SPACEDIM; n++) { growVect[n] = Grow; }
         growVect[dir] = 0;
         amrex::Box modDom = geom.Domain();
         modDom.grow(growVect);
-        auto bndryBoxHI_ghost = amrex::Box(amrex::adjCellHi(modDom,dir,Grow) & bx);
+        auto bndryBoxHI_ghost = amrex::Box(amrex::adjCellHi(modDom, dir, Grow) & bx);
         for (int nf = 0; nf <= NUM_FIELD; ++nf) {
-          data.setVal<amrex::RunOn::Host>(0.0,bndryBoxHI_ghost,nf*NVAR+UMX,AMREX_SPACEDIM);
-          CNS::turb_inflow.add_turb(bndryBoxHI_ghost, data, nf*NVAR+UMX, geom, time, dir, amrex::Orientation::high);
+          data.setVal<amrex::RunOn::Host>(0.0, bndryBoxHI_ghost, nf * NVAR + UMX,
+                                          AMREX_SPACEDIM);
+          CNS::turb_inflow.add_turb(bndryBoxHI_ghost, data, nf * NVAR + UMX, geom,
+                                    time, dir, amrex::Orientation::high);
         }
       }
     }
   }
 
-  GpuBndryFuncFab<CnsFillExtDir> gpu_hyp_bndry_func(CnsFillExtDir{lprobparm});
+  GpuBndryFuncFab<CnsFillExtDir> gpu_hyp_bndry_func(
+    CnsFillExtDir{lprobparm, lpmfdata});
   gpu_hyp_bndry_func(bx, data, dcomp, numcomp, geom, time, bcr, bcomp, scomp);
+
+  // NSCBC (done after bcnormal so that we can use the ghost cells as target values)
+  // Ref: Motheau et al. AIAA J. Vol. 55, No. 10: pp. 3399-3408, 2017.
+  if (CNS::do_nscbc) {
+    const int* lo_bc = CNS::phys_bc.lo();
+    const int* hi_bc = CNS::phys_bc.hi();
+
+    for (int dir = 0; dir < AMREX_SPACEDIM; ++dir) {
+      // Lo side
+      auto bndryBoxLO = amrex::Box(amrex::adjCellLo(geom.Domain(), dir) & bx);
+      if ((/*lo_bc[dir] == 1 ||*/ lo_bc[dir] == 2) && // inflow or outflow
+          bndryBoxLO.ok()) {
+        for (int nf = 0; nf <= NUM_FIELD; ++nf) {
+          CNS::apply_nscbc(bx, data.array(), nf * NVAR, geom, dir, 1, lo_bc[dir]);
+        }
+      }
+
+      // Hi side
+      auto bndryBoxHI = amrex::Box(amrex::adjCellHi(geom.Domain(), dir) & bx);
+      if ((/*hi_bc[dir] == 1 ||*/ hi_bc[dir] == 2) && // inflow or outflow
+          bndryBoxHI.ok()) {
+        for (int nf = 0; nf <= NUM_FIELD; ++nf) {
+          CNS::apply_nscbc(bx, data.array(), nf * NVAR, geom, dir, -1, hi_bc[dir]);
+        }
+      }
+    }
+  }
 }
 
 void cns_react_bcfill(Box const& bx, FArrayBox& data, const int dcomp,

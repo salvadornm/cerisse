@@ -124,8 +124,16 @@ void CNS::variableSetUp()
 #if CNS_USE_EB
   EBMFCellConsLinInterp* interp = &eb_mf_cell_cons_interp;
 #else
-  MFInterpolater* interp = &mf_cell_cons_interp;
-  // what is the difference between cell_cons_interp and mf_cell_cons_interp?
+  InterpBase* interp;
+  if (amr_interp_order == 3) {
+    interp = &quadratic_interp;
+  } else if (amr_interp_order == 4) {
+    interp = &quartic_interp;
+  } else {
+    // default: second-order limited interp
+    interp = &mf_cell_cons_interp;
+    // what is the difference between cell_cons_interp and mf_cell_cons_interp?
+  }
 #endif
 
   // Setup State_Type
@@ -508,6 +516,9 @@ void CNS::variableCleanUp()
 #endif
   desc_lst.clear();
   derive_lst.clear();
+
+  trans_parms.deallocate();
+  pmf_data.deallocate();
 
 #ifdef AMREX_USE_GPU
   The_Arena()->free(dp_refine_boxes);

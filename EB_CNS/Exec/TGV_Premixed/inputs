@@ -1,0 +1,89 @@
+# ====================================================== #
+#                  CERISSE INPUT SCRIPT                  #
+# ====================================================== #
+max_step = 100000
+stop_time = 0.0034451250103780034 # 20*t_ref ~ 1.15*t_ign
+
+# ================ COMPUTATIONAL DOMAIN ================ #
+geometry.is_periodic = 1 1 1
+geometry.coord_sys   = 0  # 0 => cart, 1 => RZ  2=>spherical
+geometry.prob_lo     = -1.0 -1.0 -1.0
+geometry.prob_hi     =  1.0  1.0  1.0
+# use with single level
+#amr.n_cell           =  16    16    16
+amr.n_cell           =  32    32    32
+#amr.n_cell           =  128   128   128
+#amr.n_cell           =  256   256   256
+#amr.n_cell           =  512   512   512
+
+# ================ BOUNDARY CONDITIONS ================= #
+# 0 = Interior             3 = Symmetry
+# 1 = Inflow / UserBC      4 = SlipWall = 3
+# 2 = Outflow (FOExtrap)   5 = NoSlipWall (adiabatic)
+cns.lo_bc = 0 0 0
+cns.hi_bc = 0 0 0
+
+# ==================== WHAT PHYSICS ==================== #
+cns.do_visc = 1
+
+# ==================== WHAT NUMERICS =================== #
+cns.cfl = 0.3
+cns.dt_cutoff = 5.e-20
+cns.recon_scheme = 5
+cns.char_sys = 0
+cns.recon_char_var = 1
+#cns.do_vpdf      = 1   # enable Lagevin model and p_sgs correction
+#cns.do_spdf      = 1   # enable IEM model
+#cns.clip_temp    = 0   # clip minimum temperature [K]
+
+# ================== REACTION SETTINGS ================= #
+cns.do_react = 1
+cns.chem_integrator = "ReactorCvode"
+cvode.solve_type = "denseAJ_direct"
+
+# ================ VERBOSITY & DIAGNOSIS =============== #
+cns.v = 0 # 0/1/2
+amr.v = 1
+ode.verbose = 0
+
+# ==================== LOAD BALANCE ==================== #
+amr.loadbalance_with_workestimates = 1 # for multi-level run, loadbalance_int = regrid_int
+amr.loadbalance_level0_int = 1000     # for single level run (amr.max_level = 0) only
+#amr.loadbalance_max_fac    = 1.5      # default 1.5, what is this??
+
+# =============== REFINEMENT / REGRIDDING ============== #
+amr.max_level       = 0       # maximum level number allowed
+amr.ref_ratio       = 2 2 2 2 # refinement ratio
+amr.regrid_int      = 5       # how often to regrid
+amr.blocking_factor = 8
+amr.max_grid_size   = 64
+amr.n_error_buf     = 2 2 2 2 # number of buffer cells in error est
+amr.grid_eff        = 0.7
+
+# ================== TAGGING CRITERIA ================== #
+#cns.refine_dengrad = 1e-4 1e-4 1e-3
+#cns.refine_dengrad_max_lev = 4
+#cns.refine_magvort = 1e6
+#cns.refine_magvort_max_lev = 4
+
+# ==================== OUTPUT FILES ==================== #
+amr.checkpoint_files_output = 0
+amr.check_file      = chk    # root name of checkpoint file
+amr.check_int       = 1000   # number of timesteps between checkpoints
+#amr.check_per # interval physical time between checkpoints
+
+amr.plot_files_output = 1
+amr.plot_file        = plt  # root name of plotfile
+amr.plot_int         = 1000  # number of timesteps between plotfiles
+#amr.plot_per # interval physical time between plotfiles
+amr.derive_plot_vars = ALL # pressure x_velocity y_velocity z_velocity magvort transport_coef reynolds_stress #temp MachNumber divrho divu cv cp 
+cns.plot_rhoy = 0
+cns.plot_molefrac = 0
+cns.plot_massfrac = 1
+
+# ================= PROBLEM PARAMETERS ================= #
+prob.T0 = 800.0 # mean temperature [K]
+prob.p0 = 2.0e5 # mean pressure [Ba = 10*Pa]
+prob.M  = 0.2   # Mach number
+
+amr.data_log = time32.log # to store KE and enstrophy over time

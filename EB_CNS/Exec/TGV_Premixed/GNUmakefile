@@ -1,5 +1,5 @@
 # AMReX
-DIM = 1
+DIM = 3
 COMP = gnu
 PRECISION = DOUBLE
 
@@ -26,13 +26,13 @@ THREAD_SANITIZER = FALSE
 # PelePhysics
 Eos_Model := Fuego
 Transport_Model := Simple
-Chemistry_Model := drm19
+Chemistry_Model := LiDryer
 
 # CNS
-NUM_FIELD = 0
-USE_EB = FALSE
-USE_PMFDATA = TRUE
+USE_FULL_PROB_POST_TIMESTEP = TRUE
+NUM_FIELD = 8
 
 # GNU Make
-include ./Make.package
+CEXE_headers += prob.H prob_parm.H
+CEXE_sources += prob.cpp
 include ../Make.CNS

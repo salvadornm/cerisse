@@ -46,8 +46,9 @@
 #define QG       6 // gamma
 #define QEINT    7
 #define QTEMP    8
-#define QFS      9
-#define NPRIM    int(9 + NUM_SPECIES)
+#define QWBAR    9 // average molecular weight
+#define QFS      10
+#define NPRIM    int(QFS + NUM_SPECIES)
 #define LEN_PRIM int(NPRIM * (NUM_FIELD + 1))
 
 // Characteristic variables
