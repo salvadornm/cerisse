@@ -1,17 +1,19 @@
 AMREXVERSION=23.11
 PELEPVERSION=23.03
+CGALVERSION=5.6
+dir= $PWD
 case  $1 in
 	git )
-	echo " installing git versions .. "
-	gh repo clone AMReX-Combustion/PelePhysics
-	;;
+		echo " installing git versions .. "
+		gh repo clone AMReX-Combustion/PelePhysics
+		;;
 	safe )
-        rm -rf amrex
-	echo " installing AMREX release version .." $AMREXVERSION
-	wget https://github.com/AMReX-Codes/amrex/archive/refs/tags/23.11.zip
-	unzip 23.11.zip
-        mv amrex-23.11 amrex
-	rm 23.11.zip
+    	rm -rf amrex
+		echo " installing AMREX release version .." $AMREXVERSION
+		wget https://github.com/AMReX-Codes/amrex/archive/refs/tags/$AMREXVERSION.zip
+		unzip $AMREXVERSION.zip
+        mv $AMREXVERSION amrex
+		rm $AMREXVERSION.zip
         rm -rf PelePhysics
         echo " installing PelePhysics release version .." $PELEPVERSION
         wget https://github.com/AMReX-Combustion/PelePhysics/archive/refs/tags/v$PELEPVERSION.zip
@@ -20,21 +22,36 @@ case  $1 in
         rm v$PELEPVERSION.zip
         ;;
 	pelephys)
-	rm -rf PelePhysics
+		rm -rf PelePhysics
         echo " installing PelePhysics release version .." $PELEPVERSION
         wget https://github.com/AMReX-Combustion/PelePhysics/archive/refs/tags/v$PELEPVERSION.zip        
         unzip v$PELEPVERSION.zip
         mv PelePhysics-$PELEPVERSION PelePhysics 
-	rm v$PELEPVERSION.zip
-	;;
+		rm v$PELEPVERSION.zip
+		;;
 	boost)
-	wget https://boostorg.jfrog.io/artifactory/main/release/1.66.0/source/boost_1_66_0.tar.bz2
+		echo " installing boost 1.66 version .." 
+        wget https://boostorg.jfrog.io/artifactory/main/release/1.66.0/source/boost_1_66_0.tar.bz2
         tar --bzip2 -xf boost_1_66_0.tar.bz2
-	;;
-    	*)
+		cd boost_1_66_0/
+		./bootstrap.sh
+		./b2 install
+		;;
+	cgal)
+		rm -rf cgal
+		echo " installing CGAL release version .." $CGALVERSION
+		wget https://github.com/CGAL/cgal/releases/download/v$CGALVERSION/CGAL-$CGALVERSION.zip		
+		unzip CGAL-$CGALVERSION.zip	
+		mv CGAL-$CGALVERSION cgal
+		rm CGAL-$CGALVERSION.zip	
+		cd cgal
+		mkdir build
+		cd build
+		cmake -DCMAKE_BUILD_TYPE=Release ..
+		make install
+		;;
+    *)
 	echo " no option selected [git/safe]"
     exit
 esac
 echo -e "\\033[1;32m  Installation done \\033[0m"
-
-
