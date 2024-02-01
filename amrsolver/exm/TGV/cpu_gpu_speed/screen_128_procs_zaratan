@@ -1,0 +1,938 @@
+MPI initialized with 128 MPI processes
+MPI initialized with thread support level 0
+AMReX (23.06-12-g1f3afaa42d0d) initialized
+Successfully read inputs file ... 
+Successfully read inputs file ... 
+Starting to call amrex_probinit ... 
+V0 = 210.6166191 p0 = 3.509474635 rho0 = 0.0001107604903 T0 = 110.4
+Successfully run amrex_probinit
+Mesh size (dx,dy,dz) = 0.04908734375  0.04908734375  0.04908734375  
+[computeInitialDt] Level 0 dt = 2e-05
+INITIAL GRIDS 
+  Level 0   128 grids  2097152 cells  100 % of domain
+            smallest grid: 32 x 32 x 16  biggest grid: 32 x 32 x 16
+
+PLOTFILE: file = ./plot/plt00000
+
+[CNS level 0]
+   Total mass   = 57617.333407204598
+   Total x-mom  = 2.4738255888223648e-10
+   Total y-mom  = -1.0186340659856796e-10
+   Total z-mom  = 0
+   Total energy = 4883533356.3775053
+Write plotfile time = 1.592715856  seconds
+
+ --------------------- Time advance ---------------- 
+[computeInitialDt] Level 0 dt = 2e-05
+[Level 0 step 1] ADVANCE with dt = 2e-05
+[Level 0 step 1] Advanced 2097152 cells
+
+STEP = 1 TIME = 2e-05 DT = 2e-05
+
+[Level 0 step 2] ADVANCE with dt = 2e-05
+[Level 0 step 2] Advanced 2097152 cells
+
+STEP = 2 TIME = 4e-05 DT = 2e-05
+
+[Level 0 step 3] ADVANCE with dt = 2e-05
+[Level 0 step 3] Advanced 2097152 cells
+
+STEP = 3 TIME = 6e-05 DT = 2e-05
+
+[Level 0 step 4] ADVANCE with dt = 2e-05
+[Level 0 step 4] Advanced 2097152 cells
+
+STEP = 4 TIME = 8e-05 DT = 2e-05
+
+[Level 0 step 5] ADVANCE with dt = 2e-05
+[Level 0 step 5] Advanced 2097152 cells
+
+STEP = 5 TIME = 0.0001 DT = 2e-05
+
+[Level 0 step 6] ADVANCE with dt = 2e-05
+[Level 0 step 6] Advanced 2097152 cells
+
+STEP = 6 TIME = 0.00012 DT = 2e-05
+
+[Level 0 step 7] ADVANCE with dt = 2e-05
+[Level 0 step 7] Advanced 2097152 cells
+
+STEP = 7 TIME = 0.00014 DT = 2e-05
+
+[Level 0 step 8] ADVANCE with dt = 2e-05
+[Level 0 step 8] Advanced 2097152 cells
+
+STEP = 8 TIME = 0.00016 DT = 2e-05
+
+[Level 0 step 9] ADVANCE with dt = 2e-05
+[Level 0 step 9] Advanced 2097152 cells
+
+STEP = 9 TIME = 0.00018 DT = 2e-05
+
+[Level 0 step 10] ADVANCE with dt = 2e-05
+[Level 0 step 10] Advanced 2097152 cells
+
+STEP = 10 TIME = 0.0002 DT = 2e-05
+
+
+[STEP 1] Coarse TimeStep time: 0.829157019
+[STEP 1] FAB kilobyte spread across MPI nodes: [12621 ... 12621]
+
+
+[STEP 2] Coarse TimeStep time: 0.4361913
+[STEP 2] FAB kilobyte spread across MPI nodes: [12621 ... 12621]
+
+
+[STEP 3] Coarse TimeStep time: 0.225330423
+[STEP 3] FAB kilobyte spread across MPI nodes: [12621 ... 12621]
+
+
+[STEP 4] Coarse TimeStep time: 0.074422676
+[STEP 4] FAB kilobyte spread across MPI nodes: [12621 ... 12621]
+
+
+[STEP 5] Coarse TimeStep time: 0.080382855
+[STEP 5] FAB kilobyte spread across MPI nodes: [12621 ... 12621]
+
+
+[STEP 6] Coarse TimeStep time: 0.075829359
+[STEP 6] FAB kilobyte spread across MPI nodes: [12621 ... 12621]
+
+
+[STEP 7] Coarse TimeStep time: 0.074668057
+[STEP 7] FAB kilobyte spread across MPI nodes: [12621 ... 12621]
+
+
+[STEP 8] Coarse TimeStep time: 0.073088636
+[STEP 8] FAB kilobyte spread across MPI nodes: [12621 ... 12621]
+
+
+[STEP 9] Coarse TimeStep time: 0.075142328
+[STEP 9] FAB kilobyte spread across MPI nodes: [12621 ... 12621]
+
+
+[STEP 10] Coarse TimeStep time: 0.074359528
+[STEP 10] FAB kilobyte spread across MPI nodes: [12621 ... 12621]
+
+[Level 0 step 11] ADVANCE with dt = 2e-05
+[Level 0 step 11] Advanced 2097152 cells
+
+STEP = 11 TIME = 0.00022 DT = 2e-05
+
+[Level 0 step 12] ADVANCE with dt = 2e-05
+[Level 0 step 12] Advanced 2097152 cells
+
+STEP = 12 TIME = 0.00024 DT = 2e-05
+
+[Level 0 step 13] ADVANCE with dt = 2e-05
+[Level 0 step 13] Advanced 2097152 cells
+
+STEP = 13 TIME = 0.00026 DT = 2e-05
+
+[Level 0 step 14] ADVANCE with dt = 2e-05
+[Level 0 step 14] Advanced 2097152 cells
+
+STEP = 14 TIME = 0.00028 DT = 2e-05
+
+[Level 0 step 15] ADVANCE with dt = 2e-05
+[Level 0 step 15] Advanced 2097152 cells
+
+STEP = 15 TIME = 0.0003 DT = 2e-05
+
+[Level 0 step 16] ADVANCE with dt = 2e-05
+[Level 0 step 16] Advanced 2097152 cells
+
+STEP = 16 TIME = 0.00032 DT = 2e-05
+
+[Level 0 step 17] ADVANCE with dt = 2e-05
+[Level 0 step 17] Advanced 2097152 cells
+
+STEP = 17 TIME = 0.00034 DT = 2e-05
+
+[Level 0 step 18] ADVANCE with dt = 2e-05
+[Level 0 step 18] Advanced 2097152 cells
+
+STEP = 18 TIME = 0.00036 DT = 2e-05
+
+[Level 0 step 19] ADVANCE with dt = 2e-05
+[Level 0 step 19] Advanced 2097152 cells
+
+STEP = 19 TIME = 0.00038 DT = 2e-05
+
+[Level 0 step 20] ADVANCE with dt = 2e-05
+[Level 0 step 20] Advanced 2097152 cells
+
+STEP = 20 TIME = 0.0004 DT = 2e-05
+
+
+[STEP 11] Coarse TimeStep time: 0.143902676
+[STEP 11] FAB kilobyte spread across MPI nodes: [12621 ... 12621]
+
+
+[STEP 12] Coarse TimeStep time: 0.083964213
+[STEP 12] FAB kilobyte spread across MPI nodes: [12621 ... 12621]
+
+
+[STEP 13] Coarse TimeStep time: 0.078370103
+[STEP 13] FAB kilobyte spread across MPI nodes: [12621 ... 12621]
+
+
+[STEP 14] Coarse TimeStep time: 0.343917806
+[STEP 14] FAB kilobyte spread across MPI nodes: [12621 ... 12621]
+
+
+[STEP 15] Coarse TimeStep time: 0.340450311
+[STEP 15] FAB kilobyte spread across MPI nodes: [12621 ... 12621]
+
+
+[STEP 16] Coarse TimeStep time: 0.072521464
+[STEP 16] FAB kilobyte spread across MPI nodes: [12621 ... 12621]
+
+
+[STEP 17] Coarse TimeStep time: 0.073850651
+[STEP 17] FAB kilobyte spread across MPI nodes: [12621 ... 12621]
+
+
+[STEP 18] Coarse TimeStep time: 0.077440817
+[STEP 18] FAB kilobyte spread across MPI nodes: [12621 ... 12621]
+
+
+[STEP 19] Coarse TimeStep time: 0.073990574
+[STEP 19] FAB kilobyte spread across MPI nodes: [12621 ... 12621]
+
+
+[STEP 20] Coarse TimeStep time: 0.075751242
+[STEP 20] FAB kilobyte spread across MPI nodes: [12621 ... 12621]
+
+[Level 0 step 21] ADVANCE with dt = 2e-05
+[Level 0 step 21] Advanced 2097152 cells
+
+STEP = 21 TIME = 0.00042 DT = 2e-05
+
+[Level 0 step 22] ADVANCE with dt = 2e-05
+[Level 0 step 22] Advanced 2097152 cells
+
+STEP = 22 TIME = 0.00044 DT = 2e-05
+
+[Level 0 step 23] ADVANCE with dt = 2e-05
+[Level 0 step 23] Advanced 2097152 cells
+
+STEP = 23 TIME = 0.00046 DT = 2e-05
+
+[Level 0 step 24] ADVANCE with dt = 2e-05
+[Level 0 step 24] Advanced 2097152 cells
+
+STEP = 24 TIME = 0.00048 DT = 2e-05
+
+[Level 0 step 25] ADVANCE with dt = 2e-05
+[Level 0 step 25] Advanced 2097152 cells
+
+STEP = 25 TIME = 0.0005 DT = 2e-05
+
+[Level 0 step 26] ADVANCE with dt = 2e-05
+[Level 0 step 26] Advanced 2097152 cells
+
+STEP = 26 TIME = 0.00052 DT = 2e-05
+
+[Level 0 step 27] ADVANCE with dt = 2e-05
+[Level 0 step 27] Advanced 2097152 cells
+
+STEP = 27 TIME = 0.00054 DT = 2e-05
+
+[Level 0 step 28] ADVANCE with dt = 2e-05
+[Level 0 step 28] Advanced 2097152 cells
+
+STEP = 28 TIME = 0.00056 DT = 2e-05
+
+[Level 0 step 29] ADVANCE with dt = 2e-05
+[Level 0 step 29] Advanced 2097152 cells
+
+STEP = 29 TIME = 0.00058 DT = 2e-05
+
+[Level 0 step 30] ADVANCE with dt = 2e-05
+[Level 0 step 30] Advanced 2097152 cells
+
+STEP = 30 TIME = 0.0006 DT = 2e-05
+
+
+[STEP 21] Coarse TimeStep time: 0.072037265
+[STEP 21] FAB kilobyte spread across MPI nodes: [12621 ... 12621]
+
+
+[STEP 22] Coarse TimeStep time: 0.071685053
+[STEP 22] FAB kilobyte spread across MPI nodes: [12621 ... 12621]
+
+
+[STEP 23] Coarse TimeStep time: 0.074104489
+[STEP 23] FAB kilobyte spread across MPI nodes: [12621 ... 12621]
+
+
+[STEP 24] Coarse TimeStep time: 0.075067217
+[STEP 24] FAB kilobyte spread across MPI nodes: [12621 ... 12621]
+
+
+[STEP 25] Coarse TimeStep time: 0.071725208
+[STEP 25] FAB kilobyte spread across MPI nodes: [12621 ... 12621]
+
+
+[STEP 26] Coarse TimeStep time: 0.07418575
+[STEP 26] FAB kilobyte spread across MPI nodes: [12621 ... 12621]
+
+
+[STEP 27] Coarse TimeStep time: 0.074424706
+[STEP 27] FAB kilobyte spread across MPI nodes: [12621 ... 12621]
+
+
+[STEP 28] Coarse TimeStep time: 0.074982478
+[STEP 28] FAB kilobyte spread across MPI nodes: [12621 ... 12621]
+
+
+[STEP 29] Coarse TimeStep time: 0.078184054
+[STEP 29] FAB kilobyte spread across MPI nodes: [12621 ... 12621]
+
+
+[STEP 30] Coarse TimeStep time: 0.077985853
+[STEP 30] FAB kilobyte spread across MPI nodes: [12621 ... 12621]
+
+[Level 0 step 31] ADVANCE with dt = 2e-05
+[Level 0 step 31] Advanced 2097152 cells
+
+STEP = 31 TIME = 0.00062 DT = 2e-05
+
+[Level 0 step 32] ADVANCE with dt = 2e-05
+[Level 0 step 32] Advanced 2097152 cells
+
+STEP = 32 TIME = 0.00064 DT = 2e-05
+
+[Level 0 step 33] ADVANCE with dt = 2e-05
+[Level 0 step 33] Advanced 2097152 cells
+
+STEP = 33 TIME = 0.00066 DT = 2e-05
+
+[Level 0 step 34] ADVANCE with dt = 2e-05
+[Level 0 step 34] Advanced 2097152 cells
+
+STEP = 34 TIME = 0.00068 DT = 2e-05
+
+[Level 0 step 35] ADVANCE with dt = 2e-05
+[Level 0 step 35] Advanced 2097152 cells
+
+STEP = 35 TIME = 0.0007 DT = 2e-05
+
+[Level 0 step 36] ADVANCE with dt = 2e-05
+[Level 0 step 36] Advanced 2097152 cells
+
+STEP = 36 TIME = 0.00072 DT = 2e-05
+
+[Level 0 step 37] ADVANCE with dt = 2e-05
+[Level 0 step 37] Advanced 2097152 cells
+
+STEP = 37 TIME = 0.00074 DT = 2e-05
+
+[Level 0 step 38] ADVANCE with dt = 2e-05
+[Level 0 step 38] Advanced 2097152 cells
+
+STEP = 38 TIME = 0.00076 DT = 2e-05
+
+[Level 0 step 39] ADVANCE with dt = 2e-05
+[Level 0 step 39] Advanced 2097152 cells
+
+STEP = 39 TIME = 0.00078 DT = 2e-05
+
+[Level 0 step 40] ADVANCE with dt = 2e-05
+[Level 0 step 40] Advanced 2097152 cells
+
+STEP = 40 TIME = 0.0008 DT = 2e-05
+
+
+[STEP 31] Coarse TimeStep time: 0.074696547
+[STEP 31] FAB kilobyte spread across MPI nodes: [12621 ... 12621]
+
+
+[STEP 32] Coarse TimeStep time: 0.07519755
+[STEP 32] FAB kilobyte spread across MPI nodes: [12621 ... 12621]
+
+
+[STEP 33] Coarse TimeStep time: 0.077792348
+[STEP 33] FAB kilobyte spread across MPI nodes: [12621 ... 12621]
+
+
+[STEP 34] Coarse TimeStep time: 0.076152656
+[STEP 34] FAB kilobyte spread across MPI nodes: [12621 ... 12621]
+
+
+[STEP 35] Coarse TimeStep time: 0.090319784
+[STEP 35] FAB kilobyte spread across MPI nodes: [12621 ... 12621]
+
+
+[STEP 36] Coarse TimeStep time: 0.159712848
+[STEP 36] FAB kilobyte spread across MPI nodes: [12621 ... 12621]
+
+
+[STEP 37] Coarse TimeStep time: 0.144033638
+[STEP 37] FAB kilobyte spread across MPI nodes: [12621 ... 12621]
+
+
+[STEP 38] Coarse TimeStep time: 0.081036899
+[STEP 38] FAB kilobyte spread across MPI nodes: [12621 ... 12621]
+
+
+[STEP 39] Coarse TimeStep time: 0.163679946
+[STEP 39] FAB kilobyte spread across MPI nodes: [12621 ... 12621]
+
+
+[STEP 40] Coarse TimeStep time: 0.149463167
+[STEP 40] FAB kilobyte spread across MPI nodes: [12621 ... 12621]
+
+[Level 0 step 41] ADVANCE with dt = 2e-05
+[Level 0 step 41] Advanced 2097152 cells
+
+STEP = 41 TIME = 0.00082 DT = 2e-05
+
+[Level 0 step 42] ADVANCE with dt = 2e-05
+[Level 0 step 42] Advanced 2097152 cells
+
+STEP = 42 TIME = 0.00084 DT = 2e-05
+
+[Level 0 step 43] ADVANCE with dt = 2e-05
+[Level 0 step 43] Advanced 2097152 cells
+
+STEP = 43 TIME = 0.00086 DT = 2e-05
+
+[Level 0 step 44] ADVANCE with dt = 2e-05
+[Level 0 step 44] Advanced 2097152 cells
+
+STEP = 44 TIME = 0.00088 DT = 2e-05
+
+[Level 0 step 45] ADVANCE with dt = 2e-05
+[Level 0 step 45] Advanced 2097152 cells
+
+STEP = 45 TIME = 0.0009 DT = 2e-05
+
+[Level 0 step 46] ADVANCE with dt = 2e-05
+[Level 0 step 46] Advanced 2097152 cells
+
+STEP = 46 TIME = 0.00092 DT = 2e-05
+
+[Level 0 step 47] ADVANCE with dt = 2e-05
+[Level 0 step 47] Advanced 2097152 cells
+
+STEP = 47 TIME = 0.00094 DT = 2e-05
+
+[Level 0 step 48] ADVANCE with dt = 2e-05
+[Level 0 step 48] Advanced 2097152 cells
+
+STEP = 48 TIME = 0.00096 DT = 2e-05
+
+[Level 0 step 49] ADVANCE with dt = 2e-05
+[Level 0 step 49] Advanced 2097152 cells
+
+STEP = 49 TIME = 0.00098 DT = 2e-05
+
+[Level 0 step 50] ADVANCE with dt = 2e-05
+[Level 0 step 50] Advanced 2097152 cells
+
+STEP = 50 TIME = 0.001 DT = 2e-05
+
+
+[STEP 41] Coarse TimeStep time: 0.081654459
+[STEP 41] FAB kilobyte spread across MPI nodes: [12621 ... 12621]
+
+
+[STEP 42] Coarse TimeStep time: 0.082844087
+[STEP 42] FAB kilobyte spread across MPI nodes: [12621 ... 12621]
+
+
+[STEP 43] Coarse TimeStep time: 0.105668853
+[STEP 43] FAB kilobyte spread across MPI nodes: [12621 ... 12621]
+
+
+[STEP 44] Coarse TimeStep time: 0.121100458
+[STEP 44] FAB kilobyte spread across MPI nodes: [12621 ... 12621]
+
+
+[STEP 45] Coarse TimeStep time: 0.078750961
+[STEP 45] FAB kilobyte spread across MPI nodes: [12621 ... 12621]
+
+
+[STEP 46] Coarse TimeStep time: 0.075060351
+[STEP 46] FAB kilobyte spread across MPI nodes: [12621 ... 12621]
+
+
+[STEP 47] Coarse TimeStep time: 0.075341791
+[STEP 47] FAB kilobyte spread across MPI nodes: [12621 ... 12621]
+
+
+[STEP 48] Coarse TimeStep time: 0.076142766
+[STEP 48] FAB kilobyte spread across MPI nodes: [12621 ... 12621]
+
+
+[STEP 49] Coarse TimeStep time: 0.076219526
+[STEP 49] FAB kilobyte spread across MPI nodes: [12621 ... 12621]
+
+
+[STEP 50] Coarse TimeStep time: 0.074519365
+[STEP 50] FAB kilobyte spread across MPI nodes: [12621 ... 12621]
+
+[Level 0 step 51] ADVANCE with dt = 2e-05
+[Level 0 step 51] Advanced 2097152 cells
+
+STEP = 51 TIME = 0.00102 DT = 2e-05
+
+[Level 0 step 52] ADVANCE with dt = 2e-05
+[Level 0 step 52] Advanced 2097152 cells
+
+STEP = 52 TIME = 0.00104 DT = 2e-05
+
+[Level 0 step 53] ADVANCE with dt = 2e-05
+[Level 0 step 53] Advanced 2097152 cells
+
+STEP = 53 TIME = 0.00106 DT = 2e-05
+
+[Level 0 step 54] ADVANCE with dt = 2e-05
+[Level 0 step 54] Advanced 2097152 cells
+
+STEP = 54 TIME = 0.00108 DT = 2e-05
+
+[Level 0 step 55] ADVANCE with dt = 2e-05
+[Level 0 step 55] Advanced 2097152 cells
+
+STEP = 55 TIME = 0.0011 DT = 2e-05
+
+[Level 0 step 56] ADVANCE with dt = 2e-05
+[Level 0 step 56] Advanced 2097152 cells
+
+STEP = 56 TIME = 0.00112 DT = 2e-05
+
+[Level 0 step 57] ADVANCE with dt = 2e-05
+[Level 0 step 57] Advanced 2097152 cells
+
+STEP = 57 TIME = 0.00114 DT = 2e-05
+
+[Level 0 step 58] ADVANCE with dt = 2e-05
+[Level 0 step 58] Advanced 2097152 cells
+
+STEP = 58 TIME = 0.00116 DT = 2e-05
+
+[Level 0 step 59] ADVANCE with dt = 2e-05
+[Level 0 step 59] Advanced 2097152 cells
+
+STEP = 59 TIME = 0.00118 DT = 2e-05
+
+[Level 0 step 60] ADVANCE with dt = 2e-05
+[Level 0 step 60] Advanced 2097152 cells
+
+STEP = 60 TIME = 0.0012 DT = 2e-05
+
+
+[STEP 51] Coarse TimeStep time: 0.0716029
+[STEP 51] FAB kilobyte spread across MPI nodes: [12621 ... 12621]
+
+
+[STEP 52] Coarse TimeStep time: 0.078069099
+[STEP 52] FAB kilobyte spread across MPI nodes: [12621 ... 12621]
+
+
+[STEP 53] Coarse TimeStep time: 0.076554692
+[STEP 53] FAB kilobyte spread across MPI nodes: [12621 ... 12621]
+
+
+[STEP 54] Coarse TimeStep time: 0.127917238
+[STEP 54] FAB kilobyte spread across MPI nodes: [12621 ... 12621]
+
+
+[STEP 55] Coarse TimeStep time: 0.122507123
+[STEP 55] FAB kilobyte spread across MPI nodes: [12621 ... 12621]
+
+
+[STEP 56] Coarse TimeStep time: 0.081214133
+[STEP 56] FAB kilobyte spread across MPI nodes: [12621 ... 12621]
+
+
+[STEP 57] Coarse TimeStep time: 0.077296496
+[STEP 57] FAB kilobyte spread across MPI nodes: [12621 ... 12621]
+
+
+[STEP 58] Coarse TimeStep time: 0.074121927
+[STEP 58] FAB kilobyte spread across MPI nodes: [12621 ... 12621]
+
+
+[STEP 59] Coarse TimeStep time: 0.077588214
+[STEP 59] FAB kilobyte spread across MPI nodes: [12621 ... 12621]
+
+
+[STEP 60] Coarse TimeStep time: 0.073668294
+[STEP 60] FAB kilobyte spread across MPI nodes: [12621 ... 12621]
+
+[Level 0 step 61] ADVANCE with dt = 2e-05
+[Level 0 step 61] Advanced 2097152 cells
+
+STEP = 61 TIME = 0.00122 DT = 2e-05
+
+[Level 0 step 62] ADVANCE with dt = 2e-05
+[Level 0 step 62] Advanced 2097152 cells
+
+STEP = 62 TIME = 0.00124 DT = 2e-05
+
+[Level 0 step 63] ADVANCE with dt = 2e-05
+[Level 0 step 63] Advanced 2097152 cells
+
+STEP = 63 TIME = 0.00126 DT = 2e-05
+
+[Level 0 step 64] ADVANCE with dt = 2e-05
+[Level 0 step 64] Advanced 2097152 cells
+
+STEP = 64 TIME = 0.00128 DT = 2e-05
+
+[Level 0 step 65] ADVANCE with dt = 2e-05
+[Level 0 step 65] Advanced 2097152 cells
+
+STEP = 65 TIME = 0.0013 DT = 2e-05
+
+[Level 0 step 66] ADVANCE with dt = 2e-05
+[Level 0 step 66] Advanced 2097152 cells
+
+STEP = 66 TIME = 0.00132 DT = 2e-05
+
+[Level 0 step 67] ADVANCE with dt = 2e-05
+[Level 0 step 67] Advanced 2097152 cells
+
+STEP = 67 TIME = 0.00134 DT = 2e-05
+
+[Level 0 step 68] ADVANCE with dt = 2e-05
+[Level 0 step 68] Advanced 2097152 cells
+
+STEP = 68 TIME = 0.00136 DT = 2e-05
+
+[Level 0 step 69] ADVANCE with dt = 2e-05
+[Level 0 step 69] Advanced 2097152 cells
+
+STEP = 69 TIME = 0.00138 DT = 2e-05
+
+[Level 0 step 70] ADVANCE with dt = 2e-05
+[Level 0 step 70] Advanced 2097152 cells
+
+STEP = 70 TIME = 0.0014 DT = 2e-05
+
+
+[STEP 61] Coarse TimeStep time: 0.076723729
+[STEP 61] FAB kilobyte spread across MPI nodes: [12621 ... 12621]
+
+
+[STEP 62] Coarse TimeStep time: 0.077934455
+[STEP 62] FAB kilobyte spread across MPI nodes: [12621 ... 12621]
+
+
+[STEP 63] Coarse TimeStep time: 0.075682902
+[STEP 63] FAB kilobyte spread across MPI nodes: [12621 ... 12621]
+
+
+[STEP 64] Coarse TimeStep time: 0.077961456
+[STEP 64] FAB kilobyte spread across MPI nodes: [12621 ... 12621]
+
+
+[STEP 65] Coarse TimeStep time: 0.075525203
+[STEP 65] FAB kilobyte spread across MPI nodes: [12621 ... 12621]
+
+
+[STEP 66] Coarse TimeStep time: 0.072300472
+[STEP 66] FAB kilobyte spread across MPI nodes: [12621 ... 12621]
+
+
+[STEP 67] Coarse TimeStep time: 0.075334367
+[STEP 67] FAB kilobyte spread across MPI nodes: [12621 ... 12621]
+
+
+[STEP 68] Coarse TimeStep time: 0.071862518
+[STEP 68] FAB kilobyte spread across MPI nodes: [12621 ... 12621]
+
+
+[STEP 69] Coarse TimeStep time: 0.076553479
+[STEP 69] FAB kilobyte spread across MPI nodes: [12621 ... 12621]
+
+
+[STEP 70] Coarse TimeStep time: 0.074031149
+[STEP 70] FAB kilobyte spread across MPI nodes: [12621 ... 12621]
+
+[Level 0 step 71] ADVANCE with dt = 2e-05
+[Level 0 step 71] Advanced 2097152 cells
+
+STEP = 71 TIME = 0.00142 DT = 2e-05
+
+[Level 0 step 72] ADVANCE with dt = 2e-05
+[Level 0 step 72] Advanced 2097152 cells
+
+STEP = 72 TIME = 0.00144 DT = 2e-05
+
+[Level 0 step 73] ADVANCE with dt = 2e-05
+[Level 0 step 73] Advanced 2097152 cells
+
+STEP = 73 TIME = 0.00146 DT = 2e-05
+
+[Level 0 step 74] ADVANCE with dt = 2e-05
+[Level 0 step 74] Advanced 2097152 cells
+
+STEP = 74 TIME = 0.00148 DT = 2e-05
+
+[Level 0 step 75] ADVANCE with dt = 2e-05
+[Level 0 step 75] Advanced 2097152 cells
+
+STEP = 75 TIME = 0.0015 DT = 2e-05
+
+[Level 0 step 76] ADVANCE with dt = 2e-05
+[Level 0 step 76] Advanced 2097152 cells
+
+STEP = 76 TIME = 0.00152 DT = 2e-05
+
+[Level 0 step 77] ADVANCE with dt = 2e-05
+[Level 0 step 77] Advanced 2097152 cells
+
+STEP = 77 TIME = 0.00154 DT = 2e-05
+
+[Level 0 step 78] ADVANCE with dt = 2e-05
+[Level 0 step 78] Advanced 2097152 cells
+
+STEP = 78 TIME = 0.00156 DT = 2e-05
+
+[Level 0 step 79] ADVANCE with dt = 2e-05
+[Level 0 step 79] Advanced 2097152 cells
+
+STEP = 79 TIME = 0.00158 DT = 2e-05
+
+[Level 0 step 80] ADVANCE with dt = 2e-05
+[Level 0 step 80] Advanced 2097152 cells
+
+STEP = 80 TIME = 0.0016 DT = 2e-05
+
+
+[STEP 71] Coarse TimeStep time: 0.072344875
+[STEP 71] FAB kilobyte spread across MPI nodes: [12621 ... 12621]
+
+
+[STEP 72] Coarse TimeStep time: 0.076463049
+[STEP 72] FAB kilobyte spread across MPI nodes: [12621 ... 12621]
+
+
+[STEP 73] Coarse TimeStep time: 0.076806856
+[STEP 73] FAB kilobyte spread across MPI nodes: [12621 ... 12621]
+
+
+[STEP 74] Coarse TimeStep time: 0.073318968
+[STEP 74] FAB kilobyte spread across MPI nodes: [12621 ... 12621]
+
+
+[STEP 75] Coarse TimeStep time: 0.073039442
+[STEP 75] FAB kilobyte spread across MPI nodes: [12621 ... 12621]
+
+
+[STEP 76] Coarse TimeStep time: 0.074869062
+[STEP 76] FAB kilobyte spread across MPI nodes: [12621 ... 12621]
+
+
+[STEP 77] Coarse TimeStep time: 0.076988717
+[STEP 77] FAB kilobyte spread across MPI nodes: [12621 ... 12621]
+
+
+[STEP 78] Coarse TimeStep time: 0.077313649
+[STEP 78] FAB kilobyte spread across MPI nodes: [12621 ... 12621]
+
+
+[STEP 79] Coarse TimeStep time: 0.075743856
+[STEP 79] FAB kilobyte spread across MPI nodes: [12621 ... 12621]
+
+
+[STEP 80] Coarse TimeStep time: 0.071946738
+[STEP 80] FAB kilobyte spread across MPI nodes: [12621 ... 12621]
+
+[Level 0 step 81] ADVANCE with dt = 2e-05
+[Level 0 step 81] Advanced 2097152 cells
+
+STEP = 81 TIME = 0.00162 DT = 2e-05
+
+[Level 0 step 82] ADVANCE with dt = 2e-05
+[Level 0 step 82] Advanced 2097152 cells
+
+STEP = 82 TIME = 0.00164 DT = 2e-05
+
+[Level 0 step 83] ADVANCE with dt = 2e-05
+[Level 0 step 83] Advanced 2097152 cells
+
+STEP = 83 TIME = 0.00166 DT = 2e-05
+
+[Level 0 step 84] ADVANCE with dt = 2e-05
+[Level 0 step 84] Advanced 2097152 cells
+
+STEP = 84 TIME = 0.00168 DT = 2e-05
+
+[Level 0 step 85] ADVANCE with dt = 2e-05
+[Level 0 step 85] Advanced 2097152 cells
+
+STEP = 85 TIME = 0.0017 DT = 2e-05
+
+[Level 0 step 86] ADVANCE with dt = 2e-05
+[Level 0 step 86] Advanced 2097152 cells
+
+STEP = 86 TIME = 0.00172 DT = 2e-05
+
+[Level 0 step 87] ADVANCE with dt = 2e-05
+[Level 0 step 87] Advanced 2097152 cells
+
+STEP = 87 TIME = 0.00174 DT = 2e-05
+
+[Level 0 step 88] ADVANCE with dt = 2e-05
+[Level 0 step 88] Advanced 2097152 cells
+
+STEP = 88 TIME = 0.00176 DT = 2e-05
+
+[Level 0 step 89] ADVANCE with dt = 2e-05
+[Level 0 step 89] Advanced 2097152 cells
+
+STEP = 89 TIME = 0.00178 DT = 2e-05
+
+[Level 0 step 90] ADVANCE with dt = 2e-05
+[Level 0 step 90] Advanced 2097152 cells
+
+STEP = 90 TIME = 0.0018 DT = 2e-05
+
+
+[STEP 81] Coarse TimeStep time: 0.074629501
+[STEP 81] FAB kilobyte spread across MPI nodes: [12621 ... 12621]
+
+
+[STEP 82] Coarse TimeStep time: 0.073982035
+[STEP 82] FAB kilobyte spread across MPI nodes: [12621 ... 12621]
+
+
+[STEP 83] Coarse TimeStep time: 0.074934805
+[STEP 83] FAB kilobyte spread across MPI nodes: [12621 ... 12621]
+
+
+[STEP 84] Coarse TimeStep time: 0.074903978
+[STEP 84] FAB kilobyte spread across MPI nodes: [12621 ... 12621]
+
+
+[STEP 85] Coarse TimeStep time: 0.07467141
+[STEP 85] FAB kilobyte spread across MPI nodes: [12621 ... 12621]
+
+
+[STEP 86] Coarse TimeStep time: 0.087206048
+[STEP 86] FAB kilobyte spread across MPI nodes: [12621 ... 12621]
+
+
+[STEP 87] Coarse TimeStep time: 0.143366848
+[STEP 87] FAB kilobyte spread across MPI nodes: [12621 ... 12621]
+
+
+[STEP 88] Coarse TimeStep time: 0.100751407
+[STEP 88] FAB kilobyte spread across MPI nodes: [12621 ... 12621]
+
+
+[STEP 89] Coarse TimeStep time: 0.076437872
+[STEP 89] FAB kilobyte spread across MPI nodes: [12621 ... 12621]
+
+
+[STEP 90] Coarse TimeStep time: 0.070540563
+[STEP 90] FAB kilobyte spread across MPI nodes: [12621 ... 12621]
+
+[Level 0 step 91] ADVANCE with dt = 2e-05
+[Level 0 step 91] Advanced 2097152 cells
+
+STEP = 91 TIME = 0.00182 DT = 2e-05
+
+[Level 0 step 92] ADVANCE with dt = 2e-05
+[Level 0 step 92] Advanced 2097152 cells
+
+STEP = 92 TIME = 0.00184 DT = 2e-05
+
+[Level 0 step 93] ADVANCE with dt = 2e-05
+[Level 0 step 93] Advanced 2097152 cells
+
+STEP = 93 TIME = 0.00186 DT = 2e-05
+
+[Level 0 step 94] ADVANCE with dt = 2e-05
+[Level 0 step 94] Advanced 2097152 cells
+
+STEP = 94 TIME = 0.00188 DT = 2e-05
+
+[Level 0 step 95] ADVANCE with dt = 2e-05
+[Level 0 step 95] Advanced 2097152 cells
+
+STEP = 95 TIME = 0.0019 DT = 2e-05
+
+[Level 0 step 96] ADVANCE with dt = 2e-05
+[Level 0 step 96] Advanced 2097152 cells
+
+STEP = 96 TIME = 0.00192 DT = 2e-05
+
+[Level 0 step 97] ADVANCE with dt = 2e-05
+[Level 0 step 97] Advanced 2097152 cells
+
+STEP = 97 TIME = 0.00194 DT = 2e-05
+
+[Level 0 step 98] ADVANCE with dt = 2e-05
+[Level 0 step 98] Advanced 2097152 cells
+
+STEP = 98 TIME = 0.00196 DT = 2e-05
+
+[Level 0 step 99] ADVANCE with dt = 2e-05
+[Level 0 step 99] Advanced 2097152 cells
+
+STEP = 99 TIME = 0.00198 DT = 2e-05
+
+[Level 0 step 100] ADVANCE with dt = 2e-05
+[Level 0 step 100] Advanced 2097152 cells
+
+STEP = 100 TIME = 0.002 DT = 2e-05
+
+
+[STEP 91] Coarse TimeStep time: 0.075416782
+[STEP 91] FAB kilobyte spread across MPI nodes: [12621 ... 12621]
+
+
+[STEP 92] Coarse TimeStep time: 0.077853323
+[STEP 92] FAB kilobyte spread across MPI nodes: [12621 ... 12621]
+
+
+[STEP 93] Coarse TimeStep time: 0.077114344
+[STEP 93] FAB kilobyte spread across MPI nodes: [12621 ... 12621]
+
+
+[STEP 94] Coarse TimeStep time: 0.077204333
+[STEP 94] FAB kilobyte spread across MPI nodes: [12621 ... 12621]
+
+
+[STEP 95] Coarse TimeStep time: 0.078216095
+[STEP 95] FAB kilobyte spread across MPI nodes: [12621 ... 12621]
+
+
+[STEP 96] Coarse TimeStep time: 0.081901465
+[STEP 96] FAB kilobyte spread across MPI nodes: [12621 ... 12621]
+
+
+[STEP 97] Coarse TimeStep time: 0.17301564
+[STEP 97] FAB kilobyte spread across MPI nodes: [12621 ... 12621]
+
+
+[STEP 98] Coarse TimeStep time: 0.126855128
+[STEP 98] FAB kilobyte spread across MPI nodes: [12621 ... 12621]
+
+
+[STEP 99] Coarse TimeStep time: 0.080943013
+[STEP 99] FAB kilobyte spread across MPI nodes: [12621 ... 12621]
+
+
+[STEP 100] Coarse TimeStep time: 0.077088205
+[STEP 100] FAB kilobyte spread across MPI nodes: [12621 ... 12621]
+
+PLOTFILE: file = ./plot/plt00100
+Write plotfile time = 1.890277563  seconds
+
+Run Time total        = 12.39143086
+Run Time init         = 0
+Run Time advance      = 8.80829816
+Unused ParmParse Variables:
+  [TOP]::cns.order_keep(nvals = 1)  :: [4]
+  [TOP]::amr.ref_ratio(nvals = 1)  :: [2]
+  [TOP]::amr.regrid_int(nvals = 1)  :: [5000]
+
+AMReX (23.06-12-g1f3afaa42d0d) finalized

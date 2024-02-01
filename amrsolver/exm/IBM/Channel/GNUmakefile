@@ -1,0 +1,15 @@
+TINY_PROFILE = FALSE
+
+DEBUG   = FALSE
+DIM	= 3
+USE_MPI = TRUE
+USE_OMP = FALSE
+
+USE_CUDA = FALSE 
+COMP     = gcc
+
+USE_GPIBM= TRUE
+AMREX_NO_PROBINIT=TRUE
+
+include ./Make.package
+include $(AMR_SOLVER)/src/Make.CNS

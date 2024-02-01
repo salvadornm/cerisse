@@ -1,0 +1,50 @@
+#------------------------------------------------------------------------------#
+#                                 INPUT FILE
+#------------------------------------------------------------------------------#
+# start time is assumed to be 0, unless re-starting
+max_step  = 10000
+stop_time = 10.0
+#time_step = 1.0e-5 # at base level, higher level time step is computed based on the number of subcycles (depending on the subcycling strategy). stop_time = max_step*time_step
+# or
+cfl = 0.5
+
+#-------------------------------- IMMERSED BOUNDARY ---------------------------#
+ib.filename = MSL_coarse_8deg.stl
+#ib.fields   = 2 #
+
+#-------------------------------- COMPUTATIONAL DOMAIN ------------------------#
+geometry.is_periodic = 0 1 1
+geometry.coord_sys   = 0  # 0 => cart, 1 => RZ  2=>spherical
+geometry.prob_lo     =   0.0    0.0    0.0
+geometry.prob_hi     =   0.4    0.4    0.5
+#amr.n_cell           =   64      64     64
+amr.n_cell           =   128     128     128
+
+#-------------------------------- REFINEMENT / REGRIDDING ---------------------#
+amr.max_level       = 2       # maximum level number allowed
+amr.ref_ratio       = 2 2  # refinement ratio
+amr.regrid_int      = 5000000 2000000  # how often to regrid
+amr.blocking_factor_x = 8 8 # blocking factor in x per level
+amr.blocking_factor_y = 8 8 # blocking factor in x per level
+amr.blocking_factor_z = 8 8 # blocking factor in x per level
+amr.max_grid_size_x   = 64 64  # maximum grid size in x per level
+amr.max_grid_size_y   = 64 64  # maximum grid size in y per level
+amr.max_grid_size_z   = 64 64  # maximum grid size in z per level
+amr.n_error_buf     = 2 2  # number of buffer cells in error est
+amr.grid_eff        = 0.8     # what constitutes an efficient grid
+
+#-------------------------------- PLOTFILES -----------------------------------#
+amr.plot_files_output = 1
+amr.plot_file         = ./plot/plt # root name of plotfile
+amr.plot_int          = 10     # number of timesteps between plotfiles
+amr.derive_plot_vars  = x_velocity pressure x_velocity y_velocity z_velocity temperature
+amr.v = 1 # 0=quiet, 1=verbose
+
+amr.checkpoint_files_output = 0
+#amr.check_file              = chk    # root name of checkpoint file
+#amr.check_int               = 100    # number of timesteps between checkpoints
+
+#amrex.fpe_trap_invalid=1
+#amrex.fpe_trap_zero = 1
+#amrex.fpe_trap_overflow = 1
+# fab.init_snan = true;

@@ -1,0 +1,565 @@
+AMReX (23.06-12-g1f3afaa42d0d-dirty) initialized
+Successfully read inputs file ... 
+Successfully read inputs file ... 
+Starting to call amrex_probinit ... 
+Successfully run amrex_probinit
+Mesh size (dx,dy,dz) = 0.1  0.3125  0.3125  
+[computeInitialDt] Level 0 dt = 0.08451542547
+
+[CNS level 0]
+   Total mass   = 57600000
+   Total x-mom  = 0
+   Total y-mom  = 0
+   Total z-mom  = 0
+   Total energy = 140800000.00000003
+INITIAL GRIDS 
+  Level 0   1 grids  102400 cells  100 % of domain
+
+PLOTFILE: file = ./plot/plt00000
+FillPatchSingleLevel: smf.size() == 1
+FillPatchSingleLevel: smf.size() == 1
+FillPatchSingleLevel: smf.size() == 1
+FillPatchSingleLevel: smf.size() == 1
+FillPatchSingleLevel: smf.size() == 1
+FillPatchSingleLevel: smf.size() == 1
+FillPatchSingleLevel: smf.size() == 1
+FillPatchSingleLevel: smf.size() == 1
+Write plotfile time = 0.018542175  seconds
+
+ --------------------- Time advance ---------------- 
+[computeInitialDt] Level 0 dt = 0.08451542547
+[Level 0 step 1] ADVANCE with dt = 0.08451542547
+FillPatchSingleLevel: smf.size() == 1
+FillPatchSingleLevel: smf.size() == 1
+[Level 0 step 1] Advanced 102400 cells
+
+[STEP 1] Coarse TimeStep time: 0.109612442
+[STEP 1] FAB kilobyte spread across MPI nodes: [68438 ... 68438]
+
+
+STEP = 1 TIME = 0.08451542547 DT = 0.08451542547
+
+[computeNewDt] Level 0 dt = 0.04602602823
+[Level 0 step 2] ADVANCE with dt = 0.04602602823
+FillPatchSingleLevel: smf.size() == 1
+FillPatchSingleLevel: smf.size() == 1
+[Level 0 step 2] Advanced 102400 cells
+
+[STEP 2] Coarse TimeStep time: 0.100703126
+[STEP 2] FAB kilobyte spread across MPI nodes: [68438 ... 68438]
+
+
+STEP = 2 TIME = 0.1305414537 DT = 0.04602602823
+
+[computeNewDt] Level 0 dt = 0.04970812681
+[Level 0 step 3] ADVANCE with dt = 0.04970812681
+FillPatchSingleLevel: smf.size() == 1
+FillPatchSingleLevel: smf.size() == 1
+[Level 0 step 3] Advanced 102400 cells
+
+[STEP 3] Coarse TimeStep time: 0.100093676
+[STEP 3] FAB kilobyte spread across MPI nodes: [68438 ... 68438]
+
+
+STEP = 3 TIME = 0.1802495805 DT = 0.04970812681
+
+[computeNewDt] Level 0 dt = 0.05069346174
+[Level 0 step 4] ADVANCE with dt = 0.05069346174
+FillPatchSingleLevel: smf.size() == 1
+FillPatchSingleLevel: smf.size() == 1
+[Level 0 step 4] Advanced 102400 cells
+
+[STEP 4] Coarse TimeStep time: 0.101113923
+[STEP 4] FAB kilobyte spread across MPI nodes: [68438 ... 68438]
+
+
+STEP = 4 TIME = 0.2309430422 DT = 0.05069346174
+
+[computeNewDt] Level 0 dt = 0.04948765298
+[Level 0 step 5] ADVANCE with dt = 0.04948765298
+FillPatchSingleLevel: smf.size() == 1
+FillPatchSingleLevel: smf.size() == 1
+[Level 0 step 5] Advanced 102400 cells
+
+[STEP 5] Coarse TimeStep time: 0.101723336
+[STEP 5] FAB kilobyte spread across MPI nodes: [68438 ... 68438]
+
+
+STEP = 5 TIME = 0.2804306952 DT = 0.04948765298
+
+[computeNewDt] Level 0 dt = 0.04728894205
+[Level 0 step 6] ADVANCE with dt = 0.04728894205
+FillPatchSingleLevel: smf.size() == 1
+FillPatchSingleLevel: smf.size() == 1
+[Level 0 step 6] Advanced 102400 cells
+
+[STEP 6] Coarse TimeStep time: 0.101356682
+[STEP 6] FAB kilobyte spread across MPI nodes: [68438 ... 68438]
+
+
+STEP = 6 TIME = 0.3277196373 DT = 0.04728894205
+
+[computeNewDt] Level 0 dt = 0.04818017421
+[Level 0 step 7] ADVANCE with dt = 0.04818017421
+FillPatchSingleLevel: smf.size() == 1
+FillPatchSingleLevel: smf.size() == 1
+[Level 0 step 7] Advanced 102400 cells
+
+[STEP 7] Coarse TimeStep time: 0.099475483
+[STEP 7] FAB kilobyte spread across MPI nodes: [68438 ... 68438]
+
+
+STEP = 7 TIME = 0.3758998115 DT = 0.04818017421
+
+[computeNewDt] Level 0 dt = 0.04733250727
+[Level 0 step 8] ADVANCE with dt = 0.04733250727
+FillPatchSingleLevel: smf.size() == 1
+FillPatchSingleLevel: smf.size() == 1
+[Level 0 step 8] Advanced 102400 cells
+
+[STEP 8] Coarse TimeStep time: 0.10283915
+[STEP 8] FAB kilobyte spread across MPI nodes: [68438 ... 68438]
+
+
+STEP = 8 TIME = 0.4232323188 DT = 0.04733250727
+
+[computeNewDt] Level 0 dt = 0.04672497483
+[Level 0 step 9] ADVANCE with dt = 0.04672497483
+FillPatchSingleLevel: smf.size() == 1
+FillPatchSingleLevel: smf.size() == 1
+[Level 0 step 9] Advanced 102400 cells
+
+[STEP 9] Coarse TimeStep time: 0.100892272
+[STEP 9] FAB kilobyte spread across MPI nodes: [68438 ... 68438]
+
+
+STEP = 9 TIME = 0.4699572936 DT = 0.04672497483
+
+[computeNewDt] Level 0 dt = 0.04693867792
+[Level 0 step 10] ADVANCE with dt = 0.04693867792
+FillPatchSingleLevel: smf.size() == 1
+FillPatchSingleLevel: smf.size() == 1
+[Level 0 step 10] Advanced 102400 cells
+
+[STEP 10] Coarse TimeStep time: 0.102057418
+[STEP 10] FAB kilobyte spread across MPI nodes: [68438 ... 68438]
+
+
+STEP = 10 TIME = 0.5168959715 DT = 0.04693867792
+
+[computeNewDt] Level 0 dt = 0.04742691245
+[Level 0 step 11] ADVANCE with dt = 0.04742691245
+FillPatchSingleLevel: smf.size() == 1
+FillPatchSingleLevel: smf.size() == 1
+[Level 0 step 11] Advanced 102400 cells
+
+[STEP 11] Coarse TimeStep time: 0.100044826
+[STEP 11] FAB kilobyte spread across MPI nodes: [68438 ... 68438]
+
+
+STEP = 11 TIME = 0.564322884 DT = 0.04742691245
+
+[computeNewDt] Level 0 dt = 0.04655895683
+[Level 0 step 12] ADVANCE with dt = 0.04655895683
+FillPatchSingleLevel: smf.size() == 1
+FillPatchSingleLevel: smf.size() == 1
+[Level 0 step 12] Advanced 102400 cells
+
+[STEP 12] Coarse TimeStep time: 0.099680455
+[STEP 12] FAB kilobyte spread across MPI nodes: [68438 ... 68438]
+
+
+STEP = 12 TIME = 0.6108818408 DT = 0.04655895683
+
+[computeNewDt] Level 0 dt = 0.04622106182
+[Level 0 step 13] ADVANCE with dt = 0.04622106182
+FillPatchSingleLevel: smf.size() == 1
+FillPatchSingleLevel: smf.size() == 1
+[Level 0 step 13] Advanced 102400 cells
+
+[STEP 13] Coarse TimeStep time: 0.09870681
+[STEP 13] FAB kilobyte spread across MPI nodes: [68438 ... 68438]
+
+
+STEP = 13 TIME = 0.6571029026 DT = 0.04622106182
+
+[computeNewDt] Level 0 dt = 0.04627924352
+[Level 0 step 14] ADVANCE with dt = 0.04627924352
+FillPatchSingleLevel: smf.size() == 1
+FillPatchSingleLevel: smf.size() == 1
+[Level 0 step 14] Advanced 102400 cells
+
+[STEP 14] Coarse TimeStep time: 0.099203854
+[STEP 14] FAB kilobyte spread across MPI nodes: [68438 ... 68438]
+
+
+STEP = 14 TIME = 0.7033821461 DT = 0.04627924352
+
+[computeNewDt] Level 0 dt = 0.04631812134
+[Level 0 step 15] ADVANCE with dt = 0.04631812134
+FillPatchSingleLevel: smf.size() == 1
+FillPatchSingleLevel: smf.size() == 1
+[Level 0 step 15] Advanced 102400 cells
+
+[STEP 15] Coarse TimeStep time: 0.1021643
+[STEP 15] FAB kilobyte spread across MPI nodes: [68438 ... 68438]
+
+
+STEP = 15 TIME = 0.7497002675 DT = 0.04631812134
+
+[computeNewDt] Level 0 dt = 0.04606059871
+[Level 0 step 16] ADVANCE with dt = 0.04606059871
+FillPatchSingleLevel: smf.size() == 1
+FillPatchSingleLevel: smf.size() == 1
+[Level 0 step 16] Advanced 102400 cells
+
+[STEP 16] Coarse TimeStep time: 0.098532838
+[STEP 16] FAB kilobyte spread across MPI nodes: [68438 ... 68438]
+
+
+STEP = 16 TIME = 0.7957608662 DT = 0.04606059871
+
+[computeNewDt] Level 0 dt = 0.04583555966
+[Level 0 step 17] ADVANCE with dt = 0.04583555966
+FillPatchSingleLevel: smf.size() == 1
+FillPatchSingleLevel: smf.size() == 1
+[Level 0 step 17] Advanced 102400 cells
+
+[STEP 17] Coarse TimeStep time: 0.097643879
+[STEP 17] FAB kilobyte spread across MPI nodes: [68438 ... 68438]
+
+
+STEP = 17 TIME = 0.8415964258 DT = 0.04583555966
+
+[computeNewDt] Level 0 dt = 0.04590541424
+[Level 0 step 18] ADVANCE with dt = 0.04590541424
+FillPatchSingleLevel: smf.size() == 1
+FillPatchSingleLevel: smf.size() == 1
+[Level 0 step 18] Advanced 102400 cells
+
+[STEP 18] Coarse TimeStep time: 0.098770191
+[STEP 18] FAB kilobyte spread across MPI nodes: [68438 ... 68438]
+
+
+STEP = 18 TIME = 0.8875018401 DT = 0.04590541424
+
+[computeNewDt] Level 0 dt = 0.04598278291
+[Level 0 step 19] ADVANCE with dt = 0.04598278291
+FillPatchSingleLevel: smf.size() == 1
+FillPatchSingleLevel: smf.size() == 1
+[Level 0 step 19] Advanced 102400 cells
+
+[STEP 19] Coarse TimeStep time: 0.102648555
+[STEP 19] FAB kilobyte spread across MPI nodes: [68438 ... 68438]
+
+
+STEP = 19 TIME = 0.933484623 DT = 0.04598278291
+
+[computeNewDt] Level 0 dt = 0.04579584531
+[Level 0 step 20] ADVANCE with dt = 0.04579584531
+FillPatchSingleLevel: smf.size() == 1
+FillPatchSingleLevel: smf.size() == 1
+[Level 0 step 20] Advanced 102400 cells
+
+[STEP 20] Coarse TimeStep time: 0.100121604
+[STEP 20] FAB kilobyte spread across MPI nodes: [68438 ... 68438]
+
+
+STEP = 20 TIME = 0.9792804683 DT = 0.04579584531
+
+[computeNewDt] Level 0 dt = 0.04571225028
+[Level 0 step 21] ADVANCE with dt = 0.04571225028
+FillPatchSingleLevel: smf.size() == 1
+FillPatchSingleLevel: smf.size() == 1
+[Level 0 step 21] Advanced 102400 cells
+
+[STEP 21] Coarse TimeStep time: 0.100383541
+[STEP 21] FAB kilobyte spread across MPI nodes: [68438 ... 68438]
+
+
+STEP = 21 TIME = 1.024992719 DT = 0.04571225028
+
+[computeNewDt] Level 0 dt = 0.0457140843
+[Level 0 step 22] ADVANCE with dt = 0.0457140843
+FillPatchSingleLevel: smf.size() == 1
+FillPatchSingleLevel: smf.size() == 1
+[Level 0 step 22] Advanced 102400 cells
+
+[STEP 22] Coarse TimeStep time: 0.09886248
+[STEP 22] FAB kilobyte spread across MPI nodes: [68438 ... 68438]
+
+
+STEP = 22 TIME = 1.070706803 DT = 0.0457140843
+
+[computeNewDt] Level 0 dt = 0.04578023738
+[Level 0 step 23] ADVANCE with dt = 0.04578023738
+FillPatchSingleLevel: smf.size() == 1
+FillPatchSingleLevel: smf.size() == 1
+[Level 0 step 23] Advanced 102400 cells
+
+[STEP 23] Coarse TimeStep time: 0.097807287
+[STEP 23] FAB kilobyte spread across MPI nodes: [68438 ... 68438]
+
+
+STEP = 23 TIME = 1.11648704 DT = 0.04578023738
+
+[computeNewDt] Level 0 dt = 0.04569627059
+[Level 0 step 24] ADVANCE with dt = 0.04569627059
+FillPatchSingleLevel: smf.size() == 1
+FillPatchSingleLevel: smf.size() == 1
+[Level 0 step 24] Advanced 102400 cells
+
+[STEP 24] Coarse TimeStep time: 0.099151765
+[STEP 24] FAB kilobyte spread across MPI nodes: [68438 ... 68438]
+
+
+STEP = 24 TIME = 1.162183311 DT = 0.04569627059
+
+[computeNewDt] Level 0 dt = 0.04562356609
+[Level 0 step 25] ADVANCE with dt = 0.04562356609
+FillPatchSingleLevel: smf.size() == 1
+FillPatchSingleLevel: smf.size() == 1
+[Level 0 step 25] Advanced 102400 cells
+
+[STEP 25] Coarse TimeStep time: 0.100900344
+[STEP 25] FAB kilobyte spread across MPI nodes: [68438 ... 68438]
+
+
+STEP = 25 TIME = 1.207806877 DT = 0.04562356609
+
+[computeNewDt] Level 0 dt = 0.04559429214
+[Level 0 step 26] ADVANCE with dt = 0.04559429214
+FillPatchSingleLevel: smf.size() == 1
+FillPatchSingleLevel: smf.size() == 1
+[Level 0 step 26] Advanced 102400 cells
+
+[STEP 26] Coarse TimeStep time: 0.099155305
+[STEP 26] FAB kilobyte spread across MPI nodes: [68438 ... 68438]
+
+
+STEP = 26 TIME = 1.253401169 DT = 0.04559429214
+
+[computeNewDt] Level 0 dt = 0.04567633128
+[Level 0 step 27] ADVANCE with dt = 0.04567633128
+FillPatchSingleLevel: smf.size() == 1
+FillPatchSingleLevel: smf.size() == 1
+[Level 0 step 27] Advanced 102400 cells
+
+[STEP 27] Coarse TimeStep time: 0.099945356
+[STEP 27] FAB kilobyte spread across MPI nodes: [68438 ... 68438]
+
+
+STEP = 27 TIME = 1.2990775 DT = 0.04567633128
+
+[computeNewDt] Level 0 dt = 0.04562873857
+[Level 0 step 28] ADVANCE with dt = 0.04562873857
+FillPatchSingleLevel: smf.size() == 1
+FillPatchSingleLevel: smf.size() == 1
+[Level 0 step 28] Advanced 102400 cells
+
+[STEP 28] Coarse TimeStep time: 0.107323033
+[STEP 28] FAB kilobyte spread across MPI nodes: [68438 ... 68438]
+
+
+STEP = 28 TIME = 1.344706239 DT = 0.04562873857
+
+[computeNewDt] Level 0 dt = 0.04560663266
+[Level 0 step 29] ADVANCE with dt = 0.04560663266
+FillPatchSingleLevel: smf.size() == 1
+FillPatchSingleLevel: smf.size() == 1
+[Level 0 step 29] Advanced 102400 cells
+
+[STEP 29] Coarse TimeStep time: 0.107701002
+[STEP 29] FAB kilobyte spread across MPI nodes: [68438 ... 68438]
+
+
+STEP = 29 TIME = 1.390312872 DT = 0.04560663266
+
+[computeNewDt] Level 0 dt = 0.0455880032
+[Level 0 step 30] ADVANCE with dt = 0.0455880032
+FillPatchSingleLevel: smf.size() == 1
+FillPatchSingleLevel: smf.size() == 1
+[Level 0 step 30] Advanced 102400 cells
+
+[STEP 30] Coarse TimeStep time: 0.101858604
+[STEP 30] FAB kilobyte spread across MPI nodes: [68438 ... 68438]
+
+
+STEP = 30 TIME = 1.435900875 DT = 0.0455880032
+
+[computeNewDt] Level 0 dt = 0.04562071304
+[Level 0 step 31] ADVANCE with dt = 0.04562071304
+FillPatchSingleLevel: smf.size() == 1
+FillPatchSingleLevel: smf.size() == 1
+[Level 0 step 31] Advanced 102400 cells
+
+[STEP 31] Coarse TimeStep time: 0.099921379
+[STEP 31] FAB kilobyte spread across MPI nodes: [68438 ... 68438]
+
+
+STEP = 31 TIME = 1.481521588 DT = 0.04562071304
+
+[computeNewDt] Level 0 dt = 0.04559243198
+[Level 0 step 32] ADVANCE with dt = 0.04559243198
+FillPatchSingleLevel: smf.size() == 1
+FillPatchSingleLevel: smf.size() == 1
+[Level 0 step 32] Advanced 102400 cells
+
+[STEP 32] Coarse TimeStep time: 0.099187964
+[STEP 32] FAB kilobyte spread across MPI nodes: [68438 ... 68438]
+
+
+STEP = 32 TIME = 1.52711402 DT = 0.04559243198
+
+[computeNewDt] Level 0 dt = 0.04557645171
+[Level 0 step 33] ADVANCE with dt = 0.04557645171
+FillPatchSingleLevel: smf.size() == 1
+FillPatchSingleLevel: smf.size() == 1
+[Level 0 step 33] Advanced 102400 cells
+
+[STEP 33] Coarse TimeStep time: 0.099186472
+[STEP 33] FAB kilobyte spread across MPI nodes: [68438 ... 68438]
+
+
+STEP = 33 TIME = 1.572690472 DT = 0.04557645171
+
+[computeNewDt] Level 0 dt = 0.04556671176
+[Level 0 step 34] ADVANCE with dt = 0.04556671176
+FillPatchSingleLevel: smf.size() == 1
+FillPatchSingleLevel: smf.size() == 1
+[Level 0 step 34] Advanced 102400 cells
+
+[STEP 34] Coarse TimeStep time: 0.100217077
+[STEP 34] FAB kilobyte spread across MPI nodes: [68438 ... 68438]
+
+
+STEP = 34 TIME = 1.618257183 DT = 0.04556671176
+
+[computeNewDt] Level 0 dt = 0.04556163862
+[Level 0 step 35] ADVANCE with dt = 0.04556163862
+FillPatchSingleLevel: smf.size() == 1
+FillPatchSingleLevel: smf.size() == 1
+[Level 0 step 35] Advanced 102400 cells
+
+[STEP 35] Coarse TimeStep time: 0.103147732
+[STEP 35] FAB kilobyte spread across MPI nodes: [68438 ... 68438]
+
+
+STEP = 35 TIME = 1.663818822 DT = 0.04556163862
+
+[computeNewDt] Level 0 dt = 0.04558446084
+[Level 0 step 36] ADVANCE with dt = 0.04558446084
+FillPatchSingleLevel: smf.size() == 1
+FillPatchSingleLevel: smf.size() == 1
+[Level 0 step 36] Advanced 102400 cells
+
+[STEP 36] Coarse TimeStep time: 0.098990425
+[STEP 36] FAB kilobyte spread across MPI nodes: [68438 ... 68438]
+
+
+STEP = 36 TIME = 1.709403283 DT = 0.04558446084
+
+[computeNewDt] Level 0 dt = 0.04557577929
+[Level 0 step 37] ADVANCE with dt = 0.04557577929
+FillPatchSingleLevel: smf.size() == 1
+FillPatchSingleLevel: smf.size() == 1
+[Level 0 step 37] Advanced 102400 cells
+
+[STEP 37] Coarse TimeStep time: 0.098145043
+[STEP 37] FAB kilobyte spread across MPI nodes: [68438 ... 68438]
+
+
+STEP = 37 TIME = 1.754979062 DT = 0.04557577929
+
+[computeNewDt] Level 0 dt = 0.04557047466
+[Level 0 step 38] ADVANCE with dt = 0.04557047466
+FillPatchSingleLevel: smf.size() == 1
+FillPatchSingleLevel: smf.size() == 1
+[Level 0 step 38] Advanced 102400 cells
+
+[STEP 38] Coarse TimeStep time: 0.098333981
+[STEP 38] FAB kilobyte spread across MPI nodes: [68438 ... 68438]
+
+
+STEP = 38 TIME = 1.800549537 DT = 0.04557047466
+
+[computeNewDt] Level 0 dt = 0.04556649972
+[Level 0 step 39] ADVANCE with dt = 0.04556649972
+FillPatchSingleLevel: smf.size() == 1
+FillPatchSingleLevel: smf.size() == 1
+[Level 0 step 39] Advanced 102400 cells
+
+[STEP 39] Coarse TimeStep time: 0.101559172
+[STEP 39] FAB kilobyte spread across MPI nodes: [68438 ... 68438]
+
+
+STEP = 39 TIME = 1.846116036 DT = 0.04556649972
+
+[computeNewDt] Level 0 dt = 0.04556774648
+[Level 0 step 40] ADVANCE with dt = 0.04556774648
+FillPatchSingleLevel: smf.size() == 1
+FillPatchSingleLevel: smf.size() == 1
+[Level 0 step 40] Advanced 102400 cells
+
+[STEP 40] Coarse TimeStep time: 0.099173085
+[STEP 40] FAB kilobyte spread across MPI nodes: [68438 ... 68438]
+
+
+STEP = 40 TIME = 1.891683783 DT = 0.04556774648
+
+[computeNewDt] Level 0 dt = 0.04556269673
+[Level 0 step 41] ADVANCE with dt = 0.04556269673
+FillPatchSingleLevel: smf.size() == 1
+FillPatchSingleLevel: smf.size() == 1
+[Level 0 step 41] Advanced 102400 cells
+
+[STEP 41] Coarse TimeStep time: 0.09878573
+[STEP 41] FAB kilobyte spread across MPI nodes: [68438 ... 68438]
+
+
+STEP = 41 TIME = 1.93724648 DT = 0.04556269673
+
+[computeNewDt] Level 0 dt = 0.04555970521
+[Level 0 step 42] ADVANCE with dt = 0.04555970521
+FillPatchSingleLevel: smf.size() == 1
+FillPatchSingleLevel: smf.size() == 1
+[Level 0 step 42] Advanced 102400 cells
+
+[STEP 42] Coarse TimeStep time: 0.099538655
+[STEP 42] FAB kilobyte spread across MPI nodes: [68438 ... 68438]
+
+
+STEP = 42 TIME = 1.982806185 DT = 0.04555970521
+
+[computeNewDt] Level 0 dt = 0.01719381516
+[Level 0 step 43] ADVANCE with dt = 0.01719381516
+FillPatchSingleLevel: smf.size() == 1
+FillPatchSingleLevel: smf.size() == 1
+[Level 0 step 43] Advanced 102400 cells
+
+[STEP 43] Coarse TimeStep time: 0.098176631
+[STEP 43] FAB kilobyte spread across MPI nodes: [68438 ... 68438]
+
+
+STEP = 43 TIME = 2 DT = 0.01719381516
+
+PLOTFILE: file = ./plot/plt00043
+FillPatchSingleLevel: smf.size() == 1
+FillPatchSingleLevel: smf.size() == 1
+FillPatchSingleLevel: smf.size() == 1
+FillPatchSingleLevel: smf.size() == 1
+FillPatchSingleLevel: smf.size() == 1
+FillPatchSingleLevel: smf.size() == 1
+FillPatchSingleLevel: smf.size() == 1
+FillPatchSingleLevel: smf.size() == 1
+Write plotfile time = 0.012950956  seconds
+
+Run Time total        = 4.363189914
+Run Time init         = 0
+Run Time advance      = 4.325500731
+Unused ParmParse Variables:
+  [TOP]::cns.order_keep(nvals = 1)  :: [4]
+  [TOP]::amr.ref_ratio(nvals = 4)  :: [2, 2, 2, 2]
+  [TOP]::amr.regrid_int(nvals = 4)  :: [2, 2, 2, 2]
+
+AMReX (23.06-12-g1f3afaa42d0d-dirty) finalized

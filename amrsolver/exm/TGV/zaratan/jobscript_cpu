@@ -1,0 +1,17 @@
+#!/bin/bash   
+##SBATCH --mail-type=ALL
+#SBATCH --mail-user=mpatel38@umd.edu
+#SBATCH --output=slurm-%j.out
+#SBATCH --error=slurm-%j.err
+#SBATCH -A brehm-prj-paid
+#SBATCH -t 00-00:10:00
+#SBATCH -n 128 
+#SBATCH -c 1 
+#SBATCH --constraint="epyc_7763"
+
+source ~/.bashrc
+
+module load gcc/11.3.0
+module load openmpi/gcc/11.3.0
+
+mpiexec -np 128 ./main3d.gnu.MPI.ex inputs 

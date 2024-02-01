@@ -1,0 +1,46 @@
+amrex.fpe_trap_invalid=1
+# amrex.use_gpu_aware_mpi = 1
+
+# start time is assumed to be 0, unless re-starting
+max_step  = 100000 
+stop_time = 1.0
+#time_step = 1.0e-7 # at base level, higher level time step is computed based on the number of subcycles (depending on the subcycling strategy). stop_time = max_step*time_step
+# or
+cfl = 0.9
+
+# computational domain 
+geometry.is_periodic = 1 1 1
+geometry.coord_sys   = 0  # 0 => cart, 1 => RZ  2=>spherical
+geometry.prob_lo     = 0.0     0.0     0.0
+geometry.prob_hi     = 0.08214 0.0141147 0.02738
+
+# dy  = 0.00010693046
+# 4dy = 0.0004276
+
+
+ib.filename = channel_flow_plate_top.stl channel_flow_plate_bot.stl
+
+# REFINEMENT / REGRIDDING 
+#amr.n_cell          = 96 132 64  
+amr.n_cell          = 192 264 128  
+amr.max_level       = 0       # maximum level number allowed
+amr.ref_ratio       = 2 2 2 2 # refinement ratio
+amr.regrid_int      = 2 2 2 2 # how often to regrid
+amr.blocking_factor = 2
+amr.max_grid_size   = 64
+amr.n_error_buf     = 2 0 0 0 # number of buffer cells in error est
+amr.grid_eff        = 0.7    # what constitutes an efficient grid
+amr.v               = 1
+# amr.subcycling_mode = # None, Manual, Optimal (n_cycle[lev] is set dynamically), Auto (n_cycle[lev]=ref_ratio[lev])
+fabarray.mfiter_tile_size=128 128 128
+
+# CHECKPOINT FILES
+amr.checkpoint_files_output = 0
+amr.check_file              = chk    # root name of checkpoint file
+amr.check_int               = 50000    # number of timesteps between checkpoints
+
+# PLOTFILES
+amr.plot_files_output = 1
+amr.plot_file         = plot/plt     # root name of plotfile
+amr.plot_int          = 500      # approximately 1 tau flow
+amr.derive_plot_vars  = pressure temperature x_velocity y_velocity z_velocity

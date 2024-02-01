@@ -1,0 +1,48 @@
+# Simulation time
+# start time is assumed to be 0, unless re-starting
+max_step  = 200
+stop_time = 2.0
+#time_step = 0.02 # at base level, higher level time step is computed based on the number of subcycles (depending on the subcycling strategy). stop_time = max_step*time_step
+# or
+cfl = 0.8
+
+# Geometry 
+geometry.is_periodic = 0 1 1
+geometry.coord_sys   = 0  # 0 => cart, 1 => RZ  2=>spherical
+geometry.prob_lo     = 0.0     0.0     0.0
+geometry.prob_hi     = 10.0    10.0    10.0
+
+# Refinement and regridding 
+amr.n_cell          = 64 16 16
+amr.max_level       = 0     # maximum level number allowed
+amr.ref_ratio       = 2 2 2 # refinement ratio per level
+amr.regrid_int      = 2 2 2 # how often to regrid per level
+amr.blocking_factor_x = 8 8 8 # blocking factor in x per level
+amr.blocking_factor_y = 8 8 8 # blocking factor in x per level
+amr.blocking_factor_z = 8 8 8 # blocking factor in x per level
+amr.max_grid_size_x   = 64 64 64 # maximum grid size in x per level
+amr.max_grid_size_x   = 64 64 64 # maximum grid size in y per level
+amr.max_grid_size_x   = 64 64 64 # maximum grid size in z per level
+amr.n_error_buf     = 0 0 0 # number of buffer cells in error est
+amr.grid_eff        = 0.7     # what constitutes an efficient grid
+amr.v               = 1
+# amr.subcycling_mode = # None, Manual, Optimal (n_cycle[lev] is set dynamically), Auto (n_cycle[lev]=ref_ratio[lev])
+fabarray.mfiter_tile_size = 8 8 8
+
+# Plot and checkpoint
+amr.checkpoint_files_output = 0
+amr.check_file              = chk    # root name of checkpoint file
+amr.check_int               = 100    # number of timesteps between checkpoints
+amr.plot_files_output = 1
+amr.plot_file         = ./plot/plt # root name of plotfile
+amr.plot_int          = 2         # number of timesteps between plotfiles
+amr.derive_plot_vars  = x_velocity pressure x_velocity y_velocity z_velocity temperature
+
+# Debugging 
+# amrex.fpe_trap_invalid=1
+# amrex.use_gpu_aware_mpi = 1
+# amrex.fpe_trap_zero = 1
+# amrex.fpe_trap_overflow = 1
+
+# fab.do_initval = true;
+# fab.init_snan = true;

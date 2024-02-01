@@ -1,0 +1,86 @@
+solid channel_flow_plate_bot
+   facet normal -1.000000e+00 0.000000e+00 0.000000e+00
+      outer loop
+         vertex -1.000000e-02 -1.000000e-03 4.200000e-02
+         vertex -1.000000e-02 2.138000e-04 4.200000e-02
+         vertex -1.000000e-02 -1.000000e-03 -1.000000e-02
+      endloop
+   endfacet
+   facet normal -1.000000e+00 0.000000e+00 0.000000e+00
+      outer loop
+         vertex -1.000000e-02 -1.000000e-03 -1.000000e-02
+         vertex -1.000000e-02 2.138000e-04 4.200000e-02
+         vertex -1.000000e-02 2.138000e-04 -1.000000e-02
+      endloop
+   endfacet
+   facet normal 0.000000e+00 -0.000000e+00 1.000000e+00
+      outer loop
+         vertex 9.800000e-02 -1.000000e-03 4.200000e-02
+         vertex 9.800000e-02 2.138000e-04 4.200000e-02
+         vertex -1.000000e-02 -1.000000e-03 4.200000e-02
+      endloop
+   endfacet
+   facet normal 0.000000e+00 0.000000e+00 1.000000e+00
+      outer loop
+         vertex -1.000000e-02 -1.000000e-03 4.200000e-02
+         vertex 9.800000e-02 2.138000e-04 4.200000e-02
+         vertex -1.000000e-02 2.138000e-04 4.200000e-02
+      endloop
+   endfacet
+   facet normal 1.000000e+00 0.000000e+00 0.000000e+00
+      outer loop
+         vertex 9.800000e-02 -1.000000e-03 -1.000000e-02
+         vertex 9.800000e-02 2.138000e-04 -1.000000e-02
+         vertex 9.800000e-02 -1.000000e-03 4.200000e-02
+      endloop
+   endfacet
+   facet normal 1.000000e+00 -0.000000e+00 0.000000e+00
+      outer loop
+         vertex 9.800000e-02 -1.000000e-03 4.200000e-02
+         vertex 9.800000e-02 2.138000e-04 -1.000000e-02
+         vertex 9.800000e-02 2.138000e-04 4.200000e-02
+      endloop
+   endfacet
+   facet normal 0.000000e+00 0.000000e+00 -1.000000e+00
+      outer loop
+         vertex -1.000000e-02 -1.000000e-03 -1.000000e-02
+         vertex -1.000000e-02 2.138000e-04 -1.000000e-02
+         vertex 9.800000e-02 -1.000000e-03 -1.000000e-02
+      endloop
+   endfacet
+   facet normal 0.000000e+00 0.000000e+00 -1.000000e+00
+      outer loop
+         vertex 9.800000e-02 -1.000000e-03 -1.000000e-02
+         vertex -1.000000e-02 2.138000e-04 -1.000000e-02
+         vertex 9.800000e-02 2.138000e-04 -1.000000e-02
+      endloop
+   endfacet
+   facet normal 0.000000e+00 1.000000e+00 0.000000e+00
+      outer loop
+         vertex 9.800000e-02 2.138000e-04 4.200000e-02
+         vertex 9.800000e-02 2.138000e-04 -1.000000e-02
+         vertex -1.000000e-02 2.138000e-04 4.200000e-02
+      endloop
+   endfacet
+   facet normal 0.000000e+00 1.000000e+00 0.000000e+00
+      outer loop
+         vertex -1.000000e-02 2.138000e-04 4.200000e-02
+         vertex 9.800000e-02 2.138000e-04 -1.000000e-02
+         vertex -1.000000e-02 2.138000e-04 -1.000000e-02
+      endloop
+   endfacet
+   facet normal 0.000000e+00 -1.000000e+00 0.000000e+00
+      outer loop
+         vertex 9.800000e-02 -1.000000e-03 -1.000000e-02
+         vertex 9.800000e-02 -1.000000e-03 4.200000e-02
+         vertex -1.000000e-02 -1.000000e-03 -1.000000e-02
+      endloop
+   endfacet
+   facet normal 0.000000e+00 -1.000000e+00 0.000000e+00
+      outer loop
+         vertex -1.000000e-02 -1.000000e-03 -1.000000e-02
+         vertex 9.800000e-02 -1.000000e-03 4.200000e-02
+         vertex -1.000000e-02 -1.000000e-03 4.200000e-02
+      endloop
+   endfacet
+endsolid channel_flow_plate_bot

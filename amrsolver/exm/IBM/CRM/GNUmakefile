@@ -1,0 +1,9 @@
+TINY_PROFILE = TRUE
+DEBUG = TRUE
+DIM=3
+USE_MPI = TRUE
+USE_OMP = FALSE
+USE_GPIBM=TRUE
+
+include ./Make.package
+include $(AMR_SOLVER)/src/Make.CNS

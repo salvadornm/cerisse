@@ -1,0 +1,15 @@
+TINY_PROFILE 	= TRUE
+DEBUG   	= FALSE
+PRECISION    	= DOUBLE # DOUBLE or FLOAT
+DIM     	= 3
+COMP 		= gcc
+CXXSTD          = c++17
+USE_CUDA 	= FALSE 
+USE_MPI 	= FALSE
+USE_OMP 	= FALSE
+USE_GPIBM	= FALSE
+AMREX_NO_PROBINIT=TRUE
+CUDA_ARCH=8.0
+
+include ./Make.package
+include $(AMR_SOLVER)/src/Make.CNS
