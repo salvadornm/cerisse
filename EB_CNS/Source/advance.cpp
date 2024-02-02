@@ -165,10 +165,6 @@ void CNS::compute_dSdt(const MultiFab& S, MultiFab& dSdt, Real dt,
   int as_crse = (fr_as_crse != nullptr);
   int as_fine = (fr_as_fine != nullptr);
 
-  // if (use_hybrid_scheme) {
-  //   this->derive("shock_sensor", 0.0, shock_sensor_mf, 0);
-  // }
-
 #if CNS_USE_EB
   auto const& fact = dynamic_cast<EBFArrayBoxFactory const&>(S.Factory());
   auto const& flags = fact.getMultiEBCellFlagFab();
@@ -190,6 +186,11 @@ void CNS::compute_dSdt(const MultiFab& S, MultiFab& dSdt, Real dt,
         dSdt[mfi].setVal<RunOn::Device>(0.0, bx, 0, ncomp);
       } else
 #endif
+      // if (ifine_mask[mfi].max() == 0) {
+      //   // Do not work in fine covered box
+      //   amrex::Print() << "Saved some work in fine covered box\n";
+      //   dSdt[mfi].setVal<RunOn::Device>(0.0, bx, 0, ncomp);
+      // } else 
       {
         // flux is used to store centroid flux needed for reflux
         for (int idim = 0; idim < AMREX_SPACEDIM; ++idim) {

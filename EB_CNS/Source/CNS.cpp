@@ -7,6 +7,7 @@
 #include <AMReX_EBFArrayBox.H>
 #include <AMReX_EBMultiFabUtil.H>
 #endif
+// #include <AMReX_PlotFileUtil.H>
 
 #include "CNS.H"
 #include "CNS_K.H"
@@ -45,6 +46,8 @@ CNS::CNS(Amr& papa, int lev, const Geometry& level_geom, const BoxArray& bl,
   if (!use_hybrid_scheme) {
     shock_sensor_mf.setVal(1.0); // default to shock-capturing scheme
   }
+  // ifine_mask.define(grids, dmap, 1, 0, MFInfo());
+  // fillFineMask();
 
   // Initialize reaction
   get_new_data(Reactions_Type).setVal(0.0);
@@ -250,6 +253,8 @@ void CNS::post_regrid(int /*lbase*/, int /*new_finest*/)
   enforce_consistent_state();
 
   if (do_react && use_typical_vals_chem) { set_typical_values_chem(); }
+
+  // fillFineMask();
 }
 
 void CNS::post_timestep(int iteration)
@@ -314,7 +319,7 @@ void CNS::postCoarseTimeStep(Real time)
   prob_post_coarsetimestep(time);
 #endif
 
-  printTotalandCheckNan(); // must do because this checks for nan as well
+  printTotalandCheckNan(); // must do because this checks for nan as well  
 }
 
 void CNS::post_init(Real /*stop_time*/)
@@ -326,13 +331,24 @@ void CNS::post_init(Real /*stop_time*/)
     react_state(parent->cumTime(), parent->dtLevel(level), true);
   }
 
+  // {
+  //   amrex::MultiFab ifine_mask_plot(grids, dmap, 1, 0);
+  //   auto const& ifm_arrs = ifine_mask.const_arrays();
+  //   auto const& ifmp_arrs = ifine_mask_plot.arrays();
+  //   amrex::ParallelFor(ifine_mask_plot,
+  //     [=] AMREX_GPU_DEVICE(int box_no, int i, int j, int k) noexcept {
+  //       ifmp_arrs[box_no](i, j, k) = ifm_arrs[box_no](i, j, k);
+  //     });
+  //   amrex::WriteSingleLevelPlotfile("plt_lev" + std::to_string(level), ifine_mask_plot, {"mask"}, geom, 0.0, 0);
+  // }
+
   if (level > 0) return;
 
   // Average data down from finer levels
   // so that conserved data is consistent between levels
   for (int k = parent->finestLevel() - 1; k >= 0; --k) { getLevel(k).avgDown(); }
 
-  printTotalandCheckNan();
+  printTotalandCheckNan();  
 }
 
 void CNS::post_restart()
@@ -353,7 +369,9 @@ void CNS::post_restart()
   shock_sensor_mf.define(grids, dmap, 1, 3, MFInfo(), Factory());
   if (!use_hybrid_scheme) {
     shock_sensor_mf.setVal(1.0); // default to shock-capturing scheme
-  }
+  }  
+  // ifine_mask.define(grids, dmap, 1, 0, MFInfo());
+  // fillFineMask();
 
   // Initialize reactor
   if (do_react) {
@@ -718,6 +736,7 @@ void CNS::read_params()
   pp.query("limiter_theta", plm_theta); // MUSCL specific parameter
   // }
   pp.query("use_hybrid_scheme", use_hybrid_scheme);
+  pp.query("teno_cutoff", teno_cutoff);
 
   Vector<int> lo_bc(AMREX_SPACEDIM), hi_bc(AMREX_SPACEDIM);
   pp.getarr("lo_bc", lo_bc, 0, AMREX_SPACEDIM);
@@ -1063,3 +1082,33 @@ Real CNS::estTimeStep()
   ParallelDescriptor::ReduceRealMin(estdt);
   return estdt;
 }
+
+// void CNS::fillFineMask()
+// {
+//   BL_PROFILE("CNS::fillFineMask()");
+
+//   if (level == parent->finestLevel()) {
+//     ifine_mask.setVal(1);
+//     return;
+//   }
+
+//   iMultiFab tmp_mask(grids, dmap, 1, 2, MFInfo());
+//   tmp_mask = makeFineMask(tmp_mask, parent->boxArray(level + 1), fine_ratio, geom.periodicity(), 1, 0);
+
+//   // Grow by 2 cells
+//   auto const& tmask_arrs = tmp_mask.const_arrays();
+//   auto const& fmask_arrs = ifine_mask.arrays();
+//   amrex::ParallelFor(ifine_mask,
+//     [=] AMREX_GPU_DEVICE(int box_no, int i, int j, int k) noexcept {
+//       fmask_arrs[box_no](i, j, k) = 0;
+//       for (int ii = -2; ii <= 2; ++ii) {
+//         for (int jj = -2; jj <= 2; ++jj) {
+//           for (int kk = -2; kk <= 2; ++kk) {
+//             if (tmask_arrs[box_no](i + ii, j + jj, k + kk) == 1) {
+//               fmask_arrs[box_no](i, j, k) = 1;
+//             }
+//           }
+//         }
+//       }
+//     });  
+// }

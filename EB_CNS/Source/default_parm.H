@@ -67,6 +67,8 @@ int CNS::recon_scheme = 5;        // 1: basic Godunov; 2: MUSCL; 3: WENO-Z3;
                                   // 4: WENO-JS5; 5: WENO-Z5; 6: TENO5
 Real CNS::plm_theta = 2.0; // [1,2] 1: minmod; 2: van Leer's MC (higher sharper)
 bool CNS::use_hybrid_scheme = false; // use central scheme in smooth region
+Real CNS::teno_cutoff = 1e-4; // sharp cutoff for smoothness indicator in TENO5, set
+                              // to < 0 triggers adaptively calculating cutoff
 
 bool CNS::do_restart_fields = false;
 bool CNS::do_psgs = false;

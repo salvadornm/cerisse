@@ -125,7 +125,9 @@ void CNS::variableSetUp()
   EBMFCellConsLinInterp* interp = &eb_mf_cell_cons_interp;
 #else
   InterpBase* interp;
-  if (amr_interp_order == 3) {
+  if (amr_interp_order == 1) {
+    interp = &pc_interp;
+  } else if (amr_interp_order == 3) {
     interp = &quadratic_interp;
   } else if (amr_interp_order == 4) {
     interp = &quartic_interp;

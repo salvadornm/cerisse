@@ -110,6 +110,87 @@ AMREX_GPU_DEVICE AMREX_FORCE_INLINE void normal_shock_relations(
   for (int n = 0; n < NUM_SPECIES; ++n) s_ext[UFS + n] = s_ext[URHO] * y[n];
 }
 
+AMREX_GPU_DEVICE AMREX_FORCE_INLINE void
+bc_foextrap_outlet(const int dir, const int lo_hi, amrex::Real s_ext[NVAR], const amrex::Real s_int[NVAR])
+{
+  // FOExtrap
+  s_ext[URHO] = s_int[URHO];
+  AMREX_D_TERM(s_ext[UMX] = s_int[UMX];,
+               s_ext[UMY] = s_int[UMY];,
+               s_ext[UMZ] = s_int[UMZ];)
+  s_ext[UEDEN] = s_int[UEDEN];
+  for (int n = 0; n < NUM_SPECIES; n++) s_ext[UFS + n] = s_int[UFS + n];
+
+  // Outflow: prohibit backflow
+  if (s_ext[UMX + dir] * lo_hi > 0.0) {
+    s_ext[UMX + dir] = 0.0;
+    s_ext[UEDEN] -= 0.5 * s_int[UMX + dir] * s_int[UMX + dir] / s_int[URHO];
+  }
+}
+
+//
+// AMREX_GPU_DEVICE AMREX_FORCE_INLINE void
+// bc_pressure_outlet(const amrex::Real x[AMREX_SPACEDIM], amrex::Real s_ext[NVAR], const amrex::Real s_int[NVAR],
+//                    const amrex::Real p_ext, amrex::GeometryData const& geomdata)
+// {
+//   // Initialize all quantities with FOExtrap values
+//   amrex::Real rho = s_int[URHO];
+//   AMREX_D_TERM(amrex::Real u = s_int[UMX] / rho;,
+//                amrex::Real v = s_int[UMY] / rho;,
+//                amrex::Real w = s_int[UMZ] / rho;)
+//   amrex::Real eint = s_int[UEDEN] / rho - 0.5 * (AMREX_D_TERM(u * u, + v * v, + w * w));
+//   amrex::Real massfrac[NUM_SPECIES];
+//   for (int n = 0; n < NUM_SPECIES; n++) { massfrac[n] = s_int[UFS + n] / rho; }
+//   amrex::Real T = 0.0;
+//   auto eos = pele::physics::PhysicsType::eos();
+//   eos.REY2T(rho, eint, massfrac, T);
+
+//   // Following Blazek p 279, eq. 8.23 - reimplemented from EB-C10
+//   // NOTE: it is assumed that mass fractions are constant across the boundary
+//   // Interior state (point d)
+//   const amrex::Real* prob_hi = geomdata.ProbHi();
+//   const amrex::Real* dx = geomdata.CellSize();
+//   const amrex::Real xd = prob_hi[0] - 0.5 * dx[0];
+//   const amrex::Real rho_inter = rho;
+//   AMREX_D_TERM(const amrex::Real u_inter = u;,
+//                const amrex::Real v_inter = v;,
+//                const amrex::Real w_inter = w;)
+//   const amrex::Real T_inter = T;
+//   amrex::Real p_inter = 0.0, cs_inter = 0.0;
+//   eos.RTY2P(rho_inter, T_inter, massfrac, p_inter);
+//   eos.RTY2Cs(rho_inter, T_inter, massfrac, cs_inter);
+
+//   // Boundary state (point b)
+//   const amrex::Real xb = prob_hi[0];
+//   const amrex::Real pb = p_ext;
+//   const amrex::Real rhob = rho_inter + (pb - p_inter) / (cs_inter * cs_inter);
+//   AMREX_D_TERM(
+//     const amrex::Real ub = u_inter + (p_inter - pb) / (rho_inter * cs_inter);,
+//     const amrex::Real vb = v_inter;,
+//     const amrex::Real wb = w_inter;)
+
+//   // Ghost state (point a). Linear extrapolation from d and b
+//   rho = (rhob - rho_inter) / (xb - xd) * (x[0] - xd) + rho_inter;
+//   amrex::Real p = (pb - p_inter) / (xb - xd) * (x[0] - xd) + p_inter;
+//   p = amrex::max(p, 0.0001 * p_inter);
+//   AMREX_ALWAYS_ASSERT(std::isgreater(p, 0.0));
+//   AMREX_ALWAYS_ASSERT(std::isgreater(rho, 0.0));
+
+//   eos.RYP2E(rho, massfrac, p, eint);
+//   AMREX_D_TERM(
+//     u = (ub - u_inter) / (xb - xd) * (x[0] - xd) + u_inter;,
+//     v = (vb - v_inter) / (xb - xd) * (x[0] - xd) + v_inter;,
+//     w = (wb - w_inter) / (xb - xd) * (x[0] - xd) + w_inter;)
+
+//   // Write to s_ext
+//   s_ext[URHO] = rho;
+//   AMREX_D_TERM(s_ext[UMX] = rho * u;,
+//                s_ext[UMY] = rho * v;,
+//                s_ext[UMZ] = rho * w;)
+//   s_ext[UEDEN] = rho * (eint + 0.5 * (AMREX_D_TERM(u * u, + v * v, + w * w)));
+//   for (int n = 0; n < NUM_SPECIES; n++) { s_ext[UFS + n] = rho * massfrac[n]; }
+// }
+
 // AMREX_GPU_DEVICE AMREX_FORCE_INLINE void
 // bl_profile(const amrex::Real y, const amrex::Real z, ProbParm const& pp, 
 //            amrex::Real rho, amrex::Real u, amrex::Real ei) {

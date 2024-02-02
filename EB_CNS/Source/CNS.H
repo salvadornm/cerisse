@@ -217,6 +217,10 @@ public:
   static amrex::Real ambient_p;
   static amrex::BCRec phys_bc; // this has to be public for cns_bcfill to access
 
+  // Reconstruction
+
+  static amrex::Real teno_cutoff;
+
 #ifndef AMREX_USE_CUDA
 protected:
 #endif
@@ -270,6 +274,8 @@ protected:
   const amrex::MultiFab& volFrac() const { return *volfrac; }
 #endif
 
+  // void fillFineMask();
+
   ////////////////////////////////////////////////////////////////////////////
   //    Private data                                                        //
   ////////////////////////////////////////////////////////////////////////////
@@ -292,7 +298,9 @@ protected:
 
   amrex::MultiFab Sborder; // A state array with ghost zones. It is put here inside
                            // the class so alloc overhead only happen once.
-  amrex::MultiFab shock_sensor_mf;
+  amrex::MultiFab shock_sensor_mf; // for hybrid scheme switch
+  // amrex::iMultiFab ifine_mask; // fine covered cells plus 2 buffers because they are
+  //                              // used for interpolation in fine level ghost cells
 
   //
   // EB related

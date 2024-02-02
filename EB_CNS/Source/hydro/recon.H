@@ -162,6 +162,7 @@ AMREX_GPU_DEVICE AMREX_FORCE_INLINE void wenoz5(amrex::Real s[5], amrex::Real& s
             0.25 * pow(3.0 * s[2] - 4.0 * s[3] + s[4], 2);
 
   tau = amrex::Math::abs(beta[2] - beta[0]);
+  tau = amrex::Math::abs(tau - (1.0 / 6.0) * (beta[2] + 4 * beta[1] + beta[0])); // borrowed from TENO
   beta[2] = 1.0 + (tau / (eps + beta[2])) * (tau / (eps + beta[2]));
   beta[1] = 1.0 + (tau / (eps + beta[1])) * (tau / (eps + beta[1]));
   beta[0] = 1.0 + (tau / (eps + beta[0])) * (tau / (eps + beta[0]));
@@ -186,6 +187,7 @@ AMREX_GPU_DEVICE AMREX_FORCE_INLINE void wenoz5(amrex::Real s[5], amrex::Real& s
             0.25 * pow(3.0 * s[2] - 4.0 * s[1] + s[0], 2);
 
   tau = amrex::Math::abs(beta[2] - beta[0]);
+  tau = amrex::Math::abs(tau - (1.0 / 6.0) * (beta[2] + 4 * beta[1] + beta[0])); // borrowed from TENO
   beta[2] = 1.0 + (tau / (eps + beta[2])) * (tau / (eps + beta[2]));
   beta[1] = 1.0 + (tau / (eps + beta[1])) * (tau / (eps + beta[1]));
   beta[0] = 1.0 + (tau / (eps + beta[0])) * (tau / (eps + beta[0]));
@@ -203,6 +205,67 @@ AMREX_GPU_DEVICE AMREX_FORCE_INLINE void wenoz5(amrex::Real s[5], amrex::Real& s
        (alpha[2] * vr[2] + alpha[1] * vr[1] + alpha[0] * vr[0]);
 }
 
+// AMREX_GPU_DEVICE AMREX_FORCE_INLINE void wenoz5(amrex::Real s[5], amrex::Real& sm,
+//                                                 amrex::Real& sp) noexcept
+// {
+//   using amrex::Real;
+
+//   const Real eps = 1e-20;
+//   Real vl[3];
+//   Real vr[3];
+//   Real beta[3];
+//   Real alpha[3];
+//   Real alpha1, tau;
+
+//   beta[2] = pow(s[0] - 2.0 * s[1] + s[2], 2) +
+//             0.25 * pow(s[0] - 4.0 * s[1] + 3.0 * s[2], 2);
+//   beta[1] = pow(s[1] - 2.0 * s[3], 2) +
+//             0.25 * (s[1] - s[3]) * (s[1] - s[3]);
+//   beta[0] = pow(s[2] - 2.0 * s[3] + s[4], 2) +
+//             0.25 * pow(3.0 * s[2] - 4.0 * s[3] + s[4], 2);
+
+//   tau = amrex::Math::abs(beta[2] - beta[0]);
+//   beta[2] = 1.0 + (tau / (eps + beta[2]));// * (tau / (eps + beta[2]));
+//   beta[1] = 1.0 + (tau / (eps + beta[1]));// * (tau / (eps + beta[1]));
+//   beta[0] = 1.0 + (tau / (eps + beta[0]));// * (tau / (eps + beta[0]));
+
+//   alpha[2] = beta[2];
+//   alpha[1] = 10.0 * beta[1];
+//   alpha[0] = 5.0 * beta[0];
+//   alpha1 = 1.0 / (alpha[2] + alpha[1] + alpha[0]);
+
+//   vl[2] = 3.0 * s[0] - 10.0 * s[1] + 15.0 * s[2];
+//   vl[1] = -s[1] + 6.0 * s[2] + 3.0 * s[3];
+//   vl[0] = 3.0 * s[2] + 6.0 * s[3] - s[4];
+
+//   sp = Real(1. / 8.) * alpha1 *
+//        (alpha[2] * vl[2] + alpha[1] * vl[1] + alpha[0] * vl[0]);
+
+//   beta[2] = pow(s[4] - 2.0 * s[3] + s[2], 2) +
+//             0.25 * pow(s[4] - 4.0 * s[3] + 3.0 * s[2], 2);
+//   beta[1] = pow(s[3] - 2.0 * s[1], 2) +
+//             0.25 * (s[3] - s[1]) * (s[3] - s[1]);
+//   beta[0] = pow(s[2] - 2.0 * s[1] + s[0], 2) +
+//             0.25 * pow(3.0 * s[2] - 4.0 * s[1] + s[0], 2);
+
+//   tau = amrex::Math::abs(beta[2] - beta[0]);
+//   beta[2] = 1.0 + (tau / (eps + beta[2])) * (tau / (eps + beta[2]));
+//   beta[1] = 1.0 + (tau / (eps + beta[1])) * (tau / (eps + beta[1]));
+//   beta[0] = 1.0 + (tau / (eps + beta[0])) * (tau / (eps + beta[0]));
+
+//   alpha[2] = beta[2];
+//   alpha[1] = 10.0 * beta[1];
+//   alpha[0] = 5.0 * beta[0];
+//   alpha1 = 1.0 / (alpha[2] + alpha[1] + alpha[0]);
+
+//   vr[2] = 3.0 * s[4] - 10.0 * s[3] + 15.0 * s[2];
+//   vr[1] = -s[3] + 6.0 * s[2] + 3.0 * s[1];
+//   vr[0] = 3.0 * s[2] + 6.0 * s[1] - s[0];
+
+//   sm = Real(1. / 8.) * alpha1 *
+//        (alpha[2] * vr[2] + alpha[1] * vr[1] + alpha[0] * vr[0]);
+// }
+
 /// \brief TENO 5th order. Ref https://doi.org/10.1016/j.cpc.2018.10.009.
 AMREX_GPU_DEVICE AMREX_FORCE_INLINE void teno5(amrex::Real s[5], amrex::Real& sm,
                                                amrex::Real& sp) noexcept
@@ -210,12 +273,12 @@ AMREX_GPU_DEVICE AMREX_FORCE_INLINE void teno5(amrex::Real s[5], amrex::Real& sm
   using amrex::Real;
 
   const Real eps = 1e-30; // the original 1e-40 is too close to machine zero
-  Real vl[3];
-  Real vr[3];
+  Real v[3];
   Real beta[3];
   Real alpha[3];
+  Real xi[3];
   Real beta1, alpha1, tau;
-  Real CT = 1e-4; // sharp cutoff smoothness indicator
+  Real CT; // sharp cutoff smoothness indicator
 
   beta[2] = Real(13. / 12.) * pow(s[0] - 2.0 * s[1] + s[2], 2) +
             0.25 * pow(s[0] - 4.0 * s[1] + 3.0 * s[2], 2);
@@ -226,22 +289,36 @@ AMREX_GPU_DEVICE AMREX_FORCE_INLINE void teno5(amrex::Real s[5], amrex::Real& sm
 
   tau = amrex::Math::abs(beta[2] - beta[0]);
   tau = amrex::Math::abs(tau - (1.0 / 6.0) * (beta[2] + 4 * beta[1] + beta[0]));
-  beta[2] = pow(1.0 + tau / (eps + beta[2]), 6);
-  beta[1] = pow(1.0 + tau / (eps + beta[1]), 6);
-  beta[0] = pow(1.0 + tau / (eps + beta[0]), 6);
-  beta1 = 1.0 / (beta[2] + beta[1] + beta[0]);
+  xi[2] = tau / (eps + beta[2]);
+  xi[1] = tau / (eps + beta[1]);
+  xi[0] = tau / (eps + beta[0]);
+  beta[2] = pow(1.0 + xi[2], 6);
+  beta[1] = pow(1.0 + xi[1], 6);
+  beta[0] = pow(1.0 + xi[0], 6);
+  beta1 = 1.0 / (beta[2] + beta[1] + beta[0]);  
 
+  if (CNS::teno_cutoff <= 0) {
+    // Adaptive TENO, Ref: https://doi.org/10.1016/j.jcp.2020.109902
+    Real H = 0.1; // the stencil is considered discontinuous if max(xi) > 1/H
+    amrex::Real theta = 1.0 / (1.0 + H * amrex::max(xi[0], xi[1], xi[2]));
+    amrex::Real m = 4.0 + std::floor(theta * 6.0);
+    CT = std::pow(10.0, -m);
+  } else {
+    CT = CNS::teno_cutoff;
+  } 
+
+  // TODO: consider optimised high spectral resolution weights 1.235341937, 5.065006634, 3.699651429?
   alpha[2] = beta[2] * beta1 < CT ? 0.0 : 1.0;
   alpha[1] = beta[1] * beta1 < CT ? 0.0 : 6.0;
   alpha[0] = beta[0] * beta1 < CT ? 0.0 : 3.0;
   alpha1 = 1.0 / (alpha[2] + alpha[1] + alpha[0]);
 
-  vl[2] = 2.0 * s[0] - 7.0 * s[1] + 11.0 * s[2];
-  vl[1] = -s[1] + 5.0 * s[2] + 2.0 * s[3];
-  vl[0] = 2.0 * s[2] + 5.0 * s[3] - s[4];
+  v[2] = 2.0 * s[0] - 7.0 * s[1] + 11.0 * s[2];
+  v[1] = -s[1] + 5.0 * s[2] + 2.0 * s[3];
+  v[0] = 2.0 * s[2] + 5.0 * s[3] - s[4];
 
   sp = Real(1. / 6.) * alpha1 *
-       (alpha[2] * vl[2] + alpha[1] * vl[1] + alpha[0] * vl[0]);
+       (alpha[2] * v[2] + alpha[1] * v[1] + alpha[0] * v[0]);
 
   beta[2] = Real(13. / 12.) * pow(s[4] - 2.0 * s[3] + s[2], 2) +
             0.25 * pow(s[4] - 4.0 * s[3] + 3.0 * s[2], 2);
@@ -252,22 +329,33 @@ AMREX_GPU_DEVICE AMREX_FORCE_INLINE void teno5(amrex::Real s[5], amrex::Real& sm
 
   tau = amrex::Math::abs(beta[2] - beta[0]);
   tau = amrex::Math::abs(tau - (1.0 / 6.0) * (beta[2] + 4 * beta[1] + beta[0]));
-  beta[2] = pow(1.0 + (tau / (eps + beta[2])), 6);
-  beta[1] = pow(1.0 + (tau / (eps + beta[1])), 6);
-  beta[0] = pow(1.0 + (tau / (eps + beta[0])), 6);
+  xi[2] = tau / (eps + beta[2]);
+  xi[1] = tau / (eps + beta[1]);
+  xi[0] = tau / (eps + beta[0]);
+  beta[2] = pow(1.0 + xi[2], 6);
+  beta[1] = pow(1.0 + xi[1], 6);
+  beta[0] = pow(1.0 + xi[0], 6);
   beta1 = 1.0 / (beta[2] + beta[1] + beta[0]);
+
+  if (CNS::teno_cutoff <= 0) {
+    // Adaptive TENO, Ref: https://doi.org/10.1016/j.jcp.2020.109902
+    Real H = 0.1;
+    amrex::Real theta = 1.0 / (1.0 + H * amrex::max(xi[0], xi[1], xi[2]));
+    amrex::Real m = 4.0 + std::floor(theta * 6.0);
+    CT = std::pow(10.0, -m);
+  }
 
   alpha[2] = beta[2] * beta1 < CT ? 0.0 : 1.0;
   alpha[1] = beta[1] * beta1 < CT ? 0.0 : 6.0;
   alpha[0] = beta[0] * beta1 < CT ? 0.0 : 3.0;
   alpha1 = 1.0 / (alpha[2] + alpha[1] + alpha[0]);
 
-  vr[2] = 11.0 * s[2] - 7.0 * s[3] + 2.0 * s[4];
-  vr[1] = -s[3] + 5.0 * s[2] + 2.0 * s[1];
-  vr[0] = 2.0 * s[2] + 5.0 * s[1] - s[0];
+  v[2] = 11.0 * s[2] - 7.0 * s[3] + 2.0 * s[4];
+  v[1] = -s[3] + 5.0 * s[2] + 2.0 * s[1];
+  v[0] = 2.0 * s[2] + 5.0 * s[1] - s[0];
 
   sm = Real(1. / 6.) * alpha1 *
-       (alpha[2] * vr[2] + alpha[1] * vr[1] + alpha[0] * vr[0]);
+       (alpha[2] * v[2] + alpha[1] * v[1] + alpha[0] * v[0]);
 }
 
 /**
