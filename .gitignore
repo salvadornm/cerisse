@@ -20,6 +20,14 @@ EB_CNS/Tests/**/*.visit
 EB_CNS/Tests/**/Backtrace*
 EB_CNS/Tests/**/tmp_build_dir
 
+# same in Work folder
+new/Work/**/*.ex*
+new/Work/**/plt*
+new/Work/**/chk*
+new/Work/**/*.visit
+new/Work/**/Backtrace*
+new/Work/**/tmp_build_dir
+
 # data in Build
 Build
 .old
@@ -30,8 +38,10 @@ Build
 # Submodules
 Submodules/amrex
 Submodules/PelePhysics
+Submodules/cgal
+Submodules/boost_1_66_0
 
-#Mac development
+# Mac development
 .DS_Store
 EB_CNS/.DS_Store
 EB_CNS/**/.DS_Store
