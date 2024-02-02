@@ -1,6 +1,5 @@
-# Cerisse Documentation
+# Cerisse 
 
-AMReX-based Navier-Stokes Reactive compressible LES code 
 
 --8<-- "README.md"
 
@@ -27,12 +26,12 @@ Examples include **gcc > 8**, **clang >7**  and more
 It will usually be installed by default in most systems (Mac OS/Linux)
 
 3. **MPI libraries** 
-(optional) Rrequired for parallel simulations
+(optional) required for parallel simulations.
 Similarly CUDA/OPenMPI may be required for more advanced parallelization strategies.
 
 4. **cmake** 
-(optional) reuired for some installation options (mostly related to GPU and chemistry). 
-Easy to install, version reuired **>3.2**
+(optional) required for some installation options (mostly related to GPU and chemistry). 
+Easy to install, version required **>3.2**
 
 5. **AMReX** 
 AMR libraries [AMREX](https://amrex-codes.github.io/amrex/)
@@ -62,7 +61,7 @@ or Download the latest release from [GitHub](https://github.com/salvadornm/ceris
 
 ## Documentation Editing
 
-For help editing the documentation visit [mkdocs.org](https://www.mkdocs.org). To generate the docs locally `mkdocs serve`
+For help editing the documentation visit [mkdocs.org](https://www.mkdocs.org). To generate the docs locally type in the parent directory: `mkdocs serve`
 and point the browser to [127.0.0.1.8000](http://127.0.0.1:8000)
 
 You will need to install the `python-markdown-math` extension for rendering equations and the `markdown-callouts` extension for correctly displaying the warning and note blocks. All requirements can be installed automatically using
@@ -70,3 +69,16 @@ You will need to install the `python-markdown-math` extension for rendering equa
 ```bash
 $ pip install -r docs/requirements.txt
 ```
+
+You may need to install
+
+```bash
+$ pip install pip-tools
+```
+
+if you add new markdown extensions, edit the `requirements.in`  file under `docs/`
+
+```bash
+$ pip-compile requirements.in
+```
+

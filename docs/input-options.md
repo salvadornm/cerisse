@@ -122,6 +122,7 @@ Option             | Type             | Default   | Meaning
 :------------------|:-----------------|:---------:|:--------------------------------
 cns.cfl            | Real             | 0.3       | Acoustic Courant number
 cns.dt_cutoff      | Real             | 5.e-20    | Minimum timestep size allowed
+cns.fixed_dt       | Real             | 0         | Run with constant dt
 cns.recon_scheme   | Int (1 to 6)     | 5         | Reconstruction scheme 
 cns.char_sys       | Int (0 or 1)     | 0 (sos)   | System for characteristic variable conversion
 cns.recon_char_var | Int (0 or 1)     | 0         | Reconstruct characteristic system variable or not
@@ -258,7 +259,8 @@ Four chemical integrators are supplied by PelePhysics:
 | cns.min_react_temp          | Real          | 300.0          | Turn off reactor below this temperature
 
 Some useful `ode` options
+
 | Option                      | Type          | Default | Description                                                  |
 | --------------------------- | ------------- |:-------:| ------------------------------------------------------------ |
 | ode.verbose                 | Bool          | 0       | Print out runtime info
-| ode.clean_init_massfrac     | Bool        | 0 | Normalise mass fractions to sum to 1.0 at the beginning of the reactor solve
+| ode.clean_init_massfrac     | Bool          | 0        | Normalise mass fractions to sumY=1 at the beginning of reactor solver
