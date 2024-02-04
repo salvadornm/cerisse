@@ -728,7 +728,8 @@ void cns_dervelgrad(const Box& bx, FArrayBox& derfab, int dcomp, int /*ncomp*/,
 // #if AMREX_SPACEDIM == 3
 //     max_neighbour = amrex::max(max_neighbour, tmp(i, j, k + 1), tmp(i, j, k - 1));
 // #endif
-//     shock_sensor(i, j, k) = (max_neighbour >= 1.0) ? 1.0 : 0.0;
+//     shock_sensor(i, j, k) = amrex::min(max_neighbour, 1.0);
+//     // shock_sensor(i, j, k) = (max_neighbour >= 1.0) ? 1.0 : 0.0;
 //     // shock_sensor(i, j, k) = (tmp(i, j, k) >= 1.0) ? 1.0 : 0.0;
 //   });
 // }
@@ -749,6 +750,9 @@ void cns_dershocksensor(const Box& bx, FArrayBox& derfab, int dcomp, int /*ncomp
   auto shock_sensor = derfab.array(dcomp);
   amrex::ParallelFor(bx, [=] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {
     Real divu2 = divu(i, j, k) * divu(i, j, k);
+    // Real divu2 = divu(i, j, k) * amrex::min(divu(i, j, k), 0.1); // modify to bias towards compression, the 0.1 parameter controls how much 
+    //                                                              // expansion is allowed, the higher more area will be tagged
+    //                                                              // if the value is infty, the original Ducros sensor is recovered
     Real magvort2 = magvort(i, j, k) * magvort(i, j, k);
     shock_sensor(i, j, k) = divu2 / amrex::max(divu2 + magvort2, 1e-3);
   });

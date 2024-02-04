@@ -207,7 +207,7 @@ void CNS::compute_dSdt(const MultiFab& S, MultiFab& dSdt, Real dt,
         }
 
 #if CNS_USE_EB
-        if (flag.getType(amrex::grow(bx, 2)) == FabType::regular) {
+        if (flag.getType(amrex::grow(bx, 3)) == FabType::regular) {
 #endif
           Array4<const Real> s_arr = S.array(mfi);
           Array4<Real> dsdt_arr = dSdt.array(mfi);

@@ -162,7 +162,6 @@ AMREX_GPU_DEVICE AMREX_FORCE_INLINE void wenoz5(amrex::Real s[5], amrex::Real& s
             0.25 * pow(3.0 * s[2] - 4.0 * s[3] + s[4], 2);
 
   tau = amrex::Math::abs(beta[2] - beta[0]);
-  tau = amrex::Math::abs(tau - (1.0 / 6.0) * (beta[2] + 4 * beta[1] + beta[0])); // borrowed from TENO
   beta[2] = 1.0 + (tau / (eps + beta[2])) * (tau / (eps + beta[2]));
   beta[1] = 1.0 + (tau / (eps + beta[1])) * (tau / (eps + beta[1]));
   beta[0] = 1.0 + (tau / (eps + beta[0])) * (tau / (eps + beta[0]));
@@ -187,7 +186,6 @@ AMREX_GPU_DEVICE AMREX_FORCE_INLINE void wenoz5(amrex::Real s[5], amrex::Real& s
             0.25 * pow(3.0 * s[2] - 4.0 * s[1] + s[0], 2);
 
   tau = amrex::Math::abs(beta[2] - beta[0]);
-  tau = amrex::Math::abs(tau - (1.0 / 6.0) * (beta[2] + 4 * beta[1] + beta[0])); // borrowed from TENO
   beta[2] = 1.0 + (tau / (eps + beta[2])) * (tau / (eps + beta[2]));
   beta[1] = 1.0 + (tau / (eps + beta[1])) * (tau / (eps + beta[1]));
   beta[0] = 1.0 + (tau / (eps + beta[0])) * (tau / (eps + beta[0]));
@@ -272,7 +270,8 @@ AMREX_GPU_DEVICE AMREX_FORCE_INLINE void teno5(amrex::Real s[5], amrex::Real& sm
 {
   using amrex::Real;
 
-  const Real eps = 1e-30; // the original 1e-40 is too close to machine zero
+  // const Real eps = 1e-30; // the original 1e-40 is too close to machine zero
+  constexpr Real eps = std::numeric_limits<Real>::epsilon();
   Real v[3];
   Real beta[3];
   Real alpha[3];
@@ -308,9 +307,9 @@ AMREX_GPU_DEVICE AMREX_FORCE_INLINE void teno5(amrex::Real s[5], amrex::Real& sm
   } 
 
   // TODO: consider optimised high spectral resolution weights 1.235341937, 5.065006634, 3.699651429?
-  alpha[2] = beta[2] * beta1 < CT ? 0.0 : 1.0;
-  alpha[1] = beta[1] * beta1 < CT ? 0.0 : 6.0;
-  alpha[0] = beta[0] * beta1 < CT ? 0.0 : 3.0;
+  alpha[2] = beta[2] * beta1 < CT ? 0.0 : 0.5;
+  alpha[1] = beta[1] * beta1 < CT ? 0.0 : 5.5;
+  alpha[0] = beta[0] * beta1 < CT ? 0.0 : 4.0;
   alpha1 = 1.0 / (alpha[2] + alpha[1] + alpha[0]);
 
   v[2] = 2.0 * s[0] - 7.0 * s[1] + 11.0 * s[2];
@@ -345,9 +344,9 @@ AMREX_GPU_DEVICE AMREX_FORCE_INLINE void teno5(amrex::Real s[5], amrex::Real& sm
     CT = std::pow(10.0, -m);
   }
 
-  alpha[2] = beta[2] * beta1 < CT ? 0.0 : 1.0;
-  alpha[1] = beta[1] * beta1 < CT ? 0.0 : 6.0;
-  alpha[0] = beta[0] * beta1 < CT ? 0.0 : 3.0;
+  alpha[2] = beta[2] * beta1 < CT ? 0.0 : 0.5;
+  alpha[1] = beta[1] * beta1 < CT ? 0.0 : 5.5;
+  alpha[0] = beta[0] * beta1 < CT ? 0.0 : 4.0;
   alpha1 = 1.0 / (alpha[2] + alpha[1] + alpha[0]);
 
   v[2] = 11.0 * s[2] - 7.0 * s[3] + 2.0 * s[4];

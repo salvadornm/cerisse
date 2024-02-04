@@ -83,3 +83,20 @@ If you see an error relating to `icpc: command not found`, that is because the `
 $ I_MPI_CXX=g++ make
 ```
 
+### Plotting a MultiFab (for debugging)
+
+When debugging, it is sometimes useful to plot a MultiFab. This can be done using the `amrex::WriteSingleLevelPlotfile()` function, e.g.:
+
+```cpp
+#include <AMReX_PlotFileUtil.H>
+
+{
+  amrex::MultiFab variable_to_plot(grids, dmap, 1, 0);
+
+  // Fill the MultiFab with data ...
+  
+  amrex::WriteSingleLevelPlotfile("plt_lev" + std::to_string(level), variable_to_plot, {"variable_name"}, geom, 0.0, 0);
+}
+```
+
+You can plot more than one variable by adding more `ncomp` in the MultiFab and appending the variable name list.

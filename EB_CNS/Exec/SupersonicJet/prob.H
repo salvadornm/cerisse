@@ -14,6 +14,7 @@
 #include "index_macros.H"
 #include "mechanism.H"
 #include "prob_parm.H"
+#include "bc_util.H"
 
 AMREX_GPU_DEVICE AMREX_FORCE_INLINE void prob_initdata(
   int i, int j, int k, amrex::Array4<amrex::Real> const& state,
@@ -89,7 +90,7 @@ AMREX_GPU_DEVICE AMREX_FORCE_INLINE void prob_initdata(
 AMREX_GPU_DEVICE AMREX_FORCE_INLINE void bcnormal(
   const amrex::Real x[AMREX_SPACEDIM], const amrex::Real s_int[NUM_FIELD * NVAR],
   const amrex::Real* /*s_refl[NUM_FIELD * NVAR]*/,
-  amrex::Real s_ext[NUM_FIELD * NVAR], const int /*idir*/, const int /*sgn*/,
+  amrex::Real s_ext[NUM_FIELD * NVAR], const int idir, const int sgn,
   const amrex::Real time, amrex::GeometryData const& geomdata, ProbParm const& pp)
 {
   BL_PROFILE("bcnormal()");
@@ -97,53 +98,58 @@ AMREX_GPU_DEVICE AMREX_FORCE_INLINE void bcnormal(
   const amrex::Real rsqr = AMREX_D_TERM(, x[1] * x[1], +x[2] * x[2]);
 
   for (int nf = 0; nf <= NUM_FIELD; ++nf) {
-    if (rsqr > 0.1905 * 0.1905 && rsqr < 0.889 * 0.889) { // Air inlet
-      const amrex::Real profile = 1; //- pow((sqrt(rsqr)-0.53975)/0.34925, 12);
-      s_ext[nf * NVAR + URHO] = pp.rho1;
-      s_ext[nf * NVAR + UMX] = pp.rho1 * pp.u1 * profile;
-      s_ext[nf * NVAR + UMY] = 0.0;
-      s_ext[nf * NVAR + UMZ] = 0.0;
-      s_ext[nf * NVAR + UEDEN] =
-        pp.rho1 * pp.ei1 + 0.5 * pp.rho1 * pp.u1 * pp.u1 * profile * profile;
-      for (int n = 0; n < NUM_SPECIES; ++n) {
-        s_ext[nf * NVAR + UFS + n] = pp.rho1 * pp.Y1[n];
+    if (idir == 0 && sgn == 1) {
+      if (rsqr > 0.1905 * 0.1905 && rsqr < 0.889 * 0.889) { // Air inlet
+        const amrex::Real profile = 1; //- pow((sqrt(rsqr)-0.53975)/0.34925, 12);
+        s_ext[nf * NVAR + URHO] = pp.rho1;
+        s_ext[nf * NVAR + UMX] = pp.rho1 * pp.u1 * profile;
+        s_ext[nf * NVAR + UMY] = 0.0;
+        s_ext[nf * NVAR + UMZ] = 0.0;
+        s_ext[nf * NVAR + UEDEN] =
+          pp.rho1 * pp.ei1 + 0.5 * pp.rho1 * pp.u1 * pp.u1 * profile * profile;
+        for (int n = 0; n < NUM_SPECIES; ++n) {
+          s_ext[nf * NVAR + UFS + n] = pp.rho1 * pp.Y1[n];
+        }
+      } else if (rsqr < 0.118 * 0.118) { // Fuel jet
+        const amrex::Real profile = 1;   //- pow(rsqr/0.118/0.118, 6);
+        s_ext[nf * NVAR + URHO] = pp.rho2;
+        s_ext[nf * NVAR + UMX] = pp.rho2 * pp.u2 * profile;
+        s_ext[nf * NVAR + UMY] = 0.0;
+        s_ext[nf * NVAR + UMZ] = 0.0;
+        s_ext[nf * NVAR + UEDEN] =
+          pp.rho2 * pp.ei2 + 0.5 * pp.rho2 * pp.u2 * pp.u2 * profile * profile;
+        for (int n = 0; n < NUM_SPECIES; ++n) {
+          s_ext[nf * NVAR + UFS + n] = pp.rho2 * pp.Y2[n];
+        }
+      } else if (rsqr > 0.889 * 0.889) { // Still air
+        s_ext[nf * NVAR + URHO] = pp.rho_a;
+        s_ext[nf * NVAR + UMX] = 0.0;
+        s_ext[nf * NVAR + UMY] = 0.0;
+        s_ext[nf * NVAR + UMZ] = 0.0;
+        s_ext[nf * NVAR + UEDEN] = pp.rho_a * pp.ei_a;
+        for (int n = 0; n < NUM_SPECIES; ++n) {
+          s_ext[nf * NVAR + UFS + n] = pp.rho_a * pp.Y_a[n];
+        }
+      } else { // Between two jets (adiabatic no-slip wall)
+        s_ext[nf * NVAR + URHO] = s_int[nf * NVAR + URHO];
+        s_ext[nf * NVAR + UMX] =
+          -s_int
+            [nf * NVAR +
+            UMX]; //* amrex::min(amrex::max((time-0.00017)/(0.000165-0.00017), 1.0),
+                  //-1.0);
+        s_ext[nf * NVAR + UMY] = -s_int[nf * NVAR + UMY];
+        s_ext[nf * NVAR + UMZ] = -s_int[nf * NVAR + UMZ];
+        s_ext[nf * NVAR + UEDEN] = s_int[nf * NVAR + UEDEN];
+        for (int n = 0; n < NUM_SPECIES; ++n) {
+          s_ext[nf * NVAR + UFS + n] = s_int[nf * NVAR + UFS + n];
+        }
       }
-    } else if (rsqr < 0.118 * 0.118) { // Fuel jet
-      const amrex::Real profile = 1;   //- pow(rsqr/0.118/0.118, 6);
-      s_ext[nf * NVAR + URHO] = pp.rho2;
-      s_ext[nf * NVAR + UMX] = pp.rho2 * pp.u2 * profile;
-      s_ext[nf * NVAR + UMY] = 0.0;
-      s_ext[nf * NVAR + UMZ] = 0.0;
-      s_ext[nf * NVAR + UEDEN] =
-        pp.rho2 * pp.ei2 + 0.5 * pp.rho2 * pp.u2 * pp.u2 * profile * profile;
-      for (int n = 0; n < NUM_SPECIES; ++n) {
-        s_ext[nf * NVAR + UFS + n] = pp.rho2 * pp.Y2[n];
-      }
-    } else if (rsqr > 0.889 * 0.889) { // Still air
-      s_ext[nf * NVAR + URHO] = pp.rho_a;
-      s_ext[nf * NVAR + UMX] = 0.0;
-      s_ext[nf * NVAR + UMY] = 0.0;
-      s_ext[nf * NVAR + UMZ] = 0.0;
-      s_ext[nf * NVAR + UEDEN] = pp.rho_a * pp.ei_a;
-      for (int n = 0; n < NUM_SPECIES; ++n) {
-        s_ext[nf * NVAR + UFS + n] = pp.rho_a * pp.Y_a[n];
-      }
-    } else { // Between two jets (adiabatic no-slip wall)
-      s_ext[nf * NVAR + URHO] = s_int[nf * NVAR + URHO];
-      s_ext[nf * NVAR + UMX] =
-        -s_int
-          [nf * NVAR +
-           UMX]; //* amrex::min(amrex::max((time-0.00017)/(0.000165-0.00017), 1.0),
-                 //-1.0);
-      s_ext[nf * NVAR + UMY] = -s_int[nf * NVAR + UMY];
-      s_ext[nf * NVAR + UMZ] = -s_int[nf * NVAR + UMZ];
-      s_ext[nf * NVAR + UEDEN] = s_int[nf * NVAR + UEDEN];
-      for (int n = 0; n < NUM_SPECIES; ++n) {
-        s_ext[nf * NVAR + UFS + n] = s_int[nf * NVAR + UFS + n];
-      }
-    }
+    } else /*if (idir == 0 && sgn == -1)*/ {
+      // bc_pressure_outlet(x, &s_ext[nf * NVAR], &s_int[nf * NVAR], pp.p_a, geomdata);
+      bc_foextrap_outlet(idir, sgn, &s_ext[nf * NVAR], &s_int[nf * NVAR]);
+    }    
   }
-
+  
 #if NUM_AUX > 0
   // Aux variables for storing time averages
   for (int n = 0; n < NUM_AUX; ++n) { s_ext[UFA + n] = 0.0; }
@@ -173,21 +179,25 @@ prob_tag_error(int i, int j, int k, amrex::Array4<char> const& tagarr,
   const amrex::Real* dx = geomdata.CellSize();
   const amrex::Real x = prob_lo[0] + (i + 0.5) * dx[0];
   const amrex::Real y = prob_lo[1] + (j + 0.5) * dx[1];
+#if AMREX_SPACEDIM == 3
   const amrex::Real z = prob_lo[2] + (k + 0.5) * dx[2];
+#else
+  const amrex::Real z = 0.0;
+#endif
   const amrex::Real rsqr = y * y + z * z;
 
   // Tag cylinder
-  if (level == 0 && rsqr <= 2.0 * 2.0) { tagarr(i, j, k) = tagval; }
-  if (level == 1 && rsqr <= 1.7 * 1.7) { tagarr(i, j, k) = tagval; }
-  if (level == 2 && rsqr <= 0.5 * 0.5) { tagarr(i, j, k) = tagval; }
+  // if (level == 0 && rsqr <= 2.0 * 2.0) { tagarr(i, j, k) = tagval; }
+  // if (level == 1 && rsqr <= 1.7 * 1.7) { tagarr(i, j, k) = tagval; }
+  // if (level == 2 && rsqr <= 0.3 * 0.3) { tagarr(i, j, k) = tagval; }
 
   // Tag injector
-  if (rsqr <= 0.3 * 0.3 && x < 0.1) { tagarr(i, j, k) = tagval; }
+  if (rsqr <= 0.3 * 0.3) { tagarr(i, j, k) = tagval; }
 
   // Tag flame
-  amrex::Real Y_OH = sarr(i, j, k, UFS + OH_ID) / sarr(i, j, k, URHO);
-  amrex::Real Y_HO2 = sarr(i, j, k, UFS + HO2_ID) / sarr(i, j, k, URHO);
-  if (Y_OH >= 0.02 || Y_HO2 >= 1e-3) { tagarr(i, j, k) = tagval; }
+  // amrex::Real Y_OH = sarr(i, j, k, UFS + OH_ID) / sarr(i, j, k, URHO);
+  // amrex::Real Y_HO2 = sarr(i, j, k, UFS + HO2_ID) / sarr(i, j, k, URHO);
+  // if (Y_OH >= 0.02 || Y_HO2 >= 1e-3) { tagarr(i, j, k) = tagval; }
 
   // Tag magvort in input file
 }

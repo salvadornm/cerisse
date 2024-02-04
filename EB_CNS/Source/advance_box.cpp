@@ -144,6 +144,9 @@ void CNS::compute_dSdt_box(Box const& bx, Array4<const Real>& sarr,
     auto const& vflx_arr = vflux_fab.array();
 
     uint num_scheme_switch = 1;
+    if (recon_scheme == 7) {
+      num_scheme_switch = 0; // Central KEEP
+    }
     if (use_hybrid_scheme) {
       hybflux_fab.resize(flxbx, NVAR, The_Async_Arena());
 
@@ -208,13 +211,16 @@ void CNS::compute_dSdt_box(Box const& bx, Array4<const Real>& sarr,
               amrex::max(shock_sensor_arr(i, j, k),
                          shock_sensor_arr(IntVect(AMREX_D_DECL(i, j, k)) -
                                           IntVect::TheDimensionVector(cdir)));
-            if (ss_face < 1.0) {
-              cns_KEEP4(i, j, k, cdir, hybflx_arr, q);
+            // if (ss_face < 1.0) {
+            //   cns_KEEP4(i, j, k, cdir, hybflx_arr, q);
               
-              for (int n = 0; n < NVAR; ++n) {
-                flx_arr(i, j, k, n) = ss_face * flx_arr(i, j, k, n) +
-                                      (1.0 - ss_face) * hybflx_arr(i, j, k, n);
-              }
+            //   for (int n = 0; n < NVAR; ++n) {
+            //     flx_arr(i, j, k, n) = ss_face * flx_arr(i, j, k, n) +
+            //                           (1.0 - ss_face) * hybflx_arr(i, j, k, n);
+            //   }
+            // }
+            if (ss_face < 0.67) { // OpenSBLI uses this threshold (they say)
+              cns_KEEP4(i, j, k, cdir, flx_arr, q);
             }
           });
       }

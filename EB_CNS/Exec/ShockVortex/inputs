@@ -30,8 +30,9 @@ cns.recon_scheme = 6  # 1: Godunov,  2: MUSCL,   3: WENO-Z3,
                       # 4: WENO-JS5, 5: WENO-Z5, 6: TENO-5
 cns.clip_temp = 0
 cns.recon_char_var = 1
-cns.teno_cutoff = 1.0e-3 # this is the lowest we can get with 
+cns.teno_cutoff = 3.0e-3 # this is the lowest we can get with 
                          # this challenging problem
+cns.do_hybrid_scheme = 1
 cns.do_vpdf = 0
 cns.do_psgs = 0
 cns.do_pd_model = 0
