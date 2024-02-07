@@ -7,3 +7,6 @@
 [submodule "Submodules/sundials"]
 	path = Submodules/sundials
 	url = https://github.com/LLNL/sundials.git
+[submodule "amrsolver"]
+	path = amrsolver
+	url = https://github.com/Monal-Patel/amrsolver.git
