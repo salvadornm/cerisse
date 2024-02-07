@@ -1,0 +1,5 @@
+CEXE_sources += CNSBld.cpp
+CEXE_sources += CNS_setup.cpp
+CEXE_sources += bcs.cpp
+
+CEXE_headers += Index.h

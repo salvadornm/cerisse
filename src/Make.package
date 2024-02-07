@@ -1,0 +1,2 @@
+CEXE_headers += CNS.h
+CEXE_sources += CNS.cpp
