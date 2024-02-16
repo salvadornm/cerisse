@@ -3,6 +3,7 @@ docs_dir: doc_new
 nav:
   - Home: index.md
   - NEW: new_run.md
+  - CLASS: new_class.md
   - QuickStart: Quickrun
 extra_javascript:
   - https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.4/MathJax.js?config=TeX-AMS-MML_HTMLorMML
