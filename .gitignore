@@ -17,6 +17,7 @@
 
 /wrk/
 
+/lib/*
 /lib/cgal/build/*
 /lib/boost
 /lib/install/*

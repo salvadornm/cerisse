@@ -1,14 +1,9 @@
-site_name: cerisse
+site_name: cerisse++
+docs_dir: doc_new
 nav:
   - Home: index.md
-  - Quickrun: quickrun.md
-  - Run: run.md
-  - LES: les.md
-  - PDF: pdf.md
-  - Examples: example.md
-  - Input options: input-options.md
-  - Tips: tips.md   
-  - Test: test.md
+  - NEW: new_run.md
+  - QuickStart: Quickrun
 extra_javascript:
   - https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.4/MathJax.js?config=TeX-AMS-MML_HTMLorMML
 markdown_extensions:

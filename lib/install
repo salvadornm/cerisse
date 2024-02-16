@@ -21,6 +21,14 @@ case  $1 in
         mv PelePhysics-$PELEPVERSION PelePhysics
         rm v$PELEPVERSION.zip
         ;;
+	amrex)
+		rm -rf amrex
+		echo " installing AMREX release version .." $AMREXVERSION
+		wget https://github.com/AMReX-Codes/amrex/archive/refs/tags/$AMREXVERSION.zip
+		unzip $AMREXVERSION.zip
+        mv $AMREXVERSION amrex
+		rm $AMREXVERSION.zip	
+		;;
 	pelephys)
 		rm -rf PelePhysics
         echo " installing PelePhysics release version .." $PELEPVERSION
