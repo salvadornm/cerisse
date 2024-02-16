@@ -125,7 +125,7 @@ cns.dt_cutoff      | Real             | 5.e-20    | Minimum timestep size allowe
 cns.fixed_dt       | Real             | 0         | Run with constant dt
 cns.recon_scheme   | Int (1 to 6)     | 5         | Reconstruction scheme 
 cns.char_sys       | Int (0 or 1)     | 0 (sos)   | System for characteristic variable conversion
-cns.recon_char_var | Int (0 or 1)     | 0         | Reconstruct characteristic system variable or not
+cns.recon_char_var | Int (0 or 1)     | 1         | Reconstruct characteristic system variable or not (solver order will reduce if this is off)
 cns.limiter_theta  | Real             | 2.0       | Parameter in MUSCL limiter, between 1 and 2; 1: minmod, 2: van Leer's MC (higher sharper) 
 cns.rk_order       | Int (1 or 2)     | 1         | Switch between forward Euler and 2nd-order Runge-Kutta (note that WENO is not stable with forward Euler)
 cns.clip_temp      | Real             | [C++ epsilon](https://en.cppreference.com/w/cpp/types/numeric_limits/epsilon) | The `enforce_consistent_state()` routine adds energy to cells below this temperature to enforce non-negative temperature |
@@ -138,7 +138,7 @@ Two types of LES models are available, traditional eddy-viscosity type and stoch
 | --------------------------- | ------------- |:-------:| ------------------------------------------------------------ |
 | cns.do_les                  | Bool          | 0       | Use eddy viscosity type subgrid-scale model or not           |
 | cns.do_pasr                 | Bool          | 0       | Use partially stirred reactor in reaction or not             |
-| cns.les_model_name          | String        |         | Avaliable models are "Smagorinsky" or "WALE"                 |
+| cns.les_model               | String        |         | Avaliable models are "Smagorinsky" or "WALE"                 |
 | cns.C_s                     | Real          | 0.1     | Smagorinsky constant                                         |
 | cns.C_I                     | Real          | 0.0066  | Yoshizawa constant (not used currently)                      |
 | cns.Pr_T                    | Real          | 0.7     | Turbulent Prandtl number = mu_T/(cp*kappa_T)                 |

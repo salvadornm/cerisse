@@ -59,8 +59,8 @@ Real CNS::clip_temp = std::numeric_limits<Real>::epsilon();
 bool CNS::update_heat_release = true; // write to heat release in I_R? switch it off
                                       // for some performance gain (approx 3-5%)
 
-bool CNS::recon_char_var = false; // Reconstruct the thermodynamic variable (sos or
-                                  // gamma) to cell interfaces
+bool CNS::recon_char_var = true; // Reconstruct the thermodynamic variable (sos or
+                                 // gamma) to cell interfaces
 int CNS::char_sys = 0;            // Thermodynamic system used in characteristic
                                   // reconstruction. 0:speed of sound, 1:gamma
 int CNS::recon_scheme = 5;        // 1: basic Godunov; 2: MUSCL; 3: WENO-Z3;

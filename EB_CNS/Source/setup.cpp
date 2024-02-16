@@ -441,6 +441,9 @@ void CNS::variableSetUp()
 
   derive_lst.add("var_p", IndexType::TheCellType(), 1, cns_dervarp, DeriveRec::TheSameBox);
   derive_lst.addComponent("var_p", desc_lst, State_Type, 0, LEN_STATE);
+
+  derive_lst.add("var_T", IndexType::TheCellType(), 1, cns_dervarT, DeriveRec::TheSameBox);
+  derive_lst.addComponent("var_T", desc_lst, State_Type, 0, LEN_STATE);
 #endif
   // //
   // // Dynamically generated error tagging functions

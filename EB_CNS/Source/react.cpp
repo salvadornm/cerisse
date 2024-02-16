@@ -39,7 +39,9 @@ void CNS::react_state(Real time, Real dt, bool init_react)
       amrex::Print() << "Initialising reactions, using interval dt = " << dt
                      << std::endl;
     } else {
-      amrex::Print() << " >> Computing reactions" << std::endl;
+      amrex::Print() << " >> Computing reactions";
+      if (do_pasr) amrex::Print() << " (PaSR)";
+      amrex::Print() << std::endl;
     }
   }
 
@@ -73,11 +75,13 @@ void CNS::react_state(Real time, Real dt, bool init_react)
     for (MFIter mfi(I_R, amrex::TilingIfNotGPU()); mfi.isValid(); ++mfi) {
       const Box bx = mfi.tilebox();
       Real wt = amrex::ParallelDescriptor::second(); // timing for each fab
+      // Array4<const int> ifm_arr = ifine_mask.const_array(mfi);
 
 #if CNS_USE_EB
       Array4<const Real> vfrac_arr = (*volfrac).const_array(mfi);
       if (flags[mfi].getType(bx) != amrex::FabType::covered)
 #endif
+      // if (ifine_mask[mfi].max() > 0) // do not work in fine covered box
       {
         bool do_react_fields = (NUM_FIELD > 0); // && do_spdf;
         int nf_start = do_react_fields ? 1 : 0;
@@ -140,6 +144,7 @@ void CNS::react_state(Real time, Real dt, bool init_react)
 
             // fill mask
             mask(i, j, k) = (T(i, j, k) > min_react_temp) ? 1 : -1;
+            // mask(i, j, k) = (ifm_arr(i, j, k) == 1) ? mask(i, j, k) : -1;
 #if CNS_USE_EB
             mask(i, j, k) = (vfrac_arr(i, j, k) > 0.0) ? mask(i, j, k) : -1;
 #endif

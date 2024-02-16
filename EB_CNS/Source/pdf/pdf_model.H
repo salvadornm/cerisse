@@ -250,37 +250,37 @@ AMREX_FORCE_INLINE AMREX_GPU_DEVICE void vpdf_langevin_model(
     amrex::Real delta = std::pow(AMREX_D_TERM(dx[0], *dx[1], *dx[2]),
                                  1.0 / amrex::Real(AMREX_SPACEDIM));
     amrex::Real eps = C_e * std::pow(tke, 1.5) / delta;
-    tke = amrex::max(tke, std::numeric_limits<amrex::Real>::epsilon()); // prevent divide by 0
+    eps = amrex::max(eps, std::numeric_limits<amrex::Real>::epsilon()); // prevent divide by 0
 
-    // Compute shock sensor
-    amrex::IntVect iv(AMREX_D_DECL(i,j,k));
-    bool shock_sensor[AMREX_SPACEDIM+1] = {false};
-    for (int dir = 0; dir < AMREX_SPACEDIM; ++dir){
-      amrex::IntVect iv_dir = amrex::IntVect::TheDimensionVector(dir);
-      for (int nf = 0; nf <= NUM_FIELD; ++nf) {
-        amrex::Real pp[3];
-        for (int i: {-1, 0, 1}) {
-          amrex::Real rho = s(iv+i*iv_dir, nf*NVAR+URHO);
-          // pp[i+1]=rho;
-          amrex::Real rhoinv = 1.0 / rho;
-          AMREX_D_TERM(amrex::Real ux = s(iv+i*iv_dir, nf*NVAR+UMX) * rhoinv;
-                      , amrex::Real uy = s(iv+i*iv_dir, nf*NVAR+UMY) * rhoinv;
-                      , amrex::Real uz = s(iv+i*iv_dir, nf*NVAR+UMZ) * rhoinv;);
-          amrex::Real ei = s(iv+i*iv_dir, nf*NVAR+UEDEN) * rhoinv 
-                          - amrex::Real(0.5) * (AMREX_D_TERM(ux * ux, +uy * uy, +uz * uz));;
-          amrex::Real Y[NUM_SPECIES];
-          for (int n = 0; n < NUM_SPECIES; ++n)
-            Y[n] = s(iv+i*iv_dir, nf*NVAR+UFS+n) * rhoinv;
+    // // Compute shock sensor
+    // amrex::IntVect iv(AMREX_D_DECL(i,j,k));
+    // bool shock_sensor[AMREX_SPACEDIM+1] = {false};
+    // for (int dir = 0; dir < AMREX_SPACEDIM; ++dir){
+    //   amrex::IntVect iv_dir = amrex::IntVect::TheDimensionVector(dir);
+    //   for (int nf = 0; nf <= NUM_FIELD; ++nf) {
+    //     amrex::Real pp[3];
+    //     for (int i: {-1, 0, 1}) {
+    //       amrex::Real rho = s(iv+i*iv_dir, nf*NVAR+URHO);
+    //       // pp[i+1]=rho;
+    //       amrex::Real rhoinv = 1.0 / rho;
+    //       AMREX_D_TERM(amrex::Real ux = s(iv+i*iv_dir, nf*NVAR+UMX) * rhoinv;
+    //                   , amrex::Real uy = s(iv+i*iv_dir, nf*NVAR+UMY) * rhoinv;
+    //                   , amrex::Real uz = s(iv+i*iv_dir, nf*NVAR+UMZ) * rhoinv;);
+    //       amrex::Real ei = s(iv+i*iv_dir, nf*NVAR+UEDEN) * rhoinv 
+    //                       - amrex::Real(0.5) * (AMREX_D_TERM(ux * ux, +uy * uy, +uz * uz));;
+    //       amrex::Real Y[NUM_SPECIES];
+    //       for (int n = 0; n < NUM_SPECIES; ++n)
+    //         Y[n] = s(iv+i*iv_dir, nf*NVAR+UFS+n) * rhoinv;
 
-          amrex::Real T = 0.0;
-          auto eos = pele::physics::PhysicsType::eos();
-          eos.REY2T(rho, ei, Y, T);
-          eos.RTY2P(rho, T, Y, pp[i+1]);
-        }
-        shock_sensor[dir] |= (amrex::Math::abs(pp[2]-2*pp[1]+pp[0])/(pp[2]+2*pp[1]+pp[0]) > shock_threshold);
-      }
-      shock_sensor[AMREX_SPACEDIM] |= shock_sensor[dir];
-    }
+    //       amrex::Real T = 0.0;
+    //       auto eos = pele::physics::PhysicsType::eos();
+    //       eos.REY2T(rho, ei, Y, T);
+    //       eos.RTY2P(rho, T, Y, pp[i+1]);
+    //     }
+    //     shock_sensor[dir] |= (amrex::Math::abs(pp[2]-2*pp[1]+pp[0])/(pp[2]+2*pp[1]+pp[0]) > shock_threshold);
+    //   }
+    //   shock_sensor[AMREX_SPACEDIM] |= shock_sensor[dir];
+    // }
     
     // Real M_turb = sqrt(2.0 * tke) / cs_mean; // turbulent Mach number
     // eps *= (1 + M_turb*M_turb);    
@@ -296,12 +296,12 @@ AMREX_FORCE_INLINE AMREX_GPU_DEVICE void vpdf_langevin_model(
         // Langevin Gij = (0.5 + 0.75*C0)*eps/tke; B = sqrt(C0*eps) need to /mean_rho?
         // u_sgs = (0.5 + 0.75 * C0) * eps / tke * (mean_u - u) * dt +
         //         sqrt(C0 * eps) * dW[dir][nf - 1];
-        if (shock_sensor[dir]) {
-          u_sgs = (0.5 + 0.75 * C0) / (tke / eps + dt) * (mean_u - u) * dt;
-        } else {
+        // if (shock_sensor[dir]) {
+        //   u_sgs = (0.5 + 0.75 * C0) / (tke / eps + dt) * (mean_u - u) * dt;
+        // } else {
           u_sgs = (0.5 + 0.75 * C0) / (tke / eps + dt) * (mean_u - u) * dt +
                   sqrt(C0 * eps) * dW[dir][nf - 1];
-        }
+        // }
 
         s(i, j, k, nf * NVAR + UMX + dir) += s(i, j, k, nf * NVAR + URHO) * u_sgs;
         s(i, j, k, nf * NVAR + UEDEN) += 0.5 * s(i, j, k, nf * NVAR + URHO) * ((u + u_sgs) * (u + u_sgs) - u * u); // conservative formulation
@@ -339,7 +339,7 @@ AMREX_FORCE_INLINE AMREX_GPU_DEVICE void spdf_iem_model(
     amrex::Real delta = std::pow(AMREX_D_TERM(dx[0], *dx[1], *dx[2]),
                                  1.0 / amrex::Real(AMREX_SPACEDIM));
     amrex::Real eps = C_e * std::pow(tke, 1.5) / delta;
-    tke = amrex::max(tke, 1e-10); // prevent divide by 0
+    eps = amrex::max(eps, std::numeric_limits<amrex::Real>::epsilon()); // prevent divide by 0
 
     // rhoQ_i = rhoQ_i + rho_i*0.5*C_Q*eps/k*(mean_y - y)*dt
     amrex::Real mean_Q, Q, Q_sgs;

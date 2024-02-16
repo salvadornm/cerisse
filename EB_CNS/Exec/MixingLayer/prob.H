@@ -133,37 +133,33 @@ AMREX_GPU_DEVICE AMREX_FORCE_INLINE void prob_post_timestep(
   if (pp.record_statistics) {
     Real rho = state(i, j, k, URHO);
     Real rhoinv = Real(1.0) / rho;
+    Real vz = 0.0;
     AMREX_D_TERM(Real vx = state(i, j, k, UMX) * rhoinv;
                  , Real vy = state(i, j, k, UMY) * rhoinv;
-                 , Real vz = state(i, j, k, UMZ) * rhoinv;);
+                 , vz = state(i, j, k, UMZ) * rhoinv;);
     Real ei = state(i, j, k, UEDEN) * rhoinv -
               0.5 * (AMREX_D_TERM(vx * vx, +vy * vy, +vz * vz));
     Real massfrac[NUM_SPECIES];
     for (int n = 0; n < NUM_SPECIES; ++n) {
       massfrac[n] = state(i, j, k, UFS + n) * rhoinv;
     }
-
     Real T;
     auto eos = pele::physics::PhysicsType::eos();
     eos.REY2T(rho, ei, massfrac, T);
 
-    // (u, T, Y_H2, Y_OH, Y_H2O, hrr)
-    // Mean
-    AMREX_D_TERM(state(i, j, k, UFA + 0) += vx * dtlev;    // U
-                 , state(i, j, k, UFA + 1) += vy * dtlev;  // V
-                 , state(i, j, k, UFA + 2) += vz * dtlev;) // W
-    state(i, j, k, UFA + 3) += T * dtlev;                  // T
-    state(i, j, k, UFA + 4) += massfrac[H2_ID] * dtlev;    // Y(H2)
-    state(i, j, k, UFA + 5) += massfrac[OH_ID] * dtlev;    // Y(OH)
-    state(i, j, k, UFA + 6) += massfrac[H2O_ID] * dtlev;   // Y(H2O)
-    state(i, j, k, UFA + 7) +=
-      reactions(i, j, k, NUM_SPECIES) * dtlev; // heat release rate
-
-    // RMS^2
-    AMREX_D_TERM(state(i, j, k, UFA + 8) += vx * vx * dtlev;     // U
-                 , state(i, j, k, UFA + 9) += vy * vy * dtlev;   // V
-                 , state(i, j, k, UFA + 10) += vz * vz * dtlev;) // W
-    state(i, j, k, UFA + 11) += T * T * dtlev;                   // T
+    state(i, j, k, UFA + 0) += state(i, j, k, URHO) * dtlev; // RHO
+    state(i, j, k, UFA + 1) += state(i, j, k, UMX) * dtlev;  // RHO*U
+    state(i, j, k, UFA + 2) += state(i, j, k, UMY) * dtlev;  // RHO*V
+    state(i, j, k, UFA + 3) += state(i, j, k, UMZ) * dtlev;  // RHO*W
+    state(i, j, k, UFA + 4) += T * dtlev; // T
+    state(i, j, k, UFA + 5) += state(i, j, k, UFS + H2_ID) * dtlev; // RHO*Y_H2
+    state(i, j, k, UFA + 6) += state(i, j, k, UFS + OH_ID) * dtlev; // RHO*Y_OH
+    state(i, j, k, UFA + 7) += state(i, j, k, UFS + H2O_ID) * dtlev; // RHO*Y_H2O
+    state(i, j, k, UFA + 8) += state(i, j, k, UFS + HO2_ID) * dtlev; // RHO*Y_HO2    
+    state(i, j, k, UFA + 9) += state(i, j, k, UMX) * vx * dtlev;  // RHO*U*U
+    state(i, j, k, UFA + 10) += state(i, j, k, UMY) * vy * dtlev; // RHO*V*V
+    state(i, j, k, UFA + 11) += state(i, j, k, UMZ) * vz * dtlev; // RHO*W*W
+    state(i, j, k, UFA + 12) += T * T * dtlev; // T*T
   }
 #endif
 }
@@ -180,19 +176,20 @@ AMREX_GPU_DEVICE AMREX_FORCE_INLINE void prob_tag_error(
 AMREX_GPU_DEVICE AMREX_FORCE_INLINE void
 prob_get_aux_name(amrex::Vector<std::string>& aux_name)
 {
-  aux_name.resize(12);
-  aux_name[0] = "time_avg_u";
-  aux_name[1] = "time_avg_v";
-  aux_name[2] = "time_avg_w";
-  aux_name[3] = "time_avg_T";
-  aux_name[4] = "time_avg_Y_H2";
-  aux_name[5] = "time_avg_Y_OH";
-  aux_name[6] = "time_avg_Y_H2O";
-  aux_name[7] = "time_avg_hrr";
-  aux_name[8] = "mean_squared_u";
-  aux_name[9] = "mean_squared_v";
-  aux_name[10] = "mean_squared_w";
-  aux_name[11] = "mean_squared_T";
+  aux_name.resize(13);
+  aux_name[0] = "time_avg_rho";
+  aux_name[1] = "time_avg_rhou";
+  aux_name[2] = "time_avg_rhov";
+  aux_name[3] = "time_avg_rhow";
+  aux_name[4] = "time_avg_T";
+  aux_name[5] = "time_avg_rhoH2";
+  aux_name[6] = "time_avg_rhoOH";
+  aux_name[7] = "time_avg_rhoH2O";
+  aux_name[8] = "time_avg_rhoHO2";
+  aux_name[9] = "time_avg_rhouu";
+  aux_name[10] = "time_avg_rhovv";
+  aux_name[11] = "time_avg_rhoww";
+  aux_name[12] = "time_avg_TT";
 }
 #endif
 

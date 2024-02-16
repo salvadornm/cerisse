@@ -30,7 +30,7 @@ Custom_Chemistry_Model := OConaire
 
 # CNS
 #NUM_FIELD = 16
-#NUM_AUX = 12 # for time averages
+NUM_AUX = 13 # for time averages
 
 # GNU Make
 include ./Make.package

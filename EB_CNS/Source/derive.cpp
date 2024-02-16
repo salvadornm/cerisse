@@ -568,6 +568,38 @@ void cns_dervarp(const Box& bx, FArrayBox& derfab, int dcomp, int /*ncomp*/,
     varp(i, j, k) /= amrex::Real(NUM_FIELD - 1);    
   });
 }
+
+void cns_dervarT(const Box& bx, FArrayBox& derfab, int dcomp, int /*ncomp*/,
+                 const FArrayBox& datafab, const Geometry& /*geomdata*/,
+                 Real /*time*/, const int* /*bcrec*/, int /*level*/)
+{
+  auto const dat = datafab.const_array();
+  auto varT = derfab.array(dcomp);
+
+  amrex::ParallelFor(bx, [=] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {
+    varT(i, j, k) = 0.0;
+    amrex::Real T[NUM_FIELD+1] = {0.0};
+    for (int nf = 0; nf <= NUM_FIELD; ++nf) {
+      amrex::Real rho = dat(i, j, k, nf * NVAR + URHO);
+      amrex::Real rhoinv = 1.0 / rho;
+      AMREX_D_TERM(amrex::Real ux = dat(i, j, k, nf * NVAR + UMX) * rhoinv;
+                  , amrex::Real uy = dat(i, j, k, nf * NVAR + UMY) * rhoinv;
+                  , amrex::Real uz = dat(i, j, k, nf * NVAR + UMZ) * rhoinv;);
+      amrex::Real ei = dat(i, j, k, nf * NVAR + UEDEN) * rhoinv 
+                       - amrex::Real(0.5) * (AMREX_D_TERM(ux * ux, +uy * uy, +uz * uz));;
+      amrex::Real Y[NUM_SPECIES];
+      for (int n = 0; n < NUM_SPECIES; ++n)
+        Y[n] = dat(i, j, k, nf * NVAR + UFS + n) * rhoinv;
+
+      auto eos = pele::physics::PhysicsType::eos();
+      eos.REY2T(rho, ei, Y, T[nf]);
+
+      if (nf > 0) 
+        varT(i, j, k) += (T[nf] - T[0]) * (T[nf] - T[0]);
+    }
+    varT(i, j, k) /= amrex::Real(NUM_FIELD - 1);    
+  });
+}
 #endif
 
 void cns_dervelgrad(const Box& bx, FArrayBox& derfab, int dcomp, int /*ncomp*/,
