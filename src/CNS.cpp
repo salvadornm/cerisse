@@ -11,17 +11,11 @@
 
 using namespace amrex;
 
-// bool CNS::rhs_euler=false;
-bool CNS::rhs_visc = false;
-bool CNS::rhs_source = false;
 bool CNS::verbose = true;
 bool CNS::dt_dynamic = false;
 bool CNS::ib_move = false;
 bool CNS::plot_surf = false;
 int CNS::nstep_screen_output = 10;
-// int  CNS::flux_euler=0;
-int CNS::dist_linear = 0;
-int CNS::art_diss = 0;
 int CNS::order_rk = 2;
 int CNS::stages_rk = 2;
 int CNS::do_reflux = 1;
@@ -29,10 +23,6 @@ int CNS::refine_max_dengrad_lev = -1;
 Real CNS::cfl = 0.0_rt;
 Real CNS::dt_constant = 0.0_rt;
 Real CNS::refine_dengrad = 1.0e10;
-// Vector<MultiFab> CNS::VdSdt;
-// Vector<MultiFab> CNS::VSborder;
-// Vector<MultiFab> CNS::Vprimsmf;
-// Vector<Array<MultiFab, AMREX_SPACEDIM>> CNS::Vnumflxmf, CNS::Vpntvflxmf;
 
 PROB::ProbClosures *CNS::h_prob_closures = nullptr;
 PROB::ProbClosures *CNS::d_prob_closures = nullptr;
@@ -52,12 +42,6 @@ CNS::CNS(Amr &papa, int lev, const Geometry &level_geom, const BoxArray &bl,
   if (do_reflux && level > 0) {
     flux_reg.reset(new FluxRegister(grids, dmap, crse_ratio, level,PROB::ProbClosures::NCONS));
   }
-
-  // resize MultiFab vectors based on the number of levels
-  // int nlevs = parent->finestLevel() + 1;
-  // VdSdt.resize(nlevs);
-  // VSborder.resize(nlevs);
-  // Vprimsmf.resize(nlevs);
 
 #ifdef AMREX_USE_GPIBM
   IBM::ib.buildMFs(grids, dmap, level);
@@ -85,25 +69,7 @@ void CNS::read_params() {
     h_phys_bc->setHi(i, hi_bc[i]);
   }
 
-  // pp.query("rhs_euler", rhs_euler);
-  pp.query("rhs_visc", rhs_visc);
-  pp.query("rhs_source", rhs_source);
   pp.query("do_reflux", do_reflux);
-
-  // if (!pp.query("flux_euler",flux_euler)) {
-  //   amrex::Abort("Need to specify Euler flux type,flux_euler");}
-
-  // if (flux_euler==1) {
-  //   if (!pp.query("order_keep",CentralKEEP::order_keep)) {
-  //     amrex::Abort("Need to specify KEEP scheme order of accuracy, order_keep
-  //     = {2, 4 or 6}");
-  //   }
-
-  //   if (!pp.query("art_diss",art_diss)) {
-  //     amrex::Abort("Need to specify artificial dissipation, art_diss = {1=on
-  //     0=off}");};
-
-  // }
 
   if (!pp.query("order_rk", order_rk)) {
     amrex::Abort(
@@ -394,36 +360,6 @@ void CNS::post_regrid(int lbase, int new_finest) {
   IBM::ib.initialiseGPs(level);
 #endif
 
-  // Destroy and re-allocate multifabs
-  // VdSdt[level].clear();
-  // VSborder[level].clear();
-  // Vprimsmf[level].clear();
-  // for (int i = 0; i < AMREX_SPACEDIM; ++i) {
-  // Vnumflxmf[level][i].clear();
-  // Vpntvflxmf[level][i].clear();
-  // }
-
-  // VdSdt[level].define(grids, dmap, NCONS, 0, MFInfo(), Factory());
-  // VdSdt[level].setVal(0.0);
-  // VSborder[level].define(grids, dmap, NCONS, NGHOST, MFInfo(), Factory());
-  // VSborder[level].setVal(0.0);
-  // Vprimsmf[level].define(grids, dmap, NPRIM, NGHOST, MFInfo(), Factory());
-  // Vprimsmf[level].setVal(0.0);
-
-  for (int idim = 0; idim < AMREX_SPACEDIM; ++idim) {
-    // Vnumflxmf[level][idim].define(convert(grids,IntVect::TheDimensionVector(idim)),
-    // dmap, NCONS, NGHOST,MFInfo(),Factory()); convert() function converts the
-    // Vnumflxmf to edge based type (node) Defining like this necessary for
-    // compatibility with flux register, otherwise boxArray.ixType() =/=
-    // numflxmf boxArray.ixType() error appears.
-
-    // Vpntvflxmf[level][idim].define(grids, dmap, NCONS,
-    // NGHOST,MFInfo(),Factory()); Vnumflxmf[level][idim].setVal(0.0);
-    // Vpntvflxmf[level][idim].setVal(0.0);
-  }
-
-  // if constexpr (PROB::do_euler==-1)
-  // {NLDE::post_regrid(level,grids,dmap,MFInfo(),Factory());}
 }
 
 void CNS::errorEst(TagBoxArray &tags, int /*clearval*/, int /*tagval*/,
@@ -480,9 +416,6 @@ void CNS::avgDown() {
 
   amrex::average_down(S_fine, S_crse, fine_lev.geom, geom, 0, S_fine.nComp(),
                       parent->refRatio(level));
-
-  // const int nghost = 0;
-  // computeTemp(S_crse, nghost);
 }
 
 void CNS::printTotal() const {
@@ -597,12 +530,6 @@ void CNS::variableCleanUp() {
 #endif
   desc_lst.clear();
   derive_lst.clear();
-
-  // VdSdt.clear();
-  // VSborder.clear();
-  // Vprimsmf.clear();
-  // Vnumflxmf.clear();
-  // Vpntvflxmf.clear();
 }
 
 // Plotting

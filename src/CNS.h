@@ -125,21 +125,11 @@ class CNS : public amrex::AmrLevel {
   static amrex::Real dt_constant;
   static bool dt_dynamic;
   static int nstep_screen_output;
-  // static int flux_euler;
   static int dist_linear;
-  static int art_diss;
   static int order_rk;
   static int stages_rk;
-  // static bool rhs_euler;
-  static bool rhs_visc;
-  static bool rhs_source;
   static bool ib_move;
   static bool plot_surf;
-
-  // static Vector<MultiFab> VdSdt;
-  // static Vector<MultiFab> VSborder;
-  // static Vector<MultiFab> Vprimsmf;
-  // static Vector<Array<MultiFab, AMREX_SPACEDIM>> Vnumflxmf, Vpntvflxmf;
 
  public:
   static inline PROB::ProbRHS prob_rhs;
