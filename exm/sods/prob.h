@@ -31,21 +31,10 @@ typedef rhs_dt<riemann_t<false, ProbClosures>, no_diffusive_t, no_source_t>
     ProbRHS;
 
 void inline inputs() {
-
   ParmParse pp;
 
-  // Numerical operators
-  //-1 = N/A (Incase of periodic)
-  // 0 = Interior           3 = Symmetry
-  // 1 = Inflow             4 = SlipWall
-  // 2 = Outflow            5 = NoSlipWall
-  // 6 = user defined
-  pp.addarr("cns.lo_bc", std::vector<int>{2, -1, -1});
-  pp.addarr("cns.hi_bc", std::vector<int>{2, -1, -1});
   pp.add("cns.order_rk", 3);   // -2, 1, 2 or 3"
   pp.add("cns.stages_rk", 3);  // 1, 2 or 3
-  pp.add("cns.screen_output", 1); // 0=quiet, 1=verbose
-  pp.add("cns.verbose", 1);       // 0=quiet, 1=verbose
 }
 
 // initial condition

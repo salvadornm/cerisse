@@ -3,7 +3,6 @@
 #include <CNS.h>
 #include <CNS_K.h>
 #include <prob.h>
-// #include <NLDE.h>
 
 #ifdef AMREX_USE_GPIBM
 #include <IBM.h>
