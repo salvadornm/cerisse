@@ -12,7 +12,7 @@ case  $1 in
 		echo " installing AMREX release version .." $AMREXVERSION
 		wget https://github.com/AMReX-Codes/amrex/archive/refs/tags/$AMREXVERSION.zip
 		unzip $AMREXVERSION.zip
-        mv $AMREXVERSION amrex
+        mv amrex-$AMREXVERSION amrex
 		rm $AMREXVERSION.zip
         rm -rf PelePhysics
         echo " installing PelePhysics release version .." $PELEPVERSION
