@@ -17,9 +17,10 @@
 
 /wrk/
 
-/lib/cgal/build/*
-/lib/boost
-/lib/install/*
+/lib/amrex
+/lib/Amrvis
+/lib/PelePhysics
+/lib/sundials
 
 /tst/AMReX_regtests/output/AMReX-benchmarks/*
 /tst/AMReX_regtests/output/AMReX-tests/*

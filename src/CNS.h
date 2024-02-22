@@ -48,7 +48,7 @@ class CNS : public amrex::AmrLevel {
                    amrex::FluxRegister* fr_as_crse,
                    amrex::FluxRegister* fr_as_fine);
 
-  void computeTemp(amrex::MultiFab& State, int ng);
+  // void computeTemp(amrex::MultiFab& State, int ng);
 
   amrex::Real estTimeStep();
 

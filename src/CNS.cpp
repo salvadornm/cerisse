@@ -177,26 +177,26 @@ void CNS::post_init(Real stop_time) {
 // -----------------------------------------------------------------------------
 
 // Time-stepping ---------------------------------------------------------------
-void CNS::computeTemp(MultiFab &State, int ng) {
-  BL_PROFILE("CNS::computeTemp()");
+// void CNS::computeTemp(MultiFab &State, int ng) {
+//   BL_PROFILE("CNS::computeTemp()");
 
-  PROB::ProbClosures const *lclosures = d_prob_closures;
+//   PROB::ProbClosures const *lclosures = d_prob_closures;
 
-  // This will reset Eint and compute Temperature
-#ifdef AMREX_USE_OMP
-#pragma omp parallel if (Gpu::notInLaunchRegion())
-#endif
-  for (MFIter mfi(State, TilingIfNotGPU()); mfi.isValid(); ++mfi) {
-    const Box &bx = mfi.growntilebox(ng);
-    auto const &sfab = State.array(mfi);
+//   // This will reset Eint and compute Temperature
+// #ifdef AMREX_USE_OMP
+// #pragma omp parallel if (Gpu::notInLaunchRegion())
+// #endif
+//   for (MFIter mfi(State, TilingIfNotGPU()); mfi.isValid(); ++mfi) {
+//     const Box &bx = mfi.growntilebox(ng);
+//     auto const &sfab = State.array(mfi);
 
-    amrex::Abort("ComputeTemp function not written");
+//     amrex::Abort("ComputeTemp function not written");
 
-    amrex::ParallelFor(bx, [=] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {
-      cns_compute_temperature(i, j, k, sfab, *lclosures);
-    });
-  }
-}
+//     amrex::ParallelFor(bx, [=] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {
+//       cns_compute_temperature(i, j, k, sfab, *lclosures);
+//     });
+//   }
+// }
 // Called on level 0 only, after field data is initialised but before first
 // step.
 void CNS::computeInitialDt(int finest_level, int sub_cycle,
