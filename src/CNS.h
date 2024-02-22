@@ -44,11 +44,11 @@ class CNS : public amrex::AmrLevel {
   // -------------------------------------------------------------------------
 
   // Time-stepping -----------------------------------------------------------
-  void compute_rhs(amrex::MultiFab& S, amrex::Real dt,
-                   amrex::FluxRegister* fr_as_crse,
-                   amrex::FluxRegister* fr_as_fine);
+  // void compute_rhs(amrex::MultiFab& S, amrex::Real dt,
+  //                  amrex::FluxRegister* fr_as_crse,
+  //                  amrex::FluxRegister* fr_as_fine);
 
-  void computeTemp(amrex::MultiFab& State, int ng);
+  // void computeTemp(amrex::MultiFab& State, int ng);
 
   amrex::Real estTimeStep();
 

@@ -6,6 +6,7 @@
 #include <AMReX_ParmParse.H>
 #include <Closures.h>
 #include <RHS.h>
+#include <LHS.h>
 
 using namespace amrex;
 
@@ -21,6 +22,7 @@ struct ProbParm {
   Real u_r = 0.0;
 };
 
+// Numerical operators
 inline Vector<std::string> cons_vars_names={"Density","Xmom","Ymom","Zmom","Energy"};
 inline Vector<int> cons_vars_type={0,1,2,3,0};
 
@@ -29,6 +31,9 @@ typedef closures_dt<indicies_t, visc_suth_t, cond_suth_t,
     ProbClosures;
 typedef rhs_dt<riemann_t<false, ProbClosures>, no_diffusive_t, no_source_t>
     ProbRHS;
+
+typedef RK<0,3,ProbRHS> ProbLHS;
+// typedef lhs_dt<ProbRHS,RK<3,3>> ProbLHS;
 
 void inline inputs() {
   ParmParse pp;

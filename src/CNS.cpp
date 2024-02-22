@@ -177,26 +177,26 @@ void CNS::post_init(Real stop_time) {
 // -----------------------------------------------------------------------------
 
 // Time-stepping ---------------------------------------------------------------
-void CNS::computeTemp(MultiFab &State, int ng) {
-  BL_PROFILE("CNS::computeTemp()");
+// void CNS::computeTemp(MultiFab &State, int ng) {
+//   BL_PROFILE("CNS::computeTemp()");
 
-  PROB::ProbClosures const *lclosures = d_prob_closures;
+//   PROB::ProbClosures const *lclosures = d_prob_closures;
 
-  // This will reset Eint and compute Temperature
-#ifdef AMREX_USE_OMP
-#pragma omp parallel if (Gpu::notInLaunchRegion())
-#endif
-  for (MFIter mfi(State, TilingIfNotGPU()); mfi.isValid(); ++mfi) {
-    const Box &bx = mfi.growntilebox(ng);
-    auto const &sfab = State.array(mfi);
+//   // This will reset Eint and compute Temperature
+// #ifdef AMREX_USE_OMP
+// #pragma omp parallel if (Gpu::notInLaunchRegion())
+// #endif
+//   for (MFIter mfi(State, TilingIfNotGPU()); mfi.isValid(); ++mfi) {
+//     const Box &bx = mfi.growntilebox(ng);
+//     auto const &sfab = State.array(mfi);
 
-    amrex::Abort("ComputeTemp function not written");
+//     amrex::Abort("ComputeTemp function not written");
 
-    amrex::ParallelFor(bx, [=] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {
-      cns_compute_temperature(i, j, k, sfab, *lclosures);
-    });
-  }
-}
+//     amrex::ParallelFor(bx, [=] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {
+//       cns_compute_temperature(i, j, k, sfab, *lclosures);
+//     });
+//   }
+// }
 // Called on level 0 only, after field data is initialised but before first
 // step.
 void CNS::computeInitialDt(int finest_level, int sub_cycle,
@@ -753,3 +753,47 @@ void CNS::writePlotFilePost(const std::string &dir, std::ostream &os) {
   // }
 #endif
 }
+
+
+Real CNS::advance(Real time, Real dt, int /*iteration*/, int /*ncycle*/) {
+  BL_PROFILE("CNS::advance()");
+
+  // Print() << "-------- advance start -------" << std::endl;
+  // Print() << "time = " << time << std::endl;
+  // Print() << "dt = " << dt << std::endl;
+  // state[0].printTimeInterval(std::cout);
+  // Print() << "---------------------------------" << std::endl;
+
+  for (int i = 0; i < num_state_data_types; ++i) {
+    state[i].allocOldData();
+    state[i].swapTimeLevels(dt);
+  }
+
+  MultiFab& s1 = get_old_data(State_Type);
+  MultiFab& s2 = get_new_data(State_Type);
+
+  int ncons = d_prob_closures->NCONS;
+  int nghost= d_prob_closures->NGHOST;
+  MultiFab stemp(grids,dmap,ncons,nghost,MFInfo(),Factory());
+
+  FluxRegister* fr_as_crse = nullptr;
+  if (do_reflux && level < parent->finestLevel()) {
+    CNS& fine_level = getLevel(level + 1);
+    fr_as_crse = fine_level.flux_reg.get();
+  }
+
+  FluxRegister* fr_as_fine = nullptr;
+  if (do_reflux && level > 0) {
+    fr_as_fine = flux_reg.get();
+  }
+
+  if (fr_as_crse) {
+    fr_as_crse->setVal(Real(0.0));
+  }
+
+  PROB::ProbLHS::advance(*this,s1,s2,stemp,fr_as_crse,fr_as_fine,time,dt,ncons,nghost);
+
+  return dt;
+}
+
+
