@@ -7,7 +7,7 @@
 // #include <High_resolution.h>
 // #include <NLDE.h>
 #ifdef AMREX_USE_GPIBM
-#include <IBM.h>
+#include <eib.h>
 #endif
 using namespace amrex;
 

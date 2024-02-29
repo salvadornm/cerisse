@@ -4,9 +4,9 @@
 #include <CNS_K.h>
 #include <prob.h>
 
-#ifdef AMREX_USE_GPIBM
-#include <IBM.h>
-#endif
+// #ifdef AMREX_USE_GPIBM
+// #include <IBM.h>
+// #endif
 
 using namespace amrex;
 
@@ -355,8 +355,8 @@ void CNS::post_regrid(int lbase, int new_finest) {
 #ifdef AMREX_USE_GPIBM
   IBM::ib.destroyMFs(level);
   IBM::ib.buildMFs(grids, dmap, level);
-  IBM::ib.computeMarkers(level);
-  IBM::ib.initialiseGPs(level);
+  // IBM::ib.computeMarkers(level);
+  // IBM::ib.initialiseGPs(level);
 #endif
 
 }
@@ -375,7 +375,7 @@ void CNS::errorEst(TagBoxArray &tags, int /*clearval*/, int /*tagval*/,
 
 #ifdef AMREX_USE_GPIBM
   // call function from cns_prob
-  IBM::IBMultiFab &ibdata = (*IBM::ib.ibMFa[level]);
+  auto &ibdata = (*IBM::ib.bmf_a[level]);
 #endif
   for (MFIter mfi(tags, TilingIfNotGPU()); mfi.isValid(); ++mfi) {
     const Box &bx = mfi.tilebox();
@@ -719,8 +719,8 @@ void CNS::writePlotFile(const std::string &dir, std::ostream &os,
 
 //----------------------------------------------------------------------modified
 #ifdef AMREX_USE_GPIBM
-  plotMF.setVal(0.0_rt, cnt, 2, nGrow);
-  IBM::ib.ibMFa[level]->copytoRealMF(plotMF, 0, cnt);
+  // plotMF.setVal(0.0_rt, cnt, 2, nGrow);
+  // IBM::ib.ibMFa[level]->copytoRealMF(plotMF, 0, cnt);
 #endif
   //------------------------------------------------------------------------------
 

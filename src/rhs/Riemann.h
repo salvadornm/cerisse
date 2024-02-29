@@ -33,10 +33,10 @@ class riemann_t {
     const Box& bxn = mfi.grownnodaltilebox(-1, 0);  // 0,N+1 all directions
 
     // zero rhs
-    ParallelFor(bxg, cls_t::NCONS,
-                [=] AMREX_GPU_DEVICE(int i, int j, int k, int n) noexcept {
-                  rhs(i, j, k, n) = 0.0;
-                });
+    // ParallelFor(bxg, cls_t::NCONS,
+    //             [=] AMREX_GPU_DEVICE(int i, int j, int k, int n) noexcept {
+    //               rhs(i, j, k, n) = 0.0;
+    //             });
 
     const Box& bxg1 = amrex::grow(bx, 1);
     FArrayBox slopef(bxg1, cls_t::NCONS, The_Async_Arena());
@@ -57,7 +57,7 @@ class riemann_t {
     // add x flux derivative to rhs = -(fi+1 - fi)/dx = (fi - fi+1)/dx
     ParallelFor(bx, cls_t::NCONS,
                 [=] AMREX_GPU_DEVICE(int i, int j, int k, int n) noexcept {
-                  rhs(i, j, k, n) +=
+                  rhs(i, j, k, n) =
                       dxinv[cdir] * (flx(i, j, k, n) - flx(i + 1, j, k, n));
                 });
 

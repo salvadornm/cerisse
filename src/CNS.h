@@ -146,4 +146,11 @@ void cns_bcfill(amrex::Box const& bx, amrex::FArrayBox& data, const int dcomp,
                 const amrex::Real time, const amrex::Vector<amrex::BCRec>& bcr,
                 const int bcomp, const int scomp);
 
+#ifdef AMREX_USE_GPIBM
+  // declare main IB class instance
+namespace IBM{
+  inline PROB::ProbIB ib;
+}
+#endif
+
 #endif

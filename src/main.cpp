@@ -5,10 +5,6 @@
 #include <CNS.h>
 #include <prob.h>
 
-#ifdef AMREX_USE_GPIBM
-#include <IBM.h>
-#endif
-
 using namespace amrex;
 
 amrex::LevelBld* getLevelBld();
@@ -57,7 +53,7 @@ int main(int argc, char* argv[])
     Amr amr(getLevelBld());
 #ifdef AMREX_USE_GPIBM
     // This needs to happen after amr instance and before amr.init
-    IBM::ib.init(&amr, NGHOST);
+    IBM::ib.init(&amr);
 #endif
     amr.init(start_time, stop_time);
 

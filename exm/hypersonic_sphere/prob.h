@@ -8,6 +8,7 @@
 #include <Closures.h>
 #include <RHS.h>
 #include <eib.h>
+#include <ratio>
 
 namespace PROB {
 
@@ -32,7 +33,8 @@ typedef closures_dt<indicies_t, visc_suth_t, cond_suth_t,
 typedef rhs_dt<riemann_t<false, ProbClosures>, no_diffusive_t, no_source_t>
     ProbRHS;
 
-typedef eib_t<2,2,ProbClosures> ProbIB;
+typedef std::ratio<5,4> d_image;
+typedef eib_t<2,2,d_image,ProbClosures> ProbIB;
 
 // typedef closures_derived_base_t<visc_suth_t, cond_suth_t, calorifically_perfect_gas_t, ProbParm> ProbClosures;
 
