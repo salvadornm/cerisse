@@ -17,10 +17,9 @@
 
 /wrk/
 
+#lib folder, excluding install script
 /lib/*
-/lib/cgal/build/*
-/lib/boost
-/lib/install/*
+!/lib/install/
 
 /tst/AMReX_regtests/output/AMReX-benchmarks/*
 /tst/AMReX_regtests/output/AMReX-tests/*

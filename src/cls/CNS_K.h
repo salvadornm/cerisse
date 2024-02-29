@@ -86,17 +86,17 @@ inline void derpres(const Box& bx, FArrayBox& derfab, int dcomp, int /*ncomp*/,
                     Real /*time*/, const int* /*bcrec*/, int /*level*/) {
   auto const dat = datafab.array();
   auto pfab = derfab.array(dcomp);
-  PROB::ProbClosures const& cls = *CNS::d_prob_closures;
+  PROB::ProbClosures const* cls = CNS::d_prob_closures;
 
   amrex::ParallelFor(bx, [=] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {
     // cons2P
-    Real rhoinv = 1.0_rt / dat(i, j, k, cls.URHO);
-    Real mx = dat(i, j, k, cls.UMX);
-    Real my = dat(i, j, k, cls.UMY);
-    Real mz = dat(i, j, k, cls.UMZ);
+    Real rhoinv = 1.0_rt / dat(i, j, k, cls->URHO);
+    Real mx = dat(i, j, k, cls->UMX);
+    Real my = dat(i, j, k, cls->UMY);
+    Real mz = dat(i, j, k, cls->UMZ);
     Real rhoeint =
-        dat(i, j, k, cls.UET) - Real(0.5) * rhoinv * (mx * mx + my * my + mz * mz);
-    pfab(i, j, k) = (cls.gamma - Real(1.0)) * rhoeint;
+        dat(i, j, k, cls->UET) - Real(0.5) * rhoinv * (mx * mx + my * my + mz * mz);
+    pfab(i, j, k) = (cls->gamma - Real(1.0)) * rhoeint;
   });
 }
 
@@ -105,17 +105,17 @@ inline void dertemp(const Box& bx, FArrayBox& derfab, int dcomp, int /*ncomp*/,
                     Real /*time*/, const int* /*bcrec*/, int /*level*/) {
   auto const dat = datafab.array();
   auto Tfab = derfab.array(dcomp);
-  PROB::ProbClosures const& cls = *CNS::d_prob_closures;
+  PROB::ProbClosures const* cls = CNS::d_prob_closures;
 
   amrex::ParallelFor(bx, [=] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {
     // cons2T
-    Real rhoinv = 1.0_rt / dat(i, j, k, cls.URHO);
-    Real mx = dat(i, j, k, cls.UMX);
-    Real my = dat(i, j, k, cls.UMY);
-    Real mz = dat(i, j, k, cls.UMZ);
+    Real rhoinv = 1.0_rt / dat(i, j, k, cls->URHO);
+    Real mx = dat(i, j, k, cls->UMX);
+    Real my = dat(i, j, k, cls->UMY);
+    Real mz = dat(i, j, k, cls->UMZ);
     Real rhoeint =
-        dat(i, j, k, cls.UET) - Real(0.5) * rhoinv * (mx * mx + my * my + mz * mz);
-    Tfab(i, j, k) = (rhoeint * rhoinv) / cls.cv;
+        dat(i, j, k, cls->UET) - Real(0.5) * rhoinv * (mx * mx + my * my + mz * mz);
+    Tfab(i, j, k) = (rhoeint * rhoinv) / cls->cv;
   });
 }
 
