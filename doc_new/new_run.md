@@ -4,7 +4,21 @@
 NEW CODE DISCUSSION DOCUMENT
 
 
-Folde
+
+
+Variables
+
+
+Conservative
+
+rhok,
+
+
+Primitive
+
+Storing but losing
+
+
 
 
 ## Building the code
@@ -95,7 +109,8 @@ The names follow in the **cons_var_names** array
 inline Vector<std::string> cons_vars_names={"Density","Xmom","Ymom","Zmom","Energy"};
 ```
 
-The type of variables ??
+The type of variables, keep as it is, scalar ser 0 and vectors are given by their components
+
 
 ```
 inline Vector<int> cons_vars_type={0,1,2,3,0};
