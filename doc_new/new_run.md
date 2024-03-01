@@ -53,6 +53,9 @@ AMREX_HOME ?= $(abspath ../../lib/amrex)
 
 ## Problem Set-up example
 
+This is done in the file **prob.h**.
+In the top of the file, the following line are always the same:
+
 
 ```
 #ifndef CNS_PROB_H_
@@ -66,10 +69,14 @@ AMREX_HOME ?= $(abspath ../../lib/amrex)
 
 using namespace amrex;
 ```
-Start of the problem, these line are always the same
 
+using the use AMREX geometry and call to Closures and RHS 
+(link here to pages).
 
-```
+This is follow by namespace ```PROB {```
+and the definition of problem parameters:
+
+```cpp
 / problem parameters
 struct ProbParm {
   Real p_l = 1.0;
@@ -81,25 +88,20 @@ struct ProbParm {
 };
 ```
 
-Definition of problem parameters that may be useful
-
-
+that may be useful.
+The names follow in the **cons_var_names** array
 
 ```
 inline Vector<std::string> cons_vars_names={"Density","Xmom","Ymom","Zmom","Energy"};
 ```
 
-Vector of Name of variables to solve
-
-
+The type of variables ??
 
 ```
 inline Vector<int> cons_vars_type={0,1,2,3,0};
 ```
 
-Not known ??
-
-
+The closures and right-hand-side of equations
 
 ```
 typedef closures_dt<indicies_t, visc_suth_t, cond_suth_t,
@@ -108,8 +110,6 @@ typedef closures_dt<indicies_t, visc_suth_t, cond_suth_t,
 typedef rhs_dt<riemann_t<false, ProbClosures>, no_diffusive_t, no_source_t>
     ProbRHS;
 ```
-
-These line define the problem, by firts defining the closures
 
 ### Closures
 
@@ -125,15 +125,31 @@ These line define the problem, by firts defining the closures
 
 | RHS                     | Type          | Use | Description                                                  |
 | --------------------------- | ------------- |:-------:| ------------------------------------------------------------ |
-| ```riemann_t```             |            |   often      | Rimeann Problem                          |
+| ```riemann_t```             |            |   often      | Riemann Solver                 |
 | ```no_diffusive_t```        |            |   often      | No diffusive part (Euler)                |
 | ```no_source_t```           |            |   often      | No source term    |
 
 
 
+### Inputs
+
+
+Data missed from input file
+
+```cpp
+void inline inputs() {
+  ParmParse pp;
+
+  pp.add("cns.order_rk", 3);   // -2, 1, 2 or 3"
+  pp.add("cns.stages_rk", 3);  // 1, 2 or 3
+}
+```
+
 ## Problem definition
 
-```
+The following lines define the initial conditions
+
+```cpp
 // initial condition
 AMREX_GPU_DEVICE AMREX_FORCE_INLINE void
 prob_initdata(int i, int j, int k, Array4<Real> const &state,

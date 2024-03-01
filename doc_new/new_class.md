@@ -14,7 +14,7 @@ Overall general RHS class
 
 ## Riemann
 
-Template class for Riemann Solver
+Template class for Riemann Solver, in file **Riemann.h**
 
 ```void riemann_prob```
 
@@ -27,7 +27,7 @@ Solves the HLLC  Riemann Problem based on left and right states
 
 MUSCL type reconstruction with Vanleer limiter
 
-```
+```cpp
   Real dcen = Real(0.5) * (dlft + drgt);
   Real dsgn = Math::copysign(Real(1.0), dcen);
   Real slop = Real(2.0) * min(Math::abs(dlft), Math::abs(drgt));
@@ -35,8 +35,17 @@ MUSCL type reconstruction with Vanleer limiter
   return dsgn * min(dlim, Math::abs(dcen));
 ```
 
+The average gradient is defined by
+
 $$
-\Phi= \frac{\psi}{2} ( d_{left} + d_{right})
+d_{cen}= \frac{1}{2} ( d_{left} + d_{right})
+$$
+
+Using the minmod limiter, only applies if $$ d_{left}d_{right} >0 $$
+(no extrema, otherwise 0)
+
+$$
+d_{lim} = 2  \min(|d_{left}|,|d_{right}|)
 $$
 
 
@@ -70,12 +79,14 @@ $$
 $$
 d_{right} = \frac{1}{2} \frac{ p_{i+1} - p_i }{c}  +   \frac{1}{2} \rho_i \left(u_{i+1} - u_i \right) 
 $$
+
+The slope is then recointructed using the limiter
+
 $$
 d_2 = \Phi(d_{left},d_{right})
 $$
 
-
-Same for x and y
+same applies for y and and z.
 
 
 ### Solving Riemann problem x
