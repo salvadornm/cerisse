@@ -39,11 +39,13 @@ case  $1 in
 		;;
 	boost)
 		echo " installing boost 1.66 version .." 
-        wget https://boostorg.jfrog.io/artifactory/main/release/1.66.0/source/boost_1_66_0.tar.bz2
-        tar --bzip2 -xf boost_1_66_0.tar.bz2
-		cd boost_1_66_0/
-		./bootstrap.sh
-		./b2 install
+    wget https://boostorg.jfrog.io/artifactory/main/release/1.66.0/source/boost_1_66_0.tar.bz2
+    tar --bzip2 -xf boost_1_66_0.tar.bz2
+    rm boost_1_66.0.tar.bz2
+		#cd boost_1_66_0/
+		#./bootstrap.sh --prefix=$PWD/install/
+		#./b2 install
+    #BOOST_ROOT
 		;;
 	cgal)
 		rm -rf cgal
@@ -55,7 +57,7 @@ case  $1 in
 		cd cgal
 		mkdir build
 		cd build
-		cmake -DCMAKE_BUILD_TYPE=Release ..
+		cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=$PWD/../install/ ..
 		make install
 		;;
     *)
