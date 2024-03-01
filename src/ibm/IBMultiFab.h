@@ -58,9 +58,8 @@ class IBMultiFab : public FabArray<IBFab<marker_t,gp_t>> {
       Array4<Real> realfield = realfab.array();  // real array
 
       amrex::ParallelFor(
-          ibbox, [=] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {
-            realfield(i, j, k, mfcomp) = ibMarkers(i, j, k, ibcomp);
-            realfield(i, j, k, mfcomp + 1) = ibMarkers(i, j, k, ibcomp + 1);
+          ibbox, 2, [=] AMREX_GPU_DEVICE(int i, int j, int k, int n) noexcept {
+            realfield(i, j, k, mfcomp + n) = ibMarkers(i, j, k, ibcomp + n);
           });
     }
   }

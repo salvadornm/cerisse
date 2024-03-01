@@ -4,10 +4,6 @@
 #include <CNS_K.h>
 #include <prob.h>
 
-// #ifdef AMREX_USE_GPIBM
-// #include <IBM.h>
-// #endif
-
 using namespace amrex;
 
 bool CNS::verbose = true;
@@ -43,7 +39,7 @@ CNS::CNS(Amr &papa, int lev, const Geometry &level_geom, const BoxArray &bl,
   }
 
 #ifdef AMREX_USE_GPIBM
-  IBM::ib.buildMFs(grids, dmap, level);
+  IBM::ib.build_mf(grids, dmap, level);
 #endif
 
   buildMetrics();
@@ -353,9 +349,9 @@ void CNS::postCoarseTimeStep(Real time) {
 // Called for each level from 0,1...nlevs-1
 void CNS::post_regrid(int lbase, int new_finest) {
 #ifdef AMREX_USE_GPIBM
-  IBM::ib.destroyMFs(level);
-  IBM::ib.buildMFs(grids, dmap, level);
-  // IBM::ib.computeMarkers(level);
+  IBM::ib.destroy_mf(level);
+  IBM::ib.build_mf(grids, dmap, level);
+  IBM::ib.computeMarkers(level);
   // IBM::ib.initialiseGPs(level);
 #endif
 
@@ -719,8 +715,8 @@ void CNS::writePlotFile(const std::string &dir, std::ostream &os,
 
 //----------------------------------------------------------------------modified
 #ifdef AMREX_USE_GPIBM
-  // plotMF.setVal(0.0_rt, cnt, 2, nGrow);
-  // IBM::ib.ibMFa[level]->copytoRealMF(plotMF, 0, cnt);
+  plotMF.setVal(0.0_rt, cnt, 2, nGrow);
+  IBM::ib.bmf_a[level]->copytoRealMF(plotMF, 0, cnt);
 #endif
   //------------------------------------------------------------------------------
 
