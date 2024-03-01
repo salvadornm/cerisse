@@ -521,7 +521,7 @@ void CNS::errorEst(TagBoxArray& tags, int /*clearval*/, int tagval, Real time,
     for (MFIter mfi(tags, TilingIfNotGPU()); mfi.isValid(); ++mfi) {
       const Box& bx = mfi.tilebox();
 
-      const Box bxg1 = amrex::grow(bx, 1);
+      const Box& bxg1 = amrex::grow(bx, 1);
       FArrayBox pres(bxg1, 1);
       const int* bc = 0; // dummy
       cns_derpres(bxg1, pres, 0, 1, Sg1[mfi], geom, cur_time, bc, level);

@@ -72,6 +72,7 @@ void CNS::full_prob_post_timestep(int /*iteration*/)
   amrex::Real time = state[State_Type].curTime();
   amrex::Real kinetic_e = 0.0;
   amrex::Real enstrophy = 0.0;
+  amrex::Real k_sgs = 0.0;
 
   if (level == 0) {
     if (amrex::ParallelDescriptor::IOProcessor()) {
@@ -103,23 +104,41 @@ void CNS::full_prob_post_timestep(int /*iteration*/)
       auto const& vortarrs = magvort.const_arrays();
 
       auto reduce_tuple = amrex::ParReduce(
-        TypeList<ReduceOpSum, ReduceOpSum>{}, TypeList<Real, Real>{}, S_new, IntVect(0),
-        [=] AMREX_GPU_DEVICE(int box_no, int i, int j, int k) -> GpuTuple<Real, Real> {
+        TypeList<ReduceOpSum, ReduceOpSum, ReduceOpSum>{}, 
+        TypeList<Real, Real, Real>{}, S_new, IntVect(0),
+        [=] AMREX_GPU_DEVICE(int box_no, int i, int j, int k) -> GpuTuple<Real, Real, Real> {
           const amrex::Real rho = sarrs[box_no](i, j, k, URHO);
           const amrex::Real rhoinv = 1.0 / rho;
-          const amrex::Real mx = sarrs[box_no](i, j, k, UMX);
-          const amrex::Real my = sarrs[box_no](i, j, k, UMY);
-          const amrex::Real mz = sarrs[box_no](i, j, k, UMZ);
+          const amrex::Real ux = sarrs[box_no](i, j, k, UMX) * rhoinv;
+          const amrex::Real uy = sarrs[box_no](i, j, k, UMY) * rhoinv;
+          const amrex::Real uz = sarrs[box_no](i, j, k, UMZ) * rhoinv;
           const amrex::Real mask = amrex::Real(marrs[box_no](i, j, k));
           const amrex::Real vol = volarr[box_no](i, j, k);
           const amrex::Real mvt = vortarrs[box_no](i, j, k);
 
-          amrex::Real ke = mask * vol * 0.5 * rhoinv * (mx * mx + my * my + mz * mz);
+          amrex::Real ke = mask * vol * 0.5 * rho * (ux * ux + uy * uy + uz * uz);
           amrex::Real en = mask * vol * 0.5 * rho * (mvt * mvt); // 0.5 * rho * omega^2
-          return {ke, en};
+
+          amrex::Real ksgs = 0.0;
+#if NUM_FIELD > 1
+          for (int nf = 1; nf <= NUM_FIELD; ++nf) {
+            const amrex::Real rhof = sarrs[box_no](i, j, k, URHO + nf * NVAR);
+            const amrex::Real rhofinv = 1.0 / rhof;
+            const amrex::Real ufx = sarrs[box_no](i, j, k, UMX + nf * NVAR) * rhofinv;
+            const amrex::Real ufy = sarrs[box_no](i, j, k, UMY + nf * NVAR) * rhofinv;
+            const amrex::Real ufz = sarrs[box_no](i, j, k, UMZ + nf * NVAR) * rhofinv;
+
+            ksgs += mask * vol * 0.5 * rhof * ((ufx - ux) * (ufx - ux) 
+                      + (ufy - uy) * (ufy - uy) + (ufz - uz) * (ufz - uz));
+          }
+          ksgs /= amrex::Real(NUM_FIELD);
+#endif
+
+          return {ke, en, ksgs};
         });
       kinetic_e += amrex::get<0>(reduce_tuple);
       enstrophy += amrex::get<1>(reduce_tuple);
+      k_sgs += amrex::get<2>(reduce_tuple);
     }
 
     // Reductions
@@ -127,10 +146,13 @@ void CNS::full_prob_post_timestep(int /*iteration*/)
       &kinetic_e, 1, amrex::ParallelDescriptor::IOProcessorNumber());
     amrex::ParallelDescriptor::ReduceRealSum(
       &enstrophy, 1, amrex::ParallelDescriptor::IOProcessorNumber());
+    amrex::ParallelDescriptor::ReduceRealSum(
+      &k_sgs, 1, amrex::ParallelDescriptor::IOProcessorNumber());
 
     if (amrex::ParallelDescriptor::IOProcessor()) {
       amrex::Print() << "TIME = " << time << '\n'
-                     << " SUM KE        = " << kinetic_e << '\n'
+                     << " SUM KE        = " << kinetic_e 
+                     << " of which SGS = " << k_sgs << '\n'
                      << " SUM ENSTROPHY = " << enstrophy << '\n';
 
       // Write the quantities at this time
@@ -143,6 +165,8 @@ void CNS::full_prob_post_timestep(int /*iteration*/)
                 << kinetic_e;
       data_log << std::setw(datwidth) << std::setprecision(datprecision)
                 << enstrophy;
+      data_log << std::setw(datwidth) << std::setprecision(datprecision)
+                << k_sgs;
       data_log << std::endl;      
     }
   }
