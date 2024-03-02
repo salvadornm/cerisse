@@ -10,3 +10,6 @@
 [submodule "old/amrsolver"]
 	path = old/amrsolver
 	url = https://github.com/Monal-Patel/amrsolver.git
+[submodule "lib/cgal"]
+	path = lib/cgal
+	url = https://github.com/CGAL/cgal.git

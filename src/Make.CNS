@@ -31,11 +31,11 @@ INCLUDE_LOCATIONS += $(AMR_SOLVER)/src/cls/
 VPATH_LOCATIONS   += $(AMR_SOLVER)/src/cls/
 
 ifeq ($(USE_GPIBM),TRUE)
-  INCLUDE_LOCATIONS += $(AMR_SOLVER)/lib/boost/include
-  LIBRARY_LOCATIONS += $(AMR_SOLVER)/../install/boost/lib
+  INCLUDE_LOCATIONS += $(AMR_SOLVER)/lib/install/boost/include
+  LIBRARY_LOCATIONS += $(AMR_SOLVER)/lib/install/boost/lib
 
-  INCLUDE_LOCATIONS += $(AMR_SOLVER)/lib/cgal/install/include
-  LIBRARY_LOCATIONS += $(AMR_SOLVER)/lib/cgal/install/lib/cmake/CGAL
+  INCLUDE_LOCATIONS += $(AMR_SOLVER)/lib/install/cgal/include
+  LIBRARY_LOCATIONS += $(AMR_SOLVER)/lib/install/cgal/lib/cmake/CGAL
   LIBRARIES += -lgmp
   
 
