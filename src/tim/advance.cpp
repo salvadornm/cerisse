@@ -239,6 +239,10 @@ void CNS::compute_rhs(MultiFab& statemf, Real dt, FluxRegister* fr_as_crse, Flux
     // source term evaluations once per fab from CPU, to be run on GPU.
     cls_h.cons2prims(mfi, state, prims);
 
+#ifdef AMREX_USE_GPIBM
+    IBM::ib.computeGPs(mfi, state, prims, cls_d, level);
+#endif
+
     // Fluxes including boundary/discontinuity corrections
     // Note: we are over-writing state (cons) with flux derivative
     prob_rhs.eflux(geom, mfi, prims, temp, state, cls_h);

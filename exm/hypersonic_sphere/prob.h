@@ -33,10 +33,8 @@ typedef closures_dt<indicies_t, visc_suth_t, cond_suth_t,
 typedef rhs_dt<riemann_t<false, ProbClosures>, no_diffusive_t, no_source_t>
     ProbRHS;
 
-typedef std::ratio<5,4> d_image;
+typedef std::ratio<3,5> d_image;
 typedef eib_t<2,2,d_image,ProbClosures> ProbIB;
-
-// typedef closures_derived_base_t<visc_suth_t, cond_suth_t, calorifically_perfect_gas_t, ProbParm> ProbClosures;
 
 void inline inputs() {
   ParmParse pp;
@@ -47,6 +45,15 @@ void inline inputs() {
   pp.add   ("ib.move",0); // 0=false, 1=true
   pp.add   ("ib.plot_surf",0); // 0=false, 1=true
 }
+
+// called for each ghost point
+// space and time varying
+// input arguments
+// output dq_bndry and q_bndry
+
+// void ibc(q,dq,closest_element) {
+
+// }
 
 // void inline inputs() {
 //   ParmParse pp;

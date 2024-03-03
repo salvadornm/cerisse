@@ -352,9 +352,8 @@ void CNS::post_regrid(int lbase, int new_finest) {
   IBM::ib.destroy_mf(level);
   IBM::ib.build_mf(grids, dmap, level);
   IBM::ib.computeMarkers(level);
-  // IBM::ib.initialiseGPs(level);
+  IBM::ib.initialiseGPs(level);
 #endif
-
 }
 
 void CNS::errorEst(TagBoxArray &tags, int /*clearval*/, int /*tagval*/,
