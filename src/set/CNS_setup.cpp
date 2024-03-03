@@ -142,12 +142,12 @@ void CNS::variableSetUp() {
   // Pressure
   derive_lst.add("pressure", IndexType::TheCellType(), 1, derpres,
                  the_same_box);
-  derive_lst.addComponent("pressure", desc_lst, State_Type, h_prob_closures->URHO, h_prob_closures->NCONS);
+  derive_lst.addComponent("pressure", desc_lst, State_Type, 0, h_prob_closures->NCONS);
 
   // Temperature
   derive_lst.add("temperature", IndexType::TheCellType(), 1, dertemp,
                  the_same_box);
-  derive_lst.addComponent("temperature", desc_lst, State_Type, h_prob_closures->URHO, h_prob_closures->NCONS);
+  derive_lst.addComponent("temperature", desc_lst, State_Type, 0, h_prob_closures->NCONS);
 
 //   // Velocities
 //   derive_lst.add("x_velocity", amrex::IndexType::TheCellType(), 1, dervel,

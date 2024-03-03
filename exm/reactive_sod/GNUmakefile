@@ -1,0 +1,34 @@
+# AMReX
+DIM = 3
+COMP = gnu
+PRECISION = DOUBLE
+
+# Profiling
+TINY_PROFILE = FALSE
+
+# Performance
+USE_MPI = TRUE
+USE_OMP = FALSE
+USE_CUDA = FALSE
+
+# Debugging
+DEBUG = FALSE
+
+# PelePhysics
+EOS_MODEL := GAMMALAW
+TRANSPORT_MODEL := CONSTANT
+CHEMISTRY_MODEL := Null
+
+# CNS
+AMREX_NO_PROBINIT = TRUE
+USE_GPIBM = FALSE
+USE_EB = FALSE
+USE_PELEPHYSICS = TRUE
+
+# GNU Make
+AMR_SOLVER = $(abspath ../../)
+AMREX_HOME = $(abspath ../../lib/amrex)
+PELE_PHYSICS_HOME = $(abspath ../../lib/PelePhysics)
+
+CEXE_headers += prob.h
+include $(AMR_SOLVER)/src/Make.CNS

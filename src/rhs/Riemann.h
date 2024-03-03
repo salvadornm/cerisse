@@ -39,7 +39,7 @@ class riemann_t {
     //             });
 
     const Box& bxg1 = amrex::grow(bx, 1);
-    FArrayBox slopef(bxg1, cls_t::NCONS, The_Async_Arena());
+    FArrayBox slopef(bxg1, cls_t::NCONS+1, The_Async_Arena()); // +1 because of the density
     const Array4<Real>& slope = slopef.array();
 
     // x-direction
@@ -117,9 +117,9 @@ class riemann_t {
   AMREX_GPU_DEVICE AMREX_FORCE_INLINE void riemann_prob(
       const Real gamma, const Real smallp, const Real /*smallr*/, const Real rl,
       const Real ul, const Real pl, const Real ut1l, const Real ut2l,
-      const Real rr, const Real ur, const Real pr, const Real ut1r,
-      const Real ut2r, Real& flxrho, Real& flxu, Real& flxut, Real& flxutt,
-      Real& flxe) const {
+      const Real Yl[NUM_SPECIES], const Real rr, const Real ur, const Real pr,
+      const Real ut1r, const Real ut2r, const Real Yr[NUM_SPECIES], Real& flxu,
+      Real& flxut, Real& flxutt, Real& flxe, Real flxrY[NUM_SPECIES]) const {
     constexpr Real weakwv = Real(1.e-3);
     constexpr Real small = Real(1.e-6);
 
@@ -178,7 +178,7 @@ class riemann_t {
       ustar = Real(0.5) * (ustarm + ustarp);
     }
 
-    Real ro, uo, po, sgnm, utrans1, utrans2;
+    Real ro, uo, po, sgnm, utrans1, utrans2, Y[NUM_SPECIES];
     if (ustar > Real(0.)) {
       ro = rl;
       uo = ul;
@@ -186,6 +186,9 @@ class riemann_t {
       sgnm = Real(1.);
       utrans1 = ut1l;
       utrans2 = ut2l;
+      for (int n = 0; n < NUM_SPECIES; n++) {
+        Y[n] = Yl[n];
+      }
     } else if (ustar < Real(0.)) {
       ro = rr;
       uo = ur;
@@ -193,6 +196,9 @@ class riemann_t {
       sgnm = Real(-1.);
       utrans1 = ut1r;
       utrans2 = ut2r;
+      for (int n = 0; n < NUM_SPECIES; n++) {
+        Y[n] = Yr[n];
+      }
     } else {
       uo = Real(0.5) * (ur + ul);
       po = Real(0.5) * (pr + pl);
@@ -200,6 +206,9 @@ class riemann_t {
       sgnm = Real(1.);
       utrans1 = Real(0.5) * (ut1l + ut1r);
       utrans2 = Real(0.5) * (ut2l + ut2r);
+      for (int n = 0; n < NUM_SPECIES; n++) {
+        Y[n] = Real(0.5) * (Yl[n] + Yr[n]);
+      }
     }
     Real wosq = (Real(0.5) * (gamma - Real(1.)) * (pstar + po) + pstar) * ro;
     Real co = std::sqrt(gamma * po / ro);
@@ -231,7 +240,7 @@ class riemann_t {
       pgdnv = frac * pstar + (Real(1.) - frac) * po;
     }
 
-    flxrho = rgdnv * ugdnv;
+    // flxrho = rgdnv * ugdnv;
     flxu = rgdnv * ugdnv * ugdnv + pgdnv;
     flxut = rgdnv * ugdnv * utrans1;
     flxutt = rgdnv * ugdnv * utrans2;
@@ -239,12 +248,15 @@ class riemann_t {
         ugdnv * (Real(0.5) * rgdnv *
                      (ugdnv * ugdnv + utrans1 * utrans1 + utrans2 * utrans2) +
                  pgdnv / (gamma - Real(1.)) + pgdnv);
+    for (int n = 0; n < NUM_SPECIES; n++) {
+      flxrY[n] = rgdnv * ugdnv * Y[n];
+    }
   }
 
   AMREX_GPU_DEVICE AMREX_FORCE_INLINE void cns_slope_x(
       int i, int j, int k, const Array4<Real>& dq, const Array4<Real>& q,
       const cls_t& cls) const {
-    Real cspeed = sqrt(cls.gamma * cls.Rspec * q(i, j, k, cls.QT)) + 2.e-40;
+    Real cspeed = q(i, j, k, cls.QC) + 1.e-40;
     Real dlft = Real(0.5) *
                     (q(i, j, k, cls.QPRES) - q(i - 1, j, k, cls.QPRES)) /
                     cspeed -
@@ -287,12 +299,18 @@ class riemann_t {
     dq(i, j, k, 2) = d2;
     dq(i, j, k, 3) = d3;
     dq(i, j, k, 4) = d4;
+
+    for (int n = 0; n < NUM_SPECIES; ++n) {
+      dlft = q(i, j, k, cls.QFS + n) - q(i - 1, j, k, cls.QFS + n);
+      drgt = q(i + 1, j, k, cls.QFS + n) - q(i, j, k, cls.QFS + n);
+      dq(i, j, k, 5 + n) = limiter(dlft, drgt);
+    }
   }
 
   AMREX_GPU_DEVICE AMREX_FORCE_INLINE void cns_slope_y(
       int i, int j, int k, Array4<Real> const& dq, Array4<Real const> const& q,
       cls_t const& cls) const {
-    Real cspeed = sqrt(cls.gamma * cls.Rspec * q(i, j, k, cls.QT)) + 1.e-40;
+    Real cspeed = q(i, j, k, cls.QC) + 1.e-40;
     Real dlft = Real(0.5) *
                     (q(i, j, k, cls.QPRES) - q(i, j - 1, k, cls.QPRES)) /
                     cspeed -
@@ -335,12 +353,18 @@ class riemann_t {
     dq(i, j, k, 2) = d2;
     dq(i, j, k, 3) = d3;
     dq(i, j, k, 4) = d4;
+
+    for (int n = 0; n < NUM_SPECIES; ++n) {
+      dlft = q(i, j, k, cls.QFS + n) - q(i, j - 1, k, cls.QFS + n);
+      drgt = q(i, j + 1, k, cls.QFS + n) - q(i, j, k, cls.QFS + n);
+      dq(i, j, k, 5 + n) = limiter(dlft, drgt);
+    }
   }
 
   AMREX_GPU_DEVICE AMREX_FORCE_INLINE void cns_slope_z(
       int i, int j, int k, Array4<Real> const& dq, Array4<Real const> const& q,
       cls_t const& cls) const {
-    Real cspeed = sqrt(cls.gamma * cls.Rspec * q(i, j, k, cls.QT)) + 1.e-40;
+    Real cspeed = q(i, j, k, cls.QC) + 1.e-40;
     Real dlft = Real(0.5) *
                     (q(i, j, k, cls.QPRES) - q(i, j, k - 1, cls.QPRES)) /
                     cspeed -
@@ -383,12 +407,18 @@ class riemann_t {
     dq(i, j, k, 2) = d2;
     dq(i, j, k, 3) = d3;
     dq(i, j, k, 4) = d4;
+
+    for (int n = 0; n < NUM_SPECIES; ++n) {
+      dlft = q(i, j, k, cls.QFS + n) - q(i, j, k - 1, cls.QFS + n);
+      drgt = q(i, j, k + 1, cls.QFS + n) - q(i, j, k, cls.QFS + n);
+      dq(i, j, k, 5 + n) = limiter(dlft, drgt);
+    }
   }
 
   AMREX_GPU_DEVICE AMREX_FORCE_INLINE void cns_riemann_x(
       int i, int j, int k, Array4<Real> const& fx, Array4<Real> const& dq,
       Array4<Real> const& q, cls_t const& cls) const {
-    Real cspeed = sqrt(cls.gamma * cls.Rspec * q(i - 1, j, k, cls.QT)) + 1.e-40;
+    Real cspeed = q(i - 1, j, k, cls.QC) + 1.e-40;
     Real rl = q(i - 1, j, k, cls.QRHO) +
               Real(0.5) * ((dq(i - 1, j, k, 0) + dq(i - 1, j, k, 2)) / cspeed +
                            dq(i - 1, j, k, 1));
@@ -402,7 +432,7 @@ class riemann_t {
     Real ut1l = q(i - 1, j, k, cls.QV) + Real(0.5) * dq(i - 1, j, k, 3);
     Real ut2l = q(i - 1, j, k, cls.QW) + Real(0.5) * dq(i - 1, j, k, 4);
 
-    cspeed = sqrt(cls.gamma * cls.Rspec * q(i, j, k, cls.QT)) + 1.e-40;
+    cspeed = q(i, j, k, cls.QC) + 1.e-40;
     Real rr = q(i, j, k, cls.QRHO) -
               Real(0.5) *
                   ((dq(i, j, k, 0) + dq(i, j, k, 2)) / cspeed + dq(i, j, k, 1));
@@ -416,16 +446,26 @@ class riemann_t {
     Real ut1r = q(i, j, k, cls.QV) - Real(0.5) * dq(i, j, k, 3);
     Real ut2r = q(i, j, k, cls.QW) - Real(0.5) * dq(i, j, k, 4);
 
-    riemann_prob(cls.gamma, 1.0e-40, 1.0e-40, rl, ul, pl, ut1l, ut2l, rr, ur,
-                 pr, ut1r, ut2r, fx(i, j, k, cls.URHO), fx(i, j, k, cls.UMX),
-                 fx(i, j, k, cls.UMY), fx(i, j, k, cls.UMZ),
-                 fx(i, j, k, cls.UET));
+    Real Yl[NUM_SPECIES], Yr[NUM_SPECIES], flxrY[NUM_SPECIES];
+    for (int n = 0; n < NUM_SPECIES; ++n) {
+      Yl[n] = q(i - 1, j, k, cls.QFS + n) + Real(0.5) * dq(i - 1, j, k, 5 + n);
+      Yr[n] = q(i, j, k, cls.QFS + n) - Real(0.5) * dq(i, j, k, 5 + n);
+    }
+
+    const Real gamma = 0.5 * (q(i - 1, j, k, cls.QG) + q(i, j, k, cls.QG));
+    riemann_prob(gamma, 1.0e-40, 1.0e-40, rl, ul, pl, ut1l, ut2l, Yl, rr, ur,
+                 pr, ut1r, ut2r, Yr, fx(i, j, k, cls.UMX), fx(i, j, k, cls.UMY),
+                 fx(i, j, k, cls.UMZ), fx(i, j, k, cls.UET), flxrY);
+
+    for (int n = 0; n < NUM_SPECIES; ++n) {
+      fx(i, j, k, cls.UFS + n) = flxrY[n];
+    }
   }
 
   AMREX_GPU_DEVICE AMREX_FORCE_INLINE void cns_riemann_y(
       int i, int j, int k, Array4<Real> const& fy, Array4<Real const> const& dq,
       Array4<Real const> const& q, cls_t const& cls) const {
-    Real cspeed = sqrt(cls.gamma * cls.Rspec * q(i, j - 1, k, cls.QT)) + 1.e-40;
+    Real cspeed = q(i, j - 1, k, cls.QC) + 1.e-40;
     Real rl = q(i, j - 1, k, cls.QRHO) +
               Real(0.5) * ((dq(i, j - 1, k, 0) + dq(i, j - 1, k, 2)) / cspeed +
                            dq(i, j - 1, k, 1));
@@ -439,7 +479,7 @@ class riemann_t {
     Real ut1l = q(i, j - 1, k, cls.QU) + Real(0.5) * dq(i, j - 1, k, 3);
     Real ut2l = q(i, j - 1, k, cls.QW) + Real(0.5) * dq(i, j - 1, k, 4);
 
-    cspeed = sqrt(cls.gamma * cls.Rspec * q(i, j, k, cls.QT)) + 1.e-40;
+    cspeed = q(i, j, k, cls.QC) + 1.e-40;
     Real rr = q(i, j, k, cls.QRHO) -
               Real(0.5) *
                   ((dq(i, j, k, 0) + dq(i, j, k, 2)) / cspeed + dq(i, j, k, 1));
@@ -453,16 +493,25 @@ class riemann_t {
     Real ut1r = q(i, j, k, cls.QU) - Real(0.5) * dq(i, j, k, 3);
     Real ut2r = q(i, j, k, cls.QW) - Real(0.5) * dq(i, j, k, 4);
 
-    riemann_prob(cls.gamma, 1.0e-40, 1.0e-40, rl, ul, pl, ut1l, ut2l, rr, ur,
-                 pr, ut1r, ut2r, fy(i, j, k, cls.URHO), fy(i, j, k, cls.UMY),
-                 fy(i, j, k, cls.UMX), fy(i, j, k, cls.UMZ),
-                 fy(i, j, k, cls.UET));
+    Real Yl[NUM_SPECIES], Yr[NUM_SPECIES], flxrY[NUM_SPECIES];
+    for (int n = 0; n < NUM_SPECIES; ++n) {
+      Yl[n] = q(i, j - 1, k, cls.QFS + n) + Real(0.5) * dq(i, j - 1, k, 5 + n);
+      Yr[n] = q(i, j, k, cls.QFS + n) - Real(0.5) * dq(i, j, k, 5 + n);
+    }
+    const Real gamma = 0.5 * (q(i, j - 1, k, cls.QG) + q(i, j, k, cls.QG));
+    riemann_prob(gamma, 1.0e-40, 1.0e-40, rl, ul, pl, ut1l, ut2l, Yl, rr, ur,
+                 pr, ut1r, ut2r, Yr, fy(i, j, k, cls.UMY), fy(i, j, k, cls.UMX),
+                 fy(i, j, k, cls.UMZ), fy(i, j, k, cls.UET), flxrY);
+
+    for (int n = 0; n < NUM_SPECIES; ++n) {
+      fy(i, j, k, cls.UFS + n) = flxrY[n];
+    }
   }
 
   AMREX_GPU_DEVICE AMREX_FORCE_INLINE void cns_riemann_z(
       int i, int j, int k, Array4<Real> const& fz, Array4<Real const> const& dq,
       Array4<Real const> const& q, cls_t const& cls) const {
-    Real cspeed = sqrt(cls.gamma * cls.Rspec * q(i, j, k + 1, cls.QT)) + 1.e-40;
+    Real cspeed = q(i, j, k - 1, cls.QC) + 1.e-40;
     Real rl = q(i, j, k - 1, cls.QRHO) +
               Real(0.5) * ((dq(i, j, k - 1, 0) + dq(i, j, k - 1, 2)) / cspeed +
                            dq(i, j, k - 1, 1));
@@ -476,7 +525,7 @@ class riemann_t {
     Real ut1l = q(i, j, k - 1, cls.QU) + Real(0.5) * dq(i, j, k - 1, 3);
     Real ut2l = q(i, j, k - 1, cls.QV) + Real(0.5) * dq(i, j, k - 1, 4);
 
-    cspeed = sqrt(cls.gamma * cls.Rspec * q(i, j, k, cls.QT)) + 1.e-40;
+    cspeed = q(i, j, k, cls.QC) + 1.e-40;
     Real rr = q(i, j, k, cls.QRHO) -
               Real(0.5) *
                   ((dq(i, j, k, 0) + dq(i, j, k, 2)) / cspeed + dq(i, j, k, 1));
@@ -490,10 +539,19 @@ class riemann_t {
     Real ut1r = q(i, j, k, cls.QU) - Real(0.5) * dq(i, j, k, 3);
     Real ut2r = q(i, j, k, cls.QV) - Real(0.5) * dq(i, j, k, 4);
 
-    riemann_prob(cls.gamma, 1.0e-40, 1.0e-40, rl, ul, pl, ut1l, ut2l, rr, ur,
-                 pr, ut1r, ut2r, fz(i, j, k, cls.URHO), fz(i, j, k, cls.UMZ),
-                 fz(i, j, k, cls.UMX), fz(i, j, k, cls.UMY),
-                 fz(i, j, k, cls.UET));
+    Real Yl[NUM_SPECIES], Yr[NUM_SPECIES], flxrY[NUM_SPECIES];
+    for (int n = 0; n < NUM_SPECIES; ++n) {
+      Yl[n] = q(i, j, k - 1, cls.QFS + n) + Real(0.5) * dq(i, j, k - 1, 5 + n);
+      Yr[n] = q(i, j, k, cls.QFS + n) - Real(0.5) * dq(i, j, k, 5 + n);
+    }
+    const Real gamma = 0.5 * (q(i - 1, j, k, cls.QG) + q(i, j, k, cls.QG));
+    riemann_prob(gamma, 1.0e-40, 1.0e-40, rl, ul, pl, ut1l, ut2l, Yl, rr, ur,
+                 pr, ut1r, ut2r, Yr, fz(i, j, k, cls.UMZ), fz(i, j, k, cls.UMX),
+                 fz(i, j, k, cls.UMY), fz(i, j, k, cls.UET), flxrY);
+
+    for (int n = 0; n < NUM_SPECIES; ++n) {
+      fz(i, j, k, cls.UFS + n) = flxrY[n];
+    }
   }
 };
 

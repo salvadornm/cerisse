@@ -26,18 +26,29 @@ cns_estdt(Box const& bx, Array4<Real const> const& state,
   for (int k = lo.z; k <= hi.z; ++k) {
     for (int j = lo.y; j <= hi.y; ++j) {
       for (int i = lo.x; i <= hi.x; ++i) {
-        Real rho = state(i, j, k, cls.URHO);
+        Real rho = 0.0;
+        for (int n = 0; n < NUM_SPECIES; ++n) {
+          rho += state(i, j, k, cls.UFS + n);
+        }
         Real mx = state(i, j, k, cls.UMX);
         Real my = state(i, j, k, cls.UMY);
-        Real mz = state(i, j, k, cls.UMY);
+        Real mz = state(i, j, k, cls.UMZ);
         Real rhoinv = Real(1.0) / max(rho, 1.0e-40);
         Real vx = mx * rhoinv;
         Real vy = my * rhoinv;
         Real vz = mz * rhoinv;
         Real ke = Real(0.5) * rho * (vx * vx + vy * vy + vz * vz);
-        Real rhoei = (state(i, j, k, cls.UET) - ke);
-        Real p = (cls.gamma - Real(1.0)) * rhoei;
-        Real cs = std::sqrt(cls.gamma * p * rhoinv);
+        Real ei = (state(i, j, k, cls.UET) - ke) * rhoinv;
+        Real Y[NUM_SPECIES];
+        for (int n = 0; n < NUM_SPECIES; ++n) {
+          Y[n] = state(i, j, k, cls.UFS + n) * rhoinv;
+          // if (Y[n] < 0.0) {
+          //   std::cout << "Y[" << n << "](" << i << ", " << j << ", " << k
+          //             << ") = " << Y[n] << std::endl;
+          // }
+        }
+        Real cs;
+        cls.RYE2Cs(rho, Y, ei, cs);
         Real dtx = dx[0] / (Math::abs(vx) + cs);
         Real dty = dx[1] / (Math::abs(vy) + cs);
         Real dtz = dx[2] / (Math::abs(vz) + cs);
@@ -53,7 +64,7 @@ AMREX_GPU_DEVICE AMREX_FORCE_INLINE void pointCFL(
     int i, int j, int k, Array2D<Real, 0, 2, 0, 2>& array,
     const Array4<const Real>& prims, const PROB::ProbClosures& cls,
     const auto dx, Real dt) noexcept {
-  Real sos = std::sqrt(cls.gamma * cls.Rspec * prims(i, j, k, cls.QT));
+  Real sos = prims(i, j, k, cls.QC);
   //
   for (int idir = 0; idir < AMREX_SPACEDIM; idir++) {
     array(idir, 0) =
@@ -69,17 +80,17 @@ AMREX_GPU_DEVICE AMREX_FORCE_INLINE void pointCFL(
   }
 }
 
-AMREX_GPU_DEVICE AMREX_FORCE_INLINE void cns_compute_temperature(
-    int i, int j, int k, Array4<Real> const& u,
-    const PROB::ProbClosures& cls) noexcept {
-  Real rhoinv = Real(1.0) / u(i, j, k, cls.URHO);
-  Real mx = u(i, j, k, cls.UMX);
-  Real my = u(i, j, k, cls.UMY);
-  Real mz = u(i, j, k, cls.UMZ);
-  Real rhoeint =
-      u(i, j, k, cls.UET) - Real(0.5) * rhoinv * (mx * mx + my * my + mz * mz);
-  // u(i,j,k,UTEMP) = rhoinv * rhoeint * (Real(1.0)/parm.cv);
-}
+// AMREX_GPU_DEVICE AMREX_FORCE_INLINE void cns_compute_temperature(
+//     int i, int j, int k, Array4<Real> const& u,
+//     const PROB::ProbClosures& cls) noexcept {
+//   Real rhoinv = Real(1.0) / u(i, j, k, cls.URHO);
+//   Real mx = u(i, j, k, cls.UMX);
+//   Real my = u(i, j, k, cls.UMY);
+//   Real mz = u(i, j, k, cls.UMZ);
+//   Real rhoeint =
+//       u(i, j, k, cls.UET) - Real(0.5) * rhoinv * (mx * mx + my * my + mz * mz);
+//   // u(i,j,k,UTEMP) = rhoinv * rhoeint * (Real(1.0)/parm.cv);
+// }
 
 inline void derpres(const Box& bx, FArrayBox& derfab, int dcomp, int /*ncomp*/,
                     const FArrayBox& datafab, const Geometry& /*geomdata*/,
@@ -88,16 +99,16 @@ inline void derpres(const Box& bx, FArrayBox& derfab, int dcomp, int /*ncomp*/,
   auto pfab = derfab.array(dcomp);
   PROB::ProbClosures const* cls = CNS::d_prob_closures;
 
-  amrex::ParallelFor(bx, [=] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {
-    // cons2P
-    Real rhoinv = 1.0_rt / dat(i, j, k, cls->URHO);
-    Real mx = dat(i, j, k, cls->UMX);
-    Real my = dat(i, j, k, cls->UMY);
-    Real mz = dat(i, j, k, cls->UMZ);
-    Real rhoeint =
-        dat(i, j, k, cls->UET) - Real(0.5) * rhoinv * (mx * mx + my * my + mz * mz);
-    pfab(i, j, k) = (cls->gamma - Real(1.0)) * rhoeint;
-  });
+  // amrex::ParallelFor(bx, [=] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {
+  //   // cons2P
+  //   Real rhoinv = 1.0_rt / dat(i, j, k, cls->URHO);
+  //   Real mx = dat(i, j, k, cls->UMX);
+  //   Real my = dat(i, j, k, cls->UMY);
+  //   Real mz = dat(i, j, k, cls->UMZ);
+  //   Real rhoeint =
+  //       dat(i, j, k, cls->UET) - Real(0.5) * rhoinv * (mx * mx + my * my + mz * mz);
+  //   pfab(i, j, k) = (cls->gamma - Real(1.0)) * rhoeint;
+  // });
 }
 
 inline void dertemp(const Box& bx, FArrayBox& derfab, int dcomp, int /*ncomp*/,
@@ -107,16 +118,16 @@ inline void dertemp(const Box& bx, FArrayBox& derfab, int dcomp, int /*ncomp*/,
   auto Tfab = derfab.array(dcomp);
   PROB::ProbClosures const* cls = CNS::d_prob_closures;
 
-  amrex::ParallelFor(bx, [=] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {
-    // cons2T
-    Real rhoinv = 1.0_rt / dat(i, j, k, cls->URHO);
-    Real mx = dat(i, j, k, cls->UMX);
-    Real my = dat(i, j, k, cls->UMY);
-    Real mz = dat(i, j, k, cls->UMZ);
-    Real rhoeint =
-        dat(i, j, k, cls->UET) - Real(0.5) * rhoinv * (mx * mx + my * my + mz * mz);
-    Tfab(i, j, k) = (rhoeint * rhoinv) / cls->cv;
-  });
+  // amrex::ParallelFor(bx, [=] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {
+  //   // cons2T
+  //   Real rhoinv = 1.0_rt / dat(i, j, k, cls->URHO);
+  //   Real mx = dat(i, j, k, cls->UMX);
+  //   Real my = dat(i, j, k, cls->UMY);
+  //   Real mz = dat(i, j, k, cls->UMZ);
+  //   Real rhoeint =
+  //       dat(i, j, k, cls->UET) - Real(0.5) * rhoinv * (mx * mx + my * my + mz * mz);
+  //   Tfab(i, j, k) = (rhoeint * rhoinv) / cls->cv;
+  // });
 }
 
 inline void dervel(const Box& bx, FArrayBox& derfab, int dcomp, int /*ncomp*/,
