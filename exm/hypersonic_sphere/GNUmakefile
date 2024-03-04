@@ -11,5 +11,5 @@ CUDA_ARCH=8.0
 AMR_SOLVER = $(abspath ../../)
 AMREX_HOME = $(abspath ../../lib/amrex)
 
-include ./Make.package
+CEXE_headers += prob.H
 include $(AMR_SOLVER)/src/Make.CNS
