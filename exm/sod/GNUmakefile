@@ -16,5 +16,4 @@ AMR_SOLVER = $(abspath ../../)
 AMREX_HOME = $(abspath ../../lib/amrex)
 
 CEXE_headers += prob.h
-include ./Make.package
 include $(AMR_SOLVER)/src/Make.CNS

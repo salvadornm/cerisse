@@ -30,7 +30,6 @@ class riemann_t {
     const GpuArray<Real, AMREX_SPACEDIM> dxinv = geom.InvCellSizeArray();
     const Box& bx = mfi.tilebox();
     const Box& bxg = mfi.growntilebox(cls_t::NGHOST);
-    const Box& bxn = mfi.grownnodaltilebox(-1, 0);  // 0,N+1 all directions
 
     // zero rhs
     // ParallelFor(bxg, cls_t::NCONS,

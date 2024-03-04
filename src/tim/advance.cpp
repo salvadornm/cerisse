@@ -227,11 +227,11 @@ void CNS::compute_rhs(MultiFab& statemf, Real dt, FluxRegister* fr_as_crse, Flux
   for (MFIter mfi(statemf, false); mfi.isValid(); ++mfi) {
     Array4<Real> const& state = statemf.array(mfi);
 
-    const Box& bxgnodal = mfi.grownnodaltilebox(-1, 0);  // extent is 0,N_cell+1
+    // const Box& bxgnodal = mfi.grownnodaltilebox(-1, 1);  // extent is 0,N_cell+1
     const Box& bxg = mfi.growntilebox(cls_d.NGHOST);
 
     FArrayBox primf(bxg, cls_d.NPRIM , The_Async_Arena());
-    FArrayBox tempf(bxgnodal, cls_d.NCONS, The_Async_Arena());
+    FArrayBox tempf(bxg, cls_d.NCONS, The_Async_Arena());
     Array4<Real> const& temp = tempf.array();
     Array4<Real> const& prims= primf.array();
 
