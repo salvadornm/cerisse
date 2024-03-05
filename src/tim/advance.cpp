@@ -245,7 +245,7 @@ void CNS::compute_rhs(MultiFab& statemf, Real dt, FluxRegister* fr_as_crse, Flux
 
     // Fluxes including boundary/discontinuity corrections
     // Note: we are over-writing state (cons) with flux derivative
-    prob_rhs.eflux(geom, mfi, prims, temp, state, cls_h);
+    prob_rhs.eflux(geom, mfi, prims, temp, state, cls_d);
     prob_rhs.dflux(); //(prims,cons,nflx)
 
     // Source terms, including update mask (e.g inside IB)

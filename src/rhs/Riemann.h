@@ -38,14 +38,14 @@ class riemann_t {
     //             });
 
     const Box& bxg1 = amrex::grow(bx, 1);
-    FArrayBox slopef(bxg1, cls_t::NCONS+1, The_Async_Arena()); // +1 because of the density
+    FArrayBox slopef(bxg, cls_t::NCONS+1, The_Async_Arena()); // +1 because of the density
     const Array4<Real>& slope = slopef.array();
 
     // x-direction
     int cdir = 0;
     const Box& xslpbx = amrex::grow(bx, cdir, 1);
     amrex::ParallelFor(
-        bx, [=, *this] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {
+        xslpbx, [=, *this] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {
           this->cns_slope_x(i, j, k, slope, prims, cls);
         });
     const Box& xflxbx = amrex::surroundingNodes(bx, cdir);

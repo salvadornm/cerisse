@@ -47,7 +47,7 @@ static constexpr int QFS=8;
 
 static constexpr int NCONS=UFS + NUM_SPECIES;
 static constexpr int NPRIM=QFS + NUM_SPECIES;
-static constexpr int NGHOST=2; // TODO: make it an automatic parameter
+static constexpr int NGHOST=3; // TODO: make it an automatic parameter
 };
 
 #endif
