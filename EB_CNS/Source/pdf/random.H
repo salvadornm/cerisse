@@ -55,92 +55,110 @@ public:
    */
   void generate_new(amrex::Real sqrtdt_coarse, int rand_mode, int sync_mode)
   {
-    if (_lev == 0) { // only do this at the beginning of a coarse timestep
-      if (amrex::ParallelDescriptor::IOProcessor()) {
-        const amrex::Real sqrtdt =
-          sqrtdt_coarse / sqrt(_num_step); // sqrtdt at this level
+    if (_lev > 0) return; // only do this at the beginning of a coarse timestep
 
-        if (rand_mode == 0 || rand_mode == 1) {
-          // generate random normal //
-          amrex::Real mean, stdd; // store for normalisation
-          for (int s = 0; s < _num_step; ++s) {
-            for (int d = 0; d < _num_rand; ++d) {
-              mean = 0.0;
-              stdd = 0.0;
+    if (amrex::ParallelDescriptor::IOProcessor()) {
+      const amrex::Real sqrtdt =
+        sqrtdt_coarse / sqrt(_num_step); // sqrtdt at this level
+
+      if (rand_mode == 0 || rand_mode == 1) {
+        // generate random normal //
+        amrex::Real mean, stdd; // store for normalisation
+        for (int s = 0; s < _num_step; ++s) {
+          for (int d = 0; d < _num_rand; ++d) {
+            mean = 0.0;
+            stdd = 0.0;
+            for (int nf = 0; nf < NUM_FIELD; ++nf) {
+              amrex::Real rand = amrex::RandomNormal(0.0, sqrtdt);
+              mean += rand;
+              stdd += rand * rand;
+              raw_data(s, d, nf) = rand;
+            }
+
+            // normalisation //
+            if (rand_mode == 1) {
+              mean /= NUM_FIELD;
+              stdd = sqrt(stdd / NUM_FIELD - mean * mean);
               for (int nf = 0; nf < NUM_FIELD; ++nf) {
-                amrex::Real rand = amrex::RandomNormal(0.0, sqrtdt);
-                mean += rand;
-                stdd += rand * rand;
-                raw_data(s, d, nf) = rand;
-              }
-
-              // normalisation //
-              if (rand_mode == 1) {
-                mean /= NUM_FIELD;
-                stdd = sqrt(stdd / NUM_FIELD - mean * mean);
-                for (int nf = 0; nf < NUM_FIELD; ++nf) {
-                  raw_data(s, d, nf) = (raw_data(s, d, nf) - mean) * sqrtdt / stdd;
-                }
-              }
-            }
-          }
-        } else if (rand_mode == 2) {
-          // generate random [1,-1] //
-          amrex::Real corr_fac =
-            (NUM_FIELD % 2 == 0)
-              ? 1.0
-              : sqrt(amrex::Real(NUM_FIELD) /
-                     amrex::Real(NUM_FIELD - 1)); // to give a variance of exactly 1
-          for (int s = 0; s < _num_step; ++s) {
-            for (int d = 0; d < AMREX_SPACEDIM; ++d) {
-              for (int nf = 0; nf < NUM_FIELD - 1; nf += 2) {
-                raw_data(s, d, nf) = sqrtdt * corr_fac *
-                                     (2.0 * amrex::Real(amrex::Random_int(2)) - 1.0);
-                raw_data(s, d, nf + 1) = -raw_data(s, d, nf);
-              }
-              if (NUM_FIELD % 2 == 1) {
-                int swap_id = amrex::Random_int(NUM_FIELD - 2);
-                raw_data(s, d, NUM_FIELD - 1) = raw_data(s, d, swap_id);
-                raw_data(s, d, swap_id) = 0.0;
-              }
-            }
-          }
-        } else if (rand_mode == 3) {
-          AMREX_ALWAYS_ASSERT_WITH_MESSAGE(NUM_FIELD % 2 == 0, 
-                                           "ERROR: Antithetic sampling must have even NUM_FIELD");
-          // generate random normal //
-          for (int s = 0; s < _num_step; ++s) {
-            for (int d = 0; d < _num_rand; ++d) {
-              for (int nf = 0; nf < NUM_FIELD / 2; ++nf) {
-                amrex::Real rand = amrex::RandomNormal(0.0, sqrtdt);
-                raw_data(s, d, nf) = rand;
-                raw_data(s, d, NUM_FIELD / 2 + nf) = -rand;
+                raw_data(s, d, nf) = (raw_data(s, d, nf) - mean) * sqrtdt / stdd;
               }
             }
           }
         }
-
-        // replace all random numbers with the first ones if sync_mode == 1 //
-        if (sync_mode == 1) {
+      } else if (rand_mode == 2) {
+        // generate random [1,-1] //
+        amrex::Real corr_fac =
+          (NUM_FIELD % 2 == 0)
+            ? 1.0
+            : sqrt(amrex::Real(NUM_FIELD) /
+                    amrex::Real(NUM_FIELD - 1)); // to give a variance of exactly 1
+        for (int s = 0; s < _num_step; ++s) {
           for (int d = 0; d < AMREX_SPACEDIM; ++d) {
-            for (int nf = 0; nf < NUM_FIELD; ++nf) {
-              raw_data(0, d, nf) /=
-                sqrt(_num_step); // this is to account for the fact that each step
-                                 // is not independent now
-              for (int s = 1; s < _num_step; ++s) {
-                raw_data(s, d, nf) = raw_data(0, d, nf);
-              }
+            for (int nf = 0; nf < NUM_FIELD - 1; nf += 2) {
+              raw_data(s, d, nf) = sqrtdt * corr_fac *
+                                    (2.0 * amrex::Real(amrex::Random_int(2)) - 1.0);
+              raw_data(s, d, nf + 1) = -raw_data(s, d, nf);
+            }
+            if (NUM_FIELD % 2 == 1) {
+              int swap_id = amrex::Random_int(NUM_FIELD - 2);
+              raw_data(s, d, NUM_FIELD - 1) = raw_data(s, d, swap_id);
+              raw_data(s, d, swap_id) = 0.0;
+            }
+          }
+        }
+      } else if (rand_mode == 3) {
+        AMREX_ALWAYS_ASSERT_WITH_MESSAGE(NUM_FIELD % 2 == 0, 
+                                          "ERROR: Antithetic sampling must have even NUM_FIELD");
+        // generate random normal //
+        for (int s = 0; s < _num_step; ++s) {
+          for (int d = 0; d < _num_rand; ++d) {
+            for (int nf = 0; nf < NUM_FIELD / 2; ++nf) {
+              amrex::Real rand = amrex::RandomNormal(0.0, sqrtdt);
+              raw_data(s, d, nf) = rand;
+              raw_data(s, d, NUM_FIELD / 2 + nf) = -rand;
+            }
+            // shuffle
+            for (int nf = 0; nf < NUM_FIELD / 2; ++nf) {
+              int swap_id = amrex::Random_int(NUM_FIELD - 1);
+              amrex::Real tmp = raw_data(s, d, nf);
+              raw_data(s, d, nf) = raw_data(s, d, swap_id);
+              raw_data(s, d, swap_id) = tmp;
             }
           }
         }
       }
 
-      // broadcast to all ranks //
-      amrex::ParallelDescriptor::Bcast(
-        _data.data(), _data.size(), amrex::ParallelDescriptor::IOProcessorNumber());
+      // replace all random numbers with the first ones if sync_mode == 1 //
+      if (sync_mode == 1) {
+        for (int d = 0; d < AMREX_SPACEDIM; ++d) {
+          for (int nf = 0; nf < NUM_FIELD; ++nf) {
+            // raw_data(0, d, nf) /=
+            //   sqrt(_num_step); // this is to account for the fact that each step
+            //                    // is not independent now
+            // for (int s = 1; s < _num_step; ++s) {
+            //   raw_data(s, d, nf) = raw_data(0, d, nf);
+            // }
 
-      // amrex::Print() << "** Called WienerProcess.generate_new()" << std::endl;
+            // or
+
+            amrex::Real sum = 0;
+            for (int s = 0; s < _num_step; ++s) {
+              sum += raw_data(s, d, nf);
+            }
+            sum /= _num_step;
+            for (int s = 0; s < _num_step; ++s) {
+              raw_data(s, d, nf) = sum;
+            }
+          }
+        }
+      }
     }
+
+    // broadcast to all ranks //
+    amrex::ParallelDescriptor::Bcast(
+      _data.data(), _data.size(), amrex::ParallelDescriptor::IOProcessorNumber());
+
+    // amrex::Print() << "** Called WienerProcess.generate_new()" << std::endl;
   }
 
   /**
