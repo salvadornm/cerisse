@@ -18,11 +18,8 @@
 /wrk/
 
 #lib folder, excluding install script
-/lib/PelePhysics
-/lib/sundials
-/lib/Amrvis
-/lib/amrex
-/lib/install/
+/lib/*
+!/lib/install_script
 
 /tst/AMReX_regtests/output/AMReX-benchmarks/*
 /tst/AMReX_regtests/output/AMReX-tests/*
