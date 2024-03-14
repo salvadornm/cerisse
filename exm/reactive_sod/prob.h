@@ -15,29 +15,23 @@ namespace PROB {
 
 // problem parameters
 struct ProbParm {
-  // Real p_l = 71730;                         // pressure [0.1*Pa]
-  // Real u_l = 0.0;                           // velocity [cm/s]
-  // Real rho_l = 0.072e-3;                    // density  [g/cm^3]
-  // Real e_l;                                 // internal energy
-  GpuArray<Real, NUM_SPECIES> Y_l = {1.0};  // mass fractions [-]
+  Real rho_l = 0.072;  // density  [kg/m^3]
+  Real u_l = 0.0;      // velocity [m/s]
+  Real p_l = 7173.0;   // pressure [Pa]
+  GpuArray<Real, NUM_SPECIES> Y_l = {
+      0.01736973, 0.13784636, 0., 0.,        0.,
+      0.,         0.,         0., 0.84478391};  // mass fractions [-]
 
-  // Real p_r = 355940;
-  // Real u_r = -48734;
-  // Real rho_r = 0.18075e-3;
-  // Real e_r;
-  GpuArray<Real, NUM_SPECIES> Y_r = {1.0};
-
-  Real p_l = 1.0;
-  Real p_r = 0.1;
-  Real rho_l = 1.0;
-  Real rho_r = 0.125;
-  Real u_l = 0.0;
-  Real u_r = 0.0;
+  Real rho_r = 0.18075;
+  Real u_r = -487.34;
+  Real p_r = 35594.0;
+  GpuArray<Real, NUM_SPECIES> Y_r = {0.01736973, 0.13784636, 0., 0.,        0.,
+                                     0.,         0.,         0., 0.84478391};
 };
 
 // these two are better to keep in setup/index?
-inline Vector<std::string> cons_vars_names = {"Xmom", "Ymom", "Zmom", "Energy", "SpeciesDensity"};
-inline Vector<int> cons_vars_type = {1, 2, 3, 0, 0};
+inline Vector<std::string> cons_vars_names = indicies_t::get_cons_vars_names();
+inline Vector<int> cons_vars_type = indicies_t::get_cons_vars_type();
 
 typedef closures_dt<indicies_t, visc_suth_t, cond_suth_t,
                     multispecies_gas_t<indicies_t>>
