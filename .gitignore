@@ -17,6 +17,9 @@
 
 /wrk/
 
+#temp folder for testing
+/exm/tmp
+
 #lib folder, excluding install script
 /lib/*
 !/lib/install_script

@@ -1,7 +1,7 @@
 # Simulation time
 # start time is assumed to be 0, unless re-starting
 max_step  = 200
-stop_time = 2.0
+stop_time = 0.2
 time_step = 0.001 # at base level, higher level time step is computed based on the number of subcycles (depending on the subcycling strategy). stop_time = max_step*time_step
 # or
 #cfl = 1.0
@@ -23,7 +23,7 @@ cns.screen_output = 1 # 0=quiet, 1=verbose
 cns.verbose = 1       # 0=quiet, 1=verbose
 
 # Refinement and regridding 
-amr.n_cell          = 64 16 16
+amr.n_cell          = 200 16 16
 amr.max_level       = 0     # maximum level number allowed
 amr.ref_ratio       = 2 2 2 # refinement ratio per level
 amr.regrid_int      = 2 2 2 # how often to regrid per level

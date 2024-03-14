@@ -106,14 +106,14 @@ that may be useful.
 The names follow in the **cons_var_names** array
 
 ```
-inline Vector<std::string> cons_vars_names={"Density","Xmom","Ymom","Zmom","Energy"};
+inline Vector<std::string> cons_vars_names={"Xmom","Ymom","Zmom","Energy","Energy"};
 ```
 
 The type of variables, keep as it is, scalar ser 0 and vectors are given by their components
 
 
 ```
-inline Vector<int> cons_vars_type={0,1,2,3,0};
+inline Vector<int> cons_vars_type={1,2,3,0,0};
 ```
 
 The closures and right-hand-side of equations

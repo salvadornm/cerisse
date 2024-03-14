@@ -1,8 +1,10 @@
-<img src="images/firescram.png" width=800 height=200>
+<img src="images/intro.png" width=800 height=200>
 
 **A high-order adaptive mesh refinement solver for Large Eddy Simulation of compressible turbulent reactive flows**
 
 Created by:
+
+**Monal Patel**
 
 **Enson Un**
 

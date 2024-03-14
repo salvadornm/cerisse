@@ -6,12 +6,12 @@
 
 ## Folder layout
 
-    EB_CNS/         # main code
-    ├───Examples/      # simple example cases
-    ├───Exec/          # more advanced test cases
-    ├───Source/        # source code
-    └───Tools/         # useful tools
-    Submodules/     # required modules
+    cerisse/           # main code
+    ├───exm/           # simple example cases
+    ├───tst/           # test cases
+    ├───src/           # souce code
+    └───bin/           # useful scripts
+    lib/               # required modules
     ├───amrex/         # AMR data structure, backends
     ├───PelePhysics    # EoS, transport, reaction
     └───sundials/      # chemical integrators
@@ -70,8 +70,14 @@ You will need to install the `python-markdown-math` extension for rendering equa
 ```bash
 $ pip install -r docs/requirements.txt
 ```
+To  install **mkdocs** 
 
-You may need to install
+```bash
+$ pip install mkdocs
+```
+or dependencies `$ pip install mkdocs`
+
+
 
 ```bash
 $ pip install pip-tools
@@ -82,4 +88,7 @@ if you add new markdown extensions, edit the `requirements.in`  file under `docs
 ```bash
 $ pip-compile requirements.in
 ```
+
+
+
 

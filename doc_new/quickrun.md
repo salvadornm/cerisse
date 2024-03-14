@@ -39,10 +39,10 @@ to see the results.
 
 
 ```
-$ cd cerisse/EB_CNS/Exec/Test
+$ cd cerisse/tst/test1
 ```
 
-The directory wil lconatin the following files
+The directory contains the following files
 
 ```bash
 $ ls
