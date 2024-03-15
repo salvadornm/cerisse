@@ -60,6 +60,7 @@ class riemann_t {
                       dxinv[cdir] * (flx(i, j, k, n) - flx(i + 1, j, k, n));
                 });
 
+#if AMREX_SPACEDIM >= 2
     // y-direction
     cdir = 1;
     const Box& yslpbx = amrex::grow(bx, cdir, 1);
@@ -81,7 +82,9 @@ class riemann_t {
                   rhs(i, j, k, n) +=
                       dxinv[cdir] * (flx(i, j, k, n) - flx(i, j + 1, k, n));
                 });
+#endif
 
+#if AMREX_SPACEDIM == 3
     // z-direction
     cdir = 2;
     const Box& zslpbx = amrex::grow(bx, cdir, 1);
@@ -103,6 +106,7 @@ class riemann_t {
                   rhs(i, j, k, n) +=
                       dxinv[cdir] * (flx(i, j, k, n) - flx(i, j, k + 1, n));
                 });
+#endif
   };
 
   AMREX_GPU_DEVICE AMREX_FORCE_INLINE Real limiter(Real dlft, Real drgt) const {

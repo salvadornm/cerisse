@@ -52,7 +52,7 @@ cns_estdt(Box const& bx, Array4<Real const> const& state,
         Real dtx = dx[0] / (Math::abs(vx) + cs);
         Real dty = dx[1] / (Math::abs(vy) + cs);
         Real dtz = dx[2] / (Math::abs(vz) + cs);
-        dt = min(dt, min(dtx, min(dty, dtz)));
+        dt = amrex::min(dt, AMREX_D_DECL(dtx, dty, dtz));
       }
     }
   }
