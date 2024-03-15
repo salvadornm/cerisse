@@ -249,7 +249,7 @@ void CNS::compute_rhs(MultiFab& statemf, Real dt, FluxRegister* fr_as_crse, Flux
     prob_rhs.dflux(); //(prims,cons,nflx)
 
     // Source terms, including update mask (e.g inside IB)
-    // prob_rhs.src(prims,cons,nflx,rhs)
+    prob_rhs.src(mfi, prims, state, cls_h, dt);
   }
 }
 

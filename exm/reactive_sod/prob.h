@@ -5,6 +5,7 @@
 #include <AMReX_Geometry.H>
 #include <AMReX_ParmParse.H>
 #include <PelePhysics.H>
+#include <ReactorBase.H>
 
 #include "Closures.h"
 #include "RHS.h"
@@ -34,10 +35,9 @@ inline Vector<std::string> cons_vars_names = indicies_t::get_cons_vars_names();
 inline Vector<int> cons_vars_type = indicies_t::get_cons_vars_type();
 
 typedef closures_dt<indicies_t, visc_suth_t, cond_suth_t,
-                    multispecies_gas_t<indicies_t>>
-    ProbClosures;
-typedef rhs_dt<riemann_t<false, ProbClosures>, no_diffusive_t, no_source_t>
-    ProbRHS;
+                    multispecies_gas_t<indicies_t>> ProbClosures;
+typedef rhs_dt<riemann_t<false, ProbClosures>, no_diffusive_t,
+               reactor_t<ProbClosures>> ProbRHS;
 
 void inline inputs() {
   ParmParse pp;

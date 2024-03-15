@@ -5,6 +5,9 @@
 #include <Weno.h>
 #include <CentralKEEP.h>
 #include <Riemann.h>
+#ifdef USE_PELEPHYSICS
+#include "react.h"
+#endif
 
 // _dt stands for derived type
 // later on change this from rhs_dt to cns_dt.
@@ -19,21 +22,24 @@ public:
 class no_euler_t
 {
 public:
-  void eflux(){};
+  template<typename... Args>
+  void eflux(Args&&... args){};
 };
 
 // no diffusive flux
 class no_diffusive_t
 {
 public:
-  void dflux() {}
+  template<typename... Args>
+  void dflux(Args&&... args) {}
 };
 
 // no source
 class no_source_t
 {
 public:
-  void src() {}
+  template<typename... Args>
+  void src(Args&&... args) {}
 };
 
 #endif

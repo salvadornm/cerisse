@@ -55,7 +55,8 @@ static constexpr int QT=4;
 static constexpr int QPRES=5;
 static constexpr int QC=6;
 static constexpr int QG=7;
-static constexpr int QFS=8;
+static constexpr int QEINT=8;
+static constexpr int QFS=9;
 
 // Vector<std::string> prim_vars_names={"Pressure","Temperature","Xvel","Yvel","Zvel"};
 // amrex::Gpu::ManagedVector<std::string> cons_vars_names={"Density","Xmom","Ymom","Zmom","Energy"};
