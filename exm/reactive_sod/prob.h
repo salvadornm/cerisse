@@ -20,17 +20,17 @@ struct ProbParm {
   Real u_l = 0.0;      // velocity [m/s]
   Real p_l = 7173.0;   // pressure [Pa]
   GpuArray<Real, NUM_SPECIES> Y_l = {
-      0.01736973, 0.13784636, 0., 0.,        0.,
-      0.,         0.,         0., 0.84478391};  // mass fractions [-]
+      0., 0.01277243, 0.,         0., 0., 0.10136214, 0.,
+      0., 0.,         0.88586543, 0., 0., 0.};  // mass fractions [-] (molefrac 2:1:7)
 
   Real rho_r = 0.18075;
   Real u_r = -487.34;
   Real p_r = 35594.0;
-  GpuArray<Real, NUM_SPECIES> Y_r = {0.01736973, 0.13784636, 0., 0.,        0.,
-                                     0.,         0.,         0., 0.84478391};
+  GpuArray<Real, NUM_SPECIES> Y_r = {
+      0., 0.01277243, 0.,         0., 0., 0.10136214, 0.,
+      0., 0.,         0.88586543, 0., 0., 0.};
 };
 
-// these two are better to keep in setup/index?
 inline Vector<std::string> cons_vars_names = indicies_t::get_cons_vars_names();
 inline Vector<int> cons_vars_type = indicies_t::get_cons_vars_type();
 
@@ -40,10 +40,9 @@ typedef rhs_dt<riemann_t<false, ProbClosures>, no_diffusive_t,
                reactor_t<ProbClosures>> ProbRHS;
 
 void inline inputs() {
-  ParmParse pp;
-
-  pp.add("cns.order_rk", 3);   // -2, 1, 2 or 3"
-  pp.add("cns.stages_rk", 3);  // 1, 2 or 3
+  // ParmParse pp;
+  // pp.add("cns.order_rk", 3);   // -2, 1, 2 or 3"
+  // pp.add("cns.stages_rk", 3);  // 1, 2 or 3
 }
 
 // initial condition
@@ -69,11 +68,12 @@ AMREX_GPU_DEVICE AMREX_FORCE_INLINE void prob_initdata(
     uxt = prob_parm.u_r;
     Yt = prob_parm.Y_r.data();
   }
+  Real et;
+  cls.RYP2E(rhot, Yt, Pt, et);
+
   state(i, j, k, cls.UMX) = rhot * uxt;
   state(i, j, k, cls.UMY) = Real(0.0);
   state(i, j, k, cls.UMZ) = Real(0.0);
-  Real et;
-  cls.RYP2E(rhot, Yt, Pt, et);
   state(i, j, k, cls.UET) = rhot * et + Real(0.5) * rhot * uxt * uxt;
   for (int n = 0; n < NUM_SPECIES; ++n) {
     state(i, j, k, cls.UFS + n) = rhot * Yt[n];

@@ -2,9 +2,7 @@
 # start time is assumed to be 0, unless re-starting
 max_step  = 1500
 stop_time = 0.00023
-#time_step = 0.001 # at base level, higher level time step is computed based on the number of subcycles (depending on the subcycling strategy). stop_time = max_step*time_step
-# or
-cfl = 0.1
+cfl = 0.3
 
 # Geometry 
 geometry.is_periodic = 0 1 1
@@ -23,7 +21,7 @@ cns.screen_output = 1 # 0=quiet, 1=verbose
 cns.verbose = 1       # 0=quiet, 1=verbose
 
 # Refinement and regridding 
-amr.n_cell          = 64 8 8
+amr.n_cell          = 128 8 8
 amr.max_level       = 1     # maximum level number allowed
 amr.ref_ratio       = 2 2 2 # refinement ratio per level
 amr.regrid_int      = 2 2 2 # how often to regrid per level
@@ -45,14 +43,20 @@ amr.check_file              = chk    # root name of checkpoint file
 amr.check_int               = 100    # number of timesteps between checkpoints
 amr.plot_files_output = 1
 amr.plot_file         = plot/plt # root name of plotfile
-amr.plot_int          = 100        # number of timesteps between plotfiles
-amr.derive_plot_vars  = pressure x_velocity y_velocity z_velocity temperature
+amr.plot_per          = 0.00001  # physical time between plotfiles
+amr.derive_plot_vars  = pressure velocity temperature
 
 # Debugging 
-amrex.fpe_trap_invalid=1
+# amrex.fpe_trap_invalid = 1
 # amrex.use_gpu_aware_mpi = 1
 # amrex.fpe_trap_zero = 1
 # amrex.fpe_trap_overflow = 1
 
 # fab.do_initval = true
 # fab.init_snan = 0
+
+cns.order_rk = 3
+cns.stages_rk = 3
+cns.reactor_type = "ReactorCvode"
+cvode.solve_type = "denseAJ_direct"
+ode.clean_init_massfrac = 1

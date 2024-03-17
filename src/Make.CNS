@@ -2,6 +2,10 @@ DIM := 3
 USE_EB := FALSE
 LAZY := TRUE
 BL_NO_FORT = TRUE
+ifeq ($(USE_PELEPHYSICS),TRUE)
+  # This must be before include amrex Make.defs
+  USE_SUNDIALS = TRUE
+endif
 
 include $(AMREX_HOME)/Tools/GNUMake/Make.defs
 
@@ -48,7 +52,7 @@ endif
 ifeq ($(USE_PELEPHYSICS),TRUE)
   CHEM_HOME = Support/Mechanism/Models/$(CHEMISTRY_MODEL)
     
-  Pdirs := Source Eos Transport $(CHEM_HOME)
+  Pdirs := Source Eos Transport Reactions $(CHEM_HOME)
   Ppack += $(foreach dir, $(Pdirs), $(PELE_PHYSICS_HOME)/$(dir)/Make.package)
   Plocs += $(foreach dir, $(Pdirs), $(PELE_PHYSICS_HOME)/$(dir))
 
@@ -56,9 +60,9 @@ ifeq ($(USE_PELEPHYSICS),TRUE)
   INCLUDE_LOCATIONS += $(Plocs)
   VPATH_LOCATIONS   += $(Plocs)
 
-  #include $(PELE_PHYSICS_HOME)/ThirdParty/Make.ThirdParty # Because it is not Make."package"
-  #INCLUDE_LOCATIONS += $(PELE_PHYSICS_HOME)/ThirdParty
-  #VPATH_LOCATIONS   += $(PELE_PHYSICS_HOME)/ThirdParty  
+  include $(PELE_PHYSICS_HOME)/ThirdParty/Make.ThirdParty # Because it is not Make."package"
+  INCLUDE_LOCATIONS += $(PELE_PHYSICS_HOME)/ThirdParty
+  VPATH_LOCATIONS   += $(PELE_PHYSICS_HOME)/ThirdParty
 
   DEFINES += -DUSE_PELEPHYSICS
   DEFINES += -DUSE_$(EOS_MODEL)_EOS#    options: GAMMALAW / FUEGO / SRK

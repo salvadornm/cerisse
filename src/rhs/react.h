@@ -6,39 +6,41 @@
 
 template <typename cls_t>
 class reactor_t {
+  bool m_initialized = false;
   std::unique_ptr<pele::physics::reactions::ReactorBase> m_reactor;
 
  public:
   reactor_t() {
-    // These needs amrex::ParmParse, but they are called before main, so before amrex::Initialize
-    // std::string reactor_type = "ReactorNull";
-    // {
-    //   amrex::ParmParse pp("cns");
-    //   pp.query("reactor_type", reactor_type);
-    // }
-    // m_reactor = pele::physics::reactions::ReactorBase::create(reactor_type);
-    // m_reactor->init(1, 1);
+    std::string reactor_type;
+    {
+      amrex::ParmParse pp("cns");
+      pp.get("reactor_type", reactor_type);
+    }
+    m_reactor = pele::physics::reactions::ReactorBase::create(reactor_type);
+    m_reactor->init(1, 1);
+    m_initialized = true;
   }
 
-  ~reactor_t() { 
-    // m_reactor->close(); 
+  ~reactor_t() {
+    if (m_initialized) m_reactor->close();
   }
 
   /**
-   * @brief Calculate chemical reaction source term, adding to the right-hand-side
-   * (rhs) array.
+   * @brief Calculate chemical reaction source term, adding to the
+   * right-hand-side (rhs) array.
    *
    * @tparam cls_t The problem closure class typename.
    * @param mfi    The MFIter object representing the current grid patch.
    * @param prims  The input primitive variables array.
-   * @param rhs    The output array where the updated right-hand-side will be stored.
+   * @param rhs    The output array where the updated right-hand-side will be
+   * stored.
    * @param cls    The problem closure object (for indicies).
-   * @param dt     The time step size.
+   * @param dt     The time step size. (react() requires it to be non-const)
    */
   void inline src(const amrex::MFIter& mfi,
                   const amrex::Array4<const amrex::Real>& prims,
                   const amrex::Array4<amrex::Real>& rhs, const cls_t& cls,
-                  const amrex::Real& dt);
+                  amrex::Real dt);
 };
 
 // see https://www.codeproject.com/Articles/48575/How-to-Define-a-Template-Class-in-a-h-File-and-Imp
@@ -46,14 +48,18 @@ template <typename cls_t>
 void inline reactor_t<cls_t>::src(const amrex::MFIter& mfi,
                                   const amrex::Array4<const amrex::Real>& prims,
                                   const amrex::Array4<amrex::Real>& rhs,
-                                  const cls_t& cls, const amrex::Real& dt) {
+                                  const cls_t& cls, amrex::Real dt) {
+  if (!m_initialized) amrex::Abort("reactor_t not initialised");
+
+  // amrex::Print() << "reactor_t::src()" << std::endl;
+
   BL_PROFILE("reactor_t::src()");
 
-  using amrex::Real;
-  using amrex::Box;
   using amrex::Array4;
+  using amrex::Box;
   using amrex::FArrayBox;
   using amrex::IArrayBox;
+  using amrex::Real;
 
   const Box bx = mfi.tilebox();
 
@@ -61,41 +67,42 @@ void inline reactor_t<cls_t>::src(const amrex::MFIter& mfi,
   // TODO: stochastic fields indexing
 
   ///////////////////// Prepare for react /////////////////////
-  FArrayBox tempf(bx, NUM_SPECIES + 4, The_Async_Arena());
+  FArrayBox tempf(bx, 2 * NUM_SPECIES + 4, The_Async_Arena());
   auto const& rY = tempf.array(0);
   auto const& rEi = tempf.array(NUM_SPECIES);
   auto const& T = tempf.array(NUM_SPECIES + 1);
-  auto const& rYsrc = Array4<Real>(rhs, cls.UFS, NUM_SPECIES);
-  auto const& rEisrc = tempf.array(NUM_SPECIES + 2);
-  auto const& fc =
-      tempf.array(NUM_SPECIES + 3);  // number of RHS eval (not used)
+  auto const& rYsrc = tempf.array(NUM_SPECIES + 2);
+  auto const& rEisrc = tempf.array(2 * NUM_SPECIES + 2);
+  auto const& fc = tempf.array(2 * NUM_SPECIES + 3);  // number of RHS eval (not used)
   IArrayBox maskf(bx, 1, The_Async_Arena());
-  maskf.setVal(1);
+  maskf.setVal<RunOn::Gpu>(1);
   auto const& mask = maskf.array();  // 1: do reaction, -1: skip reaction
 
   amrex::ParallelFor(bx, [=] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {
-    // [rY, rEi, T, rEisrc]
+    // [rY, rEi, T, rYsrc, rEisrc] Remember to convert to CGS!!
     for (int ns = 0; ns < NUM_SPECIES; ++ns) {
-      rY(i, j, k, ns) = prims(i, j, k, cls.QRHO) * prims(i, j, k, cls.QFS + ns);
+      rY(i, j, k, ns) = prims(i, j, k, cls.QRHO) * prims(i, j, k, cls.QFS + ns) * 1.0e-3;
+      rYsrc(i, j, k, ns) = rhs(i, j, k, cls.UFS + ns) * 1.0e-3;
     }
 
-    rEi(i, j, k) = prims(i, j, k, cls.QRHO) * prims(i, j, k, cls.QEINT);
+    rEi(i, j, k) = prims(i, j, k, cls.QRHO) * prims(i, j, k, cls.QEINT) * 10.0;
 
     T(i, j, k) = prims(i, j, k, cls.QT);
-
-    rEisrc(i, j, k) = rhs(i, j, k, cls.UET);
+    AMREX_ALWAYS_ASSERT(T(i, j, k) > 0.0);
 
     Real rho = prims(i, j, k, cls.QRHO);
     Real mx = rho * prims(i, j, k, cls.QU);
     Real my = rho * prims(i, j, k, cls.QV);
     Real mz = rho * prims(i, j, k, cls.QW);
     Real rke = Real(0.5) * (mx * mx + my * my + mz * mz) / rho;
-    rho += rhs(i, j, k, cls.URHO) * dt;
+    for (int ns = 0; ns < NUM_SPECIES; ++ns) {
+      rho += rhs(i, j, k, cls.UFS + ns) * dt;
+    }
     mx += rhs(i, j, k, cls.UMX) * dt;
     my += rhs(i, j, k, cls.UMY) * dt;
     mz += rhs(i, j, k, cls.UMZ) * dt;
     Real rke_new = Real(0.5) * (mx * mx + my * my + mz * mz) / rho;
-    rEisrc(i, j, k) = rhs(i, j, k, cls.UET) - (rke_new - rke) / dt;
+    rEisrc(i, j, k) = (rhs(i, j, k, cls.UET) - (rke_new - rke) / dt) * 10.0;
 
     // TODO: fill mask
     // mask(i, j, k) = (T(i, j, k) > min_react_temp) ? 1 : -1;
@@ -103,11 +110,11 @@ void inline reactor_t<cls_t>::src(const amrex::MFIter& mfi,
 
   /////////////////////////// React ///////////////////////////
   Real current_time = 0.0;
-//   m_reactor->react(bx, rY, rYsrc, T, rEi, rEisrc, fc, mask, dt, current_time
-// #ifdef AMREX_USE_GPU
-//                    , amrex::Gpu::gpuStream()
-// #endif
-//   );
+  m_reactor->react(bx, rY, rYsrc, T, rEi, rEisrc, fc, mask, dt, current_time
+#ifdef AMREX_USE_GPU
+                   , amrex::Gpu::gpuStream()
+#endif
+  );
   amrex::Gpu::Device::streamSynchronize();  // TODO: is this necessary?
 
   //////////////////////// Unpack data ////////////////////////
@@ -115,25 +122,25 @@ void inline reactor_t<cls_t>::src(const amrex::MFIter& mfi,
     if (mask(i, j, k) != -1) {
       // Monitor problem cell, do not add reaction source
       bool any_rY_unbounded = false;
-      bool temp_below_zero = T(i, j, k) < 0.0;
+      bool temp_leq_zero = (T(i, j, k) <= 0.0);
       for (int ns = 0; ns < NUM_SPECIES; ++ns) {
         any_rY_unbounded |=
             (rY(i, j, k, ns) < -1e-5 || rY(i, j, k, ns) > 1.0 + 1e-5 ||
              std::isnan(rY(i, j, k, ns)));
       }
 
-      if (any_rY_unbounded || temp_below_zero) {
+      if (any_rY_unbounded || temp_leq_zero) {
         std::cout << "Post-reaction rY=[ ";
-        for (int n = 0; n < NUM_SPECIES; ++n)
-          std::cout << rY(i, j, k, n) << " ";
+        for (int ns = 0; ns < NUM_SPECIES; ++ns) std::cout << rY(i, j, k, ns) << " ";
         std::cout << "], T=" << T(i, j, k) << " @ " << i << "," << j << "," << k
                   << '\n';
       } else {
         // Update species source terms
         for (int ns = 0; ns < NUM_SPECIES; ++ns) {
-          Real rY_init =
-              prims(i, j, k, cls.QRHO) * prims(i, j, k, cls.QFS + ns);
-          rhs(i, j, k, cls.UFS + ns) += (rY(i, j, k, ns) - rY_init) / dt;
+          // rY is overwritten by rY + rYsrc * dt + chem_src * dt = rY + new_rhs * dt
+          // Remember to convert from CGS back to SI!!
+          Real rY_init = prims(i, j, k, cls.QRHO) * prims(i, j, k, cls.QFS + ns);
+          rhs(i, j, k, cls.UFS + ns) = (rY(i, j, k, ns) * 1.0e3 - rY_init) / dt; 
         }
         // rE is unchanged because it includes chemical energy
       }
