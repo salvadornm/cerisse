@@ -37,7 +37,7 @@ inline Vector<int> cons_vars_type = indicies_t::get_cons_vars_type();
 typedef closures_dt<indicies_t, visc_suth_t, cond_suth_t,
                     multispecies_gas_t<indicies_t>> ProbClosures;
 typedef rhs_dt<riemann_t<false, ProbClosures>, no_diffusive_t,
-               reactor_t<ProbClosures>> ProbRHS;
+               reactor_t<1,ProbClosures>> ProbRHS;
 
 void inline inputs() {
   // ParmParse pp;

@@ -57,6 +57,6 @@ amr.derive_plot_vars  = pressure velocity temperature
 
 cns.order_rk = 3
 cns.stages_rk = 3
-cns.reactor_type = "ReactorCvode"
-cvode.solve_type = "denseAJ_direct"
+#cns.reactor_type = "ReactorCvode"  #moved to react_t
+cvode.solve_type =  "fixed_point" #denseAJ_direct not available on GPU 
 ode.clean_init_massfrac = 1

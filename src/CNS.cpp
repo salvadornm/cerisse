@@ -29,7 +29,9 @@ BCRec *CNS::d_phys_bc = nullptr;
 // needed for CNSBld - derived from LevelBld (abstract class, pure virtual
 // functions must be implemented)
 
-CNS::CNS() {}
+CNS::CNS() {
+  prob_rhs.init();
+}
 
 CNS::CNS(Amr &papa, int lev, const Geometry &level_geom, const BoxArray &bl,
          const DistributionMapping &dm, Real time)
@@ -43,7 +45,9 @@ CNS::CNS(Amr &papa, int lev, const Geometry &level_geom, const BoxArray &bl,
 #endif
 
   buildMetrics();
-}
+
+  prob_rhs.init();
+};
 
 CNS::~CNS() {}
 // -----------------------------------------------------------------------------
