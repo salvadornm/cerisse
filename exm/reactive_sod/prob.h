@@ -39,7 +39,7 @@ typedef closures_dt<indicies_t, visc_suth_t, cond_suth_t,
 // typedef rhs_dt<riemann_t<false, ProbClosures>, no_diffusive_t,
 //                reactor_t<1,ProbClosures>> ProbRHS;
 typedef rhs_dt<riemann_t<false, ProbClosures>, no_diffusive_t,
-               reactor_t<ProbClosures>> ProbRHS;
+               reactor_t<1,ProbClosures>> ProbRHS;
 
 void inline inputs() {
   // ParmParse pp;

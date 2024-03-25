@@ -132,7 +132,7 @@ class CNS : public amrex::AmrLevel {
   static bool plot_surf;
 
  public:
-  PROB::ProbRHS prob_rhs;
+  static inline PROB::ProbRHS prob_rhs;
   static PROB::ProbClosures* h_prob_closures;
   static PROB::ProbClosures* d_prob_closures;
   static PROB::ProbParm* h_prob_parm;
