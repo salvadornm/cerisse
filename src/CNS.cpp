@@ -30,7 +30,7 @@ BCRec *CNS::d_phys_bc = nullptr;
 // functions must be implemented)
 
 CNS::CNS() {
-  prob_rhs.init();
+  // prob_rhs.init();
 }
 
 CNS::CNS(Amr &papa, int lev, const Geometry &level_geom, const BoxArray &bl,
@@ -46,7 +46,7 @@ CNS::CNS(Amr &papa, int lev, const Geometry &level_geom, const BoxArray &bl,
 
   buildMetrics();
 
-  prob_rhs.init();
+  // prob_rhs.init();
 };
 
 CNS::~CNS() {}
