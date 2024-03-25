@@ -210,6 +210,21 @@ Real CNS::advance(Real time, Real dt, int /*iteration*/, int /*ncycle*/) {
   return dt;
 }
 
+// void where_is_nan(const FArrayBox& fab) {
+//   bool contains_any_nan = false;
+//   for (int n = 0; n < fab.nComp(); ++n) {
+//     IntVect where;
+//     bool contains_nan = fab.contains_nan<RunOn::Gpu>(fab.box(), n, 1, where);    
+//     if (contains_nan) {
+//       amrex::Print() << "NAN found at " << where << " comp " << n << '\n';
+//       contains_any_nan = true;
+//     }
+//   }
+//   if (contains_any_nan) {
+//     amrex::Abort();
+//   }
+// }
+
 // Since we do not want to use expensive cudaMemCopy, we are storing all our
 // data on the GPU to begin with. Concurrency on GPU using streams, parallel
 // computation and data transfer, is not useful then. Therefore, we can have all
@@ -220,24 +235,61 @@ void CNS::compute_rhs(MultiFab& statemf, Real dt, FluxRegister* fr_as_crse, Flux
 
   // Variables
   // TODO: introduce a struct for these variables?
-  const PROB::ProbClosures& cls_d = *CNS::d_prob_closures;
+  const PROB::ProbClosures* cls_d = CNS::d_prob_closures;
   const PROB::ProbClosures& cls_h = *CNS::h_prob_closures;
-  const PROB::ProbParm& parms = *d_prob_parm;
+  // const PROB::ProbParm& parms = *d_prob_parm;
 
   for (MFIter mfi(statemf, false); mfi.isValid(); ++mfi) {
     Array4<Real> const& state = statemf.array(mfi);
 
     // const Box& bxgnodal = mfi.grownnodaltilebox(-1, 1);  // extent is 0,N_cell+1
-    const Box& bxg = mfi.growntilebox(cls_d.NGHOST);
+    const Box& bx = mfi.tilebox();
+    const Box& bxg = mfi.growntilebox(cls_h.NGHOST);
 
-    FArrayBox primf(bxg, cls_d.NPRIM , The_Async_Arena());
-    FArrayBox tempf(bxg, cls_d.NCONS, The_Async_Arena());
+    FArrayBox primf(bxg, cls_h.NPRIM, The_Async_Arena());
+    FArrayBox tempf(bxg, cls_h.NCONS, The_Async_Arena());
     Array4<Real> const& temp = tempf.array();
     Array4<Real> const& prims= primf.array();
 
     // We want to minimise function calls. So, we call prims2cons, flux and
     // source term evaluations once per fab from CPU, to be run on GPU.
     cls_h.cons2prims(mfi, state, prims);
+    // amrex::ParallelFor(bxg, [=] AMREX_GPU_DEVICE(int i, int j, int k) {
+    //   Real rho = 0.0;
+    //   for (int n = 0; n < NUM_SPECIES; ++n) {
+    //     rho += state(i, j, k, cls_d->UFS + n);
+    //   }
+    //   Real rhoinv = Real(1.0) / rho;
+    //   Real ux = state(i, j, k, cls_d->UMX) * rhoinv;
+    //   Real uy = state(i, j, k, cls_d->UMY) * rhoinv;
+    //   Real uz = state(i, j, k, cls_d->UMZ) * rhoinv;
+    //   Real rhoke = Real(0.5) * rho * (ux * ux + uy * uy + uz * uz);
+    //   Real ei = (state(i, j, k, cls_d->UET) - rhoke) * rhoinv;
+    //   Real Y[NUM_SPECIES];
+    //   Real sumY = 0.0;
+    //   for (int n = 0; n < NUM_SPECIES; ++n) {
+    //     Y[n] = state(i, j, k, cls_d->UFS + n) * rhoinv;
+    //     prims(i, j, k, cls_d->QFS + n) = Y[n];
+    //     sumY += Y[n];
+    //   }
+    //   Real T, p, cs, gamma;
+    //   cls_d->RYE2TPCsG(rho, Y, ei, T, p, cs, gamma);
+
+    //   // AMREX_DEVICE_PRINTF("i = %d, rho = %f, ei = %f, T = %f, Y = [%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f](sum to %f)\n", 
+    //   //                     i, rho, ei, T, Y[0], Y[1], Y[2], Y[3], Y[4], Y[5], Y[6], Y[7], Y[8], Y[9], Y[10], Y[11], Y[12], sumY);      
+      
+    //   prims(i, j, k, cls_d->QRHO) = rho;
+    //   prims(i, j, k, cls_d->QU) = ux;
+    //   prims(i, j, k, cls_d->QV) = uy;
+    //   prims(i, j, k, cls_d->QW) = uz;
+    //   prims(i, j, k, cls_d->QPRES) = p;
+    //   prims(i, j, k, cls_d->QT) = T;
+    //   prims(i, j, k, cls_d->QC) = cs;
+    //   prims(i, j, k, cls_d->QG) = gamma;
+    //   prims(i, j, k, cls_d->QEINT) = ei;
+    // });
+
+    // where_is_nan(primf);
 
 #ifdef AMREX_USE_GPIBM
     IBM::ib.computeGPs(mfi, state, prims, cls_d, level);
@@ -249,7 +301,7 @@ void CNS::compute_rhs(MultiFab& statemf, Real dt, FluxRegister* fr_as_crse, Flux
     prob_rhs.dflux(); //(prims,cons,nflx)
 
     // Source terms, including update mask (e.g inside IB)
-    prob_rhs.src(mfi, prims, state, cls_h, dt);
+    prob_rhs.src(mfi, prims, state, cls_d, dt);
   }
 }
 

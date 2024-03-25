@@ -26,19 +26,18 @@ class riemann_t {
 
   void inline eflux(const Geometry& geom, const MFIter& mfi,
                     const Array4<Real>& prims, const Array4<Real>& flx,
-                    const Array4<Real>& rhs, const cls_t& cls) {
+                    const Array4<Real>& rhs, const cls_t* cls) {
     const GpuArray<Real, AMREX_SPACEDIM> dxinv = geom.InvCellSizeArray();
     const Box& bx = mfi.tilebox();
-    const Box& bxg = mfi.growntilebox(cls_t::NGHOST);
+    // const Box& bxg = mfi.growntilebox(cls_t::NGHOST);
 
     // zero rhs
     // ParallelFor(bxg, cls_t::NCONS,
     //             [=] AMREX_GPU_DEVICE(int i, int j, int k, int n) noexcept {
     //               rhs(i, j, k, n) = 0.0;
     //             });
-
     const Box& bxg1 = amrex::grow(bx, 1);
-    FArrayBox slopef(bxg, cls_t::NCONS+1, The_Async_Arena()); // +1 because of the density
+    FArrayBox slopef(bxg1, cls_t::NCONS+1, The_Async_Arena()); // +1 because of the density
     const Array4<Real>& slope = slopef.array();
 
     // x-direction
@@ -46,12 +45,12 @@ class riemann_t {
     const Box& xslpbx = amrex::grow(bx, cdir, 1);
     amrex::ParallelFor(
         xslpbx, [=, *this] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {
-          this->cns_slope_x(i, j, k, slope, prims, cls);
+          this->cns_slope_x(i, j, k, slope, prims, *cls);
         });
     const Box& xflxbx = amrex::surroundingNodes(bx, cdir);
     amrex::ParallelFor(
         xflxbx, [=, *this] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {
-          this->cns_riemann_x(i, j, k, flx, slope, prims, cls);
+          this->cns_riemann_x(i, j, k, flx, slope, prims, *cls);
         });
     // add x flux derivative to rhs = -(fi+1 - fi)/dx = (fi - fi+1)/dx
     ParallelFor(bx, cls_t::NCONS,
@@ -66,7 +65,7 @@ class riemann_t {
     const Box& yslpbx = amrex::grow(bx, cdir, 1);
     amrex::ParallelFor(
         yslpbx, [=, *this] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {
-          this->cns_slope_y(i, j, k, slope, prims, cls);
+          this->cns_slope_y(i, j, k, slope, prims, *cls);
         });
     const Box& yflxbx = amrex::surroundingNodes(bx, cdir);
     amrex::ParallelFor(
@@ -74,7 +73,7 @@ class riemann_t {
           for (int n = 0; n < cls_t::NCONS; n++) {
             flx(i, j, k, n) = 0.0;
           };
-          this->cns_riemann_y(i, j, k, flx, slope, prims, cls);
+          this->cns_riemann_y(i, j, k, flx, slope, prims, *cls);
         });
     // add y flux derivative to rhs = -(fi+1 - fi)/dy = (fi - fi+1)/dy
     ParallelFor(bx, cls_t::NCONS,
@@ -90,7 +89,7 @@ class riemann_t {
     const Box& zslpbx = amrex::grow(bx, cdir, 1);
     amrex::ParallelFor(
         zslpbx, [=, *this] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {
-          this->cns_slope_z(i, j, k, slope, prims, cls);
+          this->cns_slope_z(i, j, k, slope, prims, *cls);
         });
     const Box& zflxbx = amrex::surroundingNodes(bx, cdir);
     amrex::ParallelFor(
@@ -98,7 +97,7 @@ class riemann_t {
           for (int n = 0; n < cls_t::NCONS; n++) {
             flx(i, j, k, n) = 0.0;
           };
-          this->cns_riemann_z(i, j, k, flx, slope, prims, cls);
+          this->cns_riemann_z(i, j, k, flx, slope, prims, *cls);
         });
     // add z flux derivative to rhs = -(fi+1 - fi)/dz = (fi - fi+1)/dz
     ParallelFor(bx, cls_t::NCONS,

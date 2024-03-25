@@ -154,7 +154,7 @@ void CNS::buildMetrics() {
   // print mesh sizes
   const Real *dx = geom.CellSize();
   amrex::Print() << "Mesh size (dx,dy,dz) = ";
-  amrex::Print() << dx[0] << "  " << dx[1] << "  " << dx[2] << "  \n";
+  amrex::Print() << AMREX_D_TERM(dx[0], << "  " << dx[1], << "  " << dx[2]) << "  \n";
 }
 
 void CNS::post_init(Real stop_time) {

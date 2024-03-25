@@ -1,4 +1,4 @@
-DIM := 3
+DIM ?= 3
 USE_EB := FALSE
 LAZY := TRUE
 BL_NO_FORT = TRUE
