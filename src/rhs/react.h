@@ -4,12 +4,23 @@
 #include <PelePhysics.H>
 #include <ReactorBase.H>
 
+// template <int reactor_type, typename cls_t>
 template <typename cls_t>
 class reactor_t {
+ public:
   bool m_initialized = false;
   std::unique_ptr<pele::physics::reactions::ReactorBase> m_reactor;
 
- public:
+  // reactor_t() {
+  //   if (reactor_type == 1) {
+  //     m_reactor = pele::physics::reactions::ReactorBase::create("ReactorCvode");
+  //     m_initialized = true;
+  //   } else {
+  //     amrex::Abort("reactor_t not initialised");
+  //   }
+  //   m_reactor->init(1, 1);
+  // };
+
   reactor_t() {
     std::string reactor_type;
     {
@@ -37,10 +48,10 @@ class reactor_t {
    * @param cls    The problem closure object (for indicies).
    * @param dt     The time step size. (react() requires it to be non-const)
    */
-  // see https://www.codeproject.com/Articles/48575/How-to-Define-a-Template-Class-in-a-h-File-and-Imp
+  // https://www.codeproject.com/Articles/48575/How-to-Define-a-Template-Class-in-a-h-File-and-Imp
   void inline src(const amrex::MFIter& mfi,
                   const amrex::Array4<const amrex::Real>& prims,
-                  const amrex::Array4<amrex::Real>& rhs, const cls_t* cls,
+                  const amrex::Array4<amrex::Real>& rhs, const cls_t* cls_d,
                   amrex::Real dt) {
     if (!m_initialized) amrex::Abort("reactor_t not initialised");
 
@@ -48,6 +59,7 @@ class reactor_t {
 
     BL_PROFILE("reactor_t::src()");
 
+    // put here because this is a .h file
     using amrex::Array4;
     using amrex::Box;
     using amrex::FArrayBox;
@@ -72,15 +84,15 @@ class reactor_t {
     maskf.setVal<RunOn::Gpu>(1);
     auto const& mask = maskf.array();  // 1: do reaction, -1: skip reaction
 
-    amrex::ParallelFor(bx, [=] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {
+      amrex::ParallelFor(bx, [=] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {
       const auto& cls = *cls_d;
 
-      // [rY, rEi, T, rYsrc, rEisrc] Remember to convert to CGS!!
-      for (int ns = 0; ns < NUM_SPECIES; ++ns) {
-        rY(i, j, k, ns) =
+        // [rY, rEi, T, rYsrc, rEisrc] Remember to convert to CGS!!
+        for (int ns = 0; ns < NUM_SPECIES; ++ns) {
+          rY(i, j, k, ns) =
             prims(i, j, k, cls.QRHO) * prims(i, j, k, cls.QFS + ns) * 1.0e-3;
-        rYsrc(i, j, k, ns) = rhs(i, j, k, cls.UFS + ns) * 1.0e-3;
-      }
+          rYsrc(i, j, k, ns) = rhs(i, j, k, cls.UFS + ns) * 1.0e-3;
+        }
 
       rEi(i, j, k) =
           prims(i, j, k, cls.QRHO) * prims(i, j, k, cls.QEINT) * 10.0;

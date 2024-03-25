@@ -243,7 +243,6 @@ void CNS::compute_rhs(MultiFab& statemf, Real dt, FluxRegister* fr_as_crse, Flux
     Array4<Real> const& state = statemf.array(mfi);
 
     // const Box& bxgnodal = mfi.grownnodaltilebox(-1, 1);  // extent is 0,N_cell+1
-    const Box& bx = mfi.tilebox();
     const Box& bxg = mfi.growntilebox(cls_h.NGHOST);
 
     FArrayBox primf(bxg, cls_h.NPRIM, The_Async_Arena());
@@ -297,6 +296,7 @@ void CNS::compute_rhs(MultiFab& statemf, Real dt, FluxRegister* fr_as_crse, Flux
 
     // Fluxes including boundary/discontinuity corrections
     // Note: we are over-writing state (cons) with flux derivative
+    // NOTE: cls_h is host cls instance but cls_d causes a segmentation fault
     prob_rhs.eflux(geom, mfi, prims, temp, state, cls_d);
     prob_rhs.dflux(); //(prims,cons,nflx)
 
