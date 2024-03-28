@@ -2,12 +2,13 @@ site_name: cerisse++
 docs_dir: doc_new
 nav:
   - Home: index.md
+  - Quick: quickrun.md
   - input: input-options.md
-  - NEW: new_run.md
-  - CLASS: new_class.md
-  - QuickStart: Quickrun
+  - Run: new_run.md
+  - Class: new_class.md
   - Tests: new_test.md
   - IBM: ibm.md
+  - tips: tips.md  
 extra_javascript:
   - https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.4/MathJax.js?config=TeX-AMS-MML_HTMLorMML
 markdown_extensions:

@@ -21,27 +21,6 @@ Storing but losing
 
 
 
-## Building the code
-
-There are two ways to compile the code, using **GNUMake** or **CMake**. The former is recommended because it is simple and more comprehensible, while the latter is mainly used for automated testing with CTest.
-
-## Required files
-
-Each case must contain the following 5 files to get compiled and run
-
-* **`GNUmakefile`** - sets the compile-time options
-* **`prob.H`** - define functions for initialization (`prob_initdata`), boundary conditions (`bcnormal`), etc.
-* **`prob.cpp`** - define function to initialize AMReX (`amrex_probinit`)
-* **`prob_parm.H`** - define the `ProbParm` struct, which contains data for initialization or boundary conditions
-* **`inputs`** - contain runtime options for the cerisse executable. Some may contain the `.ini` extension, but they are the same thing
-
-There may also be a few optional files
-
-* **`Make.package`** - link the `.H` and `.cpp` files to the compiler. It can be absorbed into `GNUmakefile`
-* **`CMakeLists.txt`** - for building with CMake
-
-We will now go through these files one by one.
-
 ## GNUmakefile
 
 This file sets general options, usually modified once and that are required to compile the code. It is divided into sections

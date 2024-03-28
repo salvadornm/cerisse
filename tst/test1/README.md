@@ -6,7 +6,7 @@ The solution is plotted at t=0.2
 
 tested       |      grid     | comment
 :----------- |:-------------:| -----------:
-gcc 11.3(Linux), 13.x (Mac)       | **200**        |  Euler, 200 steps, no-AMR
+gcc 11.3(Linux), 13.x (Mac)       | **200**        |  Euler, 200 steps, no-AMR, MPI
 
 The exact solution is calculated using [ToroExact](https://github.com/tahandy/ToroExact)
 

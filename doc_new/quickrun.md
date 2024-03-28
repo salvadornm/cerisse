@@ -1,7 +1,8 @@
 
 **NEW-TEMPORARY**
 
-This page explains how to run the code after download
+This page explains how to run the code after download, installing
+it an run a simple example case
 
 ## Instal Pre-requisites
 
@@ -57,27 +58,26 @@ The directory contains the following files
 
 ```bash
 $ ls
-GNUmakefile  inputs  Make.package  prob.cpp  prob.H  prob_parm.H
+GNUmakefile  inputs  Make.package  prob.h  
 ```
 
-A detail explanation of the files is in the Run tab, but basically inpt is your simulation comntrol files
-(mesh size, number of steps, etc..), while `prob.*` files determine the problem to solve.
+A detail explanation of the files is in *ADD* tab, but basically `inputs` is your simulation comntrol files
+(mesh size, number of steps, etc..), while `prob.h` determines the problem to solve.
 
 
 ### 2) Compile code
 
-To compile use
+This will create the executable, to compile simply use
 
 ```bash
 $ make
 ```
 
-TIP: use `$make -j4` if possible, it will compile faster. This step will be slow, depending on your computer, but most of the time it has to be done only once.
-Once finished it will create a temporary directory 
-`$ tmp_build_dir` 
+NOTE:  use `$make -j4` if possible, it will compile faster. This step can be very slow, depending on your computer and options, but most of the time it has to be done only once.
 
-and (if succesful) an executable will be created named
-`Cerisse2d.gnu.ex`
+
+Once finished it will create a temporary directory 
+`$ tmp_build_dir`  and (if succesful) an executable will be created named `Cerisse2d.gnu.ex`
 the name will change depending on the compiler and problem dimension
 
 ### 4) Run

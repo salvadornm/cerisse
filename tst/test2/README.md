@@ -6,7 +6,7 @@ The solution is plotted at t=0.2
 
 tested       |      grid     | comment
 :----------- |:-------------:| -----------:
-gcc 11.4(Linux), 13.x (Mac)       | **128**        |  N-S 1500 steps, no-AMR
+gcc 11.4(Linux), 13.x (Mac)       | **128**        |  N-S 1500 steps, no-AMR, single
 
 
 
