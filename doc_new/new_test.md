@@ -1,7 +1,7 @@
 # Test
 
 This set of classic/regression test-cases are located under `tst/`
-The code will be tested periodically against these regression test to validate merges, versions, etc.
+The code will be tested periodically against these regression tests to validate merges, versions, etc. They are also goo exampels of basic functionality
 
 
 | Test                        |  Type          | Description                                                  |
@@ -13,7 +13,10 @@ The code will be tested periodically against these regression test to validate m
 
 
 
-
 ## Test 1
 
 --8<-- "tst/test1/README.md"
+
+## Test 2
+
+--8<-- "tst/test2/README.md"

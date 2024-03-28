@@ -1,7 +1,7 @@
 AMREXVERSION=23.11
 PELEPVERSION=23.03
 CGALVERSION=5.6
-dir= $PWD
+#dir= $PWD
 case  $1 in
 	git )
 		echo " installing git versions .. "
@@ -38,12 +38,11 @@ case  $1 in
 		rm v$PELEPVERSION.zip
 		;;
 	cgal)
-    mkdir -p install
-
+    	mkdir -p install
 		#echo " installing boost 1.66 version .." 
-    cd $PWD/boost
-    ./bootstrap.sh --prefix=$PWD/../install/boost
-    ./b2 install
+    	cd $PWD/boost
+    	./bootstrap.sh --prefix=$PWD/../install/boost
+    	./b2 install
 
 		#rm -rf cgal
 		#echo " installing CGAL release version .." $CGALVERSION
@@ -58,7 +57,7 @@ case  $1 in
 		make install
 		;;
     *)
-	echo " no option selected [git/safe]"
+	echo " no option selected [git/safe/amrex/pelephys/cgal]"
     exit
 esac
 echo -e "\\033[1;32m  Installation done \\033[0m"

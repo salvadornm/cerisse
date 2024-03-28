@@ -1,7 +1,7 @@
 TINY_PROFILE = FALSE
 
 DEBUG   = FALSE
-DIM     = 3
+DIM     = 1
 COMP     = gcc
 
 USE_MPI = TRUE

@@ -13,9 +13,9 @@ The exact solution is calculated using [ToroExact](https://github.com/tahandy/To
 
 After compiling using `make` to run type
 ```
-$ ./Cerisse1d.gnu.ex inputs
+$ ./main1d.gnu.MPI.ex inputs
 ```
-It should run very fast (5 secs, depending on machine)
+It should run very fast (<1 secs, depending on machine)
 The results can be seen by
 
 ```

@@ -8,8 +8,8 @@ This page explains how to run the code after download
 Install auxiliar packages, **AMReX** and **PelePhysics**
 
 ```
-$ cd cerisse/Submodules/
-$ ./install safe
+$ cd cerisse/lib/
+$ ./install_script safe
 ```
 It will connect to Github and download the required packages.
 `$ ./install git`, will intall latest release commit in the **development** branch
@@ -28,6 +28,17 @@ This is the library that control chemistry integartion and reading chemistry.
 It is an approx 30 MB download, it wil expand to a folder 146 M, the install safe
 option will install version **23.03**
 
+
+### SUNDIALS
+
+This is a libary of differential and algebraic equation solvers used by PelePhysics for CVODE to integrate the chemistry.
+To install  any example
+
+```
+$ cd exm/tmp
+$ make SUNDIALS
+```
+This will download and isntall version **6.5**. Sundials cannot be installed before compiling as some options (such as GPU) require re-compiling.
 
 ## Tutorial
 
