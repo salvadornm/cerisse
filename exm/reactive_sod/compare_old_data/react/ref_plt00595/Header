@@ -1,0 +1,74 @@
+HyperCLaw-V1.1
+42
+density
+xmom
+ymom
+zmom
+rho_E
+Temp
+rho_H
+rho_H2
+rho_O
+rho_OH
+rho_H2O
+rho_O2
+rho_HO2
+rho_H2O2
+rho_N2
+rho_AR
+rho_HE
+rho_CO
+rho_CO2
+rho_omega_H
+rho_omega_H2
+rho_omega_O
+rho_omega_OH
+rho_omega_H2O
+rho_omega_O2
+rho_omega_HO2
+rho_omega_H2O2
+rho_omega_N2
+rho_omega_AR
+rho_omega_HE
+rho_omega_CO
+rho_omega_CO2
+heatRelease
+Cost
+pressure
+x_velocity
+MachNumber
+magvort
+divu
+divrho
+cp
+cv
+1
+0.000160220247480171
+0
+0 
+12 
+
+((0) (127) (0)) 
+595 
+0.09375 
+0
+0
+0 16 0.000160220247480171
+595
+0 0.75
+0.75 1.5
+1.5 2.25
+2.25 3
+3 3.75
+3.75 4.5
+4.5 5.25
+5.25 6
+6 6.75
+6.75 7.5
+7.5 8.25
+8.25 9
+9 9.75
+9.75 10.5
+10.5 11.25
+11.25 12
+Level_0/Cell

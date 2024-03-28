@@ -1,0 +1,2 @@
+rm -rf ./plot
+rm -rf Backtrace*

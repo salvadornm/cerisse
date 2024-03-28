@@ -96,6 +96,7 @@ class calorifically_perfect_gas_t {
       prims(i, j, k, idx.QT) = p / (rho * this->Rspec);
       prims(i, j, k, idx.QC) = std::sqrt(this->gamma * p * rhoinv);
       prims(i, j, k, idx.QG) = this->gamma;
+      prims(i, j, k, idx.QEINT) = rhoei * rhoinv;
       prims(i, j, k, idx.QFS) = 1.0;
     });
   }
@@ -271,7 +272,8 @@ class multispecies_gas_t {
       prims(i, j, k, idx.QPRES) = p;
       prims(i, j, k, idx.QT) = T;
       prims(i, j, k, idx.QC) = cs;
-      prims(i, j, k, idx.QG) = gamma;
+      prims(i, j, k, idx.QG) = gamma;      
+      prims(i, j, k, idx.QEINT) = ei;
       for (int n = 0; n < NUM_SPECIES; ++n) {
         prims(i, j, k, idx.QFS + n) = Y[n];
       }

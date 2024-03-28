@@ -1,0 +1,46 @@
+HyperCLaw-V1.1
+28
+density
+xmom
+ymom
+zmom
+rho_E
+Temp
+rho_H
+rho_H2
+rho_O
+rho_OH
+rho_H2O
+rho_O2
+rho_HO2
+rho_H2O2
+rho_N2
+rho_AR
+rho_HE
+rho_CO
+rho_CO2
+Cost
+pressure
+x_velocity
+MachNumber
+magvort
+divu
+divrho
+cp
+cv
+1
+0.0001600905874713
+0
+0 
+12 
+
+((0) (127) (0)) 
+593 
+0.09375 
+0
+0
+0 2 0.0001600905874713
+593
+0 6
+6 12
+Level_0/Cell
