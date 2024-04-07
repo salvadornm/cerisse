@@ -181,6 +181,8 @@ void CNS::full_prob_post_timestep(int /*iteration*/)
                 << k_sgs;
       data_log << std::setw(datwidth) << std::setprecision(datprecision)
                 << mixedness;
+      data_log << std::setw(datwidth) << std::setprecision(datprecision)
+                << msgs;
       data_log << std::endl;      
     }
   }
