@@ -122,6 +122,8 @@ class calorifically_perfect_gas_nasg_liquid_t {
 #ifdef USE_PELEPHYSICS
 #include <PelePhysics.H>
 
+// #define DEBUG_PP_EOS
+
 // Wrapper for PelePhysics EoS. No other places of the code should call
 // pele::physics::PhysicsType::eos().
 template <typename idx_t>
@@ -142,7 +144,6 @@ class multispecies_gas_t {
     eos.RYP2E(rho_cgs, Y, p_cgs, e_cgs);
 
     E = e_cgs * 1.0e-4;
-    // AMREX_ALWAYS_ASSERT(E > 0.0);
   }
 
   AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE void RYE2TP(
@@ -153,11 +154,15 @@ class multispecies_gas_t {
 
     auto eos = pele::physics::PhysicsType::eos();
     Real p_cgs;
+    T = 0.0;
     eos.REY2T(rho_cgs, e_cgs, Y, T);
     eos.RTY2P(rho_cgs, T, Y, p_cgs);
 
     P = p_cgs * 0.1;
-    // AMREX_ALWAYS_ASSERT(P > 0.0);
+#ifdef DEBUG_PP_EOS
+    AMREX_ALWAYS_ASSERT(T > 0.0);
+    AMREX_ALWAYS_ASSERT(P > 0.0);
+#endif
   }
 
   AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE void RYE2Cs(
@@ -166,29 +171,33 @@ class multispecies_gas_t {
     Real e_cgs = E * 1.0e4;
 
     auto eos = pele::physics::PhysicsType::eos();
-    Real T, p_cgs, G, cs_cgs;
+    Real T = 0.0, p_cgs, G, cs_cgs;
     eos.REY2T(rho_cgs, e_cgs, Y, T);
     eos.RTY2P(rho_cgs, T, Y, p_cgs);
     eos.RTY2G(rho_cgs, T, Y, G);
     cs_cgs = std::sqrt(G * p_cgs / rho_cgs);
 
     cs = cs_cgs * 0.01;
-    // AMREX_ALWAYS_ASSERT(cs > 0.0);
+#ifdef DEBUG_PP_EOS
+    AMREX_ALWAYS_ASSERT(cs > 0.0);
+#endif
   }
 
-  AMREX_GPU_DEVICE AMREX_FORCE_INLINE void RYE2TPCsG(const Real R,
+  AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE void RYE2TPCsG(const Real R,
                                                      const Real Y[NUM_SPECIES],
                                                      const Real E, Real& T,
                                                      Real& P, Real& cs,
                                                      Real& G) const {
-    // AMREX_ALWAYS_ASSERT(R > 0.0);
-    // AMREX_ALWAYS_ASSERT(Y[0] >= 0.0);
-    // AMREX_ALWAYS_ASSERT(E > 0.0);
+#ifdef DEBUG_PP_EOS
+    AMREX_ALWAYS_ASSERT(R > 0.0);
+    AMREX_ALWAYS_ASSERT(Y[0] >= 0.0);
+#endif
     Real rho_cgs = R * 0.001;
     Real e_cgs = E * 1.0e4;
 
     auto eos = pele::physics::PhysicsType::eos();
     Real p_cgs, cs_cgs;
+    T = 0.0;
     eos.REY2T(rho_cgs, e_cgs, Y, T);
     eos.RTY2P(rho_cgs, T, Y, p_cgs);
     eos.RTY2G(rho_cgs, T, Y, G);
@@ -196,8 +205,10 @@ class multispecies_gas_t {
 
     P = p_cgs * 0.1;
     cs = cs_cgs * 0.01;
-    // AMREX_ALWAYS_ASSERT(P > 0.0);
-    // AMREX_ALWAYS_ASSERT(cs > 0.0);
+#ifdef DEBUG_PP_EOS
+    AMREX_ALWAYS_ASSERT(P > 0.0);
+    AMREX_ALWAYS_ASSERT(cs > 0.0);
+#endif
   }
 
   // void prims2cons(i,j,k,){};
@@ -272,17 +283,22 @@ class multispecies_gas_t {
       prims(i, j, k, idx.QPRES) = p;
       prims(i, j, k, idx.QT) = T;
       prims(i, j, k, idx.QC) = cs;
-      prims(i, j, k, idx.QG) = gamma;      
+      prims(i, j, k, idx.QG) = gamma;
       prims(i, j, k, idx.QEINT) = ei;
       for (int n = 0; n < NUM_SPECIES; ++n) {
         prims(i, j, k, idx.QFS + n) = Y[n];
       }
-
-      // AMREX_ALWAYS_ASSERT(prims(i, j, k, idx.QPRES) > 0.0);
-      // AMREX_ALWAYS_ASSERT(prims(i, j, k, idx.QRHO) > 0.0);
-      // AMREX_ALWAYS_ASSERT(prims(i, j, k, idx.QT) > 0.0);
-      // AMREX_ALWAYS_ASSERT(prims(i, j, k, idx.QC) > 0.0);
-      // AMREX_ALWAYS_ASSERT(prims(i, j, k, idx.QFS) >= 0.0);
+#ifdef DEBUG_PP_EOS
+      // AMREX_DEVICE_PRINTF(static_cast<const char*>("cons2prims: %d %d %d\n"), i, j, k);
+      AMREX_ALWAYS_ASSERT(prims(i, j, k, idx.QPRES) > 0.0 && isnan(prims(i, j, k, idx.QPRES)) == 0);
+      AMREX_ALWAYS_ASSERT(prims(i, j, k, idx.QRHO) > 0.0 && isnan(prims(i, j, k, idx.QRHO)) == 0);
+      AMREX_ALWAYS_ASSERT(prims(i, j, k, idx.QT) > 0.0 && !isnan(prims(i, j, k, idx.QT)));
+      AMREX_ALWAYS_ASSERT(prims(i, j, k, idx.QC) > 0.0 && isnan(prims(i, j, k, idx.QC)) == 0);
+      AMREX_ALWAYS_ASSERT(prims(i, j, k, idx.QG) > 0.0 && isnan(prims(i, j, k, idx.QG)) == 0);
+      AMREX_ALWAYS_ASSERT(prims(i, j, k, idx.QFS) >= 0.0 && isnan(prims(i, j, k, idx.QFS)) == 0);
+      AMREX_ALWAYS_ASSERT(prims(i, j, k, idx.QFS + NUM_SPECIES - 1) >= 0.0 && isnan(prims(i, j, k, idx.QFS + NUM_SPECIES - 1)) == 0);
+      // if (i == -3) AMREX_DEVICE_PRINTF(static_cast<const char*>("T = %f: %i %i %i\n"), prims(i, j, k, idx.QT), i, j, k);
+#endif
     });
   }
 };
