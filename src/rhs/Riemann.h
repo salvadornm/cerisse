@@ -130,7 +130,7 @@ class riemann_t {
     // Estimate wave speeds
     Real sl = amrex::min(ul - cl, ur - cr);
     Real sr = amrex::max(ul + cl, ur + cr);
-    Real rp = sqrt(rr / rl);
+    Real rp = std::sqrt(rr / rl);
     Real uroe = (ul + ur * rp) / (1. + rp);
     Real croe = (cl + cr * rp) / (1. + rp); // a more standard averaging
     sl = amrex::min(sl, uroe - croe);

@@ -210,7 +210,7 @@ Real CNS::advance(Real time, Real dt, int /*iteration*/, int /*ncycle*/) {
   return dt;
 }
 
-// void where_is_nan(const FArrayBox& fab) {
+// void where_is_nan(const FArrayBox& fab, bool abort_on_nan = true) {
 //   bool contains_any_nan = false;
 //   for (int n = 0; n < fab.nComp(); ++n) {
 //     IntVect where;
@@ -220,7 +220,7 @@ Real CNS::advance(Real time, Real dt, int /*iteration*/, int /*ncycle*/) {
 //       contains_any_nan = true;
 //     }
 //   }
-//   if (contains_any_nan) {
+//   if (contains_any_nan && abort_on_nan) {
 //     amrex::Abort();
 //   }
 // }
@@ -241,6 +241,7 @@ void CNS::compute_rhs(MultiFab& statemf, Real dt, FluxRegister* fr_as_crse, Flux
 
   for (MFIter mfi(statemf, false); mfi.isValid(); ++mfi) {
     Array4<Real> const& state = statemf.array(mfi);
+    // where_is_nan(statemf[mfi], false);
 
     // const Box& bxgnodal = mfi.grownnodaltilebox(-1, 1);  // extent is 0,N_cell+1
     const Box& bxg = mfi.growntilebox(cls_h.NGHOST);
@@ -272,7 +273,30 @@ void CNS::compute_rhs(MultiFab& statemf, Real dt, FluxRegister* fr_as_crse, Flux
     //     sumY += Y[n];
     //   }
     //   Real T, p, cs, gamma;
-    //   cls_d->RYE2TPCsG(rho, Y, ei, T, p, cs, gamma);
+
+    //   // cls_d->RYE2TPCsG(rho, Y, ei, T, p, cs, gamma);
+    //   {
+    //     T = 0.0;
+    //     Real rho_cgs = rho * 0.001;
+    //     Real e_cgs = ei * 1.0e4;
+
+    //     auto eos = pele::physics::PhysicsType::eos();
+    //     Real p_cgs, cs_cgs;
+    //     eos.REY2T(rho_cgs, e_cgs, Y, T);
+    //     eos.RTY2P(rho_cgs, T, Y, p_cgs);
+    //     eos.RTY2G(rho_cgs, T, Y, gamma);
+    //     cs_cgs = std::sqrt(gamma * p_cgs / rho_cgs);
+
+    //     p = p_cgs * 0.1;
+    //     cs = cs_cgs * 0.01;
+    //   }
+
+    //   // {
+    //   //   p = (cls_d->gamma - Real(1.0)) * rho * ei;
+    //   //   T = p / (rho * cls_d->Rspec);
+    //   //   cs = std::sqrt(cls_d->gamma * p * rhoinv);
+    //   //   gamma = cls_d->gamma;
+    //   // }
 
     //   // AMREX_DEVICE_PRINTF("i = %d, rho = %f, ei = %f, T = %f, Y = [%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f](sum to %f)\n", 
     //   //                     i, rho, ei, T, Y[0], Y[1], Y[2], Y[3], Y[4], Y[5], Y[6], Y[7], Y[8], Y[9], Y[10], Y[11], Y[12], sumY);      
@@ -287,8 +311,8 @@ void CNS::compute_rhs(MultiFab& statemf, Real dt, FluxRegister* fr_as_crse, Flux
     //   prims(i, j, k, cls_d->QG) = gamma;
     //   prims(i, j, k, cls_d->QEINT) = ei;
     // });
-
-    // where_is_nan(primf);
+    // amrex::Print() << "cons2prims done" << std::endl;
+    // where_is_nan(primf, false);
 
 #ifdef AMREX_USE_GPIBM
     IBM::ib.computeGPs(mfi, state, prims, cls_d, level);
@@ -298,6 +322,8 @@ void CNS::compute_rhs(MultiFab& statemf, Real dt, FluxRegister* fr_as_crse, Flux
     // Note: we are over-writing state (cons) with flux derivative
     // NOTE: cls_h is host cls instance but cls_d causes a segmentation fault
     prob_rhs.eflux(geom, mfi, prims, temp, state, cls_d);
+    // amrex::Print() << "eflux done" << std::endl;
+    // where_is_nan(statemf[mfi]);
     prob_rhs.dflux(); //(prims,cons,nflx)
 
     // Source terms, including update mask (e.g inside IB)
