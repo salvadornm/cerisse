@@ -155,4 +155,9 @@ void CNS::variableSetUp() {
                  dervel, the_same_box);
   derive_lst.addComponent("velocity", desc_lst, State_Type, 0,
                           h_prob_closures->NCONS);
+
+  // Density
+  derive_lst.add("density", IndexType::TheCellType(), 1, derdensity,
+                 the_same_box);
+  derive_lst.addComponent("density", desc_lst, State_Type, 0, h_prob_closures->NCONS);
 }
