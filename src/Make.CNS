@@ -51,8 +51,9 @@ endif
 
 ifeq ($(USE_PELEPHYSICS),TRUE)
   CHEM_HOME = Support/Mechanism/Models/$(CHEMISTRY_MODEL)
-    
   Pdirs := Source Eos Transport Reactions $(CHEM_HOME)
+  #CHEM_HOME = Mechanisms/$(CHEMISTRY_MODEL)# for latest pelephys
+  #Pdirs := Source Source/Eos Source/Transport Source/Reactions $(CHEM_HOME)
   Ppack += $(foreach dir, $(Pdirs), $(PELE_PHYSICS_HOME)/$(dir)/Make.package)
   Plocs += $(foreach dir, $(Pdirs), $(PELE_PHYSICS_HOME)/$(dir))
 
@@ -81,13 +82,17 @@ warning_flags +=-Wfatal-errors
 # CNS uses a coarse grained OMP approach
 DEFINES += -DAMREX_CRSEGRNDOMP
 
-SUNDIALS:
-	@echo "==> Building SUNDIALS library in PelePhysics"
-	cd $(PELE_PHYSICS_HOME)/ThirdParty; $(MAKE) sundials AMREX_HOME=$(AMREX_HOME) SUNDIALS_HOME=$(SUNDIALS_HOME) USE_CUDA=$(USE_CUDA) USE_HIP=$(USE_HIP) PELE_USE_KLU=$(PELE_USE_KLU) PELE_USE_MAGMA=$(PELE_USE_MAGMA) DEBUG=$(DEBUG) COMP=$(COMP) NVCC=$(COMP) PRECISION=$(PRECISION)
+TPL:
+	@echo "==> Building SUNDIALS library"
+	@cd $(PELE_PHYSICS_HOME)/ThirdParty; $(MAKE) sundials SUNDIALS_HOME=$(SUNDIALS_HOME) AMREX_HOME=$(AMREX_HOME) USE_SYCL=$(USE_SYCL) USE_HIP=$(USE_HIP) USE_CUDA=$(USE_CUDA) PELE_USE_KLU=$(PELE_USE_KLU) PELE_USE_MAGMA=$(PELE_USE_MAGMA) DEBUG=$(DEBUG) COMP=$(HOSTCC) NVCC=$(COMP) CUDA_ARCH=$(CUDA_ARCH) PRECISION=$(PRECISION)
 
-SUNDIALSclean:
-	@echo "==> Removing SUNDIALS library in PelePhysics"
-	cd $(PELE_PHYSICS_HOME)/ThirdParty; make AMREX_HOME=$(AMREX_HOME) USE_CUDA=$(USE_CUDA) USE_HIP=$(USE_HIP) PELE_USE_KLU=$(PELE_USE_KLU) PELE_USE_MAGMA=$(PELE_USE_MAGMA) DEBUG=$(DEBUG) COMP=$(HOSTCC) NVCC=$(COMP) PRECISION=$(PRECISION) clean
+TPLclean:
+	@echo "==> Removing SUNDIALS library"
+	@cd $(PELE_PHYSICS_HOME)/ThirdParty; $(MAKE) SUNDIALS_HOME=$(SUNDIALS_HOME) AMREX_HOME=$(AMREX_HOME) USE_SYCL=$(USE_SYCL) USE_HIP=$(USE_HIP) USE_CUDA=$(USE_CUDA) PELE_USE_KLU=$(PELE_USE_KLU) PELE_USE_MAGMA=$(PELE_USE_MAGMA) DEBUG=$(DEBUG) COMP=$(HOSTCC) NVCC=$(COMP) CUDA_ARCH=$(CUDA_ARCH) PRECISION=$(PRECISION) clean
+
+TPLrealclean:
+	@echo "==> Removing SUNDIALS library"
+	@cd $(PELE_PHYSICS_HOME)/ThirdParty; $(MAKE) SUNDIALS_HOME=$(SUNDIALS_HOME) AMREX_HOME=$(AMREX_HOME) USE_SYCL=$(USE_SYCL) USE_HIP=$(USE_HIP) USE_CUDA=$(USE_CUDA) PELE_USE_KLU=$(PELE_USE_KLU) PELE_USE_MAGMA=$(PELE_USE_MAGMA) DEBUG=$(DEBUG) COMP=$(HOSTCC) NVCC=$(COMP) CUDA_ARCH=$(CUDA_ARCH) PRECISION=$(PRECISION) realclean
 
 #
 # For debug, see amrex/Tools/GNUMake/README.md
