@@ -24,7 +24,7 @@ FSANITIZER = FALSE
 THREAD_SANITIZER = FALSE
 
 # PelePhysics
-Eos_Model := Fuego
+Eos_Model := GammaLaw
 Transport_Model := Constant
 Chemistry_Model := nitrogens
 

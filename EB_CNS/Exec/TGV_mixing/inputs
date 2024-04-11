@@ -29,7 +29,7 @@ cns.hi_bc = 0 0 0
 cns.do_visc  = 1
 
 # ==================== WHAT NUMERICS =================== #
-cns.cfl = 0.3
+cns.cfl = 0.1
 cns.dt_cutoff = 5.e-20
 cns.recon_scheme = 6   # 1: Godunov, 2: MUSCL, 
                        # 3: WENO-Z3, 4: WENO-JS5, 5: WENO-Z5
@@ -69,12 +69,12 @@ amr.grid_eff        = 0.7
 # ==================== OUTPUT FILES ==================== #
 amr.checkpoint_files_output = 0
 amr.check_file      = chk    # root name of checkpoint file
-amr.check_int       = 1000   # number of timesteps between checkpoints
+amr.check_int       = 2000   # number of timesteps between checkpoints
 #amr.check_per # interval physical time between checkpoints
 
-amr.plot_files_output = 0
+amr.plot_files_output = 1
 amr.plot_file         = plt  # root name of plotfile
-#amr.plot_int          = 200  # number of timesteps between plotfiles
+#amr.plot_int          = 2000 # number of timesteps between plotfiles
 amr.plot_per = 0.000458408486 # interval physical time between plotfiles
 amr.derive_plot_vars = ALL
 cns.plot_rhoy = 0
@@ -85,5 +85,6 @@ cns.plot_massfrac = 1
 prob.reynolds = 1600.0
 prob.mach = 0.1
 prob.prandtl = 0.71
+prob.schmidt = 0.71
 
 amr.data_log = teno-mx-sf8-128.log # to store KE and enstrophy over time

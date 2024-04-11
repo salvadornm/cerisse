@@ -150,7 +150,7 @@ void CNS::variableSetUp()
   BCRec bc;
 
   // Get the species names from the network model
-  pele::physics::eos::speciesNames<pele::physics::PhysicsType::eos_type>(spec_names);
+  pele::physics::eos::speciesNames<pele::physics::eos::Fuego>(spec_names);
 
   if (ParallelDescriptor::IOProcessor()) {
     amrex::Print() << NUM_REACTIONS << " Reactions in mechanism \n";

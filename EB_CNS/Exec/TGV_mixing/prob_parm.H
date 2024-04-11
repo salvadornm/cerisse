@@ -9,6 +9,7 @@ struct ProbParm
   amrex::Real reynolds = 1600.0;
   amrex::Real mach = 0.1;
   amrex::Real prandtl = 0.71;
+  amrex::Real schmidt = 0.71;
   bool convecting = false;
   amrex::Real omega_x = 1.0;
   amrex::Real omega_y = 1.0;
