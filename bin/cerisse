@@ -27,7 +27,7 @@ case  $1 in
 	tput setaf 2
 	echo " ...  creating movie.visit file"
 	tput sgr0
-	ls -1 plt*/Header | tee movie.visit	
+	ls -1 plot/plt*/Header | tee movie.visit	
 	echo -e "\\033[1;32m  DONE  \\033[0m"
 	;;
 	backup )

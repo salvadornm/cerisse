@@ -11,14 +11,13 @@ using namespace amrex;
 
 namespace PROB {
 
-// problem parameters
+// problem parameters  (1:bottom   2:top)
 struct ProbParm {
-  Real p_l = 1.0;
-  Real p_r = 0.1;
-  Real rho_l = 1.0;
-  Real rho_r = 0.125;
-  Real u_l = 0.0;
-  Real u_r = 0.0;
+  Real p_int = 2.0;
+  Real rho_1 = 1.0;
+  Real rho_2 = 2.0; //2.0
+  Real grav = -1.0; 
+  Real eps =  0.025;
 };
 
 inline Vector<std::string> cons_vars_names={"Xmom","Ymom","Zmom","Energy","Density"};
@@ -27,8 +26,12 @@ inline Vector<int> cons_vars_type={1,2,3,0,0};
 typedef closures_dt<indicies_t, visc_suth_t, cond_suth_t,
                     calorifically_perfect_gas_t<indicies_t>>
     ProbClosures;
-typedef rhs_dt<riemann_t<false, ProbClosures>, no_diffusive_t, no_source_t>
+    
+//typedef rhs_dt<riemann_t<false, ProbClosures>, no_diffusive_t, no_source_t>
+//    ProbRHS;
+typedef rhs_dt<riemann_t<false, ProbClosures>, no_diffusive_t, user_source_t<ProbClosures>>
     ProbRHS;
+
 
 void inline inputs() {
   ParmParse pp;
@@ -49,26 +52,44 @@ prob_initdata(int i, int j, int k, Array4<Real> const &state,
   Real x = prob_lo[0] + (i + Real(0.5)) * dx[0];
   Real y = prob_lo[1] + (j + Real(0.5)) * dx[1];
   
-  Real Pt, rhot, uxt;
-  if (x < prob_hi[0] / 2) {
-    Pt = prob_parm.p_l;
-    rhot = prob_parm.rho_l;
-    uxt = prob_parm.u_l;
-  } else {
-    Pt = prob_parm.p_r;
-    rhot = prob_parm.rho_r;
-    uxt = prob_parm.u_r;
-  }
+  Real Pt, rhot, uxt,uyt;
+  Real Lint = prob_hi[1] / 2; // half-domain lenght in y
+  Real Pint = prob_parm.p_int; // interface Pressure
+
+  const Real freq = Real(8)*Real(3.141592);
+
+  Real yrel = y - Lint;Real delta= 0.2*Lint;
+  Real delta2  = 4*dx[1];
+  Real step = Real(0.5) + Real(0.5)*tanh(yrel/delta2);
+
+  // bottom 
+  // if (y < Lint) {
+  //   rhot = prob_parm.rho_1;
+  // } 
+  // // top
+  // else {
+  //   rhot = prob_parm.rho_2;
+  // }
+
+  rhot = step*prob_parm.rho_2 + (Real(1.0) -step)*prob_parm.rho_1;
+
+  Real aux = exp(-yrel*yrel/delta/delta);
+
+  Pt = Pint + rhot*prob_parm.grav*(y - Lint);
+  //Pt = Pint;
+  uxt = Real(0.0);
+  uyt = -prob_parm.eps*cos(freq*x)*aux; // perturbation
+
+  uyt = Real(0.0); //temp
+  
+
   state(i, j, k, cls.URHO) = rhot;
-  state(i, j, k, cls.UMX) = rhot * uxt;
-  state(i, j, k, cls.UMY) = Real(0.0);
-  state(i, j, k, cls.UMZ) = Real(0.0);
+  state(i, j, k, cls.UMX)  = rhot * uxt;
+  state(i, j, k, cls.UMY)  = rhot * uyt;
+ // state(i, j, k, cls.UMZ)  = Real(0.0);
+
   Real et = Pt / (cls.gamma - Real(1.0));
-  state(i, j, k, cls.UET) = et + Real(0.5) * rhot * uxt * uxt;
-
-
-  // perturbation in x
-
+  state(i, j, k, cls.UET) = et + Real(0.5) * rhot * (uxt * uxt + uyt * uyt); 
 
 }
 
@@ -77,18 +98,27 @@ bcnormal(const Real x[AMREX_SPACEDIM], Real dratio, const Real s_int[5],
          const Real s_refl[ProbClosures::NCONS], Real s_ext[5], const int idir,
          const int sgn, const Real time, GeometryData const & /*geomdata*/,
          ProbClosures const &closures, ProbParm const &prob_parm) {
-  if (idir == 1) { // ylo or yhi
-
-    Abort("bcnormal not coded");
-  }
 }
 
 // source term
 AMREX_GPU_DEVICE AMREX_FORCE_INLINE void
 user_source(int i, int j, int k, const auto &state, const auto &rhs,
-            const ProbParm &lprobparm, ProbClosures const &closures,
-            auto const dx) {}
-////////////////////////////////////////////////////////////////////////////////
+            ProbClosures const &cls) {
+// user_source(int i, int j, int k, const auto &state, const auto &rhs,
+//             const ProbParm &prob_parm, ProbClosures const &cls,
+//             auto const dx) {
+
+
+std::cout << " aqui " << std::endl;
+
+  // rhs(i,j,k,cls.UMY) += prob_parm.grav*state(i, j, k, cls.URHO); // momentum
+  // rhs(i,j,k,cls.UET) += prob_parm.grav*state(i, j, k, cls.UMY);  // energy
+
+  rhs(i,j,k,cls.UMY) -= state(i, j, k, cls.URHO); // momentum (g=1) test
+  rhs(i,j,k,cls.UET) -= state(i, j, k, cls.UMY);  // energy
+
+
+            }
 
 ///////////////////////////////AMR//////////////////////////////////////////////
 AMREX_GPU_DEVICE AMREX_FORCE_INLINE void

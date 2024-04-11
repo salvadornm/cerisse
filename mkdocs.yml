@@ -8,7 +8,9 @@ nav:
   - Class: new_class.md
   - Tests: new_test.md
   - IBM: ibm.md
+  - Tutorial: tutorial.md
   - tips: tips.md  
+  - errors: errors.md
 extra_javascript:
   - https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.4/MathJax.js?config=TeX-AMS-MML_HTMLorMML
 markdown_extensions:

@@ -3,11 +3,21 @@
 
 # rhs/
 
-## RHS
+In the prob.h file, there the **rhs_dt** is defined
 
-Overall general RHS class
+```cpp
+typedef rhs_dt<riemann_t<false, ProbClosures>, no_diffusive_t, no_source_t>
+    ProbRHS;
+```
+The line above  defines the type of problem to be solved, and consist of a serie of keywords that
+represent the relative class
 
-```class rhs_dt : public euler, public diffusive, public source```
+
+| class                      | Type          | Options| Description                                                  |
+| --------------------------- | ------------- |:-------:| ------------------------------------------------------------ |
+| riemann_t              | Euler Solver           |   bool, ProbClosures     | Class for Riemann Solvers   |
+| no_diffusive_t             | Option          | 0       | No diffusion, viscosity   |
+| no_source_t             | Option          | 0       | No source term   |
 
 
 

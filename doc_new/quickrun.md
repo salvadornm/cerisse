@@ -41,7 +41,7 @@ $ make SUNDIALS
 ```
 This will download and isntall version **6.5**. Sundials cannot be installed before compiling as some options (such as GPU) require re-compiling.
 
-## Tutorial
+## Quick Tutorial
 
 ### 1) Go to Problem Folder
 
