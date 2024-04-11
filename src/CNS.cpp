@@ -57,7 +57,7 @@ CNS::~CNS() {}
 void CNS::read_params() {
   ParmParse pp("cns");
 
-  pp.query("screen_output", nstep_screen_output);
+  pp.query("nstep_screen_output", nstep_screen_output);
   pp.query("verbose", verbose);
 
   Vector<int> lo_bc(AMREX_SPACEDIM), hi_bc(AMREX_SPACEDIM);
@@ -171,7 +171,7 @@ void CNS::post_init(Real stop_time) {
   }
 
   if (verbose) {
-    // printTotal();
+    printTotal();
   }
 }
 // -----------------------------------------------------------------------------
@@ -329,8 +329,8 @@ void CNS::post_timestep(int /* iteration*/) {
     avgDown();
   }
 
-  if (verbose && this->nStep() % nstep_screen_output == 0) {
-    // printTotal();
+  if (verbose && ((this->nStep() % nstep_screen_output) == 0)) {
+    printTotal();
   }
 }
 
@@ -417,105 +417,23 @@ void CNS::avgDown() {
 }
 
 void CNS::printTotal() const {
-//   const MultiFab &S_new = get_new_data(State_Type);
-//   std::array<Real, NCONS> tot;
-//   std::array<Real, NPRIM> prims_max, prims_min;
+  // Get conservatives multifab
+  const MultiFab& consmf = get_new_data(State_Type);
 
-//   // NEED to put these lines in GPU launch region?
-//   for (int comp = 0; comp < NCONS; ++comp) {
-//     tot[comp] = S_new.sum(comp, true) * geom.ProbSize();
-//   }
+  // Compute peicewise constant sum of conserved variables
+  std::array<Real, PROB::ProbClosures::NCONS> tot;
+  for (int comp = 0; comp < PROB::ProbClosures::NCONS; ++comp) {
+    tot[comp] = consmf.sum(comp, true) * geom.ProbSize();
+  }
 
-//   for (int comp = 0; comp < NPRIM; ++comp) {
-//     prims_max[comp] = Vprimsmf[level].max(comp, 0, true);
-//     prims_min[comp] = Vprimsmf[level].min(comp, 0, true);
-//   }
-
-// #ifdef BL_LAZY
-//   Lazy::QueueReduction([=]() mutable {
-// #endif
-//     ParallelDescriptor::ReduceRealSum(tot.data(), NCONS,
-//                                       ParallelDescriptor::IOProcessorNumber());
-
-//     ParallelDescriptor::ReduceRealMax(prims_max.data(), NPRIM,
-//                                       ParallelDescriptor::IOProcessorNumber());
-
-//     ParallelDescriptor::ReduceRealMin(prims_min.data(), NPRIM,
-//                                       ParallelDescriptor::IOProcessorNumber());
-
-//     // compute convective CFL
-//     const auto dx = geom.CellSizeArray();
-//     const Real dt = parent->dtLevel(level);
-//     const MultiFab &primsmf = Vprimsmf[level];
-//     PROB::ProbClosures const &lclosures = *d_prob_closures;
-//     Array2D<Real, 0, 2, 0, 2> *arrayCFL;
-
-// #if AMREX_USE_GPU
-//     arrayCFL = (Array2D<Real, 0, 2, 0, 2> *)The_Arena()->alloc(
-//         sizeof(Array2D<Real, 0, 2, 0, 2>));
-// #else
-//   arrayCFL = new Array2D<Real, 0, 2, 0, 2>{};
-// #endif
-//     // We cannot modify variables defined outside of the lambda function in the
-//     // lambda function (not even reals and ints). AMReX does not allow mutable
-//     // keyword. This is why we need to call functions.
-
-//     for (MFIter mfi(primsmf, TilingIfNotGPU()); mfi.isValid(); ++mfi) {
-//       auto const &prims = primsmf.array(mfi);
-//       const Box &bx = mfi.tilebox();
-
-//       amrex::ParallelFor(
-//           bx, [=] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {
-//             pointCFL(i, j, k, *arrayCFL, prims, lclosures, dx, dt);
-//           });
-//     };
-
-//     for (int idir = 0; idir < AMREX_SPACEDIM; idir++) {
-//       for (int icomp = 0; icomp < AMREX_SPACEDIM; icomp++) {
-//         ParallelDescriptor::ReduceRealMax(
-//             (*arrayCFL)(idir, icomp), ParallelDescriptor::IOProcessorNumber());
-//       }
-//     }
-
-//     amrex::Print().SetPrecision(17) << "\n[CNS level " << level << "]\n"
-//                                     << "   Rho  min, max = " << prims_min[0]
-//                                     << " , " << prims_max[0] << "\n"
-//                                     << "   Ux   min, max = " << prims_min[1]
-//                                     << " , " << prims_max[1] << "\n"
-//                                     << "   Uy   min, max = " << prims_min[2]
-//                                     << " , " << prims_max[2] << "\n"
-//                                     << "   Uz   min, max = " << prims_min[3]
-//                                     << " , " << prims_max[3] << "\n"
-//                                     << "   P    min, max = " << prims_min[5]
-//                                     << " , " << prims_max[5] << "\n"
-//                                     << "   T    min, max = " << prims_min[4]
-//                                     << " , " << prims_max[4] << "\n";
-
-//     amrex::Print().SetPrecision(17)
-//         << "   Vax  min, max = " << (*arrayCFL)(0, 0) << " , "
-//         << (*arrayCFL)(0, 1) << "\n"
-//         << "   Vay  min, max = " << (*arrayCFL)(1, 0) << " , "
-//         << (*arrayCFL)(1, 1) << "\n"
-//         << "   Vaz  min, max = " << (*arrayCFL)(2, 0) << " , "
-//         << (*arrayCFL)(2, 1) << "\n"
-//         << "   CFLx         = " << (*arrayCFL)(0, 2) << "\n"
-//         << "   CFLy         = " << (*arrayCFL)(1, 2) << "\n"
-//         << "   CFLz         = " << (*arrayCFL)(2, 2) << "\n \n";
-
-//     amrex::Print().SetPrecision(17) << "   Total mass   = " << tot[0] << "\n"
-//                                     << "   Total x-mom  = " << tot[1] << "\n"
-//                                     << "   Total y-mom  = " << tot[2] << "\n"
-//                                     << "   Total z-mom  = " << tot[3] << "\n"
-//                                     << "   Total energy = " << tot[4] << "\n";
-
-// #if AMREX_USE_GPU
-//     The_Arena()->free(arrayCFL);
-// #else
-//   delete arrayCFL;
-// #endif
-// #ifdef BL_LAZY
-//   });
-// #endif
+  // Communicate across processors
+  ParallelDescriptor::ReduceRealSum(tot.data(), PROB::ProbClosures::NCONS,
+                                    ParallelDescriptor::IOProcessorNumber());
+  // Print
+  Vector<std::string> names= PROB::ProbClosures::get_cons_vars_names();
+  for (int comp = 0; comp < PROB::ProbClosures::NCONS; ++comp) {
+    amrex::Print().SetPrecision(17) << "   Total " << names[comp] << " = " << tot[comp] << "\n";
+  }
 }
 
 void CNS::variableCleanUp() {
