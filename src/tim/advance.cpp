@@ -238,6 +238,9 @@ void CNS::compute_rhs(MultiFab& statemf, Real dt, FluxRegister* fr_as_crse, Flux
   const PROB::ProbClosures* cls_d = CNS::d_prob_closures;
   const PROB::ProbClosures& cls_h = *CNS::h_prob_closures;
   // const PROB::ProbParm& parms = *d_prob_parm;
+#ifdef AMREX_USE_GPIBM
+  auto& ib_mf = *IBM::ib.bmf_a[level];
+#endif
 
   for (MFIter mfi(statemf, false); mfi.isValid(); ++mfi) {
     Array4<Real> const& state = statemf.array(mfi);
@@ -254,65 +257,7 @@ void CNS::compute_rhs(MultiFab& statemf, Real dt, FluxRegister* fr_as_crse, Flux
     // We want to minimise function calls. So, we call prims2cons, flux and
     // source term evaluations once per fab from CPU, to be run on GPU.
     cls_h.cons2prims(mfi, state, prims);
-    // amrex::ParallelFor(bxg, [=] AMREX_GPU_DEVICE(int i, int j, int k) {
-    //   Real rho = 0.0;
-    //   for (int n = 0; n < NUM_SPECIES; ++n) {
-    //     rho += state(i, j, k, cls_d->UFS + n);
-    //   }
-    //   Real rhoinv = Real(1.0) / rho;
-    //   Real ux = state(i, j, k, cls_d->UMX) * rhoinv;
-    //   Real uy = state(i, j, k, cls_d->UMY) * rhoinv;
-    //   Real uz = state(i, j, k, cls_d->UMZ) * rhoinv;
-    //   Real rhoke = Real(0.5) * rho * (ux * ux + uy * uy + uz * uz);
-    //   Real ei = (state(i, j, k, cls_d->UET) - rhoke) * rhoinv;
-    //   Real Y[NUM_SPECIES];
-    //   Real sumY = 0.0;
-    //   for (int n = 0; n < NUM_SPECIES; ++n) {
-    //     Y[n] = state(i, j, k, cls_d->UFS + n) * rhoinv;
-    //     prims(i, j, k, cls_d->QFS + n) = Y[n];
-    //     sumY += Y[n];
-    //   }
-    //   Real T, p, cs, gamma;
 
-    //   // cls_d->RYE2TPCsG(rho, Y, ei, T, p, cs, gamma);
-    //   {
-    //     T = 0.0;
-    //     Real rho_cgs = rho * 0.001;
-    //     Real e_cgs = ei * 1.0e4;
-
-    //     auto eos = pele::physics::PhysicsType::eos();
-    //     Real p_cgs, cs_cgs;
-    //     eos.REY2T(rho_cgs, e_cgs, Y, T);
-    //     eos.RTY2P(rho_cgs, T, Y, p_cgs);
-    //     eos.RTY2G(rho_cgs, T, Y, gamma);
-    //     cs_cgs = std::sqrt(gamma * p_cgs / rho_cgs);
-
-    //     p = p_cgs * 0.1;
-    //     cs = cs_cgs * 0.01;
-    //   }
-
-    //   // {
-    //   //   p = (cls_d->gamma - Real(1.0)) * rho * ei;
-    //   //   T = p / (rho * cls_d->Rspec);
-    //   //   cs = std::sqrt(cls_d->gamma * p * rhoinv);
-    //   //   gamma = cls_d->gamma;
-    //   // }
-
-    //   // AMREX_DEVICE_PRINTF("i = %d, rho = %f, ei = %f, T = %f, Y = [%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f](sum to %f)\n", 
-    //   //                     i, rho, ei, T, Y[0], Y[1], Y[2], Y[3], Y[4], Y[5], Y[6], Y[7], Y[8], Y[9], Y[10], Y[11], Y[12], sumY);      
-      
-    //   prims(i, j, k, cls_d->QRHO) = rho;
-    //   prims(i, j, k, cls_d->QU) = ux;
-    //   prims(i, j, k, cls_d->QV) = uy;
-    //   prims(i, j, k, cls_d->QW) = uz;
-    //   prims(i, j, k, cls_d->QPRES) = p;
-    //   prims(i, j, k, cls_d->QT) = T;
-    //   prims(i, j, k, cls_d->QC) = cs;
-    //   prims(i, j, k, cls_d->QG) = gamma;
-    //   prims(i, j, k, cls_d->QEINT) = ei;
-    // });
-    // amrex::Print() << "cons2prims done" << std::endl;
-    // where_is_nan(primf, false);
 
 #ifdef AMREX_USE_GPIBM
     IBM::ib.computeGPs(mfi, state, prims, cls_d, level);
@@ -328,6 +273,17 @@ void CNS::compute_rhs(MultiFab& statemf, Real dt, FluxRegister* fr_as_crse, Flux
 
     // Source terms, including update mask (e.g inside IB)
     prob_rhs.src(mfi, prims, state, cls_d, dt);
+
+    // Set solid point RHS to 0
+#if AMREX_USE_GPIBM
+    const Box& bx   = mfi.tilebox();
+    const auto& ibMarkers = ib_mf.array(mfi);
+    amrex::ParallelFor(bx, cls_h.NCONS,
+    [=] AMREX_GPU_DEVICE (int i, int j, int k, int n) noexcept
+    {
+    state(i,j,k,n) = state(i,j,k,n)*(1 - int(ibMarkers(i,j,k,0)));
+    });
+#endif
   }
 }
 

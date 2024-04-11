@@ -115,7 +115,7 @@ void prob_initdata (int i, int j, int k, amrex::Array4<amrex::Real> const& state
   //     ux = pparm.u_inf;
   // }
 
-  Real u_small = pparm.u_inf*0.5;
+  Real u_small = pparm.u_inf*0.1;
   Real xstart = 0.2_rt;
   Real xend   = pparm.x0;
   Real dis = xstart - xend;
