@@ -244,7 +244,6 @@ void CNS::compute_rhs(MultiFab& statemf, Real dt, FluxRegister* fr_as_crse, Flux
 
   for (MFIter mfi(statemf, false); mfi.isValid(); ++mfi) {
     Array4<Real> const& state = statemf.array(mfi);
-    // where_is_nan(statemf[mfi], false);
 
     // const Box& bxgnodal = mfi.grownnodaltilebox(-1, 1);  // extent is 0,N_cell+1
     const Box& bxg = mfi.growntilebox(cls_h.NGHOST);
@@ -275,6 +274,7 @@ void CNS::compute_rhs(MultiFab& statemf, Real dt, FluxRegister* fr_as_crse, Flux
     prob_rhs.src(mfi, prims, state, cls_d, dt);
 
     // Set solid point RHS to 0
+    // TODO: IBM::set_solid_state(mfi,state,cls_d)
 #if AMREX_USE_GPIBM
     const Box& bx   = mfi.tilebox();
     const auto& ibMarkers = ib_mf.array(mfi);

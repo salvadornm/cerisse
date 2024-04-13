@@ -177,143 +177,191 @@ void CNS::post_init(Real stop_time) {
 // -----------------------------------------------------------------------------
 
 // Time-stepping ---------------------------------------------------------------
-// void CNS::computeTemp(MultiFab &State, int ng) {
-//   BL_PROFILE("CNS::computeTemp()");
-
-//   PROB::ProbClosures const *lclosures = d_prob_closures;
-
-//   // This will reset Eint and compute Temperature
-// #ifdef AMREX_USE_OMP
-// #pragma omp parallel if (Gpu::notInLaunchRegion())
-// #endif
-//   for (MFIter mfi(State, TilingIfNotGPU()); mfi.isValid(); ++mfi) {
-//     const Box &bx = mfi.growntilebox(ng);
-//     auto const &sfab = State.array(mfi);
-
-//     amrex::Abort("ComputeTemp function not written");
-
-//     amrex::ParallelFor(bx, [=] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {
-//       cns_compute_temperature(i, j, k, sfab, *lclosures);
-//     });
-//   }
-// }
-// Called on level 0 only, after field data is initialised but before first
-// step.
 void CNS::computeInitialDt(int finest_level, int sub_cycle,
                            Vector<int> &n_cycle,  // no. of subcycling steps
                            const Vector<IntVect> &ref_ratio,
                            Vector<Real> &dt_level, Real stop_time) {
+  BL_PROFILE("CNS::computeInitialDt()");
   Real dt0 = std::numeric_limits<Real>::max();
-  int nfactor = 1;
+  const GpuArray<Real,AMREX_SPACEDIM> dx = geom.CellSizeArray();
+  Vector<GpuArray<Real,AMREX_SPACEDIM>> eigenvals_level;
+  Vector<Real> CFL_level;
+  eigenvals_level.resize(finest_level + 1);
+  CFL_level.resize(finest_level + 1);
 
-  // dt at base level
-  if (!dt_dynamic) {
-    dt0 = dt_constant;
-  } else {
-    // estimate dt per level
+  // Compute max eigenvalues in all directions on each level
+  for (int i = 0; i <= finest_level; i++) {
+    eigenvals_level[i] = getLevel(i).maxEigen();
+  }
+
+  if (dt_dynamic) {
+    // Dynamic dt
     for (int i = 0; i <= finest_level; i++) {
-      dt_level[i] = getLevel(i).estTimeStep();
+      dt_level[i] = cfl*amrex::min(AMREX_D_DECL(dx[0]/eigenvals_level[i][0],
+                                            dx[1]/eigenvals_level[i][1],
+                                            dx[2]/eigenvals_level[i][2]));
     }
-    // find min dt across all levels
-    nfactor = 1;
+    // Find min dt across all levels
+    int nfactor = 1;
     for (int i = 0; i <= finest_level; i++) {
       nfactor *= n_cycle[i];
       dt0 = std::min(dt0, nfactor * dt_level[i]);
     }
+  } 
+  else {
+    // If constant dt
+    dt0 = dt_constant;
   }
-
-  // set dt at all levels
-  nfactor = 1;
+  // Set dt for all levels
+  int nfactor = 1;
   for (int i = 0; i <= finest_level; i++) {
     nfactor *= n_cycle[i];
     dt_level[i] = dt0 / nfactor;
+    CFL_level[i] = dt_level[i] * amrex::max(AMREX_D_DECL(
+                                          eigenvals_level[i][0]/dx[0],
+                                          eigenvals_level[i][1]/dx[1],
+                                          eigenvals_level[i][2]/dx[2]));
   }
-
-  Print() << "[computeInitialDt] Level 0 dt = " << dt0 << std::endl;
+  // Print
+  if (ParallelDescriptor::IOProcessor()) {
+    for (int i = 0; i <= finest_level; i++) {
+      printf("[computeInitialDt] Level %d, CFL= %f, Max eigenvalues (x,y,z) = (%f,%f,%f) \n", i, CFL_level[i],eigenvals_level[i][0], eigenvals_level[i][1], eigenvals_level[i][2]);
+    }
+  }
 }
 
 // Called at the end of a coarse grid timecycle or after regrid, to compute the
 // dt (time step) for all levels, for the next step.
-void CNS::computeNewDt(int finest_level, int /*sub_cycle*/,
-                       Vector<int> &n_cycle,
-                       const Vector<IntVect> & /*ref_ratio*/,
-                       Vector<Real> &dt_min, Vector<Real> &dt_level,
-                       Real stop_time, int post_regrid_flag) {
-  // dt is constant, dt at level 0 is from inputs and dt at higher levels is
-  // computed from the number of subcycles
-  // ////////////////////////////////////////
-  if (!dt_dynamic) {
+// Output dt_level
+void CNS::computeNewDt(int finest_level, int sub_cycle, Vector<int> &n_cycle,
+                       const Vector<IntVect> &ref_ratio, Vector<Real> &dt_min,
+                       Vector<Real> &dt_level, Real stop_time,
+                       int post_regrid_flag) {
+  BL_PROFILE("CNS::computeNewDt()");
+
+  Real dt0 = std::numeric_limits<Real>::max();
+  const GpuArray<Real,AMREX_SPACEDIM> dx = geom.CellSizeArray();
+  Vector<GpuArray<Real,AMREX_SPACEDIM>> eigenvals_level;
+  Vector<Real> CFL_level;
+  eigenvals_level.resize(finest_level + 1);
+  CFL_level.resize(finest_level + 1);
+
+  // Compute max eigenvalues in all directions on each level
+  for (int i = 0; i <= finest_level; i++) {
+    eigenvals_level[i] = getLevel(i).maxEigen();
+  }
+
+  if (dt_dynamic) {
+    // Estimate timestep across all points, levels, and procs
+    for (int i = 0; i <= finest_level; i++) {
+      dt_min[i] = cfl*amrex::min(AMREX_D_DECL(dx[0]/eigenvals_level[i][0],
+                                          dx[1]/eigenvals_level[i][1],
+                                          dx[2]/eigenvals_level[i][2]));
+    };
+
+    // Limit dt
+    if (post_regrid_flag == 1) {
+      // Limit dt's by pre-regrid dt
+      for (int i = 0; i <= finest_level; i++) {
+        dt_min[i] = std::min(dt_min[i], dt_level[i]);
+      }
+    } else {
+      // Limit dt's by change_max * old dt
+      static Real change_max = 1.1; //////// PARAMETER /////////////
+      for (int i = 0; i <= finest_level; i++) {
+        dt_min[i] = std::min(dt_min[i], change_max * dt_level[i]);
+      }
+    }
+    // Find the minimum over all levels
     int nfactor = 1;
     for (int i = 0; i <= finest_level; i++) {
       nfactor *= n_cycle[i];
-      dt_level[i] = dt_constant / nfactor;
+      dt0 = std::min(dt0, nfactor * dt_min[i]);
     }
-    return;
-  }
-
-  // if dt is dynamic //////////////////////////////////////////////////////////
-  for (int i = 0; i <= finest_level; i++) {
-    dt_min[i] = getLevel(i).estTimeStep();
-  }
-
-  // Limit dt
-  if (post_regrid_flag == 1) {
-    // Limit dt's by pre-regrid dt
+    // Limit dt0 by the value of stop_time.
+    const Real eps = 0.001_rt * dt0; ////////// PARAMETER /////////////
+    Real cur_time = state[State_Type].curTime();
+    if (stop_time >= 0.0_rt) {
+      if ((cur_time + dt0) > (stop_time - eps)) {
+        dt0 = stop_time - cur_time;
+      }
+    }
+    // Set dt at all levels
+    nfactor = 1;
     for (int i = 0; i <= finest_level; i++) {
-      dt_min[i] = std::min(dt_min[i], dt_level[i]);
+      nfactor *= n_cycle[i];
+      dt_level[i] = dt0 / nfactor;
     }
+  } else {
+    // If constant dt
+    dt0 = dt_constant;
   }
-  // Limit dt's by change_max * old dt
-  else {
-    static Real change_max = 1.1;
-    for (int i = 0; i <= finest_level; i++) {
-      dt_min[i] = std::min(dt_min[i], change_max * dt_level[i]);
-    }
-  }
-
-  // Find the minimum over all levels
-  Real dt0 = std::numeric_limits<Real>::max();
+  // Set dt for all levels
   int nfactor = 1;
   for (int i = 0; i <= finest_level; i++) {
     nfactor *= n_cycle[i];
-    dt0 = std::min(dt0, nfactor * dt_min[i]);
+    dt_level[i] = dt0 / nfactor;
+    CFL_level[i] = dt_level[i] * amrex::max(AMREX_D_DECL(
+                                          eigenvals_level[i][0]/dx[0],
+                                          eigenvals_level[i][1]/dx[1],
+                                          eigenvals_level[i][2]/dx[2]));
   }
-
-  // Limit dt0 by the value of stop_time.
-  const Real eps = 0.001_rt * dt0;
-  Real cur_time = state[State_Type].curTime();
-  if (stop_time >= 0.0_rt) {
-    if ((cur_time + dt0) > (stop_time - eps)) {
-      dt0 = stop_time - cur_time;
+  // Print
+  if (ParallelDescriptor::IOProcessor()) {
+    for (int i = 0; i <= finest_level; i++) {
+      printf("[computeInitialDt] Level %d, CFL= %f, Max eigenvalues (x,y,z) = (%f,%f,%f) \n", i, CFL_level[i],eigenvals_level[i][0], eigenvals_level[i][1], eigenvals_level[i][2]);
     }
   }
-
-  // Set dt at all levels
-  nfactor = 1;
-  for (int i = 0; i <= finest_level; i++) {
-    nfactor *= n_cycle[i];
-    dt_level[i] = dt0 / nfactor;
-  }
-
-  Print() << "[computeNewDt] Level 0 dt = " << dt0 << std::endl;
 }
 
-Real CNS::estTimeStep() {
-  BL_PROFILE("CNS::estTimeStep()");
+// Returns maximum eigenvalue in each direction
+ [[nodiscard]] GpuArray<Real,AMREX_SPACEDIM> CNS::maxEigen() {
+  BL_PROFILE("CNS::maxEigen()");
 
   const auto dx = geom.CellSizeArray();
-  const MultiFab &S = get_new_data(State_Type);
-  PROB::ProbClosures const *lclosures = d_prob_closures;
+  PROB::ProbClosures const *d_cls = d_prob_closures;
 
-  Real estdt = amrex::ReduceMin(
-      S, 0,
-      [=] AMREX_GPU_HOST_DEVICE(Box const &bx, Array4<Real const> const &fab)
-          -> Real { return cns_estdt(bx, fab, dx, *lclosures); });
+  // Get multifabs
+  MultiFab& consmf = get_new_data(State_Type);
+#if AMREX_USE_GPIBM
+  auto& ib_mf = *IBM::ib.bmf_a[level];
+#endif
 
-  estdt *= cfl;
-  ParallelDescriptor::ReduceRealMin(estdt);
+  // CPU arrays
+  typedef GpuArray<Real,AMREX_SPACEDIM> Array_t;
+  Array_t h_max_eigenvals;
+  for (int idir = 0; idir < AMREX_SPACEDIM; idir++) {
+    h_max_eigenvals[idir] = - std::numeric_limits<Real>::min();
+  }
 
-  return estdt;
+  // CPU-GPU transfer array
+  AsyncArray<Array_t> aa_max_eigenvals(&h_max_eigenvals, 1);  
+  Array_t* d_max_eigenvals = aa_max_eigenvals.data(); // Get associated device pointer
+
+  // Compute max eigenvalues
+  for (MFIter mfi(consmf, false); mfi.isValid(); ++mfi) {
+    const Box &bx = mfi.tilebox();
+    const Array4<Real>& cons= consmf.array(mfi);
+    ParallelFor(
+        bx, [=] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {
+          for (int idir = 0; idir < AMREX_SPACEDIM; idir++) {
+            GpuArray<Real,PROB::ProbClosures::NWAVES> temp = d_cls->cons2eigenvals(i, j, k, idir, cons);
+
+            for (int iwave = 0; iwave < PROB::ProbClosures::NWAVES; iwave++) {
+              (*d_max_eigenvals)[idir] = max((*d_max_eigenvals)[idir],
+                                            std::abs((temp[iwave])));
+            }
+          }
+        });
+  };
+  aa_max_eigenvals.copyToHost(&h_max_eigenvals, 1); // Copy the value back to host
+
+  // Communicate across processors
+  for (int idir = 0; idir < AMREX_SPACEDIM; idir++) {
+    ParallelDescriptor::ReduceRealMax(h_max_eigenvals[idir]);
+  }
+
+  return h_max_eigenvals;
 }
 
 void CNS::post_timestep(int /* iteration*/) {

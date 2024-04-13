@@ -4,7 +4,7 @@ max_step  = 200
 stop_time = 2.0
 time_step = 0.001 # at base level, higher level time step is computed based on the number of subcycles (depending on the subcycling strategy). stop_time = max_step*time_step
 # or
-#cfl = 1.0
+#cfl = 0.8
 
 # Geometry 
 geometry.is_periodic = 0 1 1
