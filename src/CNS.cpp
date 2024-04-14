@@ -378,10 +378,6 @@ void CNS::post_timestep(int /* iteration*/) {
   if (level < parent->finestLevel()) {
     avgDown();
   }
-
-  if (verbose && ((this->nStep() % nstep_screen_output) == 0)) {
-    printTotal();
-  }
 }
 
 void CNS::postCoarseTimeStep(Real time) {
@@ -396,6 +392,10 @@ void CNS::postCoarseTimeStep(Real time) {
   //   }
   // }
 #endif
+
+  if (verbose && ((this->nStep() % nstep_screen_output) == 0)) {
+    printTotal();
+  }
 }
 // -----------------------------------------------------------------------------
 
