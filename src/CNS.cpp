@@ -183,7 +183,6 @@ void CNS::computeInitialDt(int finest_level, int sub_cycle,
                            Vector<Real> &dt_level, Real stop_time) {
   BL_PROFILE("CNS::computeInitialDt()");
   Real dt0 = std::numeric_limits<Real>::max();
-  const GpuArray<Real,AMREX_SPACEDIM> dx = geom.CellSizeArray();
   Vector<GpuArray<Real,AMREX_SPACEDIM>> eigenvals_level;
   Vector<Real> CFL_level;
   eigenvals_level.resize(finest_level + 1);
@@ -197,6 +196,7 @@ void CNS::computeInitialDt(int finest_level, int sub_cycle,
   if (dt_dynamic) {
     // Dynamic dt
     for (int i = 0; i <= finest_level; i++) {
+      const GpuArray<Real,AMREX_SPACEDIM> dx = parent->Geom(i).CellSizeArray();
       dt_level[i] = cfl*amrex::min(AMREX_D_DECL(dx[0]/eigenvals_level[i][0],
                                             dx[1]/eigenvals_level[i][1],
                                             dx[2]/eigenvals_level[i][2]));
@@ -215,6 +215,7 @@ void CNS::computeInitialDt(int finest_level, int sub_cycle,
   // Set dt for all levels
   int nfactor = 1;
   for (int i = 0; i <= finest_level; i++) {
+    const GpuArray<Real,AMREX_SPACEDIM> dx = parent->Geom(i).CellSizeArray();
     nfactor *= n_cycle[i];
     dt_level[i] = dt0 / nfactor;
     CFL_level[i] = dt_level[i] * amrex::max(AMREX_D_DECL(
@@ -225,7 +226,7 @@ void CNS::computeInitialDt(int finest_level, int sub_cycle,
   // Print
   if (ParallelDescriptor::IOProcessor()) {
     for (int i = 0; i <= finest_level; i++) {
-      printf("[computeInitialDt] Level %d, CFL= %f, Max eigenvalues (x,y,z) = (%f,%f,%f) \n", i, CFL_level[i],eigenvals_level[i][0], eigenvals_level[i][1], eigenvals_level[i][2]);
+      printf("[computeInitialDt] Level %d, Max CFL= %f, Max eigenvalues (x,y,z) = (%f,%f,%f) \n", i, CFL_level[i],eigenvals_level[i][0], eigenvals_level[i][1], eigenvals_level[i][2]);
     }
   }
 }
@@ -240,7 +241,6 @@ void CNS::computeNewDt(int finest_level, int sub_cycle, Vector<int> &n_cycle,
   BL_PROFILE("CNS::computeNewDt()");
 
   Real dt0 = std::numeric_limits<Real>::max();
-  const GpuArray<Real,AMREX_SPACEDIM> dx = geom.CellSizeArray();
   Vector<GpuArray<Real,AMREX_SPACEDIM>> eigenvals_level;
   Vector<Real> CFL_level;
   eigenvals_level.resize(finest_level + 1);
@@ -254,6 +254,7 @@ void CNS::computeNewDt(int finest_level, int sub_cycle, Vector<int> &n_cycle,
   if (dt_dynamic) {
     // Estimate timestep across all points, levels, and procs
     for (int i = 0; i <= finest_level; i++) {
+      const GpuArray<Real,AMREX_SPACEDIM> dx = parent->Geom(i).CellSizeArray();
       dt_min[i] = cfl*amrex::min(AMREX_D_DECL(dx[0]/eigenvals_level[i][0],
                                           dx[1]/eigenvals_level[i][1],
                                           dx[2]/eigenvals_level[i][2]));
@@ -299,6 +300,7 @@ void CNS::computeNewDt(int finest_level, int sub_cycle, Vector<int> &n_cycle,
   // Set dt for all levels
   int nfactor = 1;
   for (int i = 0; i <= finest_level; i++) {
+    const GpuArray<Real,AMREX_SPACEDIM> dx = parent->Geom(i).CellSizeArray();
     nfactor *= n_cycle[i];
     dt_level[i] = dt0 / nfactor;
     CFL_level[i] = dt_level[i] * amrex::max(AMREX_D_DECL(
@@ -309,7 +311,7 @@ void CNS::computeNewDt(int finest_level, int sub_cycle, Vector<int> &n_cycle,
   // Print
   if (ParallelDescriptor::IOProcessor()) {
     for (int i = 0; i <= finest_level; i++) {
-      printf("[computeInitialDt] Level %d, CFL= %f, Max eigenvalues (x,y,z) = (%f,%f,%f) \n", i, CFL_level[i],eigenvals_level[i][0], eigenvals_level[i][1], eigenvals_level[i][2]);
+      printf("[computeInitialDt] Level %d, Max CFL= %f, Max eigenvalues (x,y,z) = (%f,%f,%f) \n", i, CFL_level[i],eigenvals_level[i][0], eigenvals_level[i][1], eigenvals_level[i][2]);
     }
   }
 }
