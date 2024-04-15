@@ -50,7 +50,7 @@ class CNS : public amrex::AmrLevel {
 
   // void computeTemp(amrex::MultiFab& State, int ng);
 
-  amrex::Real estTimeStep();
+  GpuArray<Real,AMREX_SPACEDIM> maxEigen();
 
   // Compute initial time step.
   amrex::Real initialTimeStep();

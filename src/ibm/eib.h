@@ -427,7 +427,7 @@ void initialiseGPs(int lev) {
 }
 
 // called per fab
-void computeGPs(const MFIter& mfi, const Array4<Real>& cons, const Array4<Real>& prims, const cls_t& cls, int& lev) {
+void computeGPs(const MFIter& mfi, const Array4<Real>& cons, const Array4<Real>& prims, const cls_t* cls, int& lev) {
   
   auto& mfab = *bmf_a[lev];
   const auto& ibFab = mfab.get(mfi);
@@ -458,7 +458,7 @@ void computeGPs(const MFIter& mfi, const Array4<Real>& cons, const Array4<Real>&
       copy->computeIB(primsNormal,cls);
       copy->extrapolate(primsNormal, disGP[ii], disIM[ii]);
       // thermodynamic consistency
-      primsNormal(0,cls_t::QRHO)  = primsNormal(0,cls_t::QPRES)/(primsNormal(0, cls_t::QT)*cls.Rspec);
+      primsNormal(0,cls_t::QRHO)  = primsNormal(0,cls_t::QPRES)/(primsNormal(0, cls_t::QT)*cls->Rspec);
 
       // only transform velocity back to global coordinates for gp only
       int idx=0;
@@ -482,7 +482,7 @@ void computeGPs(const MFIter& mfi, const Array4<Real>& cons, const Array4<Real>&
       cons(i,j,k,cls_t::UMY)  = primsNormal(0,cls_t::QRHO)*primsNormal(0,cls_t::QV);
       cons(i,j,k,cls_t::UMZ)  = primsNormal(0,cls_t::QRHO)*primsNormal(0,cls_t::QW);
       Real ek   = 0.5_rt*(primsNormal(0,cls_t::QU)*primsNormal(0,cls_t::QU) + primsNormal(0,cls_t::QV)* primsNormal(0,cls_t::QV) + primsNormal(0,cls_t::QW)*primsNormal(0,cls_t::QW));
-      cons(i,j,k,cls_t::UET) = primsNormal(0,cls_t::QPRES)/(cls.gamma-1.0_rt) + primsNormal(0,cls_t::QRHO)*ek;
+      cons(i,j,k,cls_t::UET) = primsNormal(0,cls_t::QPRES)/(cls->gamma-1.0_rt) + primsNormal(0,cls_t::QRHO)*ek;
       });
 };
 
@@ -646,7 +646,7 @@ private:
   }
 
   AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
-  void computeIB(Array2D<Real,0,eorder_tparm+1,0,cls_t::NPRIM-1>& primsNormal, const cls_t& cls) {
+  void computeIB(Array2D<Real,0,eorder_tparm+1,0,cls_t::NPRIM-1>& primsNormal, const cls_t* cls) {
     // no-slip/slip velocity (in local coordinates)
     primsNormal(1,cls_t::QU) = 0.0_rt; // un
     primsNormal(1,cls_t::QV) = primsNormal(2,cls_t::QV); // ut1
@@ -655,7 +655,7 @@ private:
     primsNormal(1,cls_t::QPRES) = 2.0_rt*(2.0_rt*primsNormal(2,cls_t::QPRES) - 0.5_rt*primsNormal(3,cls_t::QPRES))/3.0_rt;
     primsNormal(1,cls_t::QT)    = primsNormal(2,cls_t::QT);
     // ensure thermodynamic consistency
-    primsNormal(1,cls_t::QRHO)  = primsNormal(1,cls_t::QPRES)/(primsNormal(1,cls_t::QT)*cls.Rspec); 
+    primsNormal(1,cls_t::QRHO)  = primsNormal(1,cls_t::QPRES)/(primsNormal(1,cls_t::QT)*cls->Rspec); 
     }
 
   void read_geom()

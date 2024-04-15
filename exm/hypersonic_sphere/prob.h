@@ -24,8 +24,6 @@ struct ProbParm
   Real z0 = 2.0_rt;
 };
 
-inline Vector<std::string> cons_vars_names={"Xmom","Ymom","Zmom","Energy","Density"};
-inline Vector<int> cons_vars_type={1,2,3,0,0};
 
 typedef closures_dt<indicies_t, visc_suth_t, cond_suth_t,
                     calorifically_perfect_gas_t<indicies_t>>
@@ -115,7 +113,7 @@ void prob_initdata (int i, int j, int k, amrex::Array4<amrex::Real> const& state
   //     ux = pparm.u_inf;
   // }
 
-  Real u_small = pparm.u_inf*0.5;
+  Real u_small = pparm.u_inf*0.1;
   Real xstart = 0.2_rt;
   Real xend   = pparm.x0;
   Real dis = xstart - xend;

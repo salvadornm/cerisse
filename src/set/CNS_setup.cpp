@@ -108,30 +108,31 @@ void CNS::variableSetUp() {
                          state_data_extrap, store_in_checkpoint);
   // https://github.com/AMReX-Codes/amrex/issues/396
 
-  Vector<BCRec> bcs(PROB::ProbClosures::NCONS);
-
   // Physical boundary conditions ////////////////////////////////////////////
+  Vector<BCRec> bcs(PROB::ProbClosures::NCONS);
+  Vector<int> cons_vars_type = indicies_t::get_cons_vars_type();
 
   for (int cnt=0;cnt<h_prob_closures->NCONS;cnt++) {
-    if (PROB::cons_vars_type[cnt]==0) {
+    if (cons_vars_type[cnt]==0) {
       set_scalar_bc(bcs[cnt], h_phys_bc);
     }
-    else if (PROB::cons_vars_type[cnt]==1) {
+    else if (cons_vars_type[cnt]==1) {
       set_x_vel_bc(bcs[cnt], h_phys_bc);
     }
-    else if (PROB::cons_vars_type[cnt]==2) {
+    else if (cons_vars_type[cnt]==2) {
       set_y_vel_bc(bcs[cnt], h_phys_bc);
     }
-    else if (PROB::cons_vars_type[cnt]==3) {
+    else if (cons_vars_type[cnt]==3) {
       set_z_vel_bc(bcs[cnt], h_phys_bc);
     }
   }
+
   // Boundary conditions
   StateDescriptor::BndryFunc bndryfunc(cns_bcfill);
   StateDescriptor::setBndryFuncThreadSafety(true);
   bndryfunc.setRunOnGPU(true);
   // applies bndry func to all variables in desc_lst starting from from 0.
-  desc_lst.setComponent(State_Type, 0, PROB::cons_vars_names, bcs, bndryfunc);
+  desc_lst.setComponent(State_Type, 0, PROB::ProbClosures::get_cons_vars_names(), bcs, bndryfunc);
 
   num_state_data_types = desc_lst.size();
   // printf("num_state_data_types %d \n",num_state_data_types);
@@ -155,4 +156,9 @@ void CNS::variableSetUp() {
                  dervel, the_same_box);
   derive_lst.addComponent("velocity", desc_lst, State_Type, 0,
                           h_prob_closures->NCONS);
+
+  // Density
+  derive_lst.add("density", IndexType::TheCellType(), 1, derdensity,
+                 the_same_box);
+  derive_lst.addComponent("density", desc_lst, State_Type, 0, h_prob_closures->NCONS);
 }

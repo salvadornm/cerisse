@@ -210,7 +210,7 @@ Real CNS::advance(Real time, Real dt, int /*iteration*/, int /*ncycle*/) {
   return dt;
 }
 
-// void where_is_nan(const FArrayBox& fab) {
+// void where_is_nan(const FArrayBox& fab, bool abort_on_nan = true) {
 //   bool contains_any_nan = false;
 //   for (int n = 0; n < fab.nComp(); ++n) {
 //     IntVect where;
@@ -220,7 +220,7 @@ Real CNS::advance(Real time, Real dt, int /*iteration*/, int /*ncycle*/) {
 //       contains_any_nan = true;
 //     }
 //   }
-//   if (contains_any_nan) {
+//   if (contains_any_nan && abort_on_nan) {
 //     amrex::Abort();
 //   }
 // }
@@ -238,6 +238,9 @@ void CNS::compute_rhs(MultiFab& statemf, Real dt, FluxRegister* fr_as_crse, Flux
   const PROB::ProbClosures* cls_d = CNS::d_prob_closures;
   const PROB::ProbClosures& cls_h = *CNS::h_prob_closures;
   // const PROB::ProbParm& parms = *d_prob_parm;
+#ifdef AMREX_USE_GPIBM
+  auto& ib_mf = *IBM::ib.bmf_a[level];
+#endif
 
   for (MFIter mfi(statemf, false); mfi.isValid(); ++mfi) {
     Array4<Real> const& state = statemf.array(mfi);
@@ -253,42 +256,7 @@ void CNS::compute_rhs(MultiFab& statemf, Real dt, FluxRegister* fr_as_crse, Flux
     // We want to minimise function calls. So, we call prims2cons, flux and
     // source term evaluations once per fab from CPU, to be run on GPU.
     cls_h.cons2prims(mfi, state, prims);
-    // amrex::ParallelFor(bxg, [=] AMREX_GPU_DEVICE(int i, int j, int k) {
-    //   Real rho = 0.0;
-    //   for (int n = 0; n < NUM_SPECIES; ++n) {
-    //     rho += state(i, j, k, cls_d->UFS + n);
-    //   }
-    //   Real rhoinv = Real(1.0) / rho;
-    //   Real ux = state(i, j, k, cls_d->UMX) * rhoinv;
-    //   Real uy = state(i, j, k, cls_d->UMY) * rhoinv;
-    //   Real uz = state(i, j, k, cls_d->UMZ) * rhoinv;
-    //   Real rhoke = Real(0.5) * rho * (ux * ux + uy * uy + uz * uz);
-    //   Real ei = (state(i, j, k, cls_d->UET) - rhoke) * rhoinv;
-    //   Real Y[NUM_SPECIES];
-    //   Real sumY = 0.0;
-    //   for (int n = 0; n < NUM_SPECIES; ++n) {
-    //     Y[n] = state(i, j, k, cls_d->UFS + n) * rhoinv;
-    //     prims(i, j, k, cls_d->QFS + n) = Y[n];
-    //     sumY += Y[n];
-    //   }
-    //   Real T, p, cs, gamma;
-    //   cls_d->RYE2TPCsG(rho, Y, ei, T, p, cs, gamma);
 
-    //   // AMREX_DEVICE_PRINTF("i = %d, rho = %f, ei = %f, T = %f, Y = [%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f](sum to %f)\n", 
-    //   //                     i, rho, ei, T, Y[0], Y[1], Y[2], Y[3], Y[4], Y[5], Y[6], Y[7], Y[8], Y[9], Y[10], Y[11], Y[12], sumY);      
-      
-    //   prims(i, j, k, cls_d->QRHO) = rho;
-    //   prims(i, j, k, cls_d->QU) = ux;
-    //   prims(i, j, k, cls_d->QV) = uy;
-    //   prims(i, j, k, cls_d->QW) = uz;
-    //   prims(i, j, k, cls_d->QPRES) = p;
-    //   prims(i, j, k, cls_d->QT) = T;
-    //   prims(i, j, k, cls_d->QC) = cs;
-    //   prims(i, j, k, cls_d->QG) = gamma;
-    //   prims(i, j, k, cls_d->QEINT) = ei;
-    // });
-
-    // where_is_nan(primf);
 
 #ifdef AMREX_USE_GPIBM
     IBM::ib.computeGPs(mfi, state, prims, cls_d, level);
@@ -298,10 +266,24 @@ void CNS::compute_rhs(MultiFab& statemf, Real dt, FluxRegister* fr_as_crse, Flux
     // Note: we are over-writing state (cons) with flux derivative
     // NOTE: cls_h is host cls instance but cls_d causes a segmentation fault
     prob_rhs.eflux(geom, mfi, prims, temp, state, cls_d);
+    // amrex::Print() << "eflux done" << std::endl;
+    // where_is_nan(statemf[mfi]);
     prob_rhs.dflux(); //(prims,cons,nflx)
 
     // Source terms, including update mask (e.g inside IB)
     prob_rhs.src(mfi, prims, state, cls_d, dt);
+
+    // Set solid point RHS to 0
+    // TODO: IBM::set_solid_state(mfi,state,cls_d)
+#if AMREX_USE_GPIBM
+    const Box& bx   = mfi.tilebox();
+    const auto& ibMarkers = ib_mf.array(mfi);
+    amrex::ParallelFor(bx, cls_h.NCONS,
+    [=] AMREX_GPU_DEVICE (int i, int j, int k, int n) noexcept
+    {
+    state(i,j,k,n) = state(i,j,k,n)*(1 - int(ibMarkers(i,j,k,0)));
+    });
+#endif
   }
 }
 

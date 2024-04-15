@@ -31,8 +31,6 @@ struct ProbParm {
       0., 0.,         0.88586543, 0., 0., 0.};
 };
 
-inline Vector<std::string> cons_vars_names = indicies_t::get_cons_vars_names();
-inline Vector<int> cons_vars_type = indicies_t::get_cons_vars_type();
 
 typedef closures_dt<indicies_t, visc_suth_t, cond_suth_t,
                     multispecies_gas_t<indicies_t>> ProbClosures;

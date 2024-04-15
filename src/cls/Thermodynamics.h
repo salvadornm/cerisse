@@ -3,6 +3,9 @@
 
 using namespace amrex;
 
+// Philosophy
+// Keep all thermodynamics functions local, acting on a single point
+
 template <typename idx_t>
 class calorifically_perfect_gas_t {
  protected:
@@ -39,16 +42,42 @@ class calorifically_perfect_gas_t {
     cs = std::sqrt(gamma * Rspec * T);
   }
 
-  // Real sos(Real& T){return std::sqrt(this->gamma * this->Rspec * T);}
+  AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE GpuArray<Real,idx_t::NWAVES> cons2eigenvals(const int i, const int j, const int k, const int dir,const Array4<Real>& cons) const {
 
+    GpuArray<int, AMREX_SPACEDIM> vdir = {AMREX_D_DECL(int(dir == 0), int(dir == 1), int(dir == 2))};
+
+    Real rho = cons(i, j, k, idx.URHO);
+    Real rhoinv = Real(1.0) / rho;
+    GpuArray<int, AMREX_SPACEDIM> vel= {AMREX_D_DECL(
+                                  cons(i, j, k, idx_t::UMX) * rhoinv,
+                                  cons(i, j, k, idx_t::UMY) * rhoinv,
+                                  cons(i, j, k, idx_t::UMZ) * rhoinv)};
+    Real ke = Real(0.5) * rho * AMREX_D_PICK(
+                                vel[0]*vel[0],
+                                vel[0]*vel[0] + vel[1]*vel[1], 
+                                vel[0]*vel[0] + vel[1]*vel[1] + vel[2]*vel[2]);
+    Real eint = (cons(i,j,k,idx_t::UET) - ke)/rho;
+    Real T = eint / cv;
+
+    Real cs = std::sqrt(gamma * Rspec * T);
+    Real u = AMREX_D_PICK(
+              vel[0]*vdir[0],
+              vel[0]*vdir[0] + vel[1]*vdir[1], 
+              vel[0]*vdir[0] + vel[1]*vdir[1] + vel[2]*vdir[2]);
+    GpuArray<Real,idx_t::NWAVES> eigenvals={u+cs,u,u-cs};
+  return eigenvals;
+  }
+  // Real sos(Real& T){return std::sqrt(this->gamma * this->Rspec * T);}
   // void prims2cons(i,j,k,){};
 
-  void prims2char(){};
+  // void prims2chars(int i, int j, int k, const Array4<Real>& prims, Array4<Real>& chars, const GpuArray<int, AMREX_SPACEDIM>& vdir){
 
-  // void prims2flux(int& i, int& j, int& k, const GpuArray<Real,NPRIM>& prims,
-  // GpuArray<Real,NCONS>& fluxes, const GpuArray<int, 3>& vdir) {
+  // };
+
+  // void chars2prims() {}
+
   AMREX_GPU_DEVICE AMREX_FORCE_INLINE void prims2fluxes(
-      int& i, int& j, int& k, const Array4<Real>& prims, Array4<Real>& fluxes,
+      int i, int j, int k, const Array4<Real>& prims, Array4<Real>& fluxes,
       const GpuArray<int, 3>& vdir) {
     Real rho = prims(i, j, k, idx.QRHO);
     Real ux = prims(i, j, k, idx.QU);
@@ -67,10 +96,6 @@ class calorifically_perfect_gas_t {
     fluxes(i, j, k, idx.UET) = (rhoet + P) * udir;
   };
 
-  // can move this to closures derived tyoe (closures_dt)
-  // prims to cons
-  // - We want to call it from thermodynamics class
-  // - cls is stored on cpu and gpu
   // TODO: remove ParallelFor from here. Keep closures local
   void inline cons2prims(const MFIter& mfi, const Array4<Real>& cons,
                          const Array4<Real>& prims) const {
@@ -122,6 +147,8 @@ class calorifically_perfect_gas_nasg_liquid_t {
 #ifdef USE_PELEPHYSICS
 #include <PelePhysics.H>
 
+// #define DEBUG_PP_EOS
+
 // Wrapper for PelePhysics EoS. No other places of the code should call
 // pele::physics::PhysicsType::eos().
 template <typename idx_t>
@@ -142,7 +169,6 @@ class multispecies_gas_t {
     eos.RYP2E(rho_cgs, Y, p_cgs, e_cgs);
 
     E = e_cgs * 1.0e-4;
-    // AMREX_ALWAYS_ASSERT(E > 0.0);
   }
 
   AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE void RYE2TP(
@@ -153,11 +179,15 @@ class multispecies_gas_t {
 
     auto eos = pele::physics::PhysicsType::eos();
     Real p_cgs;
+    T = 0.0;
     eos.REY2T(rho_cgs, e_cgs, Y, T);
     eos.RTY2P(rho_cgs, T, Y, p_cgs);
 
     P = p_cgs * 0.1;
-    // AMREX_ALWAYS_ASSERT(P > 0.0);
+#ifdef DEBUG_PP_EOS
+    AMREX_ALWAYS_ASSERT(T > 0.0);
+    AMREX_ALWAYS_ASSERT(P > 0.0);
+#endif
   }
 
   AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE void RYE2Cs(
@@ -166,29 +196,33 @@ class multispecies_gas_t {
     Real e_cgs = E * 1.0e4;
 
     auto eos = pele::physics::PhysicsType::eos();
-    Real T, p_cgs, G, cs_cgs;
+    Real T = 0.0, p_cgs, G, cs_cgs;
     eos.REY2T(rho_cgs, e_cgs, Y, T);
     eos.RTY2P(rho_cgs, T, Y, p_cgs);
     eos.RTY2G(rho_cgs, T, Y, G);
     cs_cgs = std::sqrt(G * p_cgs / rho_cgs);
 
     cs = cs_cgs * 0.01;
-    // AMREX_ALWAYS_ASSERT(cs > 0.0);
+#ifdef DEBUG_PP_EOS
+    AMREX_ALWAYS_ASSERT(cs > 0.0);
+#endif
   }
 
-  AMREX_GPU_DEVICE AMREX_FORCE_INLINE void RYE2TPCsG(const Real R,
+  AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE void RYE2TPCsG(const Real R,
                                                      const Real Y[NUM_SPECIES],
                                                      const Real E, Real& T,
                                                      Real& P, Real& cs,
                                                      Real& G) const {
-    // AMREX_ALWAYS_ASSERT(R > 0.0);
-    // AMREX_ALWAYS_ASSERT(Y[0] >= 0.0);
-    // AMREX_ALWAYS_ASSERT(E > 0.0);
+#ifdef DEBUG_PP_EOS
+    AMREX_ALWAYS_ASSERT(R > 0.0);
+    AMREX_ALWAYS_ASSERT(Y[0] >= 0.0);
+#endif
     Real rho_cgs = R * 0.001;
     Real e_cgs = E * 1.0e4;
 
     auto eos = pele::physics::PhysicsType::eos();
     Real p_cgs, cs_cgs;
+    T = 0.0;
     eos.REY2T(rho_cgs, e_cgs, Y, T);
     eos.RTY2P(rho_cgs, T, Y, p_cgs);
     eos.RTY2G(rho_cgs, T, Y, G);
@@ -196,8 +230,39 @@ class multispecies_gas_t {
 
     P = p_cgs * 0.1;
     cs = cs_cgs * 0.01;
-    // AMREX_ALWAYS_ASSERT(P > 0.0);
-    // AMREX_ALWAYS_ASSERT(cs > 0.0);
+#ifdef DEBUG_PP_EOS
+    AMREX_ALWAYS_ASSERT(P > 0.0);
+    AMREX_ALWAYS_ASSERT(cs > 0.0);
+#endif
+  }
+
+  AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE GpuArray<Real,idx_t::NWAVES> cons2eigenvals(const int i, const int j, const int k, const int dir,const Array4<Real>& cons) const {
+
+    Abort("cons2eigenvals not implemented for multispecies_gas_t");
+
+    // GpuArray<int, AMREX_SPACEDIM> vdir = {AMREX_D_DECL(int(dir == 0), int(dir == 1), int(dir == 2))};
+
+    // Real rho = cons(i, j, k, idx.URHO);
+    // Real rhoinv = Real(1.0) / rho;
+    // GpuArray<int, AMREX_SPACEDIM> vel= {AMREX_D_DECL(
+    //                               cons(i, j, k, idx_t::UMX) * rhoinv,
+    //                               cons(i, j, k, idx_t::UMY) * rhoinv,
+    //                               cons(i, j, k, idx_t::UMZ) * rhoinv)};
+    // Real ke = Real(0.5) * rho * AMREX_D_PICK(
+    //                             vel[0]*vel[0],
+    //                             vel[0]*vel[0] + vel[1]*vel[1], 
+    //                             vel[0]*vel[0] + vel[1]*vel[1] + vel[2]*vel[2]);
+    // Real eint = (cons(i,j,k,idx_t::UET) - ke)/rho;
+    // Real T = eint / cv;
+
+    // Real cs = std::sqrt(gamma * Rspec * T);
+    // Real u = AMREX_D_PICK(
+    //           vel[0]*vdir[0],
+    //           vel[0]*vdir[0] + vel[1]*vdir[1], 
+    //           vel[0]*vdir[0] + vel[1]*vdir[1] + vel[2]*vdir[2]);
+
+    GpuArray<Real,idx_t::NWAVES> eigenvals; //{u+cs,u,u-cs}
+  return eigenvals;
   }
 
   // void prims2cons(i,j,k,){};
@@ -272,17 +337,22 @@ class multispecies_gas_t {
       prims(i, j, k, idx.QPRES) = p;
       prims(i, j, k, idx.QT) = T;
       prims(i, j, k, idx.QC) = cs;
-      prims(i, j, k, idx.QG) = gamma;      
+      prims(i, j, k, idx.QG) = gamma;
       prims(i, j, k, idx.QEINT) = ei;
       for (int n = 0; n < NUM_SPECIES; ++n) {
         prims(i, j, k, idx.QFS + n) = Y[n];
       }
-
-      // AMREX_ALWAYS_ASSERT(prims(i, j, k, idx.QPRES) > 0.0);
-      // AMREX_ALWAYS_ASSERT(prims(i, j, k, idx.QRHO) > 0.0);
-      // AMREX_ALWAYS_ASSERT(prims(i, j, k, idx.QT) > 0.0);
-      // AMREX_ALWAYS_ASSERT(prims(i, j, k, idx.QC) > 0.0);
-      // AMREX_ALWAYS_ASSERT(prims(i, j, k, idx.QFS) >= 0.0);
+#ifdef DEBUG_PP_EOS
+      // AMREX_DEVICE_PRINTF(static_cast<const char*>("cons2prims: %d %d %d\n"), i, j, k);
+      AMREX_ALWAYS_ASSERT(prims(i, j, k, idx.QPRES) > 0.0 && isnan(prims(i, j, k, idx.QPRES)) == 0);
+      AMREX_ALWAYS_ASSERT(prims(i, j, k, idx.QRHO) > 0.0 && isnan(prims(i, j, k, idx.QRHO)) == 0);
+      AMREX_ALWAYS_ASSERT(prims(i, j, k, idx.QT) > 0.0 && !isnan(prims(i, j, k, idx.QT)));
+      AMREX_ALWAYS_ASSERT(prims(i, j, k, idx.QC) > 0.0 && isnan(prims(i, j, k, idx.QC)) == 0);
+      AMREX_ALWAYS_ASSERT(prims(i, j, k, idx.QG) > 0.0 && isnan(prims(i, j, k, idx.QG)) == 0);
+      AMREX_ALWAYS_ASSERT(prims(i, j, k, idx.QFS) >= 0.0 && isnan(prims(i, j, k, idx.QFS)) == 0);
+      AMREX_ALWAYS_ASSERT(prims(i, j, k, idx.QFS + NUM_SPECIES - 1) >= 0.0 && isnan(prims(i, j, k, idx.QFS + NUM_SPECIES - 1)) == 0);
+      // if (i == -3) AMREX_DEVICE_PRINTF(static_cast<const char*>("T = %f: %i %i %i\n"), prims(i, j, k, idx.QT), i, j, k);
+#endif
     });
   }
 };
