@@ -1,8 +1,9 @@
 # Simulation time
 # start time is assumed to be 0, unless re-starting
-max_step  = 1000
-stop_time = 0.2
-time_step = 0.00001
+max_step  = 10000
+stop_time = 2.0
+#time_step = 0.00001
+cfl = 0.3
 
 # Geometry 
 geometry.is_periodic = 0 0
@@ -18,11 +19,11 @@ geometry.prob_hi     = 0.25    1.0
 cns.lo_bc = 4 4
 cns.hi_bc = 4 4
 cns.screen_output = 0 # 0=quiet, 1=verbose
-cns.verbose = 1       # 0=quiet, 1=verbose
+cns.verbose = 0       # 0=quiet, 1=verbose
 
 # Refinement and regridding 
-amr.n_cell          = 32 128
-amr.max_level       = 0     # maximum level number allowed
+amr.n_cell          = 64 256
+amr.max_level       = 1     # maximum level number allowed
 amr.ref_ratio       = 2 2 # refinement ratio per level
 amr.regrid_int      = 2 2 # how often to regrid per level
 amr.blocking_factor_x = 8 8 # blocking factor in x per level

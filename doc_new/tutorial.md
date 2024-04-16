@@ -130,4 +130,5 @@ $ cerisse visit
 
 
 
-[^1]:  J Shi et al, J Computational Phys, (2003), 690-696 .
+[^1]:  J Shi et al, *Resolution of high order WENO schemes for complicated flow structures*, J Computational Physics, (2003), 186, pp 690-696.
+https://www.sciencedirect.com/science/article/pii/S0021999103000949

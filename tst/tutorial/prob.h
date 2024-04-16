@@ -47,6 +47,7 @@ prob_initdata(int i, int j, int k, Array4<Real> const &state,
   const Real *prob_hi = geomdata.ProbHi();
   const Real *dx = geomdata.CellSize();
 
+
   Real x = prob_lo[0] + (i + Real(0.5)) * dx[0];
   Real y = prob_lo[1] + (j + Real(0.5)) * dx[1];
   
@@ -57,6 +58,7 @@ prob_initdata(int i, int j, int k, Array4<Real> const &state,
   const Real freq = Real(8)*Real(3.14159265359); // wavelength = x-domain
 
   Real yrel = y - Lint;
+
   Real delta= 0.2*Lint;   // region size where perturbation is significant
   Real delta2  = dx[1]/5; // transition region between top/bottom
   Real step = Real(0.5) + Real(0.5)*tanh(yrel/delta2);
@@ -70,7 +72,7 @@ prob_initdata(int i, int j, int k, Array4<Real> const &state,
   Real csound = sqrt(cls.gamma*Pt/rhot); 
 
   uxt = Real(0.0);
-  uyt = -prob_parm.eps*cos(freq*x)*aux; // perturbation in y-component
+  uyt = -prob_parm.eps*cos(freq*x)*csound; // perturbation in y-component
   
 
   state(i, j, k, cls.URHO) = rhot;
@@ -99,10 +101,10 @@ user_source(int i, int j, int k, const auto &state, const auto &rhs,
 //             auto const dx) {
 
 
-std::cout << " aqui " << std::endl;
+//std::cout << " aqui " << std::endl;
 
-  rhs(i,j,k,cls.UMY) += prob_parm.grav*state(i, j, k, cls.URHO); // momentum
-  rhs(i,j,k,cls.UET) += prob_parm.grav*state(i, j, k, cls.UMY);  // energy
+//  rhs(i,j,k,cls.UMY) += prob_parm.grav*state(i, j, k, cls.URHO); // momentum
+//  rhs(i,j,k,cls.UET) += prob_parm.grav*state(i, j, k, cls.UMY);  // energy
 
 }
 
@@ -112,16 +114,27 @@ user_tagging(int i, int j, int k, int nt_level, auto &tagfab,
              const auto &sdatafab, const auto &geomdata,
              const ProbParm &prob_parm, int level) {
 
-  // Real dengrad_threshold = 0.5;
-  // Real drhox = Math::abs(sdatafab(i+1,j,k,URHO) -
-  // sdatafab(i-1,j,k,URHO))/sdatafab(i,j,k,URHO); if (drhox >
-  // dengrad_threshold) {
-  //   tagfab(i,j,k) = true;
-  //   tagfab(i+1,j,k) = true;
-  //   tagfab(i+2,j,k) = true;
-  //   tagfab(i+3,j,k) = true;
-  // }
-}
+  Real dengrad_threshold = 0.5;
+  amrex::Real drhox = amrex::Math::abs(sdatafab(i+1,j,k,ProbClosures::URHO) -
+   sdatafab(i,j,k,ProbClosures::URHO))/sdatafab(i,j,k,ProbClosures::URHO);
+
+  amrex::Real drhoy = amrex::Math::abs(sdatafab(i,j+1,k,ProbClosures::URHO) -
+   sdatafab(i,j-1,k,ProbClosures::URHO))/sdatafab(i,j,k,ProbClosures::URHO);
+
+  if (nt_level==0){
+  if (sqrt(drhox*drhox+drhoy*drhoy) > dengrad_threshold) {
+     tagfab(i,j,k) = true;}
+      // for (int ii = -1; ii <= 1; ii++) 
+      //   {
+      //     for (int jj = -1; jj <= 1; jj++) {
+      //       tagfab(i+ii,j+jj,k) = true;
+      //     }
+      //   }
+      // }   
+
+  }   
+
+   }
 ////////////////////////////////////////////////////////////////////////////////
 
 } // namespace PROB

@@ -197,9 +197,15 @@ void CNS::computeInitialDt(int finest_level, int sub_cycle,
     // Dynamic dt
     for (int i = 0; i <= finest_level; i++) {
       const GpuArray<Real,AMREX_SPACEDIM> dx = parent->Geom(i).CellSizeArray();
+#if (AMREX_SPACEDIM == 1)
+
+      dt_level[i] = cfl*dx[0]/eigenvals_level[i][0];    
+#else
       dt_level[i] = cfl*amrex::min(AMREX_D_DECL(dx[0]/eigenvals_level[i][0],
                                             dx[1]/eigenvals_level[i][1],
                                             dx[2]/eigenvals_level[i][2]));
+#endif
+
     }
     // Find min dt across all levels
     int nfactor = 1;
@@ -218,10 +224,15 @@ void CNS::computeInitialDt(int finest_level, int sub_cycle,
     const GpuArray<Real,AMREX_SPACEDIM> dx = parent->Geom(i).CellSizeArray();
     nfactor *= n_cycle[i];
     dt_level[i] = dt0 / nfactor;
+
+#if (AMREX_SPACEDIM == 1)
+    CFL_level[i] = dt_level[i] * eigenvals_level[i][0]/dx[0];  
+#else
     CFL_level[i] = dt_level[i] * amrex::max(AMREX_D_DECL(
                                           eigenvals_level[i][0]/dx[0],
                                           eigenvals_level[i][1]/dx[1],
                                           eigenvals_level[i][2]/dx[2]));
+#endif                                          
   }
   // Print
   if (ParallelDescriptor::IOProcessor()) {
@@ -255,9 +266,15 @@ void CNS::computeNewDt(int finest_level, int sub_cycle, Vector<int> &n_cycle,
     // Estimate timestep across all points, levels, and procs
     for (int i = 0; i <= finest_level; i++) {
       const GpuArray<Real,AMREX_SPACEDIM> dx = parent->Geom(i).CellSizeArray();
+
+
+#if (AMREX_SPACEDIM == 1)
+      dt_min[i] = cfl*dx[0]/eigenvals_level[i][0];
+#else     
       dt_min[i] = cfl*amrex::min(AMREX_D_DECL(dx[0]/eigenvals_level[i][0],
                                           dx[1]/eigenvals_level[i][1],
                                           dx[2]/eigenvals_level[i][2]));
+#endif                                          
     };
 
     // Limit dt
@@ -303,10 +320,16 @@ void CNS::computeNewDt(int finest_level, int sub_cycle, Vector<int> &n_cycle,
     const GpuArray<Real,AMREX_SPACEDIM> dx = parent->Geom(i).CellSizeArray();
     nfactor *= n_cycle[i];
     dt_level[i] = dt0 / nfactor;
+
+    // cpp flag
+#if (AMREX_SPACEDIM == 1)
+    CFL_level[i] = dt_level[i]*eigenvals_level[i][0]/dx[0];
+#else    
     CFL_level[i] = dt_level[i] * amrex::max(AMREX_D_DECL(
                                           eigenvals_level[i][0]/dx[0],
                                           eigenvals_level[i][1]/dx[1],
                                           eigenvals_level[i][2]/dx[2]));
+#endif                                          
   }
   // Print
   if (ParallelDescriptor::IOProcessor()) {
