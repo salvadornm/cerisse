@@ -46,8 +46,8 @@ class user_source_t {
 
 
       Real rho = prims(i, j, k, cls.QRHO);
-    //  rhs(i,j,k,cls.UMY) -= rho; // momentum (g=1) test
-    //  rhs(i,j,k,cls.UET) -= rho*prims(i, j, k, cls.QV);  // energy
+     rhs(i,j,k,cls.UMY) -= rho; // momentum (g=1) test
+      rhs(i,j,k,cls.UET) -= rho*prims(i, j, k, cls.QV);  // energy
 
       });
 

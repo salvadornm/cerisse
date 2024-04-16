@@ -15,7 +15,7 @@ namespace PROB {
 struct ProbParm {
   Real p_int = 2.0;
   Real rho_1 = 1.0;
-  Real rho_2 = 2.0; //2.0
+  Real rho_2 = 2.0;
   Real grav = -1.0; 
   Real eps =  0.025;
 };
@@ -27,8 +27,6 @@ typedef closures_dt<indicies_t, visc_suth_t, cond_suth_t,
                     calorifically_perfect_gas_t<indicies_t>>
     ProbClosures;
     
-//typedef rhs_dt<riemann_t<false, ProbClosures>, no_diffusive_t, no_source_t>
-//    ProbRHS;
 typedef rhs_dt<riemann_t<false, ProbClosures>, no_diffusive_t, user_source_t<ProbClosures>>
     ProbRHS;
 
@@ -56,31 +54,23 @@ prob_initdata(int i, int j, int k, Array4<Real> const &state,
   Real Lint = prob_hi[1] / 2; // half-domain lenght in y
   Real Pint = prob_parm.p_int; // interface Pressure
 
-  const Real freq = Real(8)*Real(3.141592);
+  const Real freq = Real(8)*Real(3.14159265359); // wavelength = x-domain
 
-  Real yrel = y - Lint;Real delta= 0.2*Lint;
-  Real delta2  = 4*dx[1];
+  Real yrel = y - Lint;
+  Real delta= 0.2*Lint;   // region size where perturbation is significant
+  Real delta2  = dx[1]/5; // transition region between top/bottom
   Real step = Real(0.5) + Real(0.5)*tanh(yrel/delta2);
-
-  // bottom 
-  // if (y < Lint) {
-  //   rhot = prob_parm.rho_1;
-  // } 
-  // // top
-  // else {
-  //   rhot = prob_parm.rho_2;
-  // }
 
   rhot = step*prob_parm.rho_2 + (Real(1.0) -step)*prob_parm.rho_1;
 
-  Real aux = exp(-yrel*yrel/delta/delta);
+  Real aux = exp(-yrel*yrel/delta/delta);     // perturbation limit 
 
-  Pt = Pint + rhot*prob_parm.grav*(y - Lint);
-  //Pt = Pint;
+  Pt = Pint + rhot*prob_parm.grav*(y - Lint); // hydrostatic pressure
+  
+  Real csound = sqrt(cls.gamma*Pt/rhot); 
+
   uxt = Real(0.0);
-  uyt = -prob_parm.eps*cos(freq*x)*aux; // perturbation
-
-  uyt = Real(0.0); //temp
+  uyt = -prob_parm.eps*cos(freq*x)*aux; // perturbation in y-component
   
 
   state(i, j, k, cls.URHO) = rhot;
@@ -111,14 +101,10 @@ user_source(int i, int j, int k, const auto &state, const auto &rhs,
 
 std::cout << " aqui " << std::endl;
 
-  // rhs(i,j,k,cls.UMY) += prob_parm.grav*state(i, j, k, cls.URHO); // momentum
-  // rhs(i,j,k,cls.UET) += prob_parm.grav*state(i, j, k, cls.UMY);  // energy
+  rhs(i,j,k,cls.UMY) += prob_parm.grav*state(i, j, k, cls.URHO); // momentum
+  rhs(i,j,k,cls.UET) += prob_parm.grav*state(i, j, k, cls.UMY);  // energy
 
-  rhs(i,j,k,cls.UMY) -= state(i, j, k, cls.URHO); // momentum (g=1) test
-  rhs(i,j,k,cls.UET) -= state(i, j, k, cls.UMY);  // energy
-
-
-            }
+}
 
 ///////////////////////////////AMR//////////////////////////////////////////////
 AMREX_GPU_DEVICE AMREX_FORCE_INLINE void
