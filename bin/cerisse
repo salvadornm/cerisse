@@ -4,15 +4,15 @@ case  $1 in
 	tput setaf 2
 	echo " ... removing plt* *.tmp  files"
 	tput sgr0
-    rm -rf ./plot/plt*
-    rm *.tmp
-	rm  ./plot/*.visit
+    	rm -rf ./plot/plt*
+	rm -f *.tmp
+	rm -f *.visit
 	rm -rf Backtrace*
 	echo -e "\\033[1;32m  dir clean and ready to run \\033[0m"
 	case $2 in
 		all )
 		tput setaf 2
-        echo " ... removing building dirs, checkpoints and *.ex " 
+        	echo " ... removing building dirs, checkpoints and *.ex " 
 		tput sgr0
 		rm -rf tmp_build_dir
 		rm -rf *.ex

@@ -126,6 +126,11 @@ Alternatively you can use the script **cerisse**, to open all directories at the
 $ cerisse visit
 ```
 
+<img src="../../images/tutorial_RT_amr2.png" width=400 height=400>
+<img src="../../images/tutorial_RT_amr3.png" width=400 height=400>
+
+
+
 ### Paraview
 
 

@@ -78,7 +78,6 @@ prob_initdata(int i, int j, int k, Array4<Real> const &state,
   state(i, j, k, cls.URHO) = rhot;
   state(i, j, k, cls.UMX)  = rhot * uxt;
   state(i, j, k, cls.UMY)  = rhot * uyt;
- // state(i, j, k, cls.UMZ)  = Real(0.0);
 
   Real et = Pt / (cls.gamma - Real(1.0));
   state(i, j, k, cls.UET) = et + Real(0.5) * rhot * (uxt * uxt + uyt * uyt); 
@@ -115,26 +114,26 @@ user_tagging(int i, int j, int k, int nt_level, auto &tagfab,
              const ProbParm &prob_parm, int level) {
 
   Real dengrad_threshold = 0.5;
+
+  Real rhot = sdatafab(i,j,k,ProbClosures::URHO);
+
   amrex::Real drhox = amrex::Math::abs(sdatafab(i+1,j,k,ProbClosures::URHO) -
-   sdatafab(i,j,k,ProbClosures::URHO))/sdatafab(i,j,k,ProbClosures::URHO);
+   sdatafab(i,j,k,ProbClosures::URHO))/rhot;
 
   amrex::Real drhoy = amrex::Math::abs(sdatafab(i,j+1,k,ProbClosures::URHO) -
-   sdatafab(i,j-1,k,ProbClosures::URHO))/sdatafab(i,j,k,ProbClosures::URHO);
+   sdatafab(i,j-1,k,ProbClosures::URHO))/rhot;
 
-  if (nt_level==0){
-  if (sqrt(drhox*drhox+drhoy*drhoy) > dengrad_threshold) {
-     tagfab(i,j,k) = true;}
-      // for (int ii = -1; ii <= 1; ii++) 
-      //   {
-      //     for (int jj = -1; jj <= 1; jj++) {
-      //       tagfab(i+ii,j+jj,k) = true;
-      //     }
-      //   }
-      // }   
+     
+  if (nt_level > 0 && level==0) {   
+    if (rhot > 1.1 && rhot < 1.9) {
+     tagfab(i,j,k) = true;     }        
+    }
+  if (nt_level > 0 && level==1) {   
+    if (rhot > 1.2 && rhot < 1.6) {
+     tagfab(i,j,k) = true;     }        
+    }  
 
-  }   
-
-   }
+  } 
 ////////////////////////////////////////////////////////////////////////////////
 
 } // namespace PROB
