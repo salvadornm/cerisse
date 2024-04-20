@@ -19,7 +19,7 @@ geometry.prob_hi     = 1.0    1.0    1.0
 # 6 = user defined
 cns.lo_bc = 2 -1 -1
 cns.hi_bc = 2 -1 -1
-cns.screen_output = 1 # 0=quiet, 1=verbose
+cns.nstep_screen_output = 1
 cns.verbose = 1       # 0=quiet, 1=verbose
 
 # Refinement and regridding 

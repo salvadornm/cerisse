@@ -26,6 +26,7 @@ typedef closures_dt<indicies_t, visc_suth_t, cond_suth_t,
                     calorifically_perfect_gas_t<indicies_t>>
     ProbClosures;
 typedef rhs_dt<riemann_t<false, ProbClosures>, no_diffusive_t, no_source_t>
+// typedef rhs_dt<rusanov_t<ProbClosures>, no_diffusive_t, no_source_t>
     ProbRHS;
 
 void inline inputs() {

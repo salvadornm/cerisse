@@ -9,7 +9,6 @@ using namespace amrex;
 template <typename idx_t>
 class calorifically_perfect_gas_t {
  protected:
-  idx_t idx;
 
  public:
   Real gamma = 1.40;   // ratio of specific heats
@@ -42,13 +41,11 @@ class calorifically_perfect_gas_t {
     cs = std::sqrt(gamma * Rspec * T);
   }
 
-  AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE GpuArray<Real,idx_t::NWAVES> cons2eigenvals(const int i, const int j, const int k, const int dir,const Array4<Real>& cons) const {
+  AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE GpuArray<Real,idx_t::NWAVES> cons2eigenvals(const int i, const int j, const int k, const Array4<Real>& cons, const GpuArray<int, 3>& vdir) const {
 
-    GpuArray<int, AMREX_SPACEDIM> vdir = {AMREX_D_DECL(int(dir == 0), int(dir == 1), int(dir == 2))};
-
-    Real rho = cons(i, j, k, idx.URHO);
+    Real rho = cons(i, j, k, idx_t::URHO);
     Real rhoinv = Real(1.0) / rho;
-    GpuArray<int, AMREX_SPACEDIM> vel= {AMREX_D_DECL(
+    GpuArray<Real, AMREX_SPACEDIM> vel= {AMREX_D_DECL(
                                   cons(i, j, k, idx_t::UMX) * rhoinv,
                                   cons(i, j, k, idx_t::UMY) * rhoinv,
                                   cons(i, j, k, idx_t::UMZ) * rhoinv)};
@@ -67,6 +64,7 @@ class calorifically_perfect_gas_t {
     GpuArray<Real,idx_t::NWAVES> eigenvals={u+cs,u,u-cs};
   return eigenvals;
   }
+
   // Real sos(Real& T){return std::sqrt(this->gamma * this->Rspec * T);}
   // void prims2cons(i,j,k,){};
 
@@ -77,23 +75,22 @@ class calorifically_perfect_gas_t {
   // void chars2prims() {}
 
   AMREX_GPU_DEVICE AMREX_FORCE_INLINE void prims2fluxes(
-      int i, int j, int k, const Array4<Real>& prims, Array4<Real>& fluxes,
-      const GpuArray<int, 3>& vdir) {
-    Real rho = prims(i, j, k, idx.QRHO);
-    Real ux = prims(i, j, k, idx.QU);
-    Real uy = prims(i, j, k, idx.QV);
-    Real uz = prims(i, j, k, idx.QW);
-    Real P = prims(i, j, k, idx.QPRES);
+      int i, int j, int k, const Array4<Real>& prims, const Array4<Real>& fluxes, const GpuArray<int, 3>& vdir) const {
+    Real rho = prims(i, j, k, idx_t::QRHO);
+    Real ux = prims(i, j, k, idx_t::QU);
+    Real uy = prims(i, j, k, idx_t::QV);
+    Real uz = prims(i, j, k, idx_t::QW);
+    Real P = prims(i, j, k, idx_t::QPRES);
     Real udir = ux * vdir[0] + uy * vdir[1] + uz * vdir[2];
 
     Real ekin = Real(0.5) * (ux * ux + uy * uy + uz * uz);
-    Real rhoet = rho * (cp * prims(i, j, k, idx.QT) + ekin);
+    Real rhoet = rho * (cp * prims(i, j, k, idx_t::QT) + ekin);
 
-    fluxes(i, j, k, idx.URHO) = rho * udir;
-    fluxes(i, j, k, idx.UMX) = rho * ux * udir + P * vdir[0];
-    fluxes(i, j, k, idx.UMY) = rho * uy * udir + P * vdir[1];
-    fluxes(i, j, k, idx.UMZ) = rho * uz * udir + P * vdir[2];
-    fluxes(i, j, k, idx.UET) = (rhoet + P) * udir;
+    fluxes(i, j, k, idx_t::URHO) = rho * udir;
+    fluxes(i, j, k, idx_t::UMX) = rho * ux * udir + P * vdir[0];
+    fluxes(i, j, k, idx_t::UMY) = rho * uy * udir + P * vdir[1];
+    fluxes(i, j, k, idx_t::UMZ) = rho * uz * udir + P * vdir[2];
+    fluxes(i, j, k, idx_t::UET) = (rhoet + P) * udir;
   };
 
   // TODO: remove ParallelFor from here. Keep closures local
@@ -102,27 +99,27 @@ class calorifically_perfect_gas_t {
     const Box& bxg = mfi.growntilebox(idx_t::NGHOST);
 
     amrex::ParallelFor(bxg, [=, *this] AMREX_GPU_DEVICE(int i, int j, int k) {
-      Real rho = cons(i, j, k, idx.URHO);
+      Real rho = cons(i, j, k, idx_t::URHO);
       // Print() << "cons2prim"<< i << j << k << rho << std::endl;
       rho = max(1e-40, rho);
       Real rhoinv = Real(1.0) / rho;
-      Real ux = cons(i, j, k, idx.UMX) * rhoinv;
-      Real uy = cons(i, j, k, idx.UMY) * rhoinv;
-      Real uz = cons(i, j, k, idx.UMZ) * rhoinv;
+      Real ux = cons(i, j, k, idx_t::UMX) * rhoinv;
+      Real uy = cons(i, j, k, idx_t::UMY) * rhoinv;
+      Real uz = cons(i, j, k, idx_t::UMZ) * rhoinv;
       Real rhoke = Real(0.5) * rho * (ux * ux + uy * uy + uz * uz);
-      Real rhoei = (cons(i, j, k, idx.UET) - rhoke);
+      Real rhoei = (cons(i, j, k, idx_t::UET) - rhoke);
       Real p = (this->gamma - Real(1.0)) * rhoei;
 
-      prims(i, j, k, idx.QRHO) = rho;
-      prims(i, j, k, idx.QU) = ux;
-      prims(i, j, k, idx.QV) = uy;
-      prims(i, j, k, idx.QW) = uz;
-      prims(i, j, k, idx.QPRES) = p;
-      prims(i, j, k, idx.QT) = p / (rho * this->Rspec);
-      prims(i, j, k, idx.QC) = std::sqrt(this->gamma * p * rhoinv);
-      prims(i, j, k, idx.QG) = this->gamma;
-      prims(i, j, k, idx.QEINT) = rhoei * rhoinv;
-      prims(i, j, k, idx.QFS) = 1.0;
+      prims(i, j, k, idx_t::QRHO) = rho;
+      prims(i, j, k, idx_t::QU) = ux;
+      prims(i, j, k, idx_t::QV) = uy;
+      prims(i, j, k, idx_t::QW) = uz;
+      prims(i, j, k, idx_t::QPRES) = p;
+      prims(i, j, k, idx_t::QT) = p / (rho * this->Rspec);
+      prims(i, j, k, idx_t::QC) = std::sqrt(this->gamma * p * rhoinv);
+      prims(i, j, k, idx_t::QG) = this->gamma;
+      prims(i, j, k, idx_t::QEINT) = rhoei * rhoinv;
+      prims(i, j, k, idx_t::QFS) = 1.0;
     });
   }
 };

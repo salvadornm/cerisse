@@ -234,7 +234,6 @@ void CNS::compute_rhs(MultiFab& statemf, Real dt, FluxRegister* fr_as_crse, Flux
   BL_PROFILE("CNS::compute_rhs()");
 
   // Variables
-  // TODO: introduce a struct for these variables?
   const PROB::ProbClosures* cls_d = CNS::d_prob_closures;
   const PROB::ProbClosures& cls_h = *CNS::h_prob_closures;
   // const PROB::ProbParm& parms = *d_prob_parm;
@@ -264,11 +263,10 @@ void CNS::compute_rhs(MultiFab& statemf, Real dt, FluxRegister* fr_as_crse, Flux
 
     // Fluxes including boundary/discontinuity corrections
     // Note: we are over-writing state (cons) with flux derivative
-    // NOTE: cls_h is host cls instance but cls_d causes a segmentation fault
+    // PROB::ProbRHS::eflux(geom, mfi, prims, temp, state, cls_d);
     prob_rhs.eflux(geom, mfi, prims, temp, state, cls_d);
-    // amrex::Print() << "eflux done" << std::endl;
-    // where_is_nan(statemf[mfi]);
-    prob_rhs.dflux(); //(prims,cons,nflx)
+
+    prob_rhs.dflux();
 
     // Source terms, including update mask (e.g inside IB)
     prob_rhs.src(mfi, prims, state, cls_d, dt);

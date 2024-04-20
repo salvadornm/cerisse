@@ -347,7 +347,10 @@ void CNS::computeNewDt(int finest_level, int sub_cycle, Vector<int> &n_cycle,
     ParallelFor(
         bx, [=] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {
           for (int idir = 0; idir < AMREX_SPACEDIM; idir++) {
-            GpuArray<Real,PROB::ProbClosures::NWAVES> temp = d_cls->cons2eigenvals(i, j, k, idir, cons);
+
+            GpuArray<int, 3> vdir = {int(idir == 0), int(idir == 1), int(idir == 2)};
+
+            GpuArray<Real,PROB::ProbClosures::NWAVES> temp = d_cls->cons2eigenvals(i, j, k, cons, vdir);
 
             for (int iwave = 0; iwave < PROB::ProbClosures::NWAVES; iwave++) {
               (*d_max_eigenvals)[idir] = max((*d_max_eigenvals)[idir],
