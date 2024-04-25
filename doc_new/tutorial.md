@@ -118,10 +118,10 @@ To compile use
 $ make
 ```
 
-and run
+and run case using 2 cores
 
 ```bash
-$ ./main2d.gnu.ex inputs
+$ mpirun -np 2 ./main2d.gnu.MPI.ex inputs
 ```
 
 ## Post-processing

@@ -9,8 +9,7 @@ In the prob.h file, there the **rhs_dt** is defined
 typedef rhs_dt<riemann_t<false, ProbClosures>, no_diffusive_t, no_source_t>
     ProbRHS;
 ```
-The line above  defines the type of problem to be solved, and consist of a serie of keywords that
-represent the relative class
+The line above  defines the type of problem to be solved, and consist of a serie of keywords that represent the relative class
 
 
 | class                      | Type          | Options| Description                                                  |
@@ -18,7 +17,7 @@ represent the relative class
 | riemann_t              | Euler Solver           |   bool, ProbClosures     | Class for Riemann Solvers   |
 | no_diffusive_t             | Option          | 0       | No diffusion, viscosity   |
 | no_source_t             | Option          | 0       | No source term   |
-
+| user_source_t             | Option          | 0       | Defined in prob.h    |
 
 
 
