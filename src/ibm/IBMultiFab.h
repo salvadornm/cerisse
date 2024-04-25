@@ -15,9 +15,9 @@ class IBFab: public BaseFab<bool> {
   gp_t gpData;  
 
   // using Box
-  explicit IBFab<marker_t, gp_t>(const Box& b, int ncomp, bool alloc = true, bool shared = false, Arena* ar = nullptr) : BaseFab<marker_t>(b, ncomp, alloc, shared, ar) {};
+  explicit inline IBFab<marker_t, gp_t>(const Box& b, int ncomp, bool alloc = true, bool shared = false, Arena* ar = nullptr) : BaseFab<marker_t>(b, ncomp, alloc, shared, ar) {};
   // using IBFab
-  explicit IBFab<marker_t, gp_t>(const IBFab<marker_t, gp_t>& rhs, MakeType make_type, int scomp, int ncomp) : BaseFab<marker_t>(rhs, make_type, scomp, ncomp) {};
+  explicit inline IBFab<marker_t, gp_t>(const IBFab<marker_t, gp_t>& rhs, MakeType make_type, int scomp, int ncomp) : BaseFab<marker_t>(rhs, make_type, scomp, ncomp) {};
 
   // IBFab (IBFab&& rhs) noexcept = default;
   // IBFab& operator= (IBFab&&) noexcept = default;
@@ -37,7 +37,7 @@ template<typename marker_t, typename gp_t>
 class IBMultiFab : public FabArray<IBFab<marker_t,gp_t>> {
  public:
   // constructor from BoxArray and DistributionMapping
-  explicit IBMultiFab<marker_t,gp_t>(
+  explicit inline IBMultiFab<marker_t,gp_t>(
       const BoxArray& bxs, const DistributionMapping& dm, const int nvar,
       const int ngrow, const MFInfo& info = MFInfo(),
       const FabFactory<IBFab<marker_t,gp_t>>& factory = DefaultFabFactory<IBFab<marker_t,gp_t>>()) : FabArray<IBFab<marker_t,gp_t>>(bxs, dm, nvar, ngrow, info, factory) {};
@@ -47,15 +47,15 @@ class IBMultiFab : public FabArray<IBFab<marker_t,gp_t>> {
 
   ~IBMultiFab() {};
 
-  void copytoRealMF(MultiFab& mf, int ibcomp, int mfcomp) {
+  void inline copytoRealMF(MultiFab& mf, int ibcomp, int mfcomp) {
     for (MFIter mfi(*this, false); mfi.isValid(); ++mfi) {
       // const Box& ibbox = mfi.fabbox(); // box with ghost points
       const Box& ibbox = mfi.validbox();  // box without ghost points
 
       IBFab<marker_t,gp_t>& ibfab = this->get(mfi);
-      FArrayBox& realfab = mf.get(mfi);
-      Array4<bool> ibMarkers = ibfab.array();    // boolean array
-      Array4<Real> realfield = realfab.array();  // real array
+      // const FArrayBox& realfab = mf.get(mfi);
+      const Array4<bool>& ibMarkers = ibfab.array();    // boolean array
+      const Array4<Real>& realfield = mf.array(mfi);  // real array
 
       amrex::ParallelFor(
           ibbox, 2, [=] AMREX_GPU_DEVICE(int i, int j, int k, int n) noexcept {

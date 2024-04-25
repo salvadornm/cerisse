@@ -97,7 +97,7 @@ public:
   Vector<Real> di_a;
 
   // number of geometries
-  int ngeom;
+  int ngeom=1;
 
   // pointer to Amr class instance
   Amr* amr_p;
@@ -205,13 +205,15 @@ public:
       const IntVect& hi = bx.bigEnd();
       const auto& ibMarkers = mfab.array(mfi); // boolean array
 
-      // compute sld markers (including at ghost points) - cannot use ParallelFor
-      // - CGAL call causes problems
+      // compute sld markers (including at ghost points) - cannot use ParallelFor - CGAL call causes problems
       for (int k = lo[2] - cls_t::NGHOST; k <= hi[2] + cls_t::NGHOST; ++k) {
         for (int j = lo[1] - cls_t::NGHOST; j <= hi[1] + cls_t::NGHOST; ++j) {
           for (int i = lo[0] - cls_t::NGHOST; i <= hi[0] + cls_t::NGHOST; ++i) {
-            ibMarkers(i, j, k, 0) = false; // initialise to false
-            ibMarkers(i, j, k, 1) = false; // initialise to false
+            // NOTE: ibMarkers are accessed on CPU here always. This relies on amrex.the_arena_is_managed=1 option in the inputs. TODO: remove this and transfer bool for all i for given j,k to GPU in async arrays.
+
+            // initialise to false
+            ibMarkers(i, j, k, 0) = false;
+            ibMarkers(i, j, k, 1) = false;
 
             Real x = prob_lo[0] + (0.5_rt + Real(i)) * dx_a[lev][0];
             Real y = prob_lo[1] + (0.5_rt + Real(j)) * dx_a[lev][1];
@@ -228,6 +230,7 @@ public:
               // (expensive) calls.
               if (int(result) == int(CGAL::ON_BOUNDED_SIDE)) {
                 ibMarkers(i, j, k, 0) = true;
+                ibFab.gpData.geomIdx.push_back(ii);
                 break;
               }
             }
@@ -235,7 +238,7 @@ public:
         }
       };
 
-      // compute ghost markers
+      // compute ghost markers -- move to GPU.
       ibFab.gpData.ngps = 0;
       int nextra = 1;
       for (int k = lo[2] - nextra; k <= hi[2] + nextra; ++k) {
@@ -419,6 +422,13 @@ void initialiseGPs(int lev) {
             gpData.imp_ipweights.push_back(ipweights);
             gpData.imp_ip_ijk.push_back(ip_ijk);
 
+            // check locations physical coordinates
+            // printf("GP point: %f %f %f\n", gp[0], gp[1], gp[2]);
+            // printf("IB point: %f %f %f\n", cp[0], cp[1], cp[2]);
+            // printf("Normal: %f %f %f\n", norm(0), norm(1), norm(2));
+            // printf("disGP: %f\n", disGP);
+            // printf("disIM: %f\n", di_a[lev]);
+            // printf("IM point: %f %f %f\n", imp_xyz(0,0), imp_xyz(0,1), imp_xyz(0,2));
         }
       }
     }
@@ -445,11 +455,34 @@ void computeGPs(const MFIter& mfi, const Array4<Real>& cons, const Array4<Real>&
   auto const tan1 = ibFab.gpData.tangent1.data();
   auto const tan2 = ibFab.gpData.tangent2.data();
 
-    ParallelFor(ibFab.gpData.ngps, [=,copy=this] AMREX_GPU_DEVICE (int ii)
+  ParallelFor(ibFab.gpData.ngps, [=,copy=this] AMREX_GPU_DEVICE (int ii)
     {
+
+// #if TEST_IB_INTERPOLATION
+    // printf("GP %d -------\n",ii);
+    // printf("GP ijk = (%d, %d, %d)\n", gp_ijk[ii](0), gp_ijk[ii](1), gp_ijk[ii](2) );
+    // printf("norm: (%f, %f, %f)\n", norm[ii](0), norm[ii](1), norm[ii](2) );
+
+    // // for each image point
+    // for (int iim=0; iim<eorder_tparm; iim++) {
+    //   // for each IP point
+    //   printf("IM %d -------\n",iim);
+    //   printf("IM ijk = (%d, %d, %d)\n", imp_ijk[ii](iim,0), imp_ijk[ii](iim,1), imp_ijk[ii](iim,2) );
+    //   for (int iip=0; iip<8; iip++) {
+    //     int iii = imp_ip_ijk[ii](iim,iip,0);
+    //     int jjj = imp_ip_ijk[ii](iim,iip,1);
+    //     int kkk = imp_ip_ijk[ii](iim,iip,2);
+    //     printf("IP %d, ijk=(%d, %d, %d), weight= %f \n",iip,iii,jjj,kkk,imp_ipweights[ii](iim,iip));
+    //   }
+    //   printf("------- \n");
+    // }
+
+// #endif
 
       Array2D<Real,0,eorder_tparm+1,0,cls_t::NPRIM-1> primsNormal={0.0};
       copy->interpolateIMs(imp_ip_ijk[ii],imp_ipweights[ii],prims,primsNormal);
+      // printf("norm: %f %f %f\n", norm[ii](0), norm[ii](1), norm[ii](2) );
+      // printf("IP vel: %f %f %f\n", primsNormal(2,cls_t::QU), primsNormal(2,cls_t::QV), primsNormal(2,cls_t::QW));
 
       // transform velocity to local coordinates for image points only
       for (int iip=2; iip<2+eorder_tparm; iip++) {
@@ -457,6 +490,10 @@ void computeGPs(const MFIter& mfi, const Array4<Real>& cons, const Array4<Real>&
       }
       copy->computeIB(primsNormal,cls);
       copy->extrapolate(primsNormal, disGP[ii], disIM[ii]);
+
+      // limiting p and T
+      primsNormal(0,cls_t::QPRES) = max(primsNormal(0,cls_t::QPRES),1.0);
+      primsNormal(0,cls_t::QT)    = max(primsNormal(0,cls_t::QT),50.0);
       // thermodynamic consistency
       primsNormal(0,cls_t::QRHO)  = primsNormal(0,cls_t::QPRES)/(primsNormal(0, cls_t::QT)*cls->Rspec);
 
@@ -464,15 +501,14 @@ void computeGPs(const MFIter& mfi, const Array4<Real>& cons, const Array4<Real>&
       int idx=0;
       copy->local2global(idx,primsNormal,norm[ii],tan1[ii],tan2[ii]);
 
-      // limiting p and T
-      // primsNormal(0,QPRES) = max(primsNormal(0,QPRES),1.0);
-      // primsNormal(0,QT)    = max(primsNormal(0,QT),50.0);
 
       // insert primitive variables into primsFab
       int i=gp_ijk[ii](0); int j=gp_ijk[ii](1); int k = gp_ijk[ii](2);
       for (int nn=0; nn<cls_t::NPRIM; nn++) {
         prims(i,j,k,nn) = primsNormal(0,nn);
       }
+
+      // printf("GP vel: %f %f %f\n \n", prims(i,j,k,cls_t::QU), prims(i,j,k,cls_t::QV), prims(i,j,k,cls_t::QW) );
 
       // AMREX_ASSERT_WITH_MESSAGE( prims(i,j,k,QPRES)>50,"P<50 at GP");
 
@@ -652,7 +688,7 @@ private:
     primsNormal(1,cls_t::QV) = primsNormal(2,cls_t::QV); // ut1
     primsNormal(1,cls_t::QW) = primsNormal(2,cls_t::QW); // ut2
     // zerograd temperature and pressure
-    primsNormal(1,cls_t::QPRES) = 2.0_rt*(2.0_rt*primsNormal(2,cls_t::QPRES) - 0.5_rt*primsNormal(3,cls_t::QPRES))/3.0_rt;
+    primsNormal(1,cls_t::QPRES) = primsNormal(2,cls_t::QPRES); //2.0_rt*(2.0_rt*primsNormal(2,cls_t::QPRES) - 0.5_rt*primsNormal(3,cls_t::QPRES))/3.0_rt;
     primsNormal(1,cls_t::QT)    = primsNormal(2,cls_t::QT);
     // ensure thermodynamic consistency
     primsNormal(1,cls_t::QRHO)  = primsNormal(1,cls_t::QPRES)/(primsNormal(1,cls_t::QT)*cls->Rspec); 

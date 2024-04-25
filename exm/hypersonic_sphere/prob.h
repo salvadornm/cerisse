@@ -28,11 +28,12 @@ struct ProbParm
 typedef closures_dt<indicies_t, visc_suth_t, cond_suth_t,
                     calorifically_perfect_gas_t<indicies_t>>
     ProbClosures;
-typedef rhs_dt<riemann_t<false, ProbClosures>, no_diffusive_t, no_source_t>
+// typedef rhs_dt<riemann_t<false, ProbClosures>, no_diffusive_t, no_source_t>
+typedef rhs_dt<rusanov_t<ProbClosures>, no_diffusive_t, no_source_t>
     ProbRHS;
 
-typedef std::ratio<3,5> d_image;
-typedef eib_t<2,2,d_image,ProbClosures> ProbIB;
+typedef std::ratio<5,5> d_image;
+typedef eib_t<1,1,d_image,ProbClosures> ProbIB;
 
 void inline inputs() {
   ParmParse pp;
@@ -43,43 +44,6 @@ void inline inputs() {
   pp.add   ("ib.move",0); // 0=false, 1=true
   pp.add   ("ib.plot_surf",0); // 0=false, 1=true
 }
-
-// called for each ghost point
-// space and time varying
-// input arguments
-// output dq_bndry and q_bndry
-
-// void ibc(q,dq,closest_element) {
-
-// }
-
-// void inline inputs() {
-//   ParmParse pp;
-
-//   // Numerical operators
-//   //-1 = N/A (Incase of periodic)
-//   // 0 = Interior           3 = Symmetry
-//   // 1 = Inflow             4 = SlipWall
-//   // 2 = Outflow            5 = NoSlipWall
-//   // 6 = user defined
-//   pp.addarr("cns.lo_bc", std::vector<int>{2,0,0});
-//   pp.addarr("cns.hi_bc", std::vector<int>{2,0,0});
-//   pp.add   ("cns.order_rk", 3); // -2, 1, 2 or 3"
-//   pp.add   ("cns.stages_rk", 3); // 1, 2 or 3
-//   pp.add   ("cns.rhs_euler", 1); // 0=false, 1=true
-//   pp.add   ("cns.rhs_visc", 0); // 0=false, 1=true
-//   pp.add   ("cns.rhs_source", 0); // 0=false, 1=true
-//   pp.add   ("cns.flux_euler", 0); // 0=riemann solver, 1=KEEP/AD, 2=WENO5
-//   pp.add   ("cns.order_keep", 4); // Order of accuracy=2, 4 or 6"
-//   pp.add   ("cns.art_diss", 0); // 0=none, 1=artificial dissipation
-//   pp.add   ("cns.screen_output", 1); // 0=quiet, 1=verbose
-//   pp.add   ("cns.verbose", 1); // 0=quiet, 1=verbose
-
-//   // ibm
-//   pp.add   ("ib.move",0); // 0=false, 1=true
-//   pp.add   ("ib.plot_surf",0); // 0=false, 1=true
-
-// }
 
 //////////////////////////// Initial conditions ////////////////////////////////
 AMREX_GPU_DEVICE AMREX_FORCE_INLINE
@@ -93,28 +57,9 @@ void prob_initdata (int i, int j, int k, amrex::Array4<amrex::Real> const& state
   Real x = prob_lo[0] + (i+0.5_rt)*dx[0];
   Real y = prob_lo[1] + (j+0.5_rt)*dx[1];
   Real z = prob_lo[2] + (k+0.5_rt)*dx[2];
-  // if (x < prob_hi[0]/8) {
-  //     P = pparm.p_l;
-  //     rho = pparm.rho_l;
-  //     ux = pparm.u_l*0.0_rt;
-  // } else {
-  //     P = pparm.p_l;
-  //     rho = pparm.rho_l;
-  //     ux = pparm.u_l;
-  // }
 
-  // if (pow(x-pparm.x0,2) + pow(y-pparm.y0,2) + pow(z-pparm.z0,2) < pow(0.4_rt,2) ){
-  //     P = pparm.p_inf;
-  //     rho = pparm.rho_inf*0.7;
-  //     ux = pparm.u_inf*0.9;
-  // } else {
-  //     P = pparm.p_inf;
-  //     rho = pparm.rho_inf;
-  //     ux = pparm.u_inf;
-  // }
-
-  Real u_small = pparm.u_inf*0.1;
-  Real xstart = 0.2_rt;
+  Real u_small = pparm.u_inf*0.2;
+  Real xstart = 0.45_rt;
   Real xend   = pparm.x0;
   Real dis = xstart - xend;
   Real grad = (pparm.u_inf - u_small)/(dis);
@@ -130,7 +75,6 @@ void prob_initdata (int i, int j, int k, amrex::Array4<amrex::Real> const& state
     T = pparm.T_inf*3;
     P = pparm.p_inf;
   } else {
-    // ux = u_small;
     ux = pparm.u_inf;
     T = pparm.T_inf*3;
     P = pparm.p_inf;

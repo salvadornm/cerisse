@@ -5,6 +5,7 @@
 #include <Weno.h>
 #include <CentralKEEP.h>
 #include <Riemann.h>
+#include <Rusanov.h>
 #ifdef USE_PELEPHYSICS
 #include "react.h"
 #endif
@@ -25,7 +26,7 @@ class no_euler_t
 {
 public:
   template<typename... Args>
-  void eflux(Args&&... args){};
+  void eflux(Args&&... args){}
 };
 
 // no diffusive flux
