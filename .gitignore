@@ -12,6 +12,10 @@
 **/plt*
 **/.ipynb_checkpoints/
 **/results
+**/*.visit
+
+# mac files
+.DS_Store
 
 /src/.temp
 

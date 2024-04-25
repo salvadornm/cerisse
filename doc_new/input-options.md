@@ -204,7 +204,7 @@ In the **input** file, users should specify the geometry of the embedded boundar
 | `combustor`   | `far_wall_loc`, `ramp_plane1_point`,  `ramp_plane2_point`, `ramp_plane2_normal`, `ramp_plane3_point`, `pipe_lo`, `pipe_hi`
 | `converging-nozzle` | `d_inlet`, `l_inlet`, `d_exit`, `l_nozzle`
 
-NOTE: You can only choose one geometry type and one geometry. If you want to use multiple geometries, you need to [define your own geometry](run.md#embedded-boundary-geometries).
+NOTE: You can only choose one geometry type and one geometry. If you want to use multiple geometries, you need to define your own geometry
 
 Below are some examples:
 ```ini

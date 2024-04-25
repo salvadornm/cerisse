@@ -1,5 +1,0 @@
-CEXE_headers += LES.H
-CEXE_headers += PaSR.H
-
-CEXE_sources += Smagorinsky.cpp
-CEXE_sources += WALE.cpp

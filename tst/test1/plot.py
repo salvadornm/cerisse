@@ -30,7 +30,7 @@ srt = np.argsort(lineout["index", "x"]) # sort according to x position
 rho = np.array(lineout["boxlib", "Density"][srt]) # get the variable
 
 # plot solutions
-plt.plot(np.array(lineout["index", "x"][srt]),rho,label=" WENO ")
+plt.plot(np.array(lineout["index", "x"][srt]),rho,label=" solution ")
 plt.ylabel("density")
 plt.xlabel(' x ', horizontalalignment='center')
 

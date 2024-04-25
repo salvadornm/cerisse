@@ -23,7 +23,7 @@ cns.verbose = 0       # 0=quiet, 1=verbose
 
 # Refinement and regridding 
 amr.n_cell          = 128 512
-amr.max_level       = 2     # maximum level number allowed
+amr.max_level       = 1     # maximum level number allowed
 amr.ref_ratio       = 2 2 # refinement ratio per level
 amr.regrid_int      = 2 2 # how often to regrid per level
 amr.blocking_factor_x = 8 8 # blocking factor in x per level

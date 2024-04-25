@@ -1,8 +1,6 @@
 
-**NEW-TEMPORARY**
-
 This page explains how to run the code after download, installing
-it an run a simple example case
+it and run a simple example case
 
 ## Instal Pre-requisites
 
@@ -36,18 +34,21 @@ This is a libary of differential and algebraic equation solvers used by PelePhys
 To install  any example
 
 ```
-$ cd exm/tmp
+$ cd tst/test2
 $ make SUNDIALS
 ```
+
+NOTE: fix THIS ? Is SUNDIALS not working ..
+
 This will download and isntall version **6.5**. Sundials cannot be installed before compiling as some options (such as GPU) require re-compiling.
 
-## Quick Tutorial
+## Quick Example
+
+This quick example shows the workflow
 
 ### 1) Go to Problem Folder
 
-Go to Exec folder and pick one example. In this Tutorial  we we will work with
-Test, which is a very corase clasic Sod Test in 1 direction, although we will run it in 2 dimensions
-to see the results.
+In this example, we wil solve  a very coarse clasic Sod Test.
 
 
 ```
@@ -58,16 +59,18 @@ The directory contains the following files
 
 ```bash
 $ ls
-GNUmakefile  inputs  Make.package  prob.h  
+GNUmakefile	    README.md	inputs		prob.h
+Make.package	exact.dat	plot.py
 ```
 
-A detail explanation of the files is in *ADD* tab, but basically `inputs` is your simulation comntrol files
-(mesh size, number of steps, etc..), while `prob.h` determines the problem to solve.
+A detailed explanation of the files is in tutorial [Tutorial](tutorial.md), but basically `inputs` is your simulation control file
+(mesh size, number of steps, etc...), while `prob.h` determines the 
+problem to solve.
 
 
 ### 2) Compile code
 
-This will create the executable, to compile simply use
+The compiling stage will create the executable, to compile simply use
 
 ```bash
 $ make
@@ -76,42 +79,71 @@ $ make
 NOTE:  use `$make -j4` if possible, it will compile faster. This step can be very slow, depending on your computer and options, but most of the time it has to be done only once.
 
 
-Once finished it will create a temporary directory 
-`$ tmp_build_dir`  and (if succesful) an executable will be created named `Cerisse2d.gnu.ex`
-the name will change depending on the compiler and problem dimension
+Once finished it will create a temporary folder
+`tmp_build_dir`  and, if succesful, an executable  named `main1d.gnu.MPI.ex`.
+The executable name will change depending on the compiler, parallelization and dimension of the problem.
 
 ### 4) Run
 
-To run type
+To run type (this test runs with one core only)
 
 ```bash
-$ ./Cerisse2d.gnu.ex inputs
+$ ./main1d.gnu.MPI.ex inputs
 ```
-It will run very quickly for 92 steps, and the output should be like this (exact numbers can change machine to machine)
+It will run very quickly for 200 steps, and the final output should be like this (exact numbers can change machine to machine)
 
 
-It will create files
+```
+[Level 0 step 200] ADVANCE at time 0.199 with dt = 0.001
+[Level 0 step 200] Advanced 200 cells
+   Total Xmom = 35.999999999999758
+   Total Ymom = 0
+   Total Zmom = 0
+   Total Energy = 274.99999999999903
+   Total Density = 112.49999999999953
+
+STEP = 200 TIME = 0.2 DT = 0.001
+
+
+[STEP 200] Coarse TimeStep time: 9.4e-05
+[STEP 200] FAB kilobyte spread across MPI nodes: [44 ... 44]
+
+PLOTFILE: file = ./plot/plt00200
+Write plotfile time = 0.000818  seconds
+
+Run Time total        = 0.022978
+Run Time init         = 0
+Run Time advance      = 0.020111
+Unused ParmParse Variables:
+  [TOP]::cns.screen_output(nvals = 1)  :: [1]
+  [TOP]::amr.ref_ratio(nvals = 3)  :: [2, 2, 2]
+  [TOP]::amr.regrid_int(nvals = 3)  :: [2, 2, 2]
+  [TOP]::amr.blocking_factor_y(nvals = 3)  :: [8, 8, 8]
+  [TOP]::amr.blocking_factor_z(nvals = 3)  :: [8, 8, 8]
+
+AMReX (ae29b6e5b68b-dirty) finalized
+```
+
+
+It will create a new folder `plot`
 
 ```bash
-$ ls
-Cerisse2d.gnu.ex  Make.package  plt00020  plt00050  plt00080  prob.cpp     tmp_build_dir
-GNUmakefile       plt00000      plt00030  plt00060  plt00090  prob.H
-inputs            plt00010      plt00040  plt00070  plt00092  prob_parm.H
+$ ls plot
+plt00000	plt00100	plt00200
 ```
-Where the directories `plt*` store the data files, every 10 steps, plus the last time step. 
+Where the directories `plt*` store the data files, every 100 steps, including the initial step. 
 
 ### 5) See the Results
 
-In this example, we will use Visit (recall that Visit cannot be used in 1D).
-To load the data, open header files of a particular directory
+The results can be seen by a python script
 
-
-If the instant 0 is open, the results for density will look like 
-
-
-Alternatively you can use the script **cerisse**, to open all directories at the same time (to make an animation for example). 
-
-``` bash
-$ cerisse visit
 ```
+$ python plt.py
+```
+which should show something like
+
+![test1plot](images/test1.png)
+
+You need to have the Python module **yt** installed
+Check [Tips](tips.md) for installation. For a more in-depth check the [Tutorial](tutorial.md)
 

@@ -42,6 +42,7 @@ static void set_scalar_bc(BCRec& bc, const BCRec* phys_bc) {
 static void set_x_vel_bc(BCRec& bc, const BCRec* phys_bc) {
   const int* lo_bc = phys_bc->lo();
   const int* hi_bc = phys_bc->hi();
+
   bc.setLo(0, norm_vel_bc[lo_bc[0]]);
   bc.setHi(0, norm_vel_bc[hi_bc[0]]);
 #if (AMREX_SPACEDIM >= 2)
@@ -57,6 +58,7 @@ static void set_x_vel_bc(BCRec& bc, const BCRec* phys_bc) {
 static void set_y_vel_bc(BCRec& bc, const BCRec* phys_bc) {
   const int* lo_bc = phys_bc->lo();
   const int* hi_bc = phys_bc->hi();
+
   bc.setLo(0, tang_vel_bc[lo_bc[0]]);
   bc.setHi(0, tang_vel_bc[hi_bc[0]]);
 #if (AMREX_SPACEDIM >= 2)
@@ -72,12 +74,18 @@ static void set_y_vel_bc(BCRec& bc, const BCRec* phys_bc) {
 static void set_z_vel_bc(BCRec& bc, const BCRec* phys_bc) {
   const int* lo_bc = phys_bc->lo();
   const int* hi_bc = phys_bc->hi();
+
   bc.setLo(0, tang_vel_bc[lo_bc[0]]);
   bc.setHi(0, tang_vel_bc[hi_bc[0]]);
+#if (AMREX_SPACEDIM >= 2)  
   bc.setLo(1, tang_vel_bc[lo_bc[1]]);
   bc.setHi(1, tang_vel_bc[hi_bc[1]]);
+#endif  
+#if (AMREX_SPACEDIM == 3)  
   bc.setLo(2, norm_vel_bc[lo_bc[2]]);
   bc.setHi(2, norm_vel_bc[hi_bc[2]]);
+#endif  
+
 }
 
 void CNS::variableSetUp() {
@@ -113,18 +121,26 @@ void CNS::variableSetUp() {
   Vector<int> cons_vars_type = indicies_t::get_cons_vars_type();
 
   for (int cnt=0;cnt<h_prob_closures->NCONS;cnt++) {
-    if (cons_vars_type[cnt]==0) {
-      set_scalar_bc(bcs[cnt], h_phys_bc);
+
+    switch (cons_vars_type[cnt])
+    {
+      case 0:
+        set_scalar_bc(bcs[cnt], h_phys_bc);
+        break;
+      case 1:
+        set_x_vel_bc (bcs[cnt], h_phys_bc);
+        break;
+      case 2:  
+        set_y_vel_bc (bcs[cnt], h_phys_bc); 
+        break;
+      case 3:  
+        set_z_vel_bc (bcs[cnt], h_phys_bc);    
+        break;
+      default:
+        std::cout << " error ... variableSetUp" << std::endl;
+        exit(1); 
     }
-    else if (cons_vars_type[cnt]==1) {
-      set_x_vel_bc(bcs[cnt], h_phys_bc);
-    }
-    else if (cons_vars_type[cnt]==2) {
-      set_y_vel_bc(bcs[cnt], h_phys_bc);
-    }
-    else if (cons_vars_type[cnt]==3) {
-      set_z_vel_bc(bcs[cnt], h_phys_bc);
-    }
+
   }
 
   // Boundary conditions

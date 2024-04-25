@@ -11,6 +11,16 @@ Created by:
 **Salvador Navarro-Martinez**
 
 
+## Capabilities
+
+- Compressible Sover
+_ Ideal Gas and S-K
+- Reactive Flows
+- Adapative Mesh Refinement
+- GPU/CPU and MPI
+- Complex geometries using Immersed/Embeded Boundaries  (no need of mesh)
+
+
 ## Getting the code
 
 1. Clone the repository with all submodules
@@ -21,8 +31,12 @@ Created by:
     ```bash
     git clone  git@github.com:salvadornm/cerisse.git
     ```
-3. Or download latest release from comand line
+3. Same using GitHub CLI
+    ```bash
+    $ gh repo clone salvadornm/cerisse
+    ```
+4. Or download latest release from comand line
     ```bash
     wget https://github.com/cerisse/archive/refs/tags/v01.zip
     ```
-4. Or download a release from [here](https://github.com/salvadornm/cerisse/releases) 
+5. Or download a release from [here](https://github.com/salvadornm/cerisse/releases) 

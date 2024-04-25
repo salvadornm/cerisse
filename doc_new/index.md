@@ -1,21 +1,9 @@
 # Cerisse++
 
-**NEW-TEMPORARY**
+
 
 --8<-- "README.md"
 
-## Folder layout
-
-    cerisse/           # main code
-    ├───exm/           # simple example cases
-    ├───tst/           # test cases
-    ├───src/           # souce code
-    └───bin/           # useful scripts
-    lib/               # required modules
-    ├───amrex/         # AMR data structure, backends
-    ├───PelePhysics    # EoS, transport, reaction
-    └───sundials/      # chemical integrators
-    docs/           # documentation folder
 
 ## Pre-requisites
 
@@ -50,44 +38,23 @@ Cerisse/AMREx/PeleC format is supported by
 and check for more options
 [AMReX Visualization](https://amrex-codes.github.io/amrex/docs_html/Visualization.html)
 
-## Installation
 
-Download the latest version on the master branch using GitHub CLI
+## Start
 
-```bash
-$ gh repo clone salvadornm/cerisse
-```
+To finih installation see [QuickStart](quickrun.md)
 
-or Download the latest release from [GitHub](https://github.com/salvadornm/cerisse/releases)
+## Folder layout
 
-## Documentation Editing
-
-For help editing the documentation visit [mkdocs.org](https://www.mkdocs.org). To generate the docs locally type in the parent directory: `mkdocs serve`
-and point the browser to [127.0.0.1.8000](http://127.0.0.1:8000)
-
-You will need to install the `python-markdown-math` extension for rendering equations and the `markdown-callouts` extension for correctly displaying the warning and note blocks. All requirements can be installed automatically using
-
-```bash
-$ pip install -r docs/requirements.txt
-```
-To  install **mkdocs** 
-
-```bash
-$ pip install mkdocs
-```
-or dependencies `$ pip install mkdocs`
-
-
-
-```bash
-$ pip install pip-tools
-```
-
-if you add new markdown extensions, edit the `requirements.in`  file under `docs/`
-
-```bash
-$ pip-compile requirements.in
-```
+    cerisse/           # main code
+    ├───exm/           # simple example cases
+    ├───tst/           # test cases
+    ├───src/           # souce code
+    └───bin/           # useful scripts
+    lib/               # required modules
+    ├───amrex/         # AMR data structure, backends
+    ├───PelePhysics    # EoS, transport, reaction
+    └───sundials/      # chemical integrators
+    docs/           # documentation folder
 
 
 

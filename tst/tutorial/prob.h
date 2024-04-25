@@ -78,6 +78,8 @@ prob_initdata(int i, int j, int k, Array4<Real> const &state,
   state(i, j, k, cls.URHO) = rhot;
   state(i, j, k, cls.UMX)  = rhot * uxt;
   state(i, j, k, cls.UMY)  = rhot * uyt;
+  state(i, j, k, cls.UMZ)  = Real(0.0);
+
 
   Real et = Pt / (cls.gamma - Real(1.0));
   state(i, j, k, cls.UET) = et + Real(0.5) * rhot * (uxt * uxt + uyt * uyt); 
