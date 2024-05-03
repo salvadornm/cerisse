@@ -7,6 +7,8 @@
 #include <Closures.h>
 #include <RHS.h>
 
+// 2D Convective Vortex 
+
 
 using namespace amrex;
 
@@ -14,11 +16,13 @@ namespace PROB {
 
 // problem parameters  (1:bottom   2:top)
 struct ProbParm {
-  Real p_int = 2.0;
-  Real rho_1 = 1.0;
-  Real rho_2 = 2.0;
-  Real grav = -1.0; 
-  Real eps =  0.025;
+  Real mach = 0.05;
+  Real beta = 0.02; // vortex strength
+  Real p0 = 1e6;    // [erg cm^-3]
+  Real T0 = 300.0;  // [K]
+  Real rho0;
+  Real v0 = 1735.95;
+  // v0 = 0.05 * np.sqrt(1.4 * 287 * 300) * 100 # convection velocity 1735.95
 };
 
 inline Vector<std::string> cons_vars_names={"Xmom","Ymom","Zmom","Energy","Density"};
@@ -32,8 +36,7 @@ template <typename cls_t > class user_source_t;
 
 
 
-typedef rhs_dt<riemann_t<false, ProbClosures>, no_diffusive_t, user_source_t<ProbClosures>>
-    ProbRHS;
+typedef rhs_dt<riemann_t<false, ProbClosures>, no_diffusive_t, no_source_t > ProbRHS;
 
 
 void inline inputs() {
@@ -52,36 +55,41 @@ prob_initdata(int i, int j, int k, Array4<Real> const &state,
   const Real *prob_hi = geomdata.ProbHi();
   const Real *dx = geomdata.CellSize();
 
-
   Real x = prob_lo[0] + (i + Real(0.5)) * dx[0];
   Real y = prob_lo[1] + (j + Real(0.5)) * dx[1];
   
-  Real Pt, rhot, uxt,uyt;
-  Real Lint = prob_hi[1] / 2; // half-domain lenght in y
-  Real Pint = prob_parm.p_int; // interface Pressure
+  // Vortex functions 
+  const Real xc = 5.0;
+  const Real yc = 5.0; // vortex initial pos
+  const Real R = 0.5;  // vortex radius
+  const Real rsq = (x - xc) * (x - xc) + (y - yc) * (y - yc);
+  amrex::Real  cp  = 1000; // temp snm
 
-  const Real freq = Real(8)*Real(3.14159265359); // wavelength = x-domain
+  amrex::Real u[3], T, Pt,rhot;
 
-  Real yrel = y - Lint;
-  Real delta  = dx[1]/5;  // transition region between top/bottom (if < dx, sharp)
-  Real step = Real(0.5) + Real(0.5)*tanh(yrel/delta);
-
-  rhot = step*prob_parm.rho_2 + (Real(1.0) -step)*prob_parm.rho_1;
-
-  Pt = Pint + rhot*prob_parm.grav*yrel; // hydrostatic pressure
+  // auxiliar parameters
+  const Real vbeta = prob_parm.v0 * prob_parm.beta;
+  const Real expd = exp(-0.5 * rsq / R / R);
   
-  Real csound = sqrt(cls.gamma*Pt/rhot); 
 
-  uxt = Real(0.0);
-  uyt = -prob_parm.eps*cos(freq*x)*csound; // perturbation in y-component
-  
+  // velocity
+  u[0] = prob_parm.v0  - vbeta * (y - yc) / R * expd;
+  u[1] = vbeta * (x - xc) / R * expd;
+  u[2] = 0.0;
+  // Temperature
+  T = prob_parm.T0 - Real(0.5) * (vbeta*vbeta) / cp * exp(-rsq / R / R);
+  // Pressure
+
+  // Density  and Internal Energy
+    
+  Real eint = Pt / (cls.gamma - Real(1.0));
+
+  // final state
   state(i, j, k, cls.URHO) = rhot;
-  state(i, j, k, cls.UMX)  = rhot * uxt;
-  state(i, j, k, cls.UMY)  = rhot * uyt;
-  state(i, j, k, cls.UMZ)  = Real(0.0);
-
-  Real et = Pt / (cls.gamma - Real(1.0));
-  state(i, j, k, cls.UET) = et + Real(0.5) * rhot * (uxt * uxt + uyt * uyt); 
+  state(i, j, k, cls.UMX)  = rhot * u[0];
+  state(i, j, k, cls.UMY)  = rhot * u[1];
+  state(i, j, k, cls.UMZ)  = Real(0.0);  
+  state(i, j, k, cls.UET) = rhot*(eint + Real(0.5) * (u[0] * u[0] + u[1] * u[1])); 
 
 }
 
@@ -91,33 +99,6 @@ bcnormal(const Real x[AMREX_SPACEDIM], Real dratio, const Real s_int[5],
          const int sgn, const Real time, GeometryData const & /*geomdata*/,
          ProbClosures const &closures, ProbParm const &prob_parm) {
 }
-
-///////////////////////////////SOURCE TERM /////////////////////////////////////
-template <typename cls_t>
-class user_source_t {
-  public:
-  void inline src(const amrex::MFIter &mfi,
-                  const amrex::Array4<const amrex::Real> &prims,
-                  const amrex::Array4<amrex::Real> &rhs, const cls_t *cls_d,
-                  amrex::Real dt){
-
-    const Box bx = mfi.tilebox();
-
-    ProbParm const prob_parm; 
-
-    amrex::ParallelFor(bx,
-      [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept
-      { 
-      const auto& cls = *cls_d;
-    
-    //  user_source(i,j,k,prims,rhs,lprobparm,cls,dx);           
-      Real rho = prims(i, j, k, cls.QRHO);
-      rhs(i,j,k,cls.UMY) += prob_parm.grav*rho; 
-      rhs(i,j,k,cls.UET) += prob_parm.grav*rho*prims(i, j, k, cls.QV);
-      });
-
-  };
-};
 
 ///////////////////////////////AMR//////////////////////////////////////////////
 AMREX_GPU_DEVICE AMREX_FORCE_INLINE void

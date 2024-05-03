@@ -15,9 +15,13 @@ The line above  defines the type of problem to be solved, and consist of a serie
 | class                      | Type          | Options| Description                                                  |
 | --------------------------- | ------------- |:-------:| ------------------------------------------------------------ |
 | riemann_t              | Euler Solver           |   bool, ProbClosures     | Class for Riemann Solvers   |
+| rusanov_t              | Euler Solver           |   bool, ProbClosures     | Rusanov   |
+| keep_t              | Euler Solver           |   bool, ProbClosures     | KEEP scheme   |
+| skew_t              | Euler Solver           |   bool, ProbClosures     | Skew-symmetric scheme   |
 | no_diffusive_t             | Option          | 0       | No diffusion, viscosity   |
 | no_source_t             | Option          | 0       | No source term   |
 | user_source_t             | Option          | 0       | Defined in prob.h    |
+
 
 
 
