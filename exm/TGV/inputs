@@ -16,6 +16,15 @@ geometry.coord_sys   = 0  # 0 => cart, 1 => RZ  2=>spherical
 geometry.prob_lo     = 0.0     0.0     0.0
 geometry.prob_hi     = 6.28318     6.28318     6.28318
 
+# -1 = N/A (Incase of periodic)
+# 0 = Interior           3 = Symmetry
+# 1 = Inflow             4 = SlipWall
+# 2 = Outflow            5 = NoSlipWall
+# 6 = user defined
+cns.lo_bc = -1 -1 -1
+cns.hi_bc = -1 -1 -1
+cns.nstep_screen_output = 1
+cns.verbose = 1       # 0=quiet, 1=verbose
 
 # REFINEMENT / REGRIDDING 
 #amr.n_cell          = 256 256 256
