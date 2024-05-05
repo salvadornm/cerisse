@@ -13,3 +13,9 @@
 [submodule "lib/cgal"]
 	path = lib/cgal
 	url = https://github.com/CGAL/cgal.git
+[submodule "lib/clad"]
+	path = lib/clad
+	url = https://github.com/vgvassilev/clad.git
+[submodule "lib/autodiff"]
+	path = lib/autodiff
+	url = https://github.com/autodiff/autodiff.git
