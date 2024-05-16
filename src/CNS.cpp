@@ -332,11 +332,13 @@ void CNS::computeNewDt(int finest_level, int sub_cycle, Vector<int> &n_cycle,
 #endif                                          
   }
   // Print
-  if (ParallelDescriptor::IOProcessor()) {
-    for (int i = 0; i <= finest_level; i++) {
-      printf("[computeNewDt] Level %d, Max CFL= %f, Max eigenvalues (x,y,z) = (%f,%f,%f) \n", i, CFL_level[i],eigenvals_level[i][0], eigenvals_level[i][1], eigenvals_level[i][2]);
-    }
-  }
+  //amrex::Print() <<  "[computeNewDt] Level %d, Max CFL= %f, Max eigenvalues (x,y,z) = (%f,%f,%f) \n", i, CFL_level[i],eigenvals_level[i][0], eigenvals_level[i][1], eigenvals_level[i][2];
+
+  // if (ParallelDescriptor::IOProcessor()) {
+  //   for (int i = 0; i <= finest_level; i++) {
+  //     printf("[computeNewDt] Level %d, Max CFL= %f, Max eigenvalues (x,y,z) = (%f,%f,%f) \n", i, CFL_level[i],eigenvals_level[i][0], eigenvals_level[i][1], eigenvals_level[i][2]);
+  //   }
+  // }
 }
 
 // Returns maximum eigenvalue in each direction

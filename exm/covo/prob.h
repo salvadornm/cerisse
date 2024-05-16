@@ -17,12 +17,11 @@ namespace PROB {
 // problem parameters  (1:bottom   2:top)
 struct ProbParm {
   Real mach = 0.05;
-  Real beta = 0.02; // vortex strength
-  Real p0 = 1e6;    // [erg cm^-3]
-  Real T0 = 300.0;  // [K]
-  Real rho0;
-  Real v0 = 1735.95;
-  // v0 = 0.05 * np.sqrt(1.4 * 287 * 300) * 100 # convection velocity 1735.95
+  Real p0 = 101300.0;    
+  Real rho0 =  1.17170407;
+  Real v0 = 35.0;
+  Real beta = 0.04; // parameter
+  Real L = 0.3112;  // size of domain
 };
 
 inline Vector<std::string> cons_vars_names={"Xmom","Ymom","Zmom","Energy","Density"};
@@ -33,7 +32,6 @@ typedef closures_dt<indicies_t, visc_suth_t, cond_suth_t,
     ProbClosures;
 
 template <typename cls_t > class user_source_t;
-
 
 
 typedef rhs_dt<riemann_t<false, ProbClosures>, no_diffusive_t, no_source_t > ProbRHS;
@@ -58,38 +56,41 @@ prob_initdata(int i, int j, int k, Array4<Real> const &state,
   Real x = prob_lo[0] + (i + Real(0.5)) * dx[0];
   Real y = prob_lo[1] + (j + Real(0.5)) * dx[1];
   
-  // Vortex functions 
-  const Real xc = 5.0;
-  const Real yc = 5.0; // vortex initial pos
-  const Real R = 0.5;  // vortex radius
+  // Vortex position (xc,yc) middle of domain
+  const Real xc = 0.5*prob_parm.L; const Real yc = 0.5*prob_parm.L;
+  const Real R  = 0.05*prob_parm.L; // vortex radius  L/20
   const Real rsq = (x - xc) * (x - xc) + (y - yc) * (y - yc);
-  amrex::Real  cp  = 1000; // temp snm
 
-  amrex::Real u[3], T, Pt,rhot;
+  amrex::Real u[3], T, P,rhot;
 
   // auxiliar parameters
-  const Real vbeta = prob_parm.v0 * prob_parm.beta;
-  const Real expd = exp(-0.5 * rsq / R / R);
+  const Real expd = exp(-Real(0.5) * rsq / R / R);
+  const Real Gam  = prob_parm.beta*prob_parm.v0*R*sqrt(exp(Real(1.0)));
+  const Real vbeta = - Gam*expd*R/R;
+  const Real Pfluc  =  Real(0.5)*prob_parm.rho0*(Gam/R)*(Gam/R);
+
   
+  // psi = Gamm*expd    stream function
+  // vx = dpsi/dy  and vy =  -dpsi/dx
 
   // velocity
-  u[0] = prob_parm.v0  - vbeta * (y - yc) / R * expd;
-  u[1] = vbeta * (x - xc) / R * expd;
-  u[2] = 0.0;
-  // Temperature
-  T = prob_parm.T0 - Real(0.5) * (vbeta*vbeta) / cp * exp(-rsq / R / R);
+  u[0] = prob_parm.v0  - vbeta * (y - yc);
+  u[1] = vbeta * (x - xc);
+  u[2] = Real(0.0);
   // Pressure
+  P = prob_parm.p0 - Pfluc*exp(-rsq / R / R);
 
   // Density  and Internal Energy
-    
-  Real eint = Pt / (cls.gamma - Real(1.0));
+
+  rhot = prob_parm.rho0;  
+  Real eint = P / (cls.gamma - Real(1.0));
 
   // final state
   state(i, j, k, cls.URHO) = rhot;
   state(i, j, k, cls.UMX)  = rhot * u[0];
   state(i, j, k, cls.UMY)  = rhot * u[1];
   state(i, j, k, cls.UMZ)  = Real(0.0);  
-  state(i, j, k, cls.UET) = rhot*(eint + Real(0.5) * (u[0] * u[0] + u[1] * u[1])); 
+  state(i, j, k, cls.UET)  = eint + Real(0.5) * rhot * (u[0] * u[0] + u[1] * u[1]); 
 
 }
 
@@ -99,41 +100,15 @@ bcnormal(const Real x[AMREX_SPACEDIM], Real dratio, const Real s_int[5],
          const int sgn, const Real time, GeometryData const & /*geomdata*/,
          ProbClosures const &closures, ProbParm const &prob_parm) {
 }
-
+//
 ///////////////////////////////AMR//////////////////////////////////////////////
 AMREX_GPU_DEVICE AMREX_FORCE_INLINE void
 user_tagging(int i, int j, int k, int nt_level, auto &tagfab,
              const auto &sdatafab, const auto &geomdata,
              const ProbParm &prob_parm, int level) {
 
-
-  Real rhot = sdatafab(i,j,k,ProbClosures::URHO);
-
-  Real dengrad_threshold = 0.5;
-  Real drhox = Math::abs(sdatafab(i+1,j,k,ProbClosures::URHO) -
-   sdatafab(i,j,k,ProbClosures::URHO))/rhot;
-
-  Real drhoy = Math::abs(sdatafab(i,j+1,k,ProbClosures::URHO) -
-   sdatafab(i,j-1,k,ProbClosures::URHO))/rhot;
-
-  if (nt_level > 0) 
-  {
-    // tag cells based on density values
-    switch (level)
-    {
-      case 0:
-        tagfab(i,j,k) = (rhot > 1.1 && rhot < 1.9);
-        break;
-      case 1:
-        tagfab(i,j,k) = (rhot > 1.2 && rhot < 1.8); 
-        break;
-      default:
-        tagfab(i,j,k) = (rhot > 1.3 && rhot < 1.7); 
-        break;
-    }
-  }
-} 
-////////////////////////////////////////////////////////////////////////////////
+}
+///////////////////////////////////////////////////////////////////////////////
 
 } // namespace PROB
 #endif
