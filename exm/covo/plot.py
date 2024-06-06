@@ -40,7 +40,7 @@ yc = 5.0
 print('opening data')
 
 # open data
-datasets = ["plt04500"]
+datasets = ["plt0000"]
 
 print('extracting lines at xc,yc=',xc,yc)
 
