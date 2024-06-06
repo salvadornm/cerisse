@@ -19,7 +19,7 @@ It should run very fast (<1 secs, depending on machine)
 The results can be seen by
 
 ```
-$ python plt.py
+$ python plot.py
 ```
 
 ![test1plot](images/test1.png)

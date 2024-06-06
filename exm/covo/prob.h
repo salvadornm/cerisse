@@ -64,9 +64,8 @@ prob_initdata(int i, int j, int k, Array4<Real> const &state,
   amrex::Real u[3], T, P,rhot;
 
   // auxiliar parameters
-  const Real expd = exp(-Real(0.5) * rsq / R / R);
+  const Real expd = exp(- rsq / R / R);
   const Real Gam  = prob_parm.beta*prob_parm.v0*R*sqrt(exp(Real(1.0)));
-  const Real vbeta = - Gam*expd*R/R;
   const Real Pfluc  = 2.0 *prob_parm.rho0*(Gam/R)*(Gam/R);
 
   
@@ -76,16 +75,16 @@ prob_initdata(int i, int j, int k, Array4<Real> const &state,
   // velocity
   if (rsq < 4*R) 
   {
-  u[0] = prob_parm.v0  - vbeta * (y - yc);
-  u[1] = vbeta * (x - xc);
-  u[2] = Real(0.0);
+    u[0] = prob_parm.v0  - Real(2.0)*Gam/(R*R) * expd * (y - yc);
+    u[1] = Real(2.0)*Gam/(R*R) * expd * (x - xc);
+    u[2] = Real(0.0);
   }
   else
   {
-   u[0]=0.0; u[1]=0.0;u[2]=0.0;	  
+    u[0]=0.0; u[1]=0.0;u[2]=0.0;	  
   }
   // Pressure
-  P = prob_parm.p0 - Pfluc*exp(-rsq / R / R);
+  P = prob_parm.p0 - Pfluc*expd;
 
   // Density  and Internal Energy
 
