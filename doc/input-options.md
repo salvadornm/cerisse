@@ -60,6 +60,11 @@ NOTE: In the tables below, DIM means the number of dimensions, Int means integer
 | amr.restart                 | String        |         | If present, then the name of checkpoint file to restart from |
 | amr.plotfile_on_restart     | Bool          | 0       | Write a plotfile when immediately after restart or not       |
 
+### GPU-related parameters
+| Option                      | Type          | Default | Description                                                  |
+| --------------------------- | ------------- |:-------:| ------------------------------------------------------------ |
+| amrex.the_arena_init_size   | Int           | 3/4 of total device memory | GPU device memory allocated to The_Arena() (in bytes) |
+
 ### Other parameters
 
 | Option                      | Type          | Default | Description                                                  |
