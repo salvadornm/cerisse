@@ -325,8 +325,8 @@ void CNS::full_prob_post_timestep(int /*iteration*/)
       amrex::Print() << "TIME = " << time << '\n'
                      << " SUM KE        = " << kinetic_e << '\n'
                      << " SUM ENSTROPHY = " << enstrophy << '\n'
-                     << " TEMP          = " << min_temp << ".." 
-                                            << mean_temp << ".." 
+                     << " TEMP          = " << min_temp << " .. " 
+                                            << mean_temp << " .. " 
                                             << max_temp << '\n';
 
       // Write the quantities at this time
