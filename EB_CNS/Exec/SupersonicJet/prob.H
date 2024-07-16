@@ -100,24 +100,66 @@ AMREX_GPU_DEVICE AMREX_FORCE_INLINE void bcnormal(
   for (int nf = 0; nf <= NUM_FIELD; ++nf) {
     if (idir == 0 && sgn == 1) {
       if (rsqr > 0.1905 * 0.1905 && rsqr < 0.889 * 0.889) { // Air inlet
-        const amrex::Real profile = 1; //- pow((sqrt(rsqr)-0.53975)/0.34925, 12);
+        amrex::Real profile = 1; //- pow((sqrt(rsqr)-0.53975)/0.34925, 12);
+        // profile += (pp.inflow_turbulence ? amrex::RandomNormal(0.0, 0.22) : 0.0);
+        // const amrex::Real prof_y = pp.inflow_turbulence ? amrex::RandomNormal(0.0, 0.22) : 0.0;
+        // const amrex::Real prof_z = pp.inflow_turbulence ? amrex::RandomNormal(0.0, 0.22) : 0.0;
+        if (pp.inflow_turbulence) {
+          const amrex::Real urms = 0.22; // in % of u2
+          const amrex::Real D = 0.118 * 2;
+          amrex::Real shift[6] = {-2.00245639, 3.324002275, 3.649820520,
+                                  -8.356795837, 1.105199344, -9.8623468700e-2}; // random phase shift
+          amrex::Real St[8] = {0.4635502163, 0.9903689339, 0.0476839647, 0.5231130471, 
+                               0.9501858289, 0.2582944864, 0.2351456733, 0.4247815352}; // random Strouhal number
+          const amrex::Real theta = std::atan(x[1] / x[2]);
+          for (int imode = 1; imode <= 6; ++imode) {
+            profile += 0.5 * urms * (std::sin((St[imode-1] * M_PI * imode * pp.u2 / D) * time + imode * theta + shift[imode-1]));
+          }
+          for (int imode = 7; imode <= 8; ++imode) {
+            profile += 0.5 * urms * std::sin((St[imode-1] * M_PI * imode * pp.u2 / D));
+          }
+
+          profile = 1 + (profile-1)*(1-pow((sqrt(rsqr)-0.53975)/0.34925, 7));
+        }
+        const amrex::Real prof_y = 0.0;
+        const amrex::Real prof_z = 0.0;
         s_ext[nf * NVAR + URHO] = pp.rho1;
         s_ext[nf * NVAR + UMX] = pp.rho1 * pp.u1 * profile;
-        s_ext[nf * NVAR + UMY] = 0.0;
-        s_ext[nf * NVAR + UMZ] = 0.0;
+        s_ext[nf * NVAR + UMY] = pp.rho1 * pp.u1 * prof_y;
+        s_ext[nf * NVAR + UMZ] = pp.rho1 * pp.u1 * prof_z;
         s_ext[nf * NVAR + UEDEN] =
-          pp.rho1 * pp.ei1 + 0.5 * pp.rho1 * pp.u1 * pp.u1 * profile * profile;
+          pp.rho1 * pp.ei1 + 0.5 * pp.rho1 * pp.u1 * pp.u1 * (profile * profile + prof_y * prof_y + prof_z * prof_z);
         for (int n = 0; n < NUM_SPECIES; ++n) {
           s_ext[nf * NVAR + UFS + n] = pp.rho1 * pp.Y1[n];
         }
       } else if (rsqr < 0.118 * 0.118) { // Fuel jet
-        const amrex::Real profile = 1;   //- pow(rsqr/0.118/0.118, 6);
+        amrex::Real profile = 1; //- pow(rsqr/0.118/0.118, 6);
+        // profile += (pp.inflow_turbulence ? amrex::RandomNormal(0.0, 0.18) : 0.0);
+        // const amrex::Real prof_y = pp.inflow_turbulence ? amrex::RandomNormal(0.0, 0.18) : 0.0;
+        // const amrex::Real prof_z = pp.inflow_turbulence ? amrex::RandomNormal(0.0, 0.18) : 0.0;
+        if (pp.inflow_turbulence) {
+          const amrex::Real urms = 0.18; // in % of u2
+          const amrex::Real D = 0.118 * 2;
+          amrex::Real shift[6] = {-6.92055468,  3.02412184, -4.8293441, 0.75940894,
+                                  -0.73516477, -0.41647826}; // random phase shift
+          amrex::Real St[8] = {0.89085216, 0.76765755, 0.11183781, 0.40518822, 0.86026686,
+                              0.18092337, 0.32188228, 0.8291226}; // random Strouhal number
+          const amrex::Real theta = std::atan(x[1] / x[2]);
+          for (int imode = 1; imode <= 6; ++imode) {
+            profile += 0.5 * urms * (std::sin((St[imode-1] * M_PI * imode * pp.u2 / D) * time + imode * theta + shift[imode-1]));
+          }
+          for (int imode = 7; imode <= 8; ++imode) {
+            profile += 0.5 * urms * std::sin((St[imode-1] * M_PI * imode * pp.u2 / D));
+          }
+        }
+        const amrex::Real prof_y = 0.0;
+        const amrex::Real prof_z = 0.0;
         s_ext[nf * NVAR + URHO] = pp.rho2;
         s_ext[nf * NVAR + UMX] = pp.rho2 * pp.u2 * profile;
-        s_ext[nf * NVAR + UMY] = 0.0;
-        s_ext[nf * NVAR + UMZ] = 0.0;
+        s_ext[nf * NVAR + UMY] = pp.rho2 * pp.u2 * prof_y;
+        s_ext[nf * NVAR + UMZ] = pp.rho2 * pp.u2 * prof_z;
         s_ext[nf * NVAR + UEDEN] =
-          pp.rho2 * pp.ei2 + 0.5 * pp.rho2 * pp.u2 * pp.u2 * profile * profile;
+          pp.rho2 * pp.ei2 + 0.5 * pp.rho2 * pp.u2 * pp.u2 * (profile * profile + prof_y * prof_y + prof_z * prof_z);
         for (int n = 0; n < NUM_SPECIES; ++n) {
           s_ext[nf * NVAR + UFS + n] = pp.rho2 * pp.Y2[n];
         }
@@ -192,7 +234,7 @@ prob_tag_error(int i, int j, int k, amrex::Array4<char> const& tagarr,
   // if (level == 2 && rsqr <= 0.3 * 0.3) { tagarr(i, j, k) = tagval; }
 
   // Tag injector
-  if (rsqr <= 0.3 * 0.3) { tagarr(i, j, k) = tagval; }
+  if (rsqr <= 0.4 * 0.4 && x < 2.0) { tagarr(i, j, k) = tagval; }
 
   // Tag flame
   // amrex::Real Y_OH = sarr(i, j, k, UFS + OH_ID) / sarr(i, j, k, URHO);

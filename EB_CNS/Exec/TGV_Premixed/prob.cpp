@@ -83,6 +83,8 @@ void CNS::full_prob_post_timestep(int /*iteration*/)
   amrex::Real kinetic_e = 0.0;
   amrex::Real enstrophy = 0.0;
   amrex::Real mean_temp = 0.0;
+  amrex::Real min_temp = 1.0e10;
+  amrex::Real max_temp = 0.0;
 
   if (level == 0) {
     for (int lev = 0; lev <= finest_level; lev++) {
@@ -110,8 +112,9 @@ void CNS::full_prob_post_timestep(int /*iteration*/)
       auto const& vortarrs = magvort.const_arrays();
 
       auto reduce_tuple = amrex::ParReduce(
-        TypeList<ReduceOpSum, ReduceOpSum, ReduceOpSum>{}, TypeList<Real, Real, Real>{}, S_new, IntVect(0),
-        [=] AMREX_GPU_DEVICE(int box_no, int i, int j, int k) -> GpuTuple<Real, Real, Real> {
+        TypeList<ReduceOpSum, ReduceOpSum, ReduceOpSum, ReduceOpMin, ReduceOpMax>{}, 
+        TypeList<Real, Real, Real, Real, Real>{}, S_new, IntVect(0),
+        [=] AMREX_GPU_DEVICE(int box_no, int i, int j, int k) -> GpuTuple<Real, Real, Real, Real, Real> {
           const amrex::Real rho = sarrs[box_no](i, j, k, URHO);
           const amrex::Real rhoinv = 1.0 / rho;
           const amrex::Real mx = sarrs[box_no](i, j, k, UMX);
@@ -133,11 +136,13 @@ void CNS::full_prob_post_timestep(int /*iteration*/)
           amrex::Real ke = mask * vol * 0.5 * rhoinv * (mx * mx + my * my + mz * mz);
           amrex::Real en = mask * vol * 0.5 * rho * (mvt * mvt); // 0.5 * rho * omega^2
           amrex::Real temp = mask * vol * T;
-          return {ke, en, temp};
+          return {ke, en, temp, T, T};
         });
       kinetic_e += amrex::get<0>(reduce_tuple);
       enstrophy += amrex::get<1>(reduce_tuple);
       mean_temp += amrex::get<2>(reduce_tuple);
+      min_temp = amrex::min(min_temp, amrex::get<3>(reduce_tuple));
+      max_temp = amrex::max(max_temp, amrex::get<4>(reduce_tuple));
     }
 
     // Reductions
@@ -157,7 +162,9 @@ void CNS::full_prob_post_timestep(int /*iteration*/)
       amrex::Print() << "TIME = " << time << '\n'
                      << " SUM KE        = " << kinetic_e << '\n'
                      << " SUM ENSTROPHY = " << enstrophy << '\n'
-                     << " MEAN TEMP     = " << mean_temp << '\n';
+                     << " TEMP          = " << min_temp << " .. " 
+                                            << mean_temp << " .. " 
+                                            << max_temp << '\n';
 
       // Write the quantities at this time
       const int log_index = 0;
