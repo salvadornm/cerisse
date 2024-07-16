@@ -19,7 +19,7 @@ USE_HIP = FALSE
 USE_SYCL = FALSE
 
 # Debugging
-TEST = TRUE
+TEST = FALSE
 DEBUG = FALSE
 FSANITIZER = FALSE
 THREAD_SANITIZER = FALSE
@@ -30,7 +30,7 @@ Transport_Model := Constant
 Chemistry_Model := Null
 
 # CNS
-USE_PROB_POST_COARSETIMESTEP = TRUE
+USE_FULL_PROB_POST_TIMESTEP = TRUE
 
 # MASA
 MASA_HOME = $(abspath masa-0.50.0/install)

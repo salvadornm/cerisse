@@ -21,6 +21,7 @@ void initialize_EB2(const Geometry& geom, const int required_level,
 int main(int argc, char* argv[])
 {
   amrex::Initialize(argc, argv);
+  amrex::ResetRandomSeed(24); // TODO: change this to runtime input
 
   amrex::Print() << R"(
                     ____ _______   __ ____________                    

@@ -372,5 +372,5 @@ void CNS::compute_dSdt_box_eb(
     });
   }
 
-  Gpu::streamSynchronize();
+  // Gpu::streamSynchronize();
 }

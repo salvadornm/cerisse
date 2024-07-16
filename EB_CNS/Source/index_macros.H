@@ -31,8 +31,9 @@
 #define UMY       2 // For now, we have UMY and
 #define UMZ       3 // UMZ no matter what AMREX_SPACEDIM
 #define UEDEN     4
-#define UFS       5
-#define NVAR      int(5 + NUM_SPECIES)        // Number of variables per field
+#define UTEMP     5 // temperature, necessary for SRK EOS
+#define UFS       6
+#define NVAR      int(6 + NUM_SPECIES)        // Number of variables per field
 #define UFA       int(NVAR * (NUM_FIELD + 1)) // Aux variables
 #define LEN_STATE int(UFA + NUM_AUX)          // Total components of state fab
 

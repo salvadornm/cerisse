@@ -290,9 +290,10 @@ void CNS::compute_dSdt(const MultiFab& S, MultiFab& dSdt, Real dt,
 }
 
 /**
- * \brief This function enforces (1) all rhoY >= 0, (2) rho <- sum(rhoY),
- *        (3) T >= min_T, and update rhoU and rhoE accordingly. This is
- *        called before each compute_dSdt.
+ * \brief This function (1) enforces all rhoY >= 0, (2) rho <- sum(rhoY),
+ *        (3) enforces T >= min_T and update rhoU and rhoE accordingly, 
+ *        (4) compute T and stores in UTEMP.
+ *        This is called before each compute_dSdt.
  */
 void CNS::enforce_consistent_state()
 {
@@ -320,8 +321,6 @@ void CNS::enforce_consistent_state()
       {
         for (int nf = 0; nf <= NUM_FIELD; ++nf) {
           Array4 s_arr = S.array(mfi, nf * NVAR);
-          FArrayBox Temp(bx, 1, The_Async_Arena());
-          Array4 T = Temp.array();
           ParallelFor(bx, [=] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {
             const IntVect iv{AMREX_D_DECL(i, j, k)};
             const Real rhoOld = s_arr(iv, URHO);
@@ -368,14 +367,15 @@ void CNS::enforce_consistent_state()
                                     +s_arr(iv, UMZ) * s_arr(iv, UMZ)));
             Real ei = rhoinv * s_arr(iv, UEDEN) - ke;
             auto eos = pele::physics::PhysicsType::eos();
-            T(i, j, k) = 0.0;
-            eos.REY2T(rhoNew, ei, Y, T(i, j, k));
+            Real T = s_arr(iv, UTEMP);
+            eos.REY2T(rhoNew, ei, Y, T);
+            s_arr(iv, UTEMP) = T;
           });
 
           ParallelFor(bx, [=] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {
             const IntVect iv{AMREX_D_DECL(i, j, k)};
 
-            if (T(iv) < clip_temp) {            
+            if (s_arr(iv, UTEMP) < clip_temp) {            
               // Find target temp by averaging over the neighbours
               // Real target_temp = 0.0;
               Real target_temp = clip_temp;
@@ -385,7 +385,7 @@ void CNS::enforce_consistent_state()
               for (int ix = -1; ix <= 1; ++ix) {
               for (int iy = -1; iy <= 1; ++iy) {
               for (int iz = -1; iz <= 1; ++iz) {
-              Real T_neighbour = T(i+ix, j+iy, k+iz);
+              Real T_neighbour = s_arr(i+ix, j+iy, k+iz, UTEMP); //T(i+ix, j+iy, k+iz);
               if ((T_neighbour > clip_temp) && (T_neighbour < 1e4) 
 #if CNS_USE_EB
                   && flag_arr(i+ix, j+iy, k+iz).isRegular()
@@ -453,7 +453,8 @@ void CNS::enforce_consistent_state()
               // Keep total E, reduce vel
               if (verbose > 1)
                 std::cout << "Momentum removed from cell " << iv
-                          << ": T=" << T(iv) << "->" << target_temp << " rhoE=" << s_arr(iv, UEDEN);
+                          << ": T=" << s_arr(iv, UTEMP) << "->" << target_temp << " rhoE=" << s_arr(iv, UEDEN);
+              s_arr(iv, UTEMP) = target_temp;
               // First take energy from KE
               Real ei_new, diff_ei;
               eos.RTY2E(rhoNew, target_temp, Y, ei_new);

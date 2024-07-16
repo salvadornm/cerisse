@@ -905,6 +905,7 @@ void CNS::read_params()
   pp.query("do_pd_model", do_pd_model);
   pp.query("do_vpdf", do_vpdf);
   pp.query("do_spdf", do_spdf);
+  pp.query("do_species_langevin", do_species_langevin);
 
   pp.query("amr_interp_order", amr_interp_order);
   if (amr_interp_order == 3 && amrex::SpaceDim == 1) {

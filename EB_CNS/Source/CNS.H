@@ -364,6 +364,7 @@ protected:
   static bool do_pd_model;
   static bool do_vpdf;
   static bool do_spdf;
+  static bool do_species_langevin;
 
   // EB
 

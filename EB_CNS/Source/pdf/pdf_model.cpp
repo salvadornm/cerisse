@@ -38,18 +38,21 @@ void CNS::compute_pdf_model(amrex::MultiFab& S, amrex::Real dt, int iteration)
 
   if (verbose > 0) {
     amrex::Print() << " >> Computing PDF source term:";
-    if (do_psgs) amrex::Print() << " p_sgs";
-    if (do_psgs) amrex::Print() << " pressure-dilatation";
-    if (do_vpdf) amrex::Print() << " VPDF";
-    if (do_spdf) amrex::Print() << " SPDF";
+    if (do_psgs)     amrex::Print() << " p_sgs";
+    if (do_pd_model) amrex::Print() << " pressure-dilatation";
+    if (do_vpdf)     amrex::Print() << " VPDF";
+    if (do_spdf)     amrex::Print() << " SPDF";
     amrex::Print() << std::endl;
+  }
+  if (do_species_langevin) {
+    amrex::Print() << " >> [WARNING: FOR TESTING ONLY] Species Langevin model" << std::endl;
   }
 
   const auto* dx = geom.CellSize();
 
   // Prepare Wiener process for vpdf. It is constant over space.
   amrex::Real dW[AMREX_SPACEDIM][NUM_FIELD];
-  WienerProcess.generate_new(sqrt(dt), 0, 0);
+  WienerProcess.generate_new(sqrt(dt), 2, 0);
   WienerProcess.get_rand(nStep(), dW);
 
 #if CNS_USE_EB
@@ -85,6 +88,8 @@ void CNS::compute_pdf_model(amrex::MultiFab& S, amrex::Real dt, int iteration)
         if (do_vpdf) { vpdf_langevin_model(bx, sarr, dt, dW, dx); }
 
         if (do_spdf) { spdf_iem_model(bx, sarr, dt, dW, dx); }
+
+        if (do_species_langevin) { species_langevin(bx, sarr, dt, dW, dx); } // FOR TESTING ONLY!
       }
 
       amrex::Gpu::streamSynchronize();

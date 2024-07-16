@@ -102,9 +102,9 @@ cns_diff_eb_x(int i, int j, int k, amrex::Array4<const amrex::Real> const& q,
   // Compute species and enthalpy fluxes for ideal EOS
   // Get species/enthalpy diffusion, compute correction vel
   Real T = q(iv, QTEMP);
-  eos.T2Hi(T, hi1);
+  eos.RTY2Hi(q(iv, QRHO), T, mass1, hi1);
   T = q(ivm, QTEMP);
-  eos.T2Hi(T, hi2);
+  eos.RTY2Hi(q(ivm, QRHO), T, mass2, hi2);
 
   Real Vc = 0.0;
   const amrex::Real dpdx = (q(iv, QPRES) - q(ivm, QPRES)) * dxinv[0];
@@ -224,9 +224,9 @@ cns_diff_eb_y(int i, int j, int k, amrex::Array4<const amrex::Real> const& q,
   // Compute species and enthalpy fluxes for ideal EOS
   // Get species/enthalpy diffusion, compute correction vel
   Real T = q(iv, QTEMP);
-  eos.T2Hi(T, hi1);
+  eos.RTY2Hi(q(iv, QRHO), T, mass1, hi1);
   T = q(ivm, QTEMP);
-  eos.T2Hi(T, hi2);
+  eos.RTY2Hi(q(ivm, QRHO), T, mass2, hi2);
 
   Real Vc = 0.0;
   const amrex::Real dpdx = (q(iv, QPRES) - q(ivm, QPRES)) * dxinv[1];
@@ -330,9 +330,9 @@ cns_diff_eb_z(int i, int j, int k, amrex::Array4<const amrex::Real> const& q,
   // Compute species and enthalpy fluxes for ideal EOS
   // Get species/enthalpy diffusion, compute correction vel
   Real T = q(iv, QTEMP);
-  eos.T2Hi(T, hi1);
+  eos.RTY2Hi(q(iv, QRHO), T, mass1, hi1);
   T = q(ivm, QTEMP);
-  eos.T2Hi(T, hi2);
+  eos.RTY2Hi(q(ivm, QRHO), T, mass2, hi2);
 
   Real Vc = 0.0;
   const amrex::Real dpdx = (q(iv, QPRES) - q(ivm, QPRES)) * dxinv[2];

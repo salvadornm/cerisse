@@ -189,10 +189,10 @@ void CNS::variableSetUp()
   bcs[cnt] = bc;
   name[cnt] = "rho_E";
   cnt++;
-  // set_scalar_bc(bc,phys_bc);
-  // bcs[cnt] = bc;
-  // name[cnt] = "Temp";
-  // cnt++;
+  set_scalar_bc(bc, phys_bc);
+  bcs[cnt] = bc;
+  name[cnt] = "Temp";
+  cnt++;
   for (int i = 0; i < NUM_SPECIES; ++i) {
     set_scalar_bc(bc, phys_bc);
     bcs[cnt] = bc;
@@ -222,10 +222,10 @@ void CNS::variableSetUp()
     bcs[cnt] = bc;
     name[cnt] = "rho_E_Field" + std::to_string(nf);
     cnt++;
-    // set_scalar_bc(bc,phys_bc);
-    // bcs[cnt] = bc;
-    // name[cnt] = "Temp_Field" + std::to_string(nf);
-    // cnt++;
+    set_scalar_bc(bc, phys_bc);
+    bcs[cnt] = bc;
+    name[cnt] = "Temp_Field" + std::to_string(nf);
+    cnt++;
     for (int i = 0; i < NUM_SPECIES; ++i) {
       set_scalar_bc(bc, phys_bc);
       bcs[cnt] = bc;
@@ -318,9 +318,9 @@ void CNS::variableSetUp()
 
   // DEFINE DERIVED QUANTITIES (Derive from MEAN field)
   // Temperature
-  derive_lst.add("temp", IndexType::TheCellType(), 1, cns_dertemp,
-                 DeriveRec::TheSameBox);
-  derive_lst.addComponent("temp", desc_lst, State_Type, URHO, NVAR);
+  // derive_lst.add("temp", IndexType::TheCellType(), 1, cns_dertemp,
+  //                DeriveRec::TheSameBox);
+  // derive_lst.addComponent("temp", desc_lst, State_Type, URHO, NVAR);
 
   // Pressure
   derive_lst.add("pressure", IndexType::TheCellType(), 1, cns_derpres,

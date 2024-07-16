@@ -167,15 +167,15 @@ AMREX_GPU_DEVICE AMREX_FORCE_INLINE void wenoz5(amrex::Real s[5], amrex::Real& s
   beta[0] = 1.0 + (tau / (eps + beta[0])) * (tau / (eps + beta[0]));
 
   alpha[2] = beta[2];
-  alpha[1] = 6.0 * beta[1];
-  alpha[0] = 3.0 * beta[0];
+  alpha[1] = 10.0 * beta[1];
+  alpha[0] = 5.0 * beta[0];
   alpha1 = 1.0 / (alpha[2] + alpha[1] + alpha[0]);
 
-  vl[2] = 2.0 * s[0] - 7.0 * s[1] + 11.0 * s[2];
-  vl[1] = -s[1] + 5.0 * s[2] + 2.0 * s[3];
-  vl[0] = 2.0 * s[2] + 5.0 * s[3] - s[4];
+  vl[2] = 3.0 * s[0] - 10.0 * s[1] + 15.0 * s[2];
+  vl[1] = -s[1] + 6.0 * s[2] + 3.0 * s[3];
+  vl[0] = 3.0 * s[2] + 6.0 * s[3] - s[4];
 
-  sp = Real(1. / 6.) * alpha1 *
+  sp = Real(1. / 8.) * alpha1 *
        (alpha[2] * vl[2] + alpha[1] * vl[1] + alpha[0] * vl[0]);
 
   beta[2] = Real(13. / 12.) * pow(s[4] - 2.0 * s[3] + s[2], 2) +
@@ -191,15 +191,15 @@ AMREX_GPU_DEVICE AMREX_FORCE_INLINE void wenoz5(amrex::Real s[5], amrex::Real& s
   beta[0] = 1.0 + (tau / (eps + beta[0])) * (tau / (eps + beta[0]));
 
   alpha[2] = beta[2];
-  alpha[1] = 6.0 * beta[1];
-  alpha[0] = 3.0 * beta[0];
+  alpha[1] = 10.0 * beta[1];
+  alpha[0] = 5.0 * beta[0];
   alpha1 = 1.0 / (alpha[2] + alpha[1] + alpha[0]);
 
-  vr[2] = 11.0 * s[2] - 7.0 * s[3] + 2.0 * s[4];
-  vr[1] = -s[3] + 5.0 * s[2] + 2.0 * s[1];
-  vr[0] = 2.0 * s[2] + 5.0 * s[1] - s[0];
+  vr[2] = 3.0 * s[4] - 10.0 * s[3] + 15.0 * s[2];
+  vr[1] = -s[3] + 6.0 * s[2] + 3.0 * s[1];
+  vr[0] = 3.0 * s[2] + 6.0 * s[1] - s[0];
 
-  sm = Real(1. / 6.) * alpha1 *
+  sm = Real(1. / 8.) * alpha1 *
        (alpha[2] * vr[2] + alpha[1] * vr[1] + alpha[0] * vr[0]);
 }
 
@@ -291,9 +291,9 @@ AMREX_GPU_DEVICE AMREX_FORCE_INLINE void teno5(amrex::Real s[5], amrex::Real& sm
   xi[2] = tau / (eps + beta[2]);
   xi[1] = tau / (eps + beta[1]);
   xi[0] = tau / (eps + beta[0]);
-  beta[2] = pow(1.0 + xi[2], 6);
-  beta[1] = pow(1.0 + xi[1], 6);
-  beta[0] = pow(1.0 + xi[0], 6);
+  beta[2] = pow(1.0 + xi[2], int(6));
+  beta[1] = pow(1.0 + xi[1], int(6));
+  beta[0] = pow(1.0 + xi[0], int(6));
   beta1 = 1.0 / (beta[2] + beta[1] + beta[0]);  
 
   if (CNS::teno_cutoff <= 0) {
@@ -307,16 +307,16 @@ AMREX_GPU_DEVICE AMREX_FORCE_INLINE void teno5(amrex::Real s[5], amrex::Real& sm
   } 
 
   // TODO: consider optimised high spectral resolution weights 1.235341937, 5.065006634, 3.699651429?
-  alpha[2] = beta[2] * beta1 < CT ? 0.0 : 0.5;
-  alpha[1] = beta[1] * beta1 < CT ? 0.0 : 5.5;
-  alpha[0] = beta[0] * beta1 < CT ? 0.0 : 4.0;
+  alpha[2] = beta[2] * beta1 < CT ? 0.0 : 1.0;
+  alpha[1] = beta[1] * beta1 < CT ? 0.0 : 10.0;
+  alpha[0] = beta[0] * beta1 < CT ? 0.0 : 5.0;
   alpha1 = 1.0 / (alpha[2] + alpha[1] + alpha[0]);
 
-  v[2] = 2.0 * s[0] - 7.0 * s[1] + 11.0 * s[2];
-  v[1] = -s[1] + 5.0 * s[2] + 2.0 * s[3];
-  v[0] = 2.0 * s[2] + 5.0 * s[3] - s[4];
+  v[2] = 3.0 * s[0] - 10.0 * s[1] + 15.0 * s[2];
+  v[1] = -s[1] + 6.0 * s[2] + 3.0 * s[3];
+  v[0] = 3.0 * s[2] + 6.0 * s[3] - s[4];
 
-  sp = Real(1. / 6.) * alpha1 *
+  sp = Real(1. / 8.) * alpha1 *
        (alpha[2] * v[2] + alpha[1] * v[1] + alpha[0] * v[0]);
 
   beta[2] = Real(13. / 12.) * pow(s[4] - 2.0 * s[3] + s[2], 2) +
@@ -331,9 +331,9 @@ AMREX_GPU_DEVICE AMREX_FORCE_INLINE void teno5(amrex::Real s[5], amrex::Real& sm
   xi[2] = tau / (eps + beta[2]);
   xi[1] = tau / (eps + beta[1]);
   xi[0] = tau / (eps + beta[0]);
-  beta[2] = pow(1.0 + xi[2], 6);
-  beta[1] = pow(1.0 + xi[1], 6);
-  beta[0] = pow(1.0 + xi[0], 6);
+  beta[2] = pow(1.0 + xi[2], int(6));
+  beta[1] = pow(1.0 + xi[1], int(6));
+  beta[0] = pow(1.0 + xi[0], int(6));
   beta1 = 1.0 / (beta[2] + beta[1] + beta[0]);
 
   if (CNS::teno_cutoff <= 0) {
@@ -344,16 +344,16 @@ AMREX_GPU_DEVICE AMREX_FORCE_INLINE void teno5(amrex::Real s[5], amrex::Real& sm
     CT = std::pow(10.0, -m);
   }
 
-  alpha[2] = beta[2] * beta1 < CT ? 0.0 : 0.5;
-  alpha[1] = beta[1] * beta1 < CT ? 0.0 : 5.5;
-  alpha[0] = beta[0] * beta1 < CT ? 0.0 : 4.0;
+  alpha[2] = beta[2] * beta1 < CT ? 0.0 : 1.0;
+  alpha[1] = beta[1] * beta1 < CT ? 0.0 : 10.0;
+  alpha[0] = beta[0] * beta1 < CT ? 0.0 : 5.0;
   alpha1 = 1.0 / (alpha[2] + alpha[1] + alpha[0]);
 
-  v[2] = 11.0 * s[2] - 7.0 * s[3] + 2.0 * s[4];
-  v[1] = -s[3] + 5.0 * s[2] + 2.0 * s[1];
-  v[0] = 2.0 * s[2] + 5.0 * s[1] - s[0];
+  v[2] = 3.0 * s[4] - 10.0 * s[3] + 15.0 * s[2];
+  v[1] = -s[3] + 6.0 * s[2] + 3.0 * s[1];
+  v[0] = 3.0 * s[2] + 6.0 * s[1] - s[0];
 
-  sm = Real(1. / 6.) * alpha1 *
+  sm = Real(1. / 8.) * alpha1 *
        (alpha[2] * v[2] + alpha[1] * v[1] + alpha[0] * v[0]);
 }
 

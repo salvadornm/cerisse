@@ -24,7 +24,7 @@
  */
 AMREX_GPU_DEVICE AMREX_FORCE_INLINE void
 cns_ctoprim(int i, int j, int k, int ns, amrex::Array4<amrex::Real const> const& u,
-            amrex::Array4<amrex::Real> const& q, Parm const& /*parm*/) noexcept
+            amrex::Array4<amrex::Real> const& q, Parm const& parm) noexcept
 {
   amrex::Real rho = u(i, j, k, ns + URHO);
   amrex::Real rhoinv = amrex::Real(1.0) / rho;
@@ -41,8 +41,27 @@ cns_ctoprim(int i, int j, int k, int ns, amrex::Array4<amrex::Real const> const&
   }
 
   auto eos = pele::physics::PhysicsType::eos();
-  amrex::Real T = 0, p, cs = 0, gamma, wbar;
+  // assert(!std::isnan(u(i, j, k, ns + UTEMP)));
+  amrex::Real T = u(i, j, k, ns + UTEMP); // Necessary for SRK EOS
+  amrex::Real p, cs = 0, gamma, wbar;
   eos.REY2T(rho, ei, massfrac, T);
+
+  // if (std::isnan(T)) {
+  //   for (int ii : {-1, 0, 1}) {
+  //   for (int jj : {-1, 0, 1}) {
+  //   // for (int kk : {-1, 0, 1}) {
+  //     T = u(i + ii, j + jj, k, ns + UTEMP);
+  //     eos.REY2T(rho, ei, massfrac, T);
+      
+  //     if (!std::isnan(T)) {
+  //       goto endofloops;
+  //     }
+  //   // }
+  //   }
+  //   }
+  // }
+  // endofloops:
+
   eos.RTY2P(rho, T, massfrac, p);
   eos.Y2WBAR(massfrac, wbar);
 
@@ -54,6 +73,12 @@ cns_ctoprim(int i, int j, int k, int ns, amrex::Array4<amrex::Real const> const&
 
   eos.RTY2Cs(rho, T, massfrac, cs);
   eos.RTY2G(rho, T, massfrac, gamma);
+  // if (std::isnan(cs) || cs < 0.0)
+  //   cs = std::sqrt(gamma * p / rho);
+
+  // p = amrex::max(p, parm.smallp);
+  // if (std::isnan(cs) || cs < 0.0)
+  //   cs = std::sqrt(gamma * p / rho);
 
   q(i, j, k, QRHO) = rho;
   AMREX_D_TERM(q(i, j, k, QU) = ux;, q(i, j, k, QV) = uy;, q(i, j, k, QW) = uz;);
@@ -203,6 +228,37 @@ cns_div(int i, int j, int k, int n, amrex::Array4<amrex::Real> const& dsdt,
   // Monitor problem cell
   // if (isnan(dsdt(i, j, k, n)))
   //   std::cout << "div(" << i << "," << j << "," << k << ") is nan" << std::endl;
+}
+
+/**
+ * @brief Compute flux function for the Euler system.
+ * @param[in] iv Cell indices.
+ * @param[in] dir Direction of the interface.
+ * @param[in] q Primitive variables.
+ * @param[out] f Flux function.
+ */
+AMREX_GPU_DEVICE AMREX_FORCE_INLINE void cns_flux(
+    amrex::IntVect iv, int dir, amrex::Array4<const amrex::Real> const &q,
+    amrex::Real f[NVAR]) noexcept {
+  using amrex::Real;
+  const int QUN = QU + dir;
+
+  f[URHO] = q(iv, QRHO) * q(iv, QUN);
+  f[UMX] =
+      q(iv, QRHO) * q(iv, QU) * q(iv, QUN) + (dir == 0 ? q(iv, QPRES) : 0.0);
+  f[UMY] =
+      q(iv, QRHO) * q(iv, QV) * q(iv, QUN) + (dir == 1 ? q(iv, QPRES) : 0.0);
+  f[UMZ] =
+      q(iv, QRHO) * q(iv, QW) * q(iv, QUN) + (dir == 2 ? q(iv, QPRES) : 0.0);
+  Real ret =
+    q(iv, QRHO) * (q(iv, QEINT) +
+                   0.5 * (AMREX_D_TERM(q(iv, QU) * q(iv, QU), +q(iv, QV) * q(iv, QV),
+                                       +q(iv, QW) * q(iv, QW))));
+  f[UEDEN] = q(iv, QUN) * (q(iv, QPRES) + ret);
+  for (int ns = 0; ns < NUM_SPECIES; ++ns) {
+    f[UFS + ns] = q(iv, QRHO) * q(iv, QUN) * q(iv, QFS + ns);
+  }
+  f[UTEMP] = 0.0;
 }
 
 /// \brief Original Riemann solver in CNS example (not used)
@@ -599,6 +655,22 @@ AMREX_GPU_DEVICE AMREX_FORCE_INLINE void cns_riemann(
   //      adv_flx(i,j,k,UEDEN), ry_flx, parm);
 
   for (int n = 0; n < NUM_SPECIES; ++n) { adv_flx(i, j, k, UFS + n) = ry_flx[n]; }
+
+  // Add higher order derivatives to achieve real high order
+  // Ref: https://doi.org/10.1137/17M115757X
+  constexpr int ng = 3;
+  Real f[2 * ng][NVAR];
+  for (int m = 0; m < 2 * ng; ++m) {
+    cns_flux(iv + (m - ng) * iv_dir, dir, q, f[m]);
+  }
+
+  for (int n = 0; n < NVAR; ++n) {
+    adv_flx(i, j, k, n) +=
+        -1.0 / 1152.0 * (-5.0 * f[0][n] + 39.0 * f[1][n] - 34.0 * f[2][n]
+                         - 34.0 * f[3][n] + 39.0 * f[4][n] - 5.0 * f[5][n])  // dx^2*fxx/24
+        + 7.0 / 11520.0 * (f[0][n] - 3.0 * f[1][n] + 2.0 * f[2][n] 
+                           + 2.0 * f[3][n] - 3.0 * f[4][n] + f[5][n]);  // dx^4*fxxxx*7/5760
+  }
 }
 
 #endif

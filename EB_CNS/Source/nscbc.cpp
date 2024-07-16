@@ -29,11 +29,10 @@ void CNS::apply_nscbc(const amrex::Box& bx, const amrex::Array4<amrex::Real>& da
     geom.ProbHi(dir) - geom.ProbLo(dir); // domain length along dir direction
   const auto prob_lo_iv = geom.Domain().loVect3d(); // domain low boundary
   const auto prob_hi_iv = geom.Domain().hiVect3d(); // domain low boundary
-  const amrex::Box interiorBox =
+  const amrex::Box interiorBox = // box containing the first interior cell
     lo_hi == 1
       ? amrex::shift(amrex::Box(amrex::adjCellLo(geom.Domain(), dir) & bx), dir, 1)
-      : amrex::shift(amrex::Box(amrex::adjCellHi(geom.Domain(), dir) & bx), dir,
-                     -1); // box containing the first interior cell
+      : amrex::shift(amrex::Box(amrex::adjCellHi(geom.Domain(), dir) & bx), dir, -1);
 
   // 0. Convert data (conservative) to primitive variables
   int ng = 6; // number of ghost cells, TODO: take this as input? or read from NUM_GROW?

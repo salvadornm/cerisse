@@ -64,8 +64,9 @@ extrap_prim(amrex::IntVect iv, amrex::IntVect iv_dir, int index, int isign,
             amrex::Real delta, amrex::Real dqdx, const amrex::Array4<amrex::Real>& q)
 {  
   amrex::Real dq = dqdx * delta;
-  // q(iv - iv_dir, index) = q(iv + iv_dir, index) - 2 * isign * dq; // original
-  q(iv - iv_dir, index) = q(iv, index) - isign * dq;
+
+  q(iv - iv_dir, index) = q(iv + iv_dir, index) - 2 * isign * dq; // original
+  // q(iv - iv_dir, index) = q(iv, index) - isign * dq;
   q(iv - 2 * iv_dir, index) = -2 * q(iv + iv_dir, index) - 3 * q(iv, index) +
                               6 * q(iv - iv_dir, index) + 6 * isign * dq;
   q(iv - 3 * iv_dir, index) = 3 * q(iv + iv_dir, index) + 10 * q(iv, index) -
@@ -85,11 +86,17 @@ extrap_prim(amrex::IntVect iv, amrex::IntVect iv_dir, int index, int isign,
     42 * isign * dq;
 
   // q(iv - iv_dir, index) = q(iv, index) - isign * dq;
-  // q(iv - 2 * iv_dir, index) = q(iv, index) - 2 * isign * dq;
-  // q(iv - 3 * iv_dir, index) = q(iv, index) - 3 * isign * dq;
-  // q(iv - 4 * iv_dir, index) = q(iv, index) - 4 * isign * dq;
-  // q(iv - 5 * iv_dir, index) = q(iv, index) - 5 * isign * dq;
-  // q(iv - 6 * iv_dir, index) = q(iv, index) - 6 * isign * dq;
+  // q(iv - 2 * iv_dir, index) = q(iv - iv_dir, index);
+  // q(iv - 3 * iv_dir, index) = q(iv - iv_dir, index);
+  // q(iv - 4 * iv_dir, index) = q(iv - iv_dir, index);
+  // q(iv - 5 * iv_dir, index) = q(iv - iv_dir, index);
+  // q(iv - 6 * iv_dir, index) = q(iv - iv_dir, index);
+
+  if (index == QRHO || index == QPRES) {
+    for (int ii = 1; ii <= 6; ++ii) {
+      q(iv - ii * iv_dir, index) = amrex::max(q(iv - ii * iv_dir, index), 1e-10);
+    }
+  }
 }
 
 AMREX_GPU_DEVICE AMREX_FORCE_INLINE void

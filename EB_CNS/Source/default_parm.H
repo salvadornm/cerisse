@@ -75,6 +75,7 @@ bool CNS::do_psgs = false;
 bool CNS::do_pd_model = false;
 bool CNS::do_vpdf = false;
 bool CNS::do_spdf = false;
+bool CNS::do_species_langevin = false;
 
 bool CNS::do_les = false;        // Eddy viscosity type subgrid-scale model
 bool CNS::do_pasr = false;       // Partially stirred reactor

@@ -44,7 +44,7 @@ bc_isothermal_wall(amrex::Real s_ext[NVAR], const amrex::Real s_int[NVAR],
 
   // Fluid states
   amrex::Real rhoinv = 1.0 / s_int[URHO];
-  amrex::Real y[NUM_SPECIES], T, p;
+  amrex::Real y[NUM_SPECIES], T = Tw, p;
   for (int n = 0; n < NUM_SPECIES; ++n) y[n] = s_int[UFS + n] * rhoinv;
   amrex::Real ke = 0.5 * rhoinv * rhoinv *
                    (AMREX_D_TERM(s_int[UMX] * s_int[UMX], +s_int[UMY] * s_int[UMY],

@@ -31,9 +31,10 @@ cns_estdt_hydro(int i, int j, int k, amrex::Array4<const amrex::Real> const& sta
     massfrac[n] = state(i, j, k, UFS + n) * rhoinv;
   }
 
-  amrex::Real cs, T;
+  amrex::Real T = state(i, j, k, UTEMP);
+  amrex::Real cs; //, T = 300.0;
   auto eos = pele::physics::PhysicsType::eos();
-  eos.REY2T(rho, ei, massfrac, T);
+  // eos.REY2T(rho, ei, massfrac, T);
   eos.RTY2Cs(rho, T, massfrac, cs);
 
   AMREX_D_TERM(amrex::Real dt = dx[0] / (amrex::Math::abs(vx) + cs);
@@ -67,7 +68,8 @@ AMREX_GPU_DEVICE AMREX_FORCE_INLINE amrex::Real cns_estdt_visc(
     massfrac[n] = state(i, j, k, UFS + n) * rhoinv;
   }
 
-  amrex::Real T, cv;
+  amrex::Real T = state(i, j, k, UTEMP);
+  amrex::Real /*T = 150.0,*/ cv;
   auto eos = pele::physics::PhysicsType::eos();
   eos.REY2T(rho, ei, massfrac, T);
   eos.RTY2Cv(rho, T, massfrac, cv);

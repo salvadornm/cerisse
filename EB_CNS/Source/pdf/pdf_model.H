@@ -41,8 +41,9 @@ AMREX_FORCE_INLINE AMREX_GPU_DEVICE void vpdf_psgs_model(
       for (int n = 0; n < NUM_SPECIES; ++n)
         Y[n] = s(i, j, k, nf * NVAR + UFS + n) * rhoinv;
 
-      amrex::Real T = 0, pres;
-      eos.REY2T(rho, ei, Y, T);
+      amrex::Real pres;
+      amrex::Real T = s(i, j, k, nf * NVAR + UTEMP);
+      // eos.REY2T(rho, ei, Y, T);
       eos.RTY2P(rho, T, Y, pres);
       p(i, j, k, nf) = pres;
 
@@ -84,8 +85,8 @@ AMREX_FORCE_INLINE AMREX_GPU_DEVICE void vpdf_psgs_model(
       mean_dup /= amrex::Real(NUM_FIELD);
 
       for (int nf = 1; nf <= NUM_FIELD; ++nf) {
-        Real p_sgs = -0.5 * (mean_dp - dp[nf - 1]) / dx[dir] * dt;
-        Real pu_sgs = -0.5 * (mean_dup - dup[nf - 1]) / dx[dir] * dt;
+        Real p_sgs = -0.5 * (mean_dp - dp[nf - 1]) / dx[dir] * dt; //* dt / (tau + dt);
+        Real pu_sgs = -0.5 * (mean_dup - dup[nf - 1]) / dx[dir] * dt; //* dt / (tau + dt);
 
         s(i, j, k, nf * NVAR + UMX + dir) += p_sgs;
         s(i, j, k, nf * NVAR + UEDEN) += pu_sgs;
@@ -143,9 +144,9 @@ AMREX_FORCE_INLINE AMREX_GPU_DEVICE void vpdf_pd_model(
       for (int n = 0; n < NUM_SPECIES; ++n)
         Y[n] = s(i, j, k, nf * NVAR + UFS + n) * rhoinv;
 
-      amrex::Real T = 0.0;
+      amrex::Real T = s(i, j, k, nf * NVAR + UTEMP);
       auto eos = pele::physics::PhysicsType::eos();
-      eos.REY2T(rho, ei, Y, T);
+      // eos.REY2T(rho, ei, Y, T);
       eos.RTY2P(rho, T, Y, p[nf]);
       eos.RTY2G(rho, T, Y, gamma[nf]);
 
@@ -176,11 +177,11 @@ AMREX_FORCE_INLINE AMREX_GPU_DEVICE void vpdf_pd_model(
                           - amrex::Real(0.5) * (AMREX_D_TERM(ux * ux, +uy * uy, +uz * uz));
           amrex::Real Y[NUM_SPECIES];
           for (int n = 0; n < NUM_SPECIES; ++n)
-            Y[n] = s(iv + i_s*iv_dir, nf*NVAR+UFS+n) * rhoinv;
+            Y[n] = s(iv + i_s * iv_dir, nf * NVAR + UFS + n) * rhoinv;
 
-          amrex::Real T = 0.0;
+          amrex::Real T = s(i, j, k, nf * NVAR + UTEMP);
           auto eos = pele::physics::PhysicsType::eos();
-          eos.REY2T(rho, ei, Y, T);
+          // eos.REY2T(rho, ei, Y, T);
           eos.RTY2P(rho, T, Y, pp[i_s+1]);
         }
         shock_sensor[dir] |= (amrex::Math::abs(pp[2]-2*pp[1]+pp[0])/(pp[2]+2*pp[1]+pp[0]) > shock_threshold);
@@ -250,6 +251,18 @@ AMREX_FORCE_INLINE AMREX_GPU_DEVICE void vpdf_langevin_model(
     amrex::Real delta = std::pow(AMREX_D_TERM(dx[0], *dx[1], *dx[2]),
                                  1.0 / amrex::Real(AMREX_SPACEDIM));
     amrex::Real eps = C_e * std::pow(tke, 1.5) / delta;
+    // Mach number correction for dissipation
+    amrex::Real mean_rho = s(i, j, k, URHO);
+    amrex::Real rhoinv = 1.0 / mean_rho;
+    amrex::Real mean_T = s(i, j, k, UTEMP);
+    amrex::Real mean_Y[NUM_SPECIES];
+    for (int n = 0; n < NUM_SPECIES; ++n) mean_Y[n] = s(i, j, k, UFS + n) * rhoinv;
+    amrex::Real mean_cs;
+    auto eos = pele::physics::PhysicsType::eos();
+    eos.RTY2Cs(mean_rho, mean_T, mean_Y, mean_cs);
+    amrex::Real M_turb2 = 2.0 * tke / mean_cs / mean_cs; // turbulent Mach number
+    eps *= (1 + M_turb2);
+
     eps = amrex::max(eps, std::numeric_limits<amrex::Real>::epsilon()); // prevent divide by 0
 
     // // Compute shock sensor
@@ -281,9 +294,6 @@ AMREX_FORCE_INLINE AMREX_GPU_DEVICE void vpdf_langevin_model(
     //   }
     //   shock_sensor[AMREX_SPACEDIM] |= shock_sensor[dir];
     // }
-    
-    // Real M_turb = sqrt(2.0 * tke) / cs_mean; // turbulent Mach number
-    // eps *= (1 + M_turb*M_turb);    
 
     // rhou_i = rhou_i + rho_i*Gij*(mean_u_i - u_i)*dt + rho_i*sqrt(C0*eps)*dW
     //                                                 need to /mean_rho? ^
@@ -384,6 +394,84 @@ AMREX_FORCE_INLINE AMREX_GPU_DEVICE void spdf_iem_model(
       // eos.REY2T()
       // eos.TY2H()
     }
+  });
+}
+
+/**
+ * @brief [WARNING: FOR TESTING ONLY] Test Langevin model using species so that the
+ *        variance decay rate is known analytically.
+ *
+ * @param bx box.
+ * @param s[in,out] state array.
+ * @param dt timestep size.
+ * @param dW generated white noise (@see UniqueRand).
+ * @param dx grid size.
+ * @param C_e turbulent dissipation model parameter.
+ * @param C_0 W.
+ * @param C_Y Langevin model parameter.
+ */
+AMREX_FORCE_INLINE AMREX_GPU_DEVICE void species_langevin(
+  const amrex::Box& bx, amrex::Array4<amrex::Real>& s, const amrex::Real dt,
+  const amrex::Real dW[AMREX_SPACEDIM][NUM_FIELD],
+  const amrex::Real dx[AMREX_SPACEDIM], const amrex::Real C_e = 500.0,
+  const amrex::Real C0 = 2.0)
+{
+#if AMREX_SPACEDIM == 2
+  const amrex::Real delta = std::sqrt(dx[0] * dx[1]);
+#elif AMREX_SPACEDIM == 3
+  const amrex::Real delta = std::cbrt(dx[0] * dx[1] * dx[2]);
+#elif AMREX_SPACEDIM == 1
+  const amrex::Real delta = dx[0];
+#endif
+
+  amrex::ParallelFor(bx, [=] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {
+    amrex::Real mean_Q, var_Q, Q, Q_sgs, eps, tau;
+
+    // for (int ns = 0; ns < 2; ++ns) {
+      int ns = 0;
+      mean_Q = s(i, j, k, UFS + ns) / s(i, j, k, URHO);
+
+      // /////////////////////// LANGEVIN ///////////////////////
+      // // Compute turbulent timescale (tau)
+      // var_Q = 0.0;
+      // for (int nf = 1; nf <= NUM_FIELD; ++nf) {
+      //   Q = s(i, j, k, nf * NVAR + UFS + ns) / s(i, j, k, nf * NVAR + URHO);
+      //   var_Q += (Q - mean_Q) * (Q - mean_Q);
+      // }
+      // var_Q /= amrex::Real(NUM_FIELD - 1);
+      // eps = C_e * std::pow(0.5 * var_Q, 1.5) / delta;
+      // tau = 0.5 * var_Q / amrex::max(eps, 1e-40);
+
+      // // Compute Q_sgs
+      // // assert(ns < amrex::SpaceDim); // because we use dW[ns]
+      // for (int nf = 1; nf <= NUM_FIELD; ++nf) {
+      //   Q = s(i, j, k, nf * NVAR + UFS + ns) / s(i, j, k, nf * NVAR + URHO);
+      //   Q_sgs = (0.5 + 0.25 * C0) / (tau + dt) * (mean_Q - Q) * dt + // note: 0.25 because only 1 component
+      //           std::sqrt(C0 * eps) * dW[ns][nf - 1];
+      //   s(i, j, k, nf * NVAR + UFS + ns) += s(i, j, k, nf * NVAR + URHO) * Q_sgs;
+      //   s(i, j, k, nf * NVAR + UFS + ns + 1) -= s(i, j, k, nf * NVAR + URHO) * Q_sgs; // ensure mass conservation
+      // }
+      
+      ////////////////// ORNSTEIN–UHLENBECK //////////////////
+      for (int nf = 1; nf <= NUM_FIELD; ++nf) {
+        Q = s(i, j, k, nf * NVAR + UFS + ns) / s(i, j, k, nf * NVAR + URHO);
+        // amrex::Real A = (0.5 - Q) / (1.0 / C_e + dt);
+        amrex::Real A = (0.5 - Q) / (1.0 / C_e + dt);
+        amrex::Real B = std::sqrt(C0);
+        Q_sgs = A * dt + B * dW[0][nf - 1];
+        // s(i, j, k, nf * NVAR + UFS + ns) += s(i, j, k, nf * NVAR + URHO) * Q_sgs;
+        // s(i, j, k, nf * NVAR + UFS + ns + 1) -= s(i, j, k, nf * NVAR + URHO) * Q_sgs;
+        // Version 2
+        s(i, j, k, nf * NVAR + UFS + ns) += s(i, j, k, URHO) * Q_sgs;
+        s(i, j, k, nf * NVAR + UFS + ns + 1) -= s(i, j, k, URHO) * Q_sgs;
+
+        // Version 3
+        // amrex::Real A = (s(i, j, k, UFS) - s(i, j, k, nf * NVAR + UFS)) / (2.0 / C_e + dt);
+        // amrex::Real rQ_sgs = A * dt;
+        // s(i, j, k, nf * NVAR + UFS + ns) += rQ_sgs;
+        // s(i, j, k, nf * NVAR + UFS + ns + 1) -= rQ_sgs;
+      }
+    // }
   });
 }
 

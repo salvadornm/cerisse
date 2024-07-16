@@ -294,5 +294,5 @@ void CNS::compute_dSdt_box(Box const& bx, Array4<const Real>& sarr,
     });
   }
 
-  Gpu::streamSynchronize();
+  // Gpu::streamSynchronize();
 }

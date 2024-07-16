@@ -114,6 +114,7 @@ void CNS::setPlotVariables()
       amrex::Amr::deleteStatePlotVar("ymom_Field" + std::to_string(nf));
       amrex::Amr::deleteStatePlotVar("zmom_Field" + std::to_string(nf));
       amrex::Amr::deleteStatePlotVar("rho_E_Field" + std::to_string(nf));
+      amrex::Amr::deleteStatePlotVar("Temp_Field" + std::to_string(nf));
       for (int i = 0; i < NUM_SPECIES; ++i) {
         amrex::Amr::deleteStatePlotVar("rho_" + spec_names[i] + "_Field" +
                                        std::to_string(nf));

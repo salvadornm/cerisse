@@ -120,9 +120,10 @@ void CNS::react_state(Real time, Real dt, bool init_react)
                               +sold_arr(i, j, k, UMZ) * sold_arr(i, j, k, UMZ))) /
                 rho_old;
 
-            const Real ei = rEi(i, j, k) / rho_old;
-            auto eos = pele::physics::PhysicsType::eos();
-            eos.REY2T(rho_old, ei, Y, T(i, j, k));
+            // const Real ei = rEi(i, j, k) / rho_old;
+            // auto eos = pele::physics::PhysicsType::eos();
+            // eos.REY2T(rho_old, ei, Y, T(i, j, k));
+            T(i, j, k) = sold_arr(i, j, k, UTEMP);
 
             if (T(i, j, k) <= 0.0)
               std::cout << "Before reaction T=" << T(i, j, k) << " @ " << i << ","
