@@ -14,7 +14,7 @@ void amrex_probinit(const int* /*init*/, const int* /*name*/, const int* /*namel
   auto eos = pele::physics::PhysicsType::eos();
 
   // Vitiated air inlet
-  amrex::Real X[NUM_SPECIES];
+  amrex::Real X[NUM_SPECIES] = {0.0};
   X[O2_ID] = 0.201;
   X[N2_ID] = 0.544;
   X[H2O_ID] = 0.255;

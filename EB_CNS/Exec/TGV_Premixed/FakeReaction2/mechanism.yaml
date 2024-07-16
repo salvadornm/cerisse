@@ -1,0 +1,59 @@
+description: |-
+  Example one-step reaction input model from Shannon Kao's thesis
+  "Detonation Stability with Reversible Kinetics" Shannon Kao, PhD Thesis,
+  California Institute of Technology, 2008.
+  https://shepherd.caltech.edu/EDL/publications/reprints/KaoThesis2008.pdf
+  See Chapter 2, section 2.1 for a detailed explanation
+  This file is for irreversible reaction gamma = 1.2, beta = 50, Ea = 50 case
+  of Erpenbeck.
+
+generator: cti2yaml
+cantera-version: 2.6.0
+date: Tue, 18 Apr 2023 07:55:59 -0700
+input-files: [one-step.cti]
+
+units: {length: cm, quantity: mol, activation-energy: cal/mol}
+
+phases:
+- name: FakeGas
+  thermo: ideal-gas
+  elements: [Ar]
+  species: [F1, F2]
+  kinetics: gas
+  reactions: all
+  transport: mixture-averaged
+  state:
+    T: 300.0
+    P: 1.01325e+05
+
+species:
+- name: F1
+  composition: {Ar: 1}
+  thermo:
+    model: NASA7
+    temperature-ranges: [300.0, 1000.0, 5000.0]
+    data:
+    - [6.0, 0.0, 0.0, 0.0, 0.0, -1800.0, 4.366]
+    - [6.0, 0.0, 0.0, 0.0, 0.0, -1800.0, 4.366]
+  transport:
+    model: gas
+    geometry: atom
+    diameter: 3.33
+    well-depth: 136.5
+- name: F2
+  composition: {Ar: 1}
+  thermo:
+    model: NASA7
+    temperature-ranges: [300.0, 1000.0, 5000.0]
+    data:
+    - [6.0, 0.0, 0.0, 0.0, 0.0, -1.68e+04, 4.366]
+    - [6.0, 0.0, 0.0, 0.0, 0.0, -1.68e+04, 4.366]
+  transport:
+    model: gas
+    geometry: atom
+    diameter: 3.33
+    well-depth: 136.5
+
+reactions:
+- equation: F1 => F2  # Reaction 1
+  rate-constant: {A: 1.5e+7, b: 1.0, Ea: 3.0e+4}

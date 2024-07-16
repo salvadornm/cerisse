@@ -26,10 +26,12 @@ THREAD_SANITIZER = FALSE
 # PelePhysics
 Eos_Model := Fuego
 Transport_Model := Simple
-Chemistry_Model := LiDryer
+#Chemistry_Model := LiDryer
+Custom_Chemistry_Model := FakeReaction2
 
 # CNS
 USE_FULL_PROB_POST_TIMESTEP = TRUE
+USE_PROB_PARM_HOST = TRUE
 NUM_FIELD = 8
 
 # GNU Make
