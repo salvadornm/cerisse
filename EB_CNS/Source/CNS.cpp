@@ -888,6 +888,7 @@ void CNS::read_params()
       amrex::Abort("CNS: buffer_box has negative volume");
   }
 
+  pp.query("do_hydro", do_hydro);
   pp.query("do_visc", do_visc);
   pp.query("do_ext_src", do_ext_src);
 
@@ -1020,7 +1021,7 @@ void CNS::buildMetrics()
 
   Parm const* l_parm = d_parm;
 
-  // Level mask for legacy redistribution (TODO: deprecated)
+  // Level mask for legacy redistribution
   level_mask.clear();
   level_mask.define(grids, dmap, 1, 3);
   level_mask.BuildMask(geom.Domain(), geom.periodicity(), l_parm->level_mask_covered,

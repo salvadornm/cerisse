@@ -25,6 +25,7 @@ bc_adiabatic_wall(amrex::Real s_ext[NVAR], const amrex::Real s_int[NVAR], int di
   s_ext[UMZ] = ((dir == 2 || no_slip) ? -1 : 1) * s_int[UMZ];
   s_ext[UEDEN] = s_int[UEDEN];
   for (int n = 0; n < NUM_SPECIES; ++n) s_ext[UFS + n] = s_int[UFS + n];
+  s_ext[UTEMP] = s_int[UTEMP];
 }
 
 /**
@@ -66,6 +67,7 @@ bc_isothermal_wall(amrex::Real s_ext[NVAR], const amrex::Real s_int[NVAR],
   s_ext[UMZ] = ((dir == 2 || no_slip) ? -1 : 1) * rhow * rhoinv * s_int[UMZ];
   s_ext[UEDEN] = rhow * ew;
   for (int n = 0; n < NUM_SPECIES; ++n) s_ext[UFS + n] = rhow * y[n];
+  s_ext[UTEMP] = Tw;
 }
 
 /**

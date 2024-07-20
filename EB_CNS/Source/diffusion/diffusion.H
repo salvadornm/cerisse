@@ -82,134 +82,6 @@ cns_diff_species(amrex::IntVect const& iv, const int idir, amrex::Array4<amrex::
 #endif
 }
 
-/// @brief Diffusion fluxes in x-direction. 4th order central difference.
-AMREX_GPU_DEVICE AMREX_FORCE_INLINE void
-cns_diff_x(int i, int j, int k, amrex::Array4<amrex::Real const> const& q,
-           amrex::Array4<amrex::Real const> const& coeffs,
-           amrex::GpuArray<amrex::Real, AMREX_SPACEDIM> const& dxinv,
-           amrex::Array4<amrex::Real> const& fx) noexcept
-{
-  using amrex::Real;
-  const amrex::IntVect iv{AMREX_D_DECL(i, j, k)};
-  constexpr int order = 4;
-
-  Real dTdx = normal_diff<order>(iv, 0, QTEMP, q, dxinv);
-  AMREX_D_TERM(Real dudx = normal_diff<order>(iv, 0, QU, q, dxinv);
-               , Real dvdx = normal_diff<order>(iv, 0, QV, q, dxinv);
-               , Real dwdx = normal_diff<order>(iv, 0, QW, q, dxinv);)
-#if (AMREX_SPACEDIM >= 2)
-  Real dudy = tangent_diff<order>(iv, 0, 1, QU, q, dxinv);
-  Real dvdy = tangent_diff<order>(iv, 0, 1, QV, q, dxinv);
-#endif
-#if (AMREX_SPACEDIM == 3)
-  Real dudz = tangent_diff<order>(iv, 0, 2, QU, q, dxinv);
-  Real dwdz = tangent_diff<order>(iv, 0, 2, QW, q, dxinv);
-#endif
-  Real divu = AMREX_D_TERM(dudx, +dvdy, +dwdz);
-
-  const Real mu = interp<order>(iv, 0, CMU, coeffs);
-  const Real xi = interp<order>(iv, 0, CXI, coeffs);
-
-  AMREX_D_TERM(Real tauxx = mu * (2.0 * dudx - 2.0 / 3.0 * divu) + xi * divu;
-               , Real tauxy = mu * (dudy + dvdx);, Real tauxz = mu * (dudz + dwdx););
-
-  AMREX_D_TERM(fx(i, j, k, UMX) += -tauxx;, fx(i, j, k, UMY) += -tauxy;
-               , fx(i, j, k, UMZ) += -tauxz;);
-  fx(i, j, k, UEDEN) += -(AMREX_D_TERM(interp<order>(iv, 0, QU, q) * tauxx,
-                                       +interp<order>(iv, 0, QV, q) * tauxy,
-                                       +interp<order>(iv, 0, QW, q) * tauxz)) -
-                        interp<order>(iv, 0, CLAM, coeffs) * dTdx;
-
-  // Species transport
-  cns_diff_species(iv, 0, q, coeffs, dxinv, fx);
-}
-
-#if (AMREX_SPACEDIM >= 2)
-/// @brief Diffusion fluxes in y-direction. 4th order central difference.
-AMREX_GPU_DEVICE AMREX_FORCE_INLINE void
-cns_diff_y(int i, int j, int k, amrex::Array4<amrex::Real const> const& q,
-           amrex::Array4<amrex::Real const> const& coeffs,
-           amrex::GpuArray<amrex::Real, AMREX_SPACEDIM> const& dxinv,
-           amrex::Array4<amrex::Real> const& fy) noexcept
-{
-  using amrex::Real;
-  const amrex::IntVect iv{AMREX_D_DECL(i, j, k)};
-  constexpr int order = 4;
-
-  Real dTdy = normal_diff<order>(iv, 1, QTEMP, q, dxinv);
-  AMREX_D_TERM(Real dudy = normal_diff<order>(iv, 1, QU, q, dxinv);
-               , Real dvdy = normal_diff<order>(iv, 1, QV, q, dxinv);
-               , Real dwdy = normal_diff<order>(iv, 1, QW, q, dxinv);)
-
-  Real dudx = tangent_diff<order>(iv, 1, 0, QU, q, dxinv);
-  Real dvdx = tangent_diff<order>(iv, 1, 0, QV, q, dxinv);
-#if (AMREX_SPACEDIM == 3)
-  Real dvdz = tangent_diff<order>(iv, 1, 2, QV, q, dxinv);
-  Real dwdz = tangent_diff<order>(iv, 1, 2, QW, q, dxinv);
-#endif
-  Real divu = AMREX_D_TERM(dudx, +dvdy, +dwdz);
-
-  const Real mu = interp<order>(iv, 1, CMU, coeffs);
-  const Real xi = interp<order>(iv, 1, CXI, coeffs);
-
-  AMREX_D_TERM(Real tauyy = mu * (2.0 * dvdy - (2.0 / 3.0) * divu) + xi * divu;
-               , Real tauxy = mu * (dudy + dvdx);, Real tauyz = mu * (dwdy + dvdz););
-
-  AMREX_D_TERM(fy(i, j, k, UMX) += -tauxy;, fy(i, j, k, UMY) += -tauyy;
-               , fy(i, j, k, UMZ) += -tauyz;);
-  fy(i, j, k, UEDEN) += -(AMREX_D_TERM(interp<order>(iv, 1, QU, q) * tauxy,
-                                       +interp<order>(iv, 1, QV, q) * tauyy,
-                                       +interp<order>(iv, 1, QW, q) * tauyz)) -
-                        interp<order>(iv, 1, CLAM, coeffs) * dTdy;
-
-  // Species transport
-  cns_diff_species(iv, 1, q, coeffs, dxinv, fy);
-}
-#endif
-
-#if (AMREX_SPACEDIM == 3)
-/// @brief Diffusion fluxes in z-direction. 4th order central difference.
-AMREX_GPU_DEVICE AMREX_FORCE_INLINE void
-cns_diff_z(int i, int j, int k, amrex::Array4<amrex::Real const> const& q,
-           amrex::Array4<amrex::Real const> const& coeffs,
-           amrex::GpuArray<amrex::Real, AMREX_SPACEDIM> const& dxinv,
-           amrex::Array4<amrex::Real> const& fz) noexcept
-{
-  using amrex::Real;
-  const amrex::IntVect iv{AMREX_D_DECL(i, j, k)};
-  constexpr int order = 4;
-
-  Real dTdz = normal_diff<order>(iv, 2, QTEMP, q, dxinv);
-  Real dudz = normal_diff<order>(iv, 2, QU, q, dxinv);
-  Real dvdz = normal_diff<order>(iv, 2, QV, q, dxinv);
-  Real dwdz = normal_diff<order>(iv, 2, QW, q, dxinv);
-
-  Real dudx = tangent_diff<order>(iv, 2, 0, QU, q, dxinv);
-  Real dwdx = tangent_diff<order>(iv, 2, 0, QW, q, dxinv);
-  Real dvdy = tangent_diff<order>(iv, 2, 1, QV, q, dxinv);
-  Real dwdy = tangent_diff<order>(iv, 2, 1, QW, q, dxinv);
-
-  Real divu = dudx + dvdy + dwdz;
-  const Real mu = interp<order>(iv, 2, CMU, coeffs);
-  const Real xi = interp<order>(iv, 2, CXI, coeffs);
-  
-  Real tauxz = mu * (dudz + dwdx);
-  Real tauyz = mu * (dvdz + dwdy);
-  Real tauzz = mu * (2.0 * dwdz - (2.0 / 3.0) * divu) + xi * divu;
-
-  fz(i, j, k, UMX) += -tauxz;
-  fz(i, j, k, UMY) += -tauyz;
-  fz(i, j, k, UMZ) += -tauzz;
-  fz(i, j, k, UEDEN) +=
-    -(interp<order>(iv, 2, QU, q) * tauxz + interp<order>(iv, 2, QV, q) * tauyz +
-      interp<order>(iv, 2, QW, q) * tauzz) -
-    interp<order>(iv, 2, CLAM, coeffs) * dTdz;
-
-  // Species transport
-  cns_diff_species(iv, 2, q, coeffs, dxinv, fz);
-}
-#endif
-
 /**
  * @brief Compute diffusion fluxes.
  *
@@ -221,24 +93,52 @@ cns_diff_z(int i, int j, int k, amrex::Array4<amrex::Real const> const& q,
  * @param[out] flx  output diffusion fluxes.
  */
 AMREX_GPU_DEVICE AMREX_FORCE_INLINE void
-cns_diff(int i, int j, int k, int dir, amrex::Array4<const amrex::Real> const& q,
+cns_diff(const int i, const int j,const int k, const int d1, amrex::Array4<const amrex::Real> const& q,
          amrex::Array4<const amrex::Real> const& coeffs,
          amrex::GpuArray<amrex::Real, AMREX_SPACEDIM> const& dxinv,
          amrex::Array4<amrex::Real> const& flx) noexcept
 {
-  if (dir == 0) {
-    cns_diff_x(i, j, k, q, coeffs, dxinv, flx);
-  }
+  using amrex::Real;
+  const amrex::IntVect iv{AMREX_D_DECL(i, j, k)};
+  const amrex::IntVect ivm = iv - amrex::IntVect::TheDimensionVector(d1);
+
+  const int d2 = d1 == 0 ? 1 : 0;
+  const int d3 = d1 == 2 ? 1 : 2;
+  AMREX_D_TERM(const int QU1 = QU + d1;, const int QU2 = QU + d2;
+               , const int QU3 = QU + d3;)
+  AMREX_D_TERM(const int UM1 = UMX + d1;, const int UM2 = UMX + d2;
+               , const int UM3 = UMX + d3;)
+
+  constexpr int order = 4;
+
+  // Aij = dA_i/dx_j
+  const Real dTdn = normal_diff<order>(iv, d1, QTEMP, q, dxinv);
+  const Real u11 = normal_diff<order>(iv, d1, QU1, q, dxinv);
 #if (AMREX_SPACEDIM >= 2)
-  else if (dir == 1) {
-    cns_diff_y(i, j, k, q, coeffs, dxinv, flx);
-  }
+  const Real u21 = normal_diff<order>(iv, d1, QU2, q, dxinv);
+  const Real u12 = tangent_diff<order>(iv, d1, d2, QU1, q, dxinv);
+  const Real u22 = tangent_diff<order>(iv, d1, d2, QU2, q, dxinv);
 #endif
 #if (AMREX_SPACEDIM == 3)
-  else {
-    cns_diff_z(i, j, k, q, coeffs, dxinv, flx);
-  }
+  const Real u31 = normal_diff<order>(iv, d1, QU3, q, dxinv);
+  const Real u13 = tangent_diff<order>(iv, d1, d3, QU1, q, dxinv);
+  const Real u33 = tangent_diff<order>(iv, d1, d3, QU3, q, dxinv);
 #endif
+  const Real divu = AMREX_D_TERM(u11, +u22, +u33);
+  const Real muf = interp<order>(iv, d1, CMU, coeffs);
+  const Real xif = interp<order>(iv, d1, CXI, coeffs);
+  AMREX_D_TERM(Real tau11 = muf * (2.0 * u11 - (2.0 / 3.0) * divu) + xif * divu;
+               , Real tau12 = muf * (u12 + u21);, Real tau13 = muf * (u13 + u31);)
+
+  AMREX_D_TERM(flx(iv, UM1) -= tau11;, flx(iv, UM2) -= tau12;
+               , flx(iv, UM3) -= tau13;)
+  flx(iv, UEDEN) -= 0.5 * (AMREX_D_TERM((q(iv, QU1) + q(ivm, QU1)) * tau11,
+                                        +(q(iv, QU2) + q(ivm, QU2)) * tau12,
+                                        +(q(iv, QU3) + q(ivm, QU3)) * tau13) +
+                           (coeffs(iv, CLAM) + coeffs(ivm, CLAM)) * dTdn);
+
+  // Species transport
+  cns_diff_species(iv, d1, q, coeffs, dxinv, flx);
 }
 
 #endif

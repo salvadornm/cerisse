@@ -33,6 +33,7 @@ Vector<Real> CNS::refine_tke;
 
 RealBox CNS::buffer_box;
 
+bool CNS::do_hydro = true;   // hydrodynamic fluxes
 bool CNS::do_visc = true;    // diffusion is on by default
 bool CNS::do_ext_src = true; // call external source term in prob.cpp
 
@@ -88,6 +89,7 @@ Real CNS::Sc_T = 0.7;   // Turbulent Schmidt number = mu_T/(rho*D_T)
 Real CNS::Cm = 0.1;     // PaSR mixing timescale coefficient
 
 #if CNS_USE_EB
+int CNS::eb_recon_mode = 0; //0: fill covered stencil with first cell values; 1: switch to 2nd order scheme
 amrex::Real CNS::eb_weight = 0.5;
 bool CNS::eb_no_slip = true;
 bool CNS::eb_isothermal = false;

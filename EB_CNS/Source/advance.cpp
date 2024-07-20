@@ -65,7 +65,8 @@ Real CNS::advance(Real time, Real dt, int iteration, int ncycle)
     // Predictor-corrector RK2
     // RK2 stage 1: U^* = U^n + dt*dUdt^n + dt*I_R^n
     if (verbose > 1)
-      amrex::Print() << " >> AMR Cycle " << iteration << " of " << ncycle << std::endl;
+      amrex::Print() << " >> AMR Cycle " << iteration << " of " << ncycle
+                     << std::endl;
     if (verbose > 0)
       amrex::Print() << " >> RK Step 1: Computing dSdt^{n}" << std::endl;
     FillPatch(*this, Sborder, NUM_GROW, time, State_Type, 0, LEN_STATE);
@@ -86,12 +87,11 @@ Real CNS::advance(Real time, Real dt, int iteration, int ncycle)
         amrex::Print() << " >> RK Step 2: Computing dSdt^{n+1}" << std::endl;
       FillPatch(*this, Sborder, NUM_GROW, time + dt, State_Type, 0, LEN_STATE);
       compute_dSdt(Sborder, dSdt_new, 0.5 * dt, fr_as_crse, fr_as_fine,
-                  (rk_reaction_iter < 1));
+                   (rk_reaction_iter < 1));
       MultiFab::LinComb(S_new, 0.5 * dt, dSdt_new, 0, 0.5 * dt, dSdt_old, 0, 0,
                         LEN_STATE, 0);
       MultiFab::Add(S_new, S_old, 0, 0, LEN_STATE, 0);
     }
-
     enforce_consistent_state(); // Enforce rho = sum(rhoY)
 
 #if (NUM_FIELD > 0)
@@ -110,7 +110,7 @@ Real CNS::advance(Real time, Real dt, int iteration, int ncycle)
     if (do_react) {
       // Compute I_R^{n+1}(U^**) and do U^{n+1} = U^** + dt*I_R^{n+1}
       react_state(time, dt);
-      
+
       enforce_consistent_state(); // Enforce rho = sum(rhoY)
     }
 
@@ -122,7 +122,7 @@ Real CNS::advance(Real time, Real dt, int iteration, int ncycle)
         }
         FillPatch(*this, Sborder, NUM_GROW, time + dt, State_Type, 0, LEN_STATE);
         compute_dSdt(Sborder, dSdt_new, 0.5 * dt, fr_as_crse, fr_as_fine,
-                    (iter == rk_reaction_iter));
+                     (iter == rk_reaction_iter));
 
         MultiFab::LinComb(S_new, 0.5 * dt, dSdt_new, 0, 0.5 * dt, dSdt_old, 0, 0,
                           LEN_STATE, 0);
@@ -134,12 +134,18 @@ Real CNS::advance(Real time, Real dt, int iteration, int ncycle)
     }
   } else {
     // Use AMRLevel RK (no reaction, no SF for now)
+    if (do_react || NUM_FIELD > 0) {
+      amrex::Abort("AMRLevel RK not implemented for reaction or SF");
+    }
+
     RK(rk_order, State_Type, time, dt, iteration, ncycle,
-      [&](int stage, MultiFab& dSdt, MultiFab const& S, Real /*t*/, Real dtsub) {
-        if (verbose > 0) amrex::Print() << " >> AMRLevel::RK Step " << stage << '\n';
-        compute_dSdt(S, dSdt, dtsub, fr_as_crse, fr_as_fine);
-      });
-      
+       [&](int stage, MultiFab& dSdt, MultiFab const& S, Real /*t*/, Real dtsub) {
+         if (verbose > 0) {
+           amrex::Print() << " >> AMRLevel::RK Step " << stage << '\n';
+         }
+         compute_dSdt(S, dSdt, dtsub, fr_as_crse, fr_as_fine);
+       });
+
     enforce_consistent_state();
   }
 
@@ -160,10 +166,7 @@ void CNS::compute_dSdt(const MultiFab& S, MultiFab& dSdt, Real dt,
   BL_PROFILE("CNS::compute_dSdt()");
 
   const Real* dx = geom.CellSize();
-  const int ncomp = dSdt.nComp();
-
-  int as_crse = (fr_as_crse != nullptr);
-  int as_fine = (fr_as_fine != nullptr);
+  const int ncomp = UFA;
 
 #if CNS_USE_EB
   auto const& fact = dynamic_cast<EBFArrayBoxFactory const&>(S.Factory());
@@ -175,6 +178,11 @@ void CNS::compute_dSdt(const MultiFab& S, MultiFab& dSdt, Real dt,
 #endif
   {
     std::array<FArrayBox, AMREX_SPACEDIM> flux;
+#if CNS_USE_EB
+    FArrayBox dm_as_fine(Box::TheUnitBox(), ncomp, The_Async_Arena());
+    FArrayBox fab_drho_as_crse(Box::TheUnitBox(), ncomp, The_Async_Arena());
+    IArrayBox fab_rrflag_as_crse(Box::TheUnitBox());
+#endif
 
     for (MFIter mfi(S, TilingIfNotGPU()); mfi.isValid(); ++mfi) {
       const Box& bx = mfi.tilebox();
@@ -186,53 +194,46 @@ void CNS::compute_dSdt(const MultiFab& S, MultiFab& dSdt, Real dt,
         dSdt[mfi].setVal<RunOn::Device>(0.0, bx, 0, ncomp);
       } else
 #endif
-      // if (ifine_mask[mfi].max() == 0) {
-      //   // Do not work in fine covered box
-      //   amrex::Print() << "Saved some work in fine covered box\n";
-      //   dSdt[mfi].setVal<RunOn::Device>(0.0, bx, 0, ncomp);
-      // } else 
       {
         // flux is used to store centroid flux needed for reflux
         for (int idim = 0; idim < AMREX_SPACEDIM; ++idim) {
-          flux[idim].resize(amrex::surroundingNodes(bx, idim), LEN_STATE,
+          flux[idim].resize(amrex::surroundingNodes(bx, idim), ncomp,
                             The_Async_Arena());
           flux[idim].setVal<RunOn::Device>(0.);
         }
 
-        if (use_hybrid_scheme) {
-          Real time = state[State_Type].curTime();
-          int* bcrec_dummy;
-          cns_dershocksensor(amrex::grow(bx, 2), shock_sensor_mf[mfi], 0, 1, S[mfi], geom, time,
-                             bcrec_dummy, level);
+        // if (use_hybrid_scheme) // now evaluate shock sensor anyway because cns_riemann needs it
+        { 
+        Real time = state[State_Type].curTime();
+        int* bcrec_dummy;
+        cns_dershocksensor(amrex::grow(bx, 2), shock_sensor_mf[mfi], 0, 1, S[mfi],
+                           geom, time, bcrec_dummy, level);
         }
+
+        Array4<const Real> s_arr = S.array(mfi);
+        Array4<Real> dsdt_arr = dSdt.array(mfi);
+        Array4<const Real> ss_arr = shock_sensor_mf.array(mfi);
 
 #if CNS_USE_EB
         if (flag.getType(amrex::grow(bx, 3)) == FabType::regular) {
 #endif
-          Array4<const Real> s_arr = S.array(mfi);
-          Array4<Real> dsdt_arr = dSdt.array(mfi);
-          Array4<const Real> ss_arr = shock_sensor_mf.array(mfi);
-
           compute_dSdt_box(bx, s_arr, dsdt_arr,
-                           {AMREX_D_DECL(&flux[0], &flux[1], &flux[2])},
-                           ss_arr);
+                           {AMREX_D_DECL(&flux[0], &flux[1], &flux[2])}, ss_arr);
 
-          if (write_to_flux_register) {
+          if (write_to_flux_register && do_reflux) {
             if (fr_as_crse) {
               fr_as_crse->CrseAdd(mfi, {AMREX_D_DECL(&flux[0], &flux[1], &flux[2])},
-                                  dx, dt, RunOn::Device);
+                                  dx, dt, 0, 0, ncomp,RunOn::Device);
             }
-
             if (fr_as_fine) {
               fr_as_fine->FineAdd(mfi, {AMREX_D_DECL(&flux[0], &flux[1], &flux[2])},
-                                  dx, dt, RunOn::Device);
+                                  dx, dt, 0, 0, ncomp,RunOn::Device);
             }
           }
 #if CNS_USE_EB
         } else {
           Array4<const Real> vf_arr = (*volfrac).array(mfi);
           Array4<const Real> bcent_arr = (*bndrycent).array(mfi);
-
           AMREX_D_TERM(
             Array4<const Real> const& apx = areafrac[0]->const_array(mfi);
             , Array4<const Real> const& apy = areafrac[1]->const_array(mfi);
@@ -242,38 +243,38 @@ void CNS::compute_dSdt(const MultiFab& S, MultiFab& dSdt, Real dt,
             , Array4<const Real> const& fcy = facecent[1]->const_array(mfi);
             , Array4<const Real> const& fcz = facecent[2]->const_array(mfi));
 
-          Array4<const Real> s_arr = S.array(mfi);
-          Array4<Real> dsdt_arr = dSdt.array(mfi);
+          FArrayBox* p_drho_as_crse =
+            (fr_as_crse) ? fr_as_crse->getCrseData(mfi) : &fab_drho_as_crse;
+          const IArrayBox* p_rrflag_as_crse =
+            (fr_as_crse) ? fr_as_crse->getCrseFlag(mfi) : &fab_rrflag_as_crse;
+          if (fr_as_fine) { 
+            dm_as_fine.resize(amrex::grow(bx, 1), ncomp); 
+            dm_as_fine.setVal<RunOn::Device>(0.0);
+          }
 
           compute_dSdt_box_eb(
             bx, s_arr, dsdt_arr, {AMREX_D_DECL(&flux[0], &flux[1], &flux[2])},
             flags.const_array(mfi), vf_arr, AMREX_D_DECL(apx, apy, apz),
-            AMREX_D_DECL(fcx, fcy, fcz), bcent_arr,
-            // , p_drho_as_crse->array(), p_rrflag_as_crse->const_array(),
-            // as_fine, level_mask.const_array(mfi),
-            dt);
+            AMREX_D_DECL(fcx, fcy, fcz), bcent_arr, int(fr_as_crse != nullptr), p_drho_as_crse->array(),
+            p_rrflag_as_crse->const_array(), int(fr_as_fine != nullptr), dm_as_fine.array(),
+            level_mask.const_array(mfi), dt);
 
-          if (write_to_flux_register) {
+          if (write_to_flux_register && do_reflux) {
             if (fr_as_crse) {
               fr_as_crse->CrseAdd(
                 mfi, {AMREX_D_DECL(&flux[0], &flux[1], &flux[2])}, dx, dt,
                 (*volfrac)[mfi],
                 {AMREX_D_DECL(&((*areafrac[0])[mfi]), &((*areafrac[1])[mfi]),
-                              &((*areafrac[2])[mfi]))},
+                              &((*areafrac[2])[mfi]))}, 0, 0, ncomp,
                 RunOn::Device);
             }
             if (fr_as_fine) {
-              // dm_as_fine is the mass flux due to redistrution, it is 0 because
-              // C/F interface does *not* cross EB, same as in PeleC.
-              FArrayBox dm_as_fine(amrex::grow(bx, 1), ncomp, The_Async_Arena());
-              dm_as_fine.setVal<RunOn::Device>(0.0);
-
               fr_as_fine->FineAdd(
                 mfi, {AMREX_D_DECL(&flux[0], &flux[1], &flux[2])}, dx, dt,
                 (*volfrac)[mfi],
                 {AMREX_D_DECL(&((*areafrac[0])[mfi]), &((*areafrac[1])[mfi]),
-                              &((*areafrac[2])[mfi]))},
-                dm_as_fine, RunOn::Device);
+                              &((*areafrac[2])[mfi]))}, 
+                dm_as_fine, 0, 0, ncomp, RunOn::Device);
             }
           }
         }
@@ -284,14 +285,13 @@ void CNS::compute_dSdt(const MultiFab& S, MultiFab& dSdt, Real dt,
       Gpu::streamSynchronize();
       wt = (amrex::ParallelDescriptor::second() - wt) / bx.d_numPts();
       get_new_data(Cost_Type)[mfi].plus<RunOn::Device>(wt, bx);
-
     } // end mfi loop
-  }   // end omp block
+  } // end omp block
 }
 
 /**
  * \brief This function (1) enforces all rhoY >= 0, (2) rho <- sum(rhoY),
- *        (3) enforces T >= min_T and update rhoU and rhoE accordingly, 
+ *        (3) enforces T >= min_T and update rhoU and rhoE accordingly,
  *        (4) compute T and stores in UTEMP.
  *        This is called before each compute_dSdt.
  */
@@ -362,9 +362,9 @@ void CNS::enforce_consistent_state()
               Y[n] = s_arr(iv, UFS + n) * rhoinv;
             }
             const Real ke = 0.5 * rhoinv * rhoinv *
-                      (AMREX_D_TERM(s_arr(iv, UMX) * s_arr(iv, UMX),
-                                    +s_arr(iv, UMY) * s_arr(iv, UMY),
-                                    +s_arr(iv, UMZ) * s_arr(iv, UMZ)));
+                            (AMREX_D_TERM(s_arr(iv, UMX) * s_arr(iv, UMX),
+                                          +s_arr(iv, UMY) * s_arr(iv, UMY),
+                                          +s_arr(iv, UMZ) * s_arr(iv, UMZ)));
             Real ei = rhoinv * s_arr(iv, UEDEN) - ke;
             auto eos = pele::physics::PhysicsType::eos();
             Real T = s_arr(iv, UTEMP);
@@ -375,30 +375,31 @@ void CNS::enforce_consistent_state()
           ParallelFor(bx, [=] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {
             const IntVect iv{AMREX_D_DECL(i, j, k)};
 
-            if (s_arr(iv, UTEMP) < clip_temp) {            
+            if (s_arr(iv, UTEMP) < clip_temp) {
               // Find target temp by averaging over the neighbours
               // Real target_temp = 0.0;
               Real target_temp = clip_temp;
-              
+
               // int n_neighbour = 0;
               int n_neighbour = 1;
               for (int ix = -1; ix <= 1; ++ix) {
-              for (int iy = -1; iy <= 1; ++iy) {
-              for (int iz = -1; iz <= 1; ++iz) {
-              Real T_neighbour = s_arr(i+ix, j+iy, k+iz, UTEMP); //T(i+ix, j+iy, k+iz);
-              if ((T_neighbour > clip_temp) && (T_neighbour < 1e4) 
+                for (int iy = -1; iy <= 1; ++iy) {
+                  for (int iz = -1; iz <= 1; ++iz) {
+                    Real T_neighbour =
+                      s_arr(i + ix, j + iy, k + iz, UTEMP); // T(i+ix, j+iy, k+iz);
+                    if ((T_neighbour > clip_temp) && (T_neighbour < 1e4)
 #if CNS_USE_EB
-                  && flag_arr(i+ix, j+iy, k+iz).isRegular()
+                        && flag_arr(i + ix, j + iy, k + iz).isRegular()
 #endif
-                ) {
-                  target_temp += T_neighbour;
-                  n_neighbour += 1;
+                    ) {
+                      target_temp += T_neighbour;
+                      n_neighbour += 1;
+                    }
+                  }
                 }
               }
-              }
-              }
               // if (n_neighbour > 0)
-                target_temp /= Real(n_neighbour);
+              target_temp /= Real(n_neighbour);
               // else
               //   target_temp = clip_temp;
 
@@ -410,9 +411,9 @@ void CNS::enforce_consistent_state()
                 Y[n] = s_arr(iv, UFS + n) * rhoinv;
               }
               const Real ke = 0.5 * rhoinv * rhoinv *
-                        (AMREX_D_TERM(s_arr(iv, UMX) * s_arr(iv, UMX),
-                                      +s_arr(iv, UMY) * s_arr(iv, UMY),
-                                      +s_arr(iv, UMZ) * s_arr(iv, UMZ)));
+                              (AMREX_D_TERM(s_arr(iv, UMX) * s_arr(iv, UMX),
+                                            +s_arr(iv, UMY) * s_arr(iv, UMY),
+                                            +s_arr(iv, UMZ) * s_arr(iv, UMZ)));
               Real ei = rhoinv * s_arr(iv, UEDEN) - ke;
               auto eos = pele::physics::PhysicsType::eos();
 
@@ -426,16 +427,17 @@ void CNS::enforce_consistent_state()
               // eos.RTY2E(rhoNew, T(iv), Y, ei);
               // s_arr(iv, UEDEN) += ei * rhoNew;
               // if (verbose > 1) std::cout << "->" << s_arr(iv, UEDEN) << std::endl;
-              
+
               // // Keep total E, reduce vel
               // if (verbose > 1)
-              //   std::cout << "Momentum removed from cell (" << i << "," << j << "," << k
+              //   std::cout << "Momentum removed from cell (" << i << "," << j <<
+              //   "," << k
               //             << "): T " << T << "->" << clip_temp << '\n';
               // // Correct
               // Real ei_new;
               // eos.RTY2E(rhoNew, clip_temp, Y, ei_new);
-              // Real frac = (std::sqrt(1.0 - (ei_new - ei) / ke)); // this may be negative
-              // AMREX_D_TERM(s_arr(iv, UMX) *= frac;,
+              // Real frac = (std::sqrt(1.0 - (ei_new - ei) / ke)); // this may be
+              // negative AMREX_D_TERM(s_arr(iv, UMX) *= frac;,
               //              s_arr(iv, UMY) *= frac;,
               //              s_arr(iv, UMZ) *= frac;)
 
@@ -453,37 +455,41 @@ void CNS::enforce_consistent_state()
               // Keep total E, reduce vel
               if (verbose > 1)
                 std::cout << "Momentum removed from cell " << iv
-                          << ": T=" << s_arr(iv, UTEMP) << "->" << target_temp << " rhoE=" << s_arr(iv, UEDEN);
+                          << ": T=" << s_arr(iv, UTEMP) << "->" << target_temp
+                          << " rhoE=" << s_arr(iv, UEDEN);
               s_arr(iv, UTEMP) = target_temp;
               // First take energy from KE
               Real ei_new, diff_ei;
               eos.RTY2E(rhoNew, target_temp, Y, ei_new);
               diff_ei = ei_new - ei;
-              Real ctrl_parm = 1.0; // control param in [0,1] how much KE can be used to heat the cell
+              Real ctrl_parm = 1.0; // control param in [0,1] how much KE can be used
+                                    // to heat the cell
               Real fac = std::sqrt(1.0 - amrex::min(diff_ei, ctrl_parm * ke) / ke);
-              AMREX_D_TERM(s_arr(iv, UMX) *= fac;,
-                           s_arr(iv, UMY) *= fac;,
-                           s_arr(iv, UMZ) *= fac;)
+              AMREX_D_TERM(s_arr(iv, UMX) *= fac;, s_arr(iv, UMY) *= fac;
+                           , s_arr(iv, UMZ) *= fac;)
               // If not enough, add energy
               s_arr(iv, UEDEN) += rhoNew * amrex::max(diff_ei - ctrl_parm * ke, 0.0);
               if (verbose > 1) std::cout << "->" << s_arr(iv, UEDEN) << '\n';
 
               // // Check
-              // Real ke_new = 0.5 * rhoinv * rhoinv * 
+              // Real ke_new = 0.5 * rhoinv * rhoinv *
               //         (AMREX_D_TERM(s_arr(iv, UMX) * s_arr(iv, UMX),
               //                       +s_arr(iv, UMY) * s_arr(iv, UMY),
               //                       +s_arr(iv, UMZ) * s_arr(iv, UMZ)));
               // Real ke_chk = ke - amrex::min(diff_ei, ctrl_parm * ke);
               // Real ei_chk = rhoinv * s_arr(iv, UEDEN) - ke_new;
-              // if (std::abs(ei_chk - ei_new) > d_parm->smallr) { //std::numeric_limits<amrex::Real>::epsilon()
-              //   std::cout << "|ei_chk-ei_new|=" << std::abs(ei_chk - ei_new) << " ke " << ke << "->" << ke_new << '\n';
-              //   std::cout << "|ke_chk-ke_new|=" << std::abs(ke_chk - ke_new) << " fac=" << fac << '\n';
+              // if (std::abs(ei_chk - ei_new) > d_parm->smallr) {
+              // //std::numeric_limits<amrex::Real>::epsilon()
+              //   std::cout << "|ei_chk-ei_new|=" << std::abs(ei_chk - ei_new) << "
+              //   ke " << ke << "->" << ke_new << '\n'; std::cout <<
+              //   "|ke_chk-ke_new|=" << std::abs(ke_chk - ke_new) << " fac=" << fac
+              //   << '\n';
               //   // amrex::Abort();
               // }
             }
           });
         } // loop through NUM_FIELD
-      }   // EB !covered
-    }     // mfi loop
-  }       // omp block
+      } // EB !covered
+    } // mfi loop
+  } // omp block
 }

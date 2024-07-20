@@ -11,10 +11,10 @@
 #include <AMReX_YAFluxRegister.H>
 #endif
 // #include <AMReX_ErrorList.H>
+#include <PMFData.H>
 #include <PelePhysics.H>
 #include <ReactorBase.H>
 #include <turbinflow.H>
-#include <PMFData.H>
 
 #include "LES.H"
 #include "index_macros.H"
@@ -130,26 +130,24 @@ public:
                         amrex::Array4<const amrex::Real>& shock_sensor);
 
 #if CNS_USE_EB
-  void compute_dSdt_box_eb(
-    const amrex::Box& bx, amrex::Array4<amrex::Real const> const& Sfab,
-    amrex::Array4<amrex::Real> const& dSdtfab,
-    const std::array<FArrayBox*, AMREX_SPACEDIM>& flux,
-    amrex::Array4<amrex::EBCellFlag const> const& flag,
-    amrex::Array4<amrex::Real const> const& vfrac,
-    AMREX_D_DECL(amrex::Array4<amrex::Real const> const& apx,
-                 amrex::Array4<amrex::Real const> const& apy,
-                 amrex::Array4<amrex::Real const> const& apz),
-    AMREX_D_DECL(amrex::Array4<amrex::Real const> const& fcx,
-                 amrex::Array4<amrex::Real const> const& fcy,
-                 amrex::Array4<amrex::Real const> const& fcz),
-    amrex::Array4<amrex::Real const> const& bcent,
-    // int                                           as_crse,
-    // amrex::Array4<amrex::Real            > const& drho_as_crse,
-    // amrex::Array4<int               const> const& rrflag_as_crse,
-    // int                                           as_fine,
-    // amrex::Array4<amrex::Real            > const& dm_as_fine,
-    // amrex::Array4<int               const> const& lev_mask,
-    amrex::Real dt);
+  void compute_dSdt_box_eb(const amrex::Box& bx,
+                           amrex::Array4<amrex::Real const> const& Sfab,
+                           amrex::Array4<amrex::Real> const& dSdtfab,
+                           const std::array<FArrayBox*, AMREX_SPACEDIM>& flux,
+                           amrex::Array4<amrex::EBCellFlag const> const& flag,
+                           amrex::Array4<amrex::Real const> const& vfrac,
+                           AMREX_D_DECL(amrex::Array4<amrex::Real const> const& apx,
+                                        amrex::Array4<amrex::Real const> const& apy,
+                                        amrex::Array4<amrex::Real const> const& apz),
+                           AMREX_D_DECL(amrex::Array4<amrex::Real const> const& fcx,
+                                        amrex::Array4<amrex::Real const> const& fcy,
+                                        amrex::Array4<amrex::Real const> const& fcz),
+                           amrex::Array4<amrex::Real const> const& bcent,
+                           int as_crse,
+                           amrex::Array4<amrex::Real> const& drho_as_crse,
+                           amrex::Array4<int const> const& rrflag_as_crse,
+                           int as_fine, amrex::Array4<amrex::Real> const& dm_as_fine,
+                           amrex::Array4<int const> const& lev_mask, amrex::Real dt);
 #endif
 
   void computeAvg(amrex::MultiFab& State);
@@ -161,8 +159,10 @@ public:
 
   void enforce_consistent_state();
 
-  static void apply_nscbc(const amrex::Box& bx, const amrex::Array4<amrex::Real>& data,
-                          int start_comp, const amrex::Geometry& geom, int dir, int lo_hi, int bc_type);
+  static void apply_nscbc(const amrex::Box& bx,
+                          const amrex::Array4<amrex::Real>& data, int start_comp,
+                          const amrex::Geometry& geom, int dir, int lo_hi,
+                          int bc_type);
 
   // These derive functions need to access variables in the class
   static void cns_dertranscoef(const amrex::Box& bx, amrex::FArrayBox& derfab,
@@ -299,8 +299,8 @@ protected:
   amrex::MultiFab Sborder; // A state array with ghost zones. It is put here inside
                            // the class so alloc overhead only happen once.
   amrex::MultiFab shock_sensor_mf; // for hybrid scheme switch
-  // amrex::iMultiFab ifine_mask; // fine covered cells plus 2 buffers because they are
-  //                              // used for interpolation in fine level ghost cells
+  // amrex::iMultiFab ifine_mask; // fine covered cells plus 2 buffers because they
+  // are used for interpolation in fine level ghost cells
 
   //
   // EB related
@@ -338,6 +338,7 @@ protected:
   static bool do_load_balance;
   static bool signalStopJob;
 
+  static bool do_hydro;
   static bool do_visc;
   static bool do_react;
   static bool do_ext_src;
@@ -369,6 +370,7 @@ protected:
   // EB
 
 #if CNS_USE_EB
+  static int eb_recon_mode;
   static amrex::Real eb_weight;
   static bool eb_no_slip;
   static bool eb_isothermal;

@@ -159,7 +159,7 @@ void CNS::react_state(Real time, Real dt, bool init_react)
                          amrex::Gpu::gpuStream()
 #endif
           );
-          amrex::Gpu::Device::streamSynchronize();
+          // amrex::Gpu::Device::streamSynchronize();
 
           //////////////////////// Unpack data ////////////////////////
           // Prepare (rho, velocities, mu) for PaSR
@@ -200,8 +200,9 @@ void CNS::react_state(Real time, Real dt, bool init_react)
                 constexpr bool get_chi = false;
                 auto trans = pele::physics::PhysicsType::transport();
                 auto const* ltransparm = trans_parms.device_trans_parm();
-                trans.transport(get_xi, get_mu, get_lam, get_Ddiag, get_chi, Tin, rhoin, yin,
-                                nullptr, nullptr, muloc, xiloc, lamloc, ltransparm);
+                trans.transport(get_xi, get_mu, get_lam, get_Ddiag, get_chi, Tin,
+                                rhoin, yin, nullptr, nullptr, muloc, xiloc, lamloc,
+                                ltransparm);
 
                 // Copy to output
                 mu(i, j, k) = muloc;
@@ -240,28 +241,17 @@ void CNS::react_state(Real time, Real dt, bool init_react)
                   unpack_pasr(i, j, k, snew_arr, new_rho, sold_arr, rY, rYsrc, qarr,
                               muarr, dx, dxinv, dt);
                 } else {
-                  // amrex::Real min_rY = 0.0;
-                  // for (int n = 0; n < NUM_SPECIES; ++n) {
-                  //   min_rY = amrex::min(min_rY, rY(i, j, k, n));
-                  // }
                   for (int n = 0; n < NUM_SPECIES; ++n) {
                     snew_arr(i, j, k, UFS + n) = amrex::max(0.0, rY(i, j, k, n));
-                    // snew_arr(i, j, k, UFS + n) = rY(i, j, k, n) - min_rY;
                     new_rho += snew_arr(i, j, k, UFS + n);
                   }
                 }
 
                 // Enforce conservation of rho
-                // if (std::abs(snew_arr(i, j, k, URHO) - new_rho) > 1e-3 *
-                // snew_arr(i, j, k, URHO))
-                //     std::cout << "Reaction changing rho: diff=" << snew_arr(i, j,
-                //     k, URHO) - new_rho
-                //               << " @ " << i << "," << j << "," << k << '\n';  //
-                //               for debug
-                for (int n = 0; n < NUM_SPECIES; ++n) {
-                  snew_arr(i, j, k, UFS + n) *= snew_arr(i, j, k, URHO) / new_rho;
-                }
-                // snew_arr(i, j, k, URHO) = new_rho;
+                // for (int n = 0; n < NUM_SPECIES; ++n) {
+                //   snew_arr(i, j, k, UFS + n) *= snew_arr(i, j, k, URHO) / new_rho;
+                // }
+                snew_arr(i, j, k, URHO) = new_rho;
               }
 
               // update drY/dt
@@ -288,24 +278,22 @@ void CNS::react_state(Real time, Real dt, bool init_react)
 
               // average I_R and put into the front NREACT entries
               if (NUM_FIELD > 0) {
+                Real invNF = Real(1.0) / Real(NUM_FIELD);
                 for (int n = 0; n < NREACT; ++n) {
-                  I_R_mean_arr(i, j, k, n) +=
-                    I_R_arr(i, j, k, n) / amrex::Real(NUM_FIELD);
+                  I_R_mean_arr(i, j, k, n) += I_R_arr(i, j, k, n) * invNF;
                 }
               }
-              // }
             }
           });
         } // end fields loop
-      }   // end EB not covered block
+      } // end EB not covered block
 
       // Record runtime for load balancing
       amrex::Gpu::streamSynchronize();
       wt = (amrex::ParallelDescriptor::second() - wt) / bx.d_numPts();
       get_new_data(Cost_Type)[mfi].plus<amrex::RunOn::Device>(wt, bx);
-
     } // end mfi loop
-  }   // end omp block
+  } // end omp block
 
   if (Snew.nGrow() > 0) { Snew.FillBoundary(geom.periodicity()); }
 

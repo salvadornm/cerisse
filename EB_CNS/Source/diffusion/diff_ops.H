@@ -33,10 +33,6 @@ AMREX_GPU_DEVICE AMREX_FORCE_INLINE amrex::Real normal_diff<4>(
   // Note that the normal stencil is [-1.5, -0.5, 0.5, 1.5]*dx
   //  i-2,  i-1  |  i,  i+1
   //             ^ we calculate dqdn at this interface
-  // Real w1 = -1.0 / 24.0;
-  // Real w2 = 27.0 / 24.0;
-  // Real w3 = -27.0 / 24.0;
-  // Real w4 = 1.0 / 24.0;
   Real w1 = -1.0 / 12.0; // only second order is "exact"
   Real w2 = 5.0 / 4.0;
   Real w3 = -5.0 / 4.0;

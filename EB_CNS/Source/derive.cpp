@@ -274,14 +274,11 @@ void cns_dermachnumber(const Box& bx, FArrayBox& derfab, int dcomp, int /*ncomp*
   amrex::ParallelFor(bx, [=] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {
     const amrex::Real rho = dat(i, j, k, URHO);
     const amrex::Real rhoinv = 1.0 / rho;
-    AMREX_D_TERM(const amrex::Real vxsq =
-                   dat(i, j, k, UMX) * dat(i, j, k, UMX) * rhoinv * rhoinv;
-                 , const amrex::Real vysq =
-                     dat(i, j, k, UMY) * dat(i, j, k, UMY) * rhoinv * rhoinv;
-                 , const amrex::Real vzsq =
-                     dat(i, j, k, UMZ) * dat(i, j, k, UMZ) * rhoinv * rhoinv;);
-    const amrex::Real ei =
-      dat(i, j, k, UEDEN) * rhoinv - 0.5 * (AMREX_D_TERM(vxsq, +vysq, +vzsq));
+    const amrex::Real q2 = (AMREX_D_TERM(dat(i, j, k, UMX) * dat(i, j, k, UMX),
+                                         +dat(i, j, k, UMY) * dat(i, j, k, UMY),
+                                         +dat(i, j, k, UMZ) * dat(i, j, k, UMZ))) *
+                           rhoinv * rhoinv;
+    const amrex::Real ei = dat(i, j, k, UEDEN) * rhoinv - 0.5 * q2;
     amrex::Real massfrac[NUM_SPECIES];
     for (int n = 0; n < NUM_SPECIES; ++n) {
       massfrac[n] = dat(i, j, k, UFS + n) * rhoinv;
@@ -289,10 +286,10 @@ void cns_dermachnumber(const Box& bx, FArrayBox& derfab, int dcomp, int /*ncomp*
     amrex::Real T = dat(i, j, k, UTEMP);
     amrex::Real cs;
     auto eos = pele::physics::PhysicsType::eos();
-    // eos.REY2T(rho, ei, massfrac, T);
+    eos.REY2T(rho, ei, massfrac, T);
     eos.RTY2Cs(rho, T, massfrac, cs);
 
-    mach(i, j, k) = sqrt(AMREX_D_TERM(vxsq, +vysq, +vzsq)) / cs;
+    mach(i, j, k) = sqrt(q2) / cs;
   });
 }
 
@@ -615,8 +612,7 @@ void cns_dervelgrad(const Box& bx, FArrayBox& derfab, int dcomp, int /*ncomp*/,
 
   const amrex::Box& gbx = amrex::grow(bx, 1);
 
-  amrex::FArrayBox local(gbx, 3);
-  amrex::Elixir local_eli = local.elixir();
+  amrex::FArrayBox local(gbx, 3, amrex::The_Async_Arena());
   auto larr = local.array();
 
 #if CNS_USE_EB
@@ -770,7 +766,7 @@ void cns_dervelgrad(const Box& bx, FArrayBox& derfab, int dcomp, int /*ncomp*/,
 //   });
 // }
 
-// Ducros shock sensor 
+// Shock sensor 
 void cns_dershocksensor(const Box& bx, FArrayBox& derfab, int dcomp, int /*ncomp*/,
                         const FArrayBox& datafab, const Geometry& geomdata, Real time,
                         const int* bcrec, int level)
@@ -784,13 +780,30 @@ void cns_dershocksensor(const Box& bx, FArrayBox& derfab, int dcomp, int /*ncomp
   auto const divu = divu_fab.const_array();
   auto const magvort = magvort_fab.const_array();
   auto shock_sensor = derfab.array(dcomp);
+  const Real* dx = geomdata.CellSize();
+  auto const sarr = datafab.const_array();
   amrex::ParallelFor(bx, [=] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {
+    // "Shock" sensor
     Real divu2 = divu(i, j, k) * divu(i, j, k);
-    // Real divu2 = divu(i, j, k) * amrex::min(divu(i, j, k), 0.1); // modify to bias towards compression, the 0.1 parameter controls how much 
-    //                                                              // expansion is allowed, the higher more area will be tagged
-    //                                                              // if the value is infty, the original Ducros sensor is recovered
-    Real magvort2 = magvort(i, j, k) * magvort(i, j, k);
-    shock_sensor(i, j, k) = divu2 / amrex::max(divu2 + magvort2, 1e-3);
+    Real magvort2 = magvort(i, j, k) * magvort(i, j, k);    
+    shock_sensor(i, j, k) = divu2 / (divu2 + magvort2 + 1.0e-3); // Ducros
+    // Real magvel2 = (AMREX_D_TERM(sarr(i, j, k, UMX) * sarr(i, j, k, UMX),
+    //                              +sarr(i, j, k, UMY) * sarr(i, j, k, UMY),
+    //                              +sarr(i, j, k, UMZ) * sarr(i, j, k, UMZ))) /
+    //                sarr(i, j, k, URHO) / sarr(i, j, k, URHO);
+    Real cellsize2 = std::pow(AMREX_D_TERM(dx[0], * dx[1], * dx[2]), 2.0 / Real(amrex::SpaceDim));
+    // shock_sensor(i, j, k) = divu2 / (divu2 + magvel2 / cellsize2 + 1.0e-6); // Hendrickson, Kartha, Candler
+
+    // Partial density discontinuity sensor
+    for (int ns = 0; ns < NUM_SPECIES; ++ns) {
+      AMREX_D_TERM(
+        Real drYdx = (sarr(i + 1, j, k, UFS + ns) - sarr(i - 1, j, k, UFS + ns)) / dx[0];,
+        Real drYdy = (sarr(i, j + 1, k, UFS + ns) - sarr(i, j - 1, k, UFS + ns)) / dx[1];,
+        Real drYdz = (sarr(i, j, k + 1, UFS + ns) - sarr(i, j, k - 1, UFS + ns)) / dx[2];)
+      Real drY2 = std::sqrt(AMREX_D_TERM(drYdx * drYdx, +drYdy * drYdy, +drYdz * drYdz));
+      Real rY2 = sarr(i, j, k, UFS + ns) * sarr(i, j, k, UFS + ns);
+      shock_sensor(i, j, k) = amrex::max(shock_sensor(i, j, k), drY2 / (drY2 + rY2 / cellsize2 + 1.0e-6));
+    }
   });
 }
 
