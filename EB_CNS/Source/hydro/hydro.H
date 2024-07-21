@@ -1,14 +1,14 @@
-#ifndef CNS_HYPERBOLICS_H_
-#define CNS_HYPERBOLICS_H_
+#ifndef CNS_HYDRO_H_
+#define CNS_HYDRO_H_
 
 #include <AMReX_FArrayBox.H>
-#include <math.h>
 
 #include <cmath>
 
 #include "PelePhysics.H"
 #include "index_macros.H"
-#include "parm.H"
+
+#define MONITOR_PROBLEM_CELL
 
 /**
  * \brief Convert state variable to primitive variable
@@ -20,11 +20,10 @@
  * @param ns      starting component index for u.
  * @param u       state variables array.
  * @param[out] q  primitive variables array.
- * @param parm    parameters and constants (see parm.H).
  */
 AMREX_GPU_DEVICE AMREX_FORCE_INLINE void
 cns_ctoprim(int i, int j, int k, int ns, amrex::Array4<amrex::Real const> const& u,
-            amrex::Array4<amrex::Real> const& q, Parm const& parm) noexcept
+            amrex::Array4<amrex::Real> const& q) noexcept
 {
   amrex::Real rho = u(i, j, k, ns + URHO);
   amrex::Real rhoinv = amrex::Real(1.0) / rho;
@@ -34,51 +33,20 @@ cns_ctoprim(int i, int j, int k, int ns, amrex::Array4<amrex::Real const> const&
   amrex::Real ei = u(i, j, k, ns + UEDEN) * rhoinv -
                    amrex::Real(0.5) * (AMREX_D_TERM(ux * ux, +uy * uy, +uz * uz));
 
-  amrex::Real massfrac[NUM_SPECIES];
-  for (int n = 0; n < NUM_SPECIES; n++) {
-    massfrac[n] = u(i, j, k, ns + UFS + n) * rhoinv;
-    q(i, j, k, QFS + n) = massfrac[n];
+  amrex::Real Y[NUM_SPECIES];
+  for (int n = 0; n < NUM_SPECIES; ++n) {
+    Y[n] = u(i, j, k, ns + UFS + n) * rhoinv;
+    q(i, j, k, QFS + n) = Y[n];
   }
 
   auto eos = pele::physics::PhysicsType::eos();
-  // assert(!std::isnan(u(i, j, k, ns + UTEMP)));
   amrex::Real T = u(i, j, k, ns + UTEMP); // Necessary for SRK EOS
-  amrex::Real p, cs = 0, gamma, wbar;
-  eos.REY2T(rho, ei, massfrac, T);
-
-  // if (std::isnan(T)) {
-  //   for (int ii : {-1, 0, 1}) {
-  //   for (int jj : {-1, 0, 1}) {
-  //   // for (int kk : {-1, 0, 1}) {
-  //     T = u(i + ii, j + jj, k, ns + UTEMP);
-  //     eos.REY2T(rho, ei, massfrac, T);
-      
-  //     if (!std::isnan(T)) {
-  //       goto endofloops;
-  //     }
-  //   // }
-  //   }
-  //   }
-  // }
-  // endofloops:
-
-  eos.RTY2P(rho, T, massfrac, p);
-  eos.Y2WBAR(massfrac, wbar);
-
-  // ss << "@" << i << "," << j << "," << k << ": ns=" << ns << ": rho=" << rho << "
-  // T=" << T << " p=" << p; for (int n = 0; n < NUM_SPECIES; n++) {
-  //     ss << " Y" << n << "=" << massfrac[n] << " ";
-  // }
-  // BL_BACKTRACE_PUSH(ss.str()); // PUSH takes std::string
-
-  eos.RTY2Cs(rho, T, massfrac, cs);
-  eos.RTY2G(rho, T, massfrac, gamma);
-  // if (std::isnan(cs) || cs < 0.0)
-  //   cs = std::sqrt(gamma * p / rho);
-
-  // p = amrex::max(p, parm.smallp);
-  // if (std::isnan(cs) || cs < 0.0)
-  //   cs = std::sqrt(gamma * p / rho);
+  amrex::Real p, cs, gamma, wbar;
+  eos.REY2T(rho, ei, Y, T);
+  eos.RTY2P(rho, T, Y, p);
+  eos.Y2WBAR(Y, wbar);
+  eos.RTY2Cs(rho, T, Y, cs);
+  eos.RTY2G(rho, T, Y, gamma);
 
   q(i, j, k, QRHO) = rho;
   AMREX_D_TERM(q(i, j, k, QU) = ux;, q(i, j, k, QV) = uy;, q(i, j, k, QW) = uz;);
@@ -89,24 +57,26 @@ cns_ctoprim(int i, int j, int k, int ns, amrex::Array4<amrex::Real const> const&
   q(i, j, k, QTEMP) = T;
   q(i, j, k, QWBAR) = wbar;
 
-  // // Monitor problem cell
+#ifdef MONITOR_PROBLEM_CELL
+  // Monitor problem cell
   // std::ostringstream ss;
   std::ostream& ss = std::cout;
 
-  if ((T <= 0.0) || amrex::isnan(cs) || amrex::isnan(ux) || 
-      (rho <= 0.0) || (p <= 0.0)) {
-      ss << "@" << i << "," << j << "," << k << ": ns=" << ns << ": rho=" << rho
-      << " T=" << T << " p=" << p << " cs=" << cs << " gamma=" << gamma
-      << " u=" << ux << " rhoE=" << u(i,j,k,ns+UEDEN) << " ei=" << ei << '\n';
-      for (int n = 0; n < NUM_SPECIES; n++) {
-          ss << " rhoY" << n << "=" << u(i,j,k,ns+UFS+n) << " ";
-      }
-      ss << '\n';
+  if ((T <= 0.0) || amrex::isnan(cs) || amrex::isnan(ux) || (rho <= 0.0) ||
+      (p <= 0.0)) {
+    ss << "cns_ctoprim @" << i << "," << j << "," << k << "(ns=" << ns
+       << "): rho=" << rho << " T=" << u(i, j, k, ns + UTEMP) << "/" << T
+       << " p=" << p << " cs=" << cs << " gamma=" << gamma << " u=" << ux
+       << " rhoE=" << u(i, j, k, ns + UEDEN) << " ei=" << ei << '\n';
+    for (int n = 0; n < NUM_SPECIES; ++n) {
+      ss << " rhoY" << n << "=" << u(i, j, k, ns + UFS + n);
+    }
+    ss << '\n';
 
-      // amrex::Abort();
-
-  //     BL_BACKTRACE_PUSH(ss.str()); // PUSH takes std::string
+    amrex::Abort();
+    // BL_BACKTRACE_PUSH(ss.str()); // PUSH takes std::string
   }
+#endif
 }
 
 /**
@@ -184,12 +154,11 @@ cns_ctochar(int i, int j, int k, int dir, amrex::Array4<const amrex::Real> const
  * @param[out] u    unpacked (normal) velocity.
  * @param[out] p    unpacked pressure.
  * @param sys   sos system (0) or gamma system (1).
- * @param parm  parameters and constants (see parm.H).
  */
-AMREX_GPU_DEVICE AMREX_FORCE_INLINE void cns_unpackchar(
-  const amrex::Real w1, const amrex::Real w2, const amrex::Real w3,
-  const amrex::Real c, const amrex::Real /*r*/, const amrex::Real gamma,
-  amrex::Real& rho, amrex::Real& u, amrex::Real& p, const int sys, Parm const& parm)
+AMREX_GPU_DEVICE AMREX_FORCE_INLINE void
+cns_unpackchar(const amrex::Real w1, const amrex::Real w2, const amrex::Real w3,
+               const amrex::Real c, const amrex::Real /*r*/, const amrex::Real gamma,
+               amrex::Real& rho, amrex::Real& u, amrex::Real& p, const int sys)
 {
   if (sys == 0) { // speed of sound system
     rho = w1 + (w2 + w3) / c;
@@ -225,9 +194,20 @@ cns_div(int i, int j, int k, int n, amrex::Array4<amrex::Real> const& dsdt,
                                   +dxinv[1] * (fy(i, j, k, n) - fy(i, j + 1, k, n)),
                                   +dxinv[2] * (fz(i, j, k, n) - fz(i, j, k + 1, n)));
 
+#ifdef MONITOR_PROBLEM_CELL
   // Monitor problem cell
-  // if (isnan(dsdt(i, j, k, n)))
-  //   std::cout << "div(" << i << "," << j << "," << k << ") is nan" << std::endl;
+  if (isnan(dsdt(i, j, k, n))) {
+    std::cout << "div(" << i << "," << j << "," << k << "," << n << ") is nan\n";
+    std::cout << "fx=" << fx(i, j, k, n) << " " << fx(i + 1, j, k, n) << '\n';
+#if AMREX_SPACEDIM > 1
+    std::cout << "fy=" << fy(i, j, k, n) << " " << fy(i, j + 1, k, n) << '\n';
+#endif
+#if AMREX_SPACEDIM == 3
+    std::cout << "fz=" << fz(i, j, k, n) << " " << fz(i, j, k + 1, n) << '\n';
+#endif
+    amrex::Abort();
+  }
+#endif
 }
 
 /**
@@ -237,19 +217,25 @@ cns_div(int i, int j, int k, int n, amrex::Array4<amrex::Real> const& dsdt,
  * @param[in] q Primitive variables.
  * @param[out] f Flux function.
  */
-AMREX_GPU_DEVICE AMREX_FORCE_INLINE void cns_flux(
-    amrex::IntVect iv, int dir, amrex::Array4<const amrex::Real> const &q,
-    amrex::Real f[NVAR]) noexcept {
+AMREX_GPU_DEVICE AMREX_FORCE_INLINE void
+cns_flux(amrex::IntVect iv, int dir, amrex::Array4<const amrex::Real> const& q,
+         amrex::Real f[NVAR]) noexcept
+{
   using amrex::Real;
   const int QUN = QU + dir;
 
   f[URHO] = q(iv, QRHO) * q(iv, QUN);
-  f[UMX] =
-      q(iv, QRHO) * q(iv, QU) * q(iv, QUN) + (dir == 0 ? q(iv, QPRES) : 0.0);
-  f[UMY] =
-      q(iv, QRHO) * q(iv, QV) * q(iv, QUN) + (dir == 1 ? q(iv, QPRES) : 0.0);
-  f[UMZ] =
-      q(iv, QRHO) * q(iv, QW) * q(iv, QUN) + (dir == 2 ? q(iv, QPRES) : 0.0);
+  f[UMX] = q(iv, QRHO) * q(iv, QU) * q(iv, QUN) + (dir == 0 ? q(iv, QPRES) : 0.0);
+  if constexpr (amrex::SpaceDim > 1) {
+    f[UMY] = q(iv, QRHO) * q(iv, QV) * q(iv, QUN) + (dir == 1 ? q(iv, QPRES) : 0.0);
+  } else {
+    f[UMY] = 0.0;
+  }
+  if constexpr (amrex::SpaceDim == 3) {
+    f[UMZ] = q(iv, QRHO) * q(iv, QW) * q(iv, QUN) + (dir == 2 ? q(iv, QPRES) : 0.0);
+  } else {
+    f[UMZ] = 0.0;
+  }
   Real ret =
     q(iv, QRHO) * (q(iv, QEINT) +
                    0.5 * (AMREX_D_TERM(q(iv, QU) * q(iv, QU), +q(iv, QV) * q(iv, QV),
@@ -261,8 +247,8 @@ AMREX_GPU_DEVICE AMREX_FORCE_INLINE void cns_flux(
   f[UTEMP] = 0.0;
 }
 
-/// \brief Original Riemann solver in CNS example (not used)
-AMREX_GPU_DEVICE inline void riemann(
+/// \brief Original Riemann solver in CNS example (Colella & Glaz)
+AMREX_GPU_DEVICE inline void colella_glaz(
   const amrex::Real rl, const amrex::Real ul, const amrex::Real ut1l,
   const amrex::Real ut2l, const amrex::Real pl, const amrex::Real cl,
   const amrex::Real /*el*/, const amrex::Real* /*yl[NUM_SPECIES]*/,
@@ -270,14 +256,14 @@ AMREX_GPU_DEVICE inline void riemann(
   const amrex::Real ut2r, const amrex::Real pr, const amrex::Real cr,
   const amrex::Real /*er*/, const amrex::Real* /*yr[NUM_SPECIES]*/,
   amrex::Real& flxrho, amrex::Real& flxu, amrex::Real& flxut, amrex::Real& flxutt,
-  amrex::Real& flxe, amrex::Real flxy[NUM_SPECIES], Parm parm) noexcept
+  amrex::Real& flxe, amrex::Real flxy[NUM_SPECIES]) noexcept
 {
   using amrex::Real;
 
   constexpr Real weakwv = Real(1.e-3);
   constexpr Real small = Real(1.e-6);
   constexpr Real gamma = Real(1.4);
-  Real smallp = parm.smallp;
+  Real smallp = CNSConstants::smallp;
 
   Real wl = cl;
   Real wr = cr;
@@ -412,7 +398,6 @@ AMREX_GPU_DEVICE inline void riemann(
  * @param[out] flxu,flxut,flxutt  output momentum fluxes.
  * @param[out] flxrhoe output total energy fluxes.
  * @param[out] flxrhoy output mass fraction fluxes.
- * @param parm  parameters and constants (see parm.H).
  */
 AMREX_GPU_DEVICE AMREX_FORCE_INLINE void hllc(
   const amrex::Real rl,
@@ -423,24 +408,18 @@ AMREX_GPU_DEVICE AMREX_FORCE_INLINE void hllc(
   const amrex::Real pr, const amrex::Real cr, const amrex::Real er,
   amrex::Real yr[NUM_SPECIES], amrex::Real& flxrho,
   AMREX_D_DECL(amrex::Real& flxu, amrex::Real& flxut, amrex::Real& flxutt),
-  amrex::Real& flxrhoe, amrex::Real flxrhoy[NUM_SPECIES], Parm const& parm) noexcept
+  amrex::Real& flxrhoe, amrex::Real flxrhoy[NUM_SPECIES]) noexcept
 {
   using amrex::Real;
 
   // Estimate wave speeds
-  // Arithmetic average (Davis), this alone won't work!
+  // Arithmetic average (Davis)
   Real sl = amrex::min(ul - cl, ur - cr);
   Real sr = amrex::max(ul + cl, ur + cr);
   // Roe-average (Einfeldt's HLLE)
   Real rp = sqrt(rr / rl);
   Real uroe = (ul + ur * rp) / (1. + rp);
-  // Real croe = (cl * cl + cr * cr * rp) / (1. + rp) +
-  //             0.5 * rp / (1. + rp) / (1. + rp) //(sqrt(rl)+sqrt(rr))
-  //               *
-  //               (AMREX_D_TERM((ul - ur) * (ul - ur), +(ut1l - ut1r) * (ut1l - ut1r),
-  //                             +(ut2l - ut2r) * (ut2l - ut2r)));
-  // croe = sqrt(croe);
-  Real croe = (cl + cr * rp) / (1. + rp); // a more standard averaging
+  Real croe = (cl + cr * rp) / (1. + rp);
   sl = amrex::min(sl, uroe - croe);
   sr = amrex::max(sr, uroe + croe);
 
@@ -511,14 +490,13 @@ AMREX_GPU_DEVICE AMREX_FORCE_INLINE void hllc(
  * @param dir           direction, 0:x, 1:y, 2:z.
  * @param[out] adv_flx  output hyperbolic fluxes.
  * @param[out] p_flx    output separately pressure and energy fluxes.
- * @param parm          parameters and constants (@see Parm).
  */
 AMREX_GPU_DEVICE AMREX_FORCE_INLINE void cns_riemann(
   int i, int j, int k, int dir, amrex::Array4<amrex::Real> const& adv_flx,
   //  amrex::Array4<amrex::Real> const& /*p_flx*/,
   amrex::Array4<const amrex::Real> const& q, amrex::Array4<amrex::Real> const& wl,
-  amrex::Array4<amrex::Real> const& wr, const int sys, const bool recon_char_var,
-  Parm const& parm) noexcept
+  amrex::Array4<amrex::Real> const& wr, const int sys,
+  const bool recon_char_var) noexcept
 {
   using amrex::Real;
 
@@ -552,8 +530,8 @@ AMREX_GPU_DEVICE AMREX_FORCE_INLINE void cns_riemann(
   auto eos = pele::physics::PhysicsType::eos();
 
   if (recon_char_var &&
-      (!isgreater(wl(iv, WTHER), 0.0) ||
-       !isgreater(wr(iv, WTHER), 0.0))) { // isgreater() returns false with nan
+      (!std::isgreater(wl(iv, WTHER), 0.0) ||
+       !std::isgreater(wr(iv, WTHER), 0.0))) { // isgreater() returns false with nan
     // Limit reconstructed thermodynamic variable
     wl(iv, WTHER) = (sys == 0) ? q(iv - iv_dir, QC) : q(iv - iv_dir, QG);
     wr(iv, WTHER) = (sys == 0) ? q(iv, QC) : q(iv, QG);
@@ -571,14 +549,14 @@ AMREX_GPU_DEVICE AMREX_FORCE_INLINE void cns_riemann(
     yl[n] = amrex::max<Real>(0.0, wl(iv, WY + n));
     sumY += yl[n];
   }
-  // if (std::abs(sumY - 1.0) > parm.smally) {
+  // if (std::abs(sumY - 1.0) > CNSConstants::smally) {
   Real invsumY = 1.0 / sumY;
   for (int n = 0; n < NUM_SPECIES; ++n) { yl[n] *= invsumY; }
   // }
   AMREX_D_TERM(, ut1l = wl(iv, WUT);, ut2l = wl(iv, WUT + 1););
 
   cns_unpackchar(wl(iv, WRHO), wl(iv, WACO), wl(iv, WACO + 1), cl, r, g, rl, ul, pl,
-                 sys, parm);
+                 sys);
 
   // Convert wr to qr
   g = (recon_char_var && sys == 1) ? wr(iv, WTHER) : q(iv, QG);
@@ -592,28 +570,25 @@ AMREX_GPU_DEVICE AMREX_FORCE_INLINE void cns_riemann(
     yr[n] = amrex::max<Real>(0.0, wr(iv, WY + n));
     sumY += yr[n];
   }
-  // if (std::abs(sumY - 1.0) > parm.smally) {
+  // if (std::abs(sumY - 1.0) > CNSConstants::smally) {
   invsumY = 1.0 / sumY;
   for (int n = 0; n < NUM_SPECIES; ++n) { yr[n] *= invsumY; }
   // }
   AMREX_D_TERM(, ut1r = wr(iv, WUT);, ut2r = wr(iv, WUT + 1););
 
   cns_unpackchar(wr(iv, WRHO), wr(iv, WACO), wr(iv, WACO + 1), cr, r, g, rr, ur, pr,
-                 sys, parm);
+                 sys);
 
-  if (!isgreater(rl, 0.0) || !isgreater(pl, 0.0) || 
-      !isgreater(rr, 0.0) || !isgreater(pr, 0.0) || 
-      isnan(AMREX_D_TERM(ul+ur, +ut1l+ut1r, +ut2l+ut2r)) ) { // isgreater() returns false with nan
-    // Revert to piecewise linear (Godunov) reconstruction
-    // SNM
-    // std::cout << "face " << i << "," << j << "," << k << " reverted to linear recon" << '\n';
-
+  if (!std::isgreater(rl, 0.0) || !std::isgreater(pl, 0.0) ||
+      !std::isgreater(rr, 0.0) || !std::isgreater(pr, 0.0) ||
+      isnan(AMREX_D_TERM(ul + ur, +ut1l + ut1r, +ut2l + ut2r))) {
+    // Revert to piecewise linear (Godunov) recon if any value is non-physical
     rl = q(iv - iv_dir, QRHO);
     AMREX_D_TERM(ul = q(iv - iv_dir, QUN);, ut1l = q(iv - iv_dir, QUT);
                  , ut2l = q(iv - iv_dir, QUTT););
     pl = q(iv - iv_dir, QPRES);
-    for (int n = 0; n < NUM_SPECIES; ++n) { yl[n] = q(iv - iv_dir, QFS + n); }    
-  
+    for (int n = 0; n < NUM_SPECIES; ++n) { yl[n] = q(iv - iv_dir, QFS + n); }
+
     rr = q(iv, QRHO);
     AMREX_D_TERM(ur = q(iv, QUN);, ut1r = q(iv, QUT);, ut2r = q(iv, QUTT););
     pr = q(iv, QPRES);
@@ -630,34 +605,44 @@ AMREX_GPU_DEVICE AMREX_FORCE_INLINE void cns_riemann(
   eos.RPY2Cs(rr, pr, yr, cr);
 
   if (isnan(cl) || isnan(cr)) {
-    std::cout << "l c=" << cl << "->" << q(iv-iv_dir, QC) << " p=" << pl << " r=" << rl << " u=" << ul << " yl=";
-    for (int n = 0; n < NUM_SPECIES; ++n) std::cout << yl[n] << " ";
-    std::cout << '\n'
-              << "r c=" << "->" << q(iv, QC) << cr << " p=" << pr << " r=" << rr << " u=" << ur << " yr=";
-    for (int n = 0; n < NUM_SPECIES; ++n) std::cout << yr[n] << " ";    
-    std::cout << '\n';
-    std::cout << "qc=" << q(iv-iv_dir, QC) << "," << q(iv, QC) << " qg=" << q(iv-iv_dir, QG) << "," << q(iv, QG)<< '\n';
-
-    cl = q(iv-iv_dir, QC);
+    cl = q(iv - iv_dir, QC);
     cr = q(iv, QC);
   }
 
   Real ry_flx[NUM_SPECIES] = {0.0};
-
   hllc(rl, AMREX_D_DECL(ul, ut1l, ut2l), pl, cl, el, yl, rr,
        AMREX_D_DECL(ur, ut1r, ut2r), pr, cr, er, yr, adv_flx(i, j, k, URHO),
        AMREX_D_DECL(adv_flx(i, j, k, UMN), adv_flx(i, j, k, UMT),
                     adv_flx(i, j, k, UMTT)),
-       adv_flx(i, j, k, UEDEN), ry_flx, parm);
-  // riemann(rl, ul, ut1l, 0.0, pl, cl, el, yl,
-  //      rr, ur, ut1r, 0.0, pr, cr, er, yr,
-  //      adv_flx(i,j,k,URHO), adv_flx(i,j,k,UMN), adv_flx(i,j,k,UMT), adv_flx(i,j,k,UMTT),
-  //      adv_flx(i,j,k,UEDEN), ry_flx, parm);
+       adv_flx(i, j, k, UEDEN), ry_flx);
+  // colella_glaz(rl, ul, ut1l, 0.0, pl, cl, el, yl, rr, ur, ut1r, 0.0, pr, cr, er,
+  // yr,
+  //              adv_flx(i, j, k, URHO), adv_flx(i, j, k, UMN), adv_flx(i, j, k,
+  //              UMT), adv_flx(i, j, k, UMTT), adv_flx(i, j, k, UEDEN), ry_flx);
 
   for (int n = 0; n < NUM_SPECIES; ++n) { adv_flx(i, j, k, UFS + n) = ry_flx[n]; }
 
-  // Add higher order derivatives to achieve real high order
-  // Ref: https://doi.org/10.1137/17M115757X
+#ifdef MONITOR_PROBLEM_CELL
+  // Monitor problem cell
+  for (int n = 0; n < NVAR; ++n) {
+    if (isnan(adv_flx(i, j, k, n))) {
+      std::cout << "flx_" << dir << "(" << i << "," << j << "," << k << "," << n
+                << ") is nan\n";
+    }
+  }
+#endif
+}
+
+// Add higher order derivatives correction term to achieve real high order
+// Ref: Alternative finite difference WENO https://doi.org/10.1137/17M115757X
+AMREX_GPU_DEVICE AMREX_FORCE_INLINE void cns_afd_correction(
+  int i, int j, int k, int dir, amrex::Array4<const amrex::Real> const& q,
+  amrex::Array4<amrex::Real> const& adv_flx) noexcept
+{
+  using amrex::Real;
+  const amrex::IntVect iv(AMREX_D_DECL(i, j, k));
+  const amrex::IntVect iv_dir = amrex::IntVect::TheDimensionVector(dir);
+
   constexpr int ng = 3;
   Real f[2 * ng][NVAR];
   for (int m = 0; m < 2 * ng; ++m) {
@@ -666,10 +651,12 @@ AMREX_GPU_DEVICE AMREX_FORCE_INLINE void cns_riemann(
 
   for (int n = 0; n < NVAR; ++n) {
     adv_flx(i, j, k, n) +=
-        -1.0 / 1152.0 * (-5.0 * f[0][n] + 39.0 * f[1][n] - 34.0 * f[2][n]
-                         - 34.0 * f[3][n] + 39.0 * f[4][n] - 5.0 * f[5][n])  // dx^2*fxx/24
-        + 7.0 / 11520.0 * (f[0][n] - 3.0 * f[1][n] + 2.0 * f[2][n] 
-                           + 2.0 * f[3][n] - 3.0 * f[4][n] + f[5][n]);  // dx^4*fxxxx*7/5760
+      -1.0 / 1152.0 *
+        (-5.0 * f[0][n] + 39.0 * f[1][n] - 34.0 * f[2][n] - 34.0 * f[3][n] +
+         39.0 * f[4][n] - 5.0 * f[5][n]) // dx^2*fxx/24
+      + 7.0 / 11520.0 *
+          (f[0][n] - 3.0 * f[1][n] + 2.0 * f[2][n] + 2.0 * f[3][n] - 3.0 * f[4][n] +
+           f[5][n]); // dx^4*fxxxx*7/5760
   }
 }
 

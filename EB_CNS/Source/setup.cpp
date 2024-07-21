@@ -7,8 +7,6 @@
 
 using namespace amrex;
 
-Parm* CNS::h_parm = nullptr;
-Parm* CNS::d_parm = nullptr;
 ProbParm* CNS::h_prob_parm = nullptr;
 ProbParm* CNS::d_prob_parm = nullptr;
 #ifdef USE_PROB_PARM_HOST
@@ -91,13 +89,10 @@ static void set_react_src_bc(BCRec& bc, const BCRec& phys_bc)
 
 void CNS::variableSetUp()
 {
-  h_parm = new Parm{};          // This lives on host
   h_prob_parm = new ProbParm{}; // This lives on host
 #ifdef USE_PROB_PARM_HOST
   prob_parm_host = new ProbParmHost{}; // This lives on host
 #endif
-  d_parm =
-    (Parm*)The_Arena()->alloc(sizeof(Parm)); // static_cast, This lives on device
   d_prob_parm =
     (ProbParm*)The_Arena()->alloc(sizeof(ProbParm)); // This lives on device
 
@@ -106,25 +101,26 @@ void CNS::variableSetUp()
 
   read_params();
 
-// - pc_interp       : Piecewise constant interpolation.
-// - cell_bilinear_interp: Linear interpolation for cell-centered data. No 3D.
-// - quadratic_interp: Quadratic polynomial interpolation. No 1D.
-// - lincc_interp    : Dimension-by-dimension linear interpolation with MC limiter.
-//   (PeleC default)   For multi-component data, the strictest limiter is used for
-//                     all components. Conservative for both Cartesian and
-//                     curvilinear coordinates.
-// - cell_cons_interp: Similar to lincc_interp, but 1) the interpolations for each
-//   (CNS default)     component are independent of each other; 2) after the
-//                     dimension-by-dimension linear interpolation with limiting,
-//                     there is a further limiting to ensure no new min or max are
-//                     created in fine cells.
-// - protected_interp: Similar to lincc_interp. Additionally, it has a  function
-//                     one can call to ensure no values are negative.
-// - quartic_interp  : Quartic polynomial conservative interpolation.
+  // - pc_interp       : Piecewise constant interpolation.
+  // - cell_bilinear_interp: Linear interpolation for cell-centered data. No 3D.
+  // - quadratic_interp: Quadratic polynomial interpolation. No 1D.
+  // - lincc_interp    : Dimension-by-dimension linear interpolation with MC limiter.
+  //   (PeleC default)   For multi-component data, the strictest limiter is used for
+  //                     all components. Conservative for both Cartesian and
+  //                     curvilinear coordinates.
+  // - cell_cons_interp: Similar to lincc_interp, but 1) the interpolations for each
+  //   (CNS default)     component are independent of each other; 2) after the
+  //                     dimension-by-dimension linear interpolation with limiting,
+  //                     there is a further limiting to ensure no new min or max are
+  //                     created in fine cells.
+  // - protected_interp: Similar to lincc_interp. Additionally, it has a  function
+  //                     one can call to ensure no values are negative.
+  // - quartic_interp  : Quartic polynomial conservative interpolation.
+  Interpolater* interp;
 #if CNS_USE_EB
-  EBMFCellConsLinInterp* interp = &eb_mf_cell_cons_interp;
+  interp = &eb_lincc_interp;
+  // interp = &eb_cell_cons_interp;
 #else
-  InterpBase* interp;
   if (amr_interp_order == 1) {
     interp = &pc_interp;
   } else if (amr_interp_order == 3) {
@@ -133,8 +129,8 @@ void CNS::variableSetUp()
     interp = &quartic_interp;
   } else {
     // default: second-order limited interp
-    interp = &mf_cell_cons_interp;
-    // what is the difference between cell_cons_interp and mf_cell_cons_interp?
+    interp = &lincc_interp;
+    // interp = &cell_cons_interp;
   }
 #endif
 
@@ -304,7 +300,7 @@ void CNS::variableSetUp()
   desc_lst.setComponent(Cost_Type, 0, "Cost", bc, bndryfunc);
 
   // SNM: commeted
-  //assert(num_state_data_types == desc_lst.size());
+  // assert(num_state_data_types == desc_lst.size());
 
   Print() << desc_lst.size() << " Data Types:" << std::endl;
   for (int typ = 0; typ < desc_lst.size(); typ++) {
@@ -317,43 +313,26 @@ void CNS::variableSetUp()
   StateDescriptor::setBndryFuncThreadSafety(true);
 
   // DEFINE DERIVED QUANTITIES (Derive from MEAN field)
-  // Temperature
-  // derive_lst.add("temp", IndexType::TheCellType(), 1, cns_dertemp,
-  //                DeriveRec::TheSameBox);
-  // derive_lst.addComponent("temp", desc_lst, State_Type, URHO, NVAR);
-
   // Pressure
   derive_lst.add("pressure", IndexType::TheCellType(), 1, cns_derpres,
                  DeriveRec::TheSameBox);
-  derive_lst.addComponent("pressure", desc_lst, State_Type, URHO, NVAR);
+  derive_lst.addComponent("pressure", desc_lst, State_Type, 0, NVAR);
 
   // Internal energy
   derive_lst.add("eint", IndexType::TheCellType(), 1, cns_dereint,
                  DeriveRec::TheSameBox);
-  derive_lst.addComponent("eint", desc_lst, State_Type, URHO, NVAR);
+  derive_lst.addComponent("eint", desc_lst, State_Type, 0, NVAR);
 
   // Velocities
-  derive_lst.add("x_velocity", IndexType::TheCellType(), 1, cns_dervel,
-                 DeriveRec::TheSameBox);
-  derive_lst.addComponent("x_velocity", desc_lst, State_Type, URHO, 1);
-  derive_lst.addComponent("x_velocity", desc_lst, State_Type, UMX, 1);
-#if (AMREX_SPACEDIM >= 2)
-  derive_lst.add("y_velocity", IndexType::TheCellType(), 1, cns_dervel,
-                 DeriveRec::TheSameBox);
-  derive_lst.addComponent("y_velocity", desc_lst, State_Type, URHO, 1);
-  derive_lst.addComponent("y_velocity", desc_lst, State_Type, UMY, 1);
-#endif
-#if (AMREX_SPACEDIM == 3)
-  derive_lst.add("z_velocity", IndexType::TheCellType(), 1, cns_dervel,
-                 DeriveRec::TheSameBox);
-  derive_lst.addComponent("z_velocity", desc_lst, State_Type, URHO, 1);
-  derive_lst.addComponent("z_velocity", desc_lst, State_Type, UMZ, 1);
-#endif
+  derive_lst.add("velocity", IndexType::TheCellType(), amrex::SpaceDim,
+                 {AMREX_D_DECL("x_velocity", "y_velocity", "z_velocity")},
+                 cns_dervel, DeriveRec::TheSameBox);
+  derive_lst.addComponent("velocity", desc_lst, State_Type, 0, NVAR);
 
   // Mach number
   derive_lst.add("MachNumber", IndexType::TheCellType(), 1, cns_dermachnumber,
                  DeriveRec::TheSameBox);
-  derive_lst.addComponent("MachNumber", desc_lst, State_Type, URHO, NVAR);
+  derive_lst.addComponent("MachNumber", desc_lst, State_Type, 0, NVAR);
 
   // Note: All GrowBoxByOne derived quantities need all NVAR states because bcnormal
   // may need them (e.g. isothermal wall)
@@ -361,20 +340,20 @@ void CNS::variableSetUp()
   // Vorticity
   derive_lst.add("magvort", IndexType::TheCellType(), 1, cns_dermagvort,
                  DeriveRec::GrowBoxByOne);
-  derive_lst.addComponent("magvort", desc_lst, State_Type, URHO, NVAR);
+  derive_lst.addComponent("magvort", desc_lst, State_Type, 0, NVAR);
   // Numerical schlieren
   derive_lst.add("divu", IndexType::TheCellType(), 1, cns_derdivu,
                  DeriveRec::GrowBoxByOne);
-  derive_lst.addComponent("divu", desc_lst, State_Type, URHO, NVAR);
+  derive_lst.addComponent("divu", desc_lst, State_Type, 0, NVAR);
 
   derive_lst.add("divrho", IndexType::TheCellType(), 1, cns_derdivrho,
                  DeriveRec::GrowBoxByOne);
-  derive_lst.addComponent("divrho", desc_lst, State_Type, URHO, NVAR);
+  derive_lst.addComponent("divrho", desc_lst, State_Type, 0, NVAR);
 
   derive_lst.add("shock_sensor", IndexType::TheCellType(), 1, cns_dershocksensor,
                  DeriveRec::GrowBoxByOne);
-  derive_lst.addComponent("shock_sensor", desc_lst, State_Type, URHO, NVAR);
-  
+  derive_lst.addComponent("shock_sensor", desc_lst, State_Type, 0, NVAR);
+
   // External source term
   // derive_lst.add("ext_src", IndexType::TheCellType(), 1,
   //                CNS::cns_derextsrc, DeriveRec::TheSameBox);
@@ -383,11 +362,11 @@ void CNS::variableSetUp()
   // Cp and Cv
   derive_lst.add("cp", IndexType::TheCellType(), 1, cns_dercp,
                  DeriveRec::TheSameBox);
-  derive_lst.addComponent("cp", desc_lst, State_Type, URHO, NVAR);
+  derive_lst.addComponent("cp", desc_lst, State_Type, 0, NVAR);
 
   derive_lst.add("cv", IndexType::TheCellType(), 1, cns_dercv,
                  DeriveRec::TheSameBox);
-  derive_lst.addComponent("cv", desc_lst, State_Type, URHO, NVAR);
+  derive_lst.addComponent("cv", desc_lst, State_Type, 0, NVAR);
 
   // Transport coefficients
   Vector<std::string> trans_coef_names(NUM_SPECIES + 3);
@@ -400,7 +379,7 @@ void CNS::variableSetUp()
 
   derive_lst.add("transport_coef", IndexType::TheCellType(), NUM_SPECIES + 3,
                  trans_coef_names, CNS::cns_dertranscoef, DeriveRec::TheSameBox);
-  derive_lst.addComponent("transport_coef", desc_lst, State_Type, URHO, NVAR);
+  derive_lst.addComponent("transport_coef", desc_lst, State_Type, 0, NVAR);
 
   // Derived mass and mole fractions (for all fields)
   amrex::Vector<std::string> massfrac_names((NUM_FIELD + 1) * NUM_SPECIES);
@@ -432,17 +411,17 @@ void CNS::variableSetUp()
   derive_lst.addComponent("reynolds_stress", desc_lst, State_Type, 0, LEN_STATE);
 
   amrex::Vector<std::string> vary_names(NUM_SPECIES);
-  for (int i = 0; i < NUM_SPECIES; i++) {
-    vary_names[i] = "var_Y_" + spec_names[i];
-  }
-  derive_lst.add("var_Y", IndexType::TheCellType(), NUM_SPECIES,
-                 vary_names, cns_dervary, DeriveRec::TheSameBox);
+  for (int i = 0; i < NUM_SPECIES; i++) { vary_names[i] = "var_Y_" + spec_names[i]; }
+  derive_lst.add("var_Y", IndexType::TheCellType(), NUM_SPECIES, vary_names,
+                 cns_dervary, DeriveRec::TheSameBox);
   derive_lst.addComponent("var_Y", desc_lst, State_Type, 0, LEN_STATE);
 
-  derive_lst.add("var_p", IndexType::TheCellType(), 1, cns_dervarp, DeriveRec::TheSameBox);
+  derive_lst.add("var_p", IndexType::TheCellType(), 1, cns_dervarp,
+                 DeriveRec::TheSameBox);
   derive_lst.addComponent("var_p", desc_lst, State_Type, 0, LEN_STATE);
 
-  derive_lst.add("var_T", IndexType::TheCellType(), 1, cns_dervarT, DeriveRec::TheSameBox);
+  derive_lst.add("var_T", IndexType::TheCellType(), 1, cns_dervarT,
+                 DeriveRec::TheSameBox);
   derive_lst.addComponent("var_T", desc_lst, State_Type, 0, LEN_STATE);
 #endif
   // //
@@ -512,9 +491,7 @@ void CNS::variableSetUp()
 
 void CNS::variableCleanUp()
 {
-  delete h_parm;
   delete h_prob_parm;
-  The_Arena()->free(d_parm);
   The_Arena()->free(d_prob_parm);
 #ifdef USE_PROB_PARM_HOST
   delete prob_parm_host;

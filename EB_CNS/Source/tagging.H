@@ -80,14 +80,4 @@ cns_tag_range(int i, int j, int k, amrex::Array4<char> const& tag,
   }
 }
 
-// TODO
-// AMREX_GPU_DEVICE AMREX_FORCE_INLINE void
-// cns_shock_sensor (int i, int j, int k,
-//                   amrex::Array4<char> const& tag,
-//                   amrex::Array4<amrex::Real const> const& s,
-//                   amrex::Real lo_threshold, amrex::Real hi_threshold, char tagval)
-//                   noexcept
-// {
-// }
-
 #endif

@@ -59,10 +59,9 @@ void CNS::fill_ext_src(int i, int j, int k, amrex::Real /*time*/,
                        amrex::GeometryData const& /*geomdata*/,
                        amrex::Array4<const amrex::Real> const& state,
                        amrex::Array4<amrex::Real> const& ext_src,
-                       Parm const& /*parm*/, ProbParm const& /*prob_parm*/)
+                       ProbParm const& /*prob_parm*/)
 {
 }
-
 
 void CNS::full_prob_post_timestep(int /*iteration*/)
 {
@@ -87,7 +86,9 @@ void CNS::full_prob_post_timestep(int /*iteration*/)
       amrex::iMultiFab ifine_mask(cns_lev.grids, cns_lev.dmap, 1, 0);
       if (lev < parent->finestLevel()) {
         // mask out fine covered cells, do not sum
-        ifine_mask = makeFineMask(cns_lev.grids, cns_lev.dmap, parent->boxArray(lev + 1), cns_lev.fine_ratio, 1, 0);
+        ifine_mask =
+          makeFineMask(cns_lev.grids, cns_lev.dmap, parent->boxArray(lev + 1),
+                       cns_lev.fine_ratio, 1, 0);
       } else {
         ifine_mask.setVal(1);
       }
@@ -104,9 +105,10 @@ void CNS::full_prob_post_timestep(int /*iteration*/)
       auto const& vortarrs = magvort.const_arrays();
 
       auto reduce_tuple = amrex::ParReduce(
-        TypeList<ReduceOpSum, ReduceOpSum, ReduceOpSum>{}, 
+        TypeList<ReduceOpSum, ReduceOpSum, ReduceOpSum>{},
         TypeList<Real, Real, Real>{}, S_new, IntVect(0),
-        [=] AMREX_GPU_DEVICE(int box_no, int i, int j, int k) -> GpuTuple<Real, Real, Real> {
+        [=] AMREX_GPU_DEVICE(int box_no, int i, int j,
+                             int k) -> GpuTuple<Real, Real, Real> {
           const amrex::Real rho = sarrs[box_no](i, j, k, URHO);
           const amrex::Real rhoinv = 1.0 / rho;
           const amrex::Real ux = sarrs[box_no](i, j, k, UMX) * rhoinv;
@@ -117,19 +119,24 @@ void CNS::full_prob_post_timestep(int /*iteration*/)
           const amrex::Real mvt = vortarrs[box_no](i, j, k);
 
           amrex::Real ke = mask * vol * 0.5 * rho * (ux * ux + uy * uy + uz * uz);
-          amrex::Real en = mask * vol * 0.5 * rho * (mvt * mvt); // 0.5 * rho * omega^2
+          amrex::Real en =
+            mask * vol * 0.5 * rho * (mvt * mvt); // 0.5 * rho * omega^2
 
           amrex::Real ksgs = 0.0;
 #if NUM_FIELD > 1
           for (int nf = 1; nf <= NUM_FIELD; ++nf) {
             const amrex::Real rhof = sarrs[box_no](i, j, k, URHO + nf * NVAR);
             const amrex::Real rhofinv = 1.0 / rhof;
-            const amrex::Real ufx = sarrs[box_no](i, j, k, UMX + nf * NVAR) * rhofinv;
-            const amrex::Real ufy = sarrs[box_no](i, j, k, UMY + nf * NVAR) * rhofinv;
-            const amrex::Real ufz = sarrs[box_no](i, j, k, UMZ + nf * NVAR) * rhofinv;
+            const amrex::Real ufx =
+              sarrs[box_no](i, j, k, UMX + nf * NVAR) * rhofinv;
+            const amrex::Real ufy =
+              sarrs[box_no](i, j, k, UMY + nf * NVAR) * rhofinv;
+            const amrex::Real ufz =
+              sarrs[box_no](i, j, k, UMZ + nf * NVAR) * rhofinv;
 
-            ksgs += mask * vol * 0.5 * rhof * ((ufx - ux) * (ufx - ux) 
-                      + (ufy - uy) * (ufy - uy) + (ufz - uz) * (ufz - uz));
+            ksgs += mask * vol * 0.5 * rhof *
+                    ((ufx - ux) * (ufx - ux) + (ufy - uy) * (ufy - uy) +
+                     (ufz - uz) * (ufz - uz));
           }
           ksgs /= amrex::Real(NUM_FIELD);
 #endif
@@ -151,7 +158,7 @@ void CNS::full_prob_post_timestep(int /*iteration*/)
 
     if (amrex::ParallelDescriptor::IOProcessor()) {
       amrex::Print() << "TIME = " << time << '\n'
-                     << " SUM KE        = " << kinetic_e 
+                     << " SUM KE        = " << kinetic_e
                      << " of which SGS = " << k_sgs << '\n'
                      << " SUM ENSTROPHY = " << enstrophy << '\n';
 
@@ -162,12 +169,11 @@ void CNS::full_prob_post_timestep(int /*iteration*/)
       const int datprecision = 6;
       data_log << std::setw(datwidth) << time;
       data_log << std::setw(datwidth) << std::setprecision(datprecision)
-                << kinetic_e;
+               << kinetic_e;
       data_log << std::setw(datwidth) << std::setprecision(datprecision)
-                << enstrophy;
-      data_log << std::setw(datwidth) << std::setprecision(datprecision)
-                << k_sgs;
-      data_log << std::endl;      
+               << enstrophy;
+      data_log << std::setw(datwidth) << std::setprecision(datprecision) << k_sgs;
+      data_log << std::endl;
     }
   }
 }

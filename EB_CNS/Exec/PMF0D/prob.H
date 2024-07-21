@@ -29,8 +29,7 @@
  */
 AMREX_GPU_DEVICE AMREX_FORCE_INLINE void
 prob_initdata(int i, int j, int k, amrex::Array4<amrex::Real> const& state,
-              amrex::GeometryData const& geomdata, Parm const& /*parm*/,
-              ProbParm const& prob_parm)
+              amrex::GeometryData const& geomdata, ProbParm const& prob_parm)
 {
   // Set states
   state(i, j, k, URHO) = prob_parm.rho;
@@ -76,9 +75,9 @@ AMREX_GPU_DEVICE AMREX_FORCE_INLINE void bcnormal(
  * @param prob_parm ProbParm data as defined in prob_parm.H and initialised in
  * amrex_probinit.
  */
-AMREX_GPU_DEVICE AMREX_FORCE_INLINE void prob_post_restart(
-  int i, int j, int k, amrex::Array4<amrex::Real> const& state,
-  amrex::GeometryData const& geomdata, Parm const& parm, ProbParm const& prob_parm)
+AMREX_GPU_DEVICE AMREX_FORCE_INLINE void
+prob_post_restart(int i, int j, int k, amrex::Array4<amrex::Real> const& state,
+                  amrex::GeometryData const& geomdata, ProbParm const& prob_parm)
 {
 }
 

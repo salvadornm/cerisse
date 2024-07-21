@@ -6,11 +6,6 @@
 
 #include "CNS.H"
 
-// void cns_dertemp(const amrex::Box& bx, amrex::FArrayBox& derfab, int dcomp,
-//                  int ncomp, const amrex::FArrayBox& datafab,
-//                  const amrex::Geometry& geomdata, amrex::Real time, const int* bcrec,
-//                  int level);
-
 void cns_derpres(const amrex::Box& bx, amrex::FArrayBox& derfab, int dcomp,
                  int ncomp, const amrex::FArrayBox& datafab,
                  const amrex::Geometry& geomdata, amrex::Real time, const int* bcrec,

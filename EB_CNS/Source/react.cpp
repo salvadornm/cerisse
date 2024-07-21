@@ -286,14 +286,14 @@ void CNS::react_state(Real time, Real dt, bool init_react)
             }
           });
         } // end fields loop
-      } // end EB not covered block
+      }   // end EB not covered block
 
       // Record runtime for load balancing
       amrex::Gpu::streamSynchronize();
       wt = (amrex::ParallelDescriptor::second() - wt) / bx.d_numPts();
       get_new_data(Cost_Type)[mfi].plus<amrex::RunOn::Device>(wt, bx);
     } // end mfi loop
-  } // end omp block
+  }   // end omp block
 
   if (Snew.nGrow() > 0) { Snew.FillBoundary(geom.periodicity()); }
 

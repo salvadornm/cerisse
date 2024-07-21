@@ -9,19 +9,12 @@
 // nz    => input resolution
 // data  <= output data
 // -----------------------------------------------------------
-void
-read_binary(
-  const std::string& iname,
-  const size_t nx,
-  const size_t ny,
-  const size_t nz,
-  const size_t ncol,
-  amrex::Vector<double>& data /*needs to be double*/)
+void read_binary(const std::string& iname, const size_t nx, const size_t ny,
+                 const size_t nz, const size_t ncol,
+                 amrex::Vector<double>& data /*needs to be double*/)
 {
   std::ifstream infile(iname, std::ios::in | std::ios::binary);
-  if (!infile.is_open()) {
-    amrex::Abort("Unable to open input file " + iname);
-  }
+  if (!infile.is_open()) { amrex::Abort("Unable to open input file " + iname); }
 
   for (size_t i = 0; i < nx * ny * nz * ncol; i++) {
     infile.read(reinterpret_cast<char*>(&data[i]), sizeof(data[i]));
@@ -38,19 +31,12 @@ read_binary(
 // nz    => input resolution
 // data  <= output data
 // -----------------------------------------------------------
-void
-read_csv(
-  const std::string& iname,
-  const size_t nx,
-  const size_t ny,
-  const size_t nz,
-  amrex::Vector<amrex::Real>& data)
+void read_csv(const std::string& iname, const size_t nx, const size_t ny,
+              const size_t nz, amrex::Vector<amrex::Real>& data)
 {
   std::ifstream infile(iname, std::ios::in);
   const std::string memfile = read_file(infile);
-  if (!infile.is_open()) {
-    amrex::Abort("Unable to open input file " + iname);
-  }
+  if (!infile.is_open()) { amrex::Abort("Unable to open input file " + iname); }
   infile.close();
   std::istringstream iss(memfile);
 
@@ -59,15 +45,13 @@ read_csv(
   std::string firstline;
   std::string line;
   std::getline(iss, firstline); // skip header
-  while (getline(iss, line)) {
-    ++nlines;
-  }
+  while (getline(iss, line)) { ++nlines; }
 
   // Quick sanity check
   if (nlines != nx * ny * nz) {
-    amrex::Abort(
-      "Number of lines in the input file (= " + std::to_string(nlines) +
-      ") does not match the input resolution (=" + std::to_string(nx) + ")");
+    amrex::Abort("Number of lines in the input file (= " + std::to_string(nlines) +
+                 ") does not match the input resolution (=" + std::to_string(nx) +
+                 ")");
   }
 
   // Read the data from the file

@@ -34,8 +34,7 @@ public:
  */
 AMREX_GPU_DEVICE AMREX_FORCE_INLINE void
 prob_initdata(int i, int j, int k, amrex::Array4<amrex::Real> const& state,
-              amrex::GeometryData const& geomdata, Parm const& /*parm*/,
-              ProbParm const& prob_parm)
+              amrex::GeometryData const& geomdata, ProbParm const& prob_parm)
 {
   // Geometry
   const amrex::Real* prob_lo = geomdata.ProbLo();
@@ -86,25 +85,25 @@ bcnormal(const amrex::Real x[AMREX_SPACEDIM], const amrex::Real s_int[LEN_STATE]
 {
 }
 
-AMREX_GPU_DEVICE AMREX_FORCE_INLINE void prob_post_restart(
-  int i, int j, int k, amrex::Array4<amrex::Real> const& state,
-  amrex::GeometryData const& geomdata, Parm const& parm, ProbParm const& prob_parm)
+AMREX_GPU_DEVICE AMREX_FORCE_INLINE void
+prob_post_restart(int i, int j, int k, amrex::Array4<amrex::Real> const& state,
+                  amrex::GeometryData const& geomdata, ProbParm const& prob_parm)
 {
 }
 
-AMREX_GPU_DEVICE AMREX_FORCE_INLINE void prob_post_timestep(
-  int i, int j, int k, const amrex::Real /*curtime*/, const amrex::Real dtlev,
-  amrex::Array4<amrex::Real> const& state,
-  amrex::Array4<const amrex::Real> const& reactions,
-  amrex::GeometryData const& /*geomdata*/, Parm const& /*parm*/, ProbParm const& pp)
+AMREX_GPU_DEVICE AMREX_FORCE_INLINE void
+prob_post_timestep(int i, int j, int k, const amrex::Real /*curtime*/,
+                   const amrex::Real dtlev, amrex::Array4<amrex::Real> const& state,
+                   amrex::Array4<const amrex::Real> const& reactions,
+                   amrex::GeometryData const& /*geomdata*/, ProbParm const& pp)
 {
 }
 
-AMREX_GPU_DEVICE AMREX_FORCE_INLINE void prob_tag_error(
-  int i, int j, int k, amrex::Array4<char> const& tagarr,
-  amrex::Array4<const amrex::Real> const& sarr, int /*level*/, char tagval,
-  const amrex::Real time, amrex::GeometryData const& geomdata, Parm const& /*parm*/,
-  ProbParm const& /*pp*/)
+AMREX_GPU_DEVICE AMREX_FORCE_INLINE void
+prob_tag_error(int i, int j, int k, amrex::Array4<char> const& tagarr,
+               amrex::Array4<const amrex::Real> const& sarr, int /*level*/,
+               char tagval, const amrex::Real time,
+               amrex::GeometryData const& geomdata, ProbParm const& /*pp*/)
 {
 }
 

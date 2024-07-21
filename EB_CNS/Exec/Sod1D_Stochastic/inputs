@@ -7,7 +7,7 @@ geometry.coord_sys   = 0  # 0 => cart, 1 => RZ  2=>spherical
 geometry.prob_lo     = 0.
 geometry.prob_hi     = 1.
 #amr.n_cell           = 64
-amr.n_cell = 512
+amr.n_cell = 128
 
 # >>>>>>>>>>>>> BC FLAGS <<<<<<<<<<<<<<<<
 # 0 = Interior            3 = Symmetry
@@ -20,13 +20,18 @@ cns.hi_bc = 2
 cns.do_visc  = 0
 cns.do_react = 0
 
-cns.recon_scheme = 4
+cns.recon_scheme = 5
+cns.do_psgs = 1
+cns.do_vpdf = 0
 
-cns.cfl = 0.1
+cns.cfl = 0.3
 cns.dt_cutoff = 5.e-20
 
 cns.v = 2
 amr.v = 1
+
+cns.char_sys = 0
+cns.recon_char_var = 1
 
 # LOAD BALANCE
 amr.loadbalance_with_workestimates = 1
@@ -53,15 +58,15 @@ amr.check_int       = 100        # number of timesteps between checkpoints
 
 # PLOTFILES
 amr.plot_files_output = 1
-amr.plot_file         = plt      # root name of plotfile
-amr.plot_int          = 100       # number of timesteps between plotfiles
-amr.derive_plot_vars  = temp pressure x_velocity MachNumber divrho divu magvort
+amr.plot_file         = vp      # root name of plotfile
+amr.plot_int          = 1000     # number of timesteps between plotfiles
+amr.derive_plot_vars  = temp pressure cp cv
 
 # PROBLEM PARAMETERS
 prob.p_l = 1e6
 prob.u_l = 0.0
 prob.rho_l = 7.29e-4
 prob.sd_u_l = 2000.0
-prob.p_r = 5e5
+prob.p_r = 6e5
 prob.u_r = 0.0
 prob.rho_r = 4.56e-4

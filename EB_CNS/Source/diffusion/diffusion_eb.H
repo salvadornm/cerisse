@@ -9,10 +9,11 @@
 #include "index_macros.H"
 
 AMREX_GPU_DEVICE AMREX_FORCE_INLINE void
-cns_diff_species_eb(amrex::IntVect const& iv, const int idir, amrex::Array4<amrex::Real const> const& q,
-                 amrex::Array4<amrex::Real const> const& coeffs,
-                 amrex::GpuArray<amrex::Real, AMREX_SPACEDIM> const& dxinv,
-                 amrex::Array4<amrex::Real> const& flx) 
+cns_diff_species_eb(amrex::IntVect const& iv, const int idir,
+                    amrex::Array4<amrex::Real const> const& q,
+                    amrex::Array4<amrex::Real const> const& coeffs,
+                    amrex::GpuArray<amrex::Real, AMREX_SPACEDIM> const& dxinv,
+                    amrex::Array4<amrex::Real> const& flx)
 {
 #if (NUM_SPECIES > 1) // no point doing diffusion for single species
   using amrex::Real;
@@ -71,7 +72,6 @@ cns_diff_species_eb(amrex::IntVect const& iv, const int idir, amrex::Array4<amre
  * @param coeffs transport coefficients.
  * @param flag   EB status flags.
  * @param dxinv  1/dx.
- * @param weights EB weights (why do we hav to pass this??)
  * @param[out] flx_arr  output diffusion fluxes.
  */
 AMREX_GPU_DEVICE AMREX_FORCE_INLINE void
@@ -80,13 +80,14 @@ cns_diff_eb(const int i, const int j, const int k, const int d1,
             amrex::Array4<const amrex::Real> const& coeffs,
             amrex::Array4<const amrex::EBCellFlag> const& flag,
             amrex::GpuArray<amrex::Real, AMREX_SPACEDIM> const& dxinv,
-            amrex::GpuArray<const amrex::Real, 3> const& weights,
             amrex::Array4<amrex::Real> const& flx) noexcept
 {
   using amrex::Real;
   const amrex::IntVect iv{AMREX_D_DECL(i, j, k)};
   const amrex::IntVect ivm(iv - amrex::IntVect::TheDimensionVector(d1));
   if (flag(iv).isCovered() || flag(ivm).isCovered()) { return; }
+
+  constexpr Real weights[3] = {0.0, 1.0, 0.5}; // EB weights
 
   const int d2 = d1 == 0 ? 1 : 0;
   const int d3 = d1 == 2 ? 1 : 2;
@@ -108,11 +109,11 @@ cns_diff_eb(const int i, const int j, const int k, const int d1,
   Real whi = weights[hip - him];
   Real wlo = weights[lop - lom];
   const Real u12 = (0.5 * dxinv[d2]) *
-             ((q(iv + hip * ivd2, QU1) - q(iv + him * ivd2, QU1)) * whi +
-              (q(ivm + lop * ivd2, QU1) - q(ivm + lom * ivd2, QU1)) * wlo);
+                   ((q(iv + hip * ivd2, QU1) - q(iv + him * ivd2, QU1)) * whi +
+                    (q(ivm + lop * ivd2, QU1) - q(ivm + lom * ivd2, QU1)) * wlo);
   const Real u22 = (0.5 * dxinv[d2]) *
-             ((q(iv + hip * ivd2, QU2) - q(iv + him * ivd2, QU2)) * whi +
-              (q(ivm + lop * ivd2, QU2) - q(ivm + lom * ivd2, QU2)) * wlo);
+                   ((q(iv + hip * ivd2, QU2) - q(iv + him * ivd2, QU2)) * whi +
+                    (q(ivm + lop * ivd2, QU2) - q(ivm + lom * ivd2, QU2)) * wlo);
 #if (AMREX_SPACEDIM == 3)
   const Real u31 = (q(iv, QU3) - q(ivm, QU3)) * dxinv[d1];
   const amrex::IntVect ivd3(amrex::IntVect::TheDimensionVector(d3));
@@ -123,11 +124,11 @@ cns_diff_eb(const int i, const int j, const int k, const int d1,
   whi = weights[hip - him];
   wlo = weights[lop - lom];
   const Real u13 = (0.5 * dxinv[d3]) *
-             ((q(iv + hip * ivd3, QU1) - q(iv + him * ivd3, QU1)) * whi +
-              (q(ivm + lop * ivd3, QU1) - q(ivm + lom * ivd3, QU1)) * wlo);
+                   ((q(iv + hip * ivd3, QU1) - q(iv + him * ivd3, QU1)) * whi +
+                    (q(ivm + lop * ivd3, QU1) - q(ivm + lom * ivd3, QU1)) * wlo);
   const Real u33 = (0.5 * dxinv[d3]) *
-             ((q(iv + hip * ivd3, QU3) - q(iv + him * ivd3, QU3)) * whi +
-              (q(ivm + lop * ivd3, QU3) - q(ivm + lom * ivd3, QU3)) * wlo);
+                   ((q(iv + hip * ivd3, QU3) - q(iv + him * ivd3, QU3)) * whi +
+                    (q(ivm + lop * ivd3, QU3) - q(ivm + lom * ivd3, QU3)) * wlo);
 #endif
   const Real divu = AMREX_D_TERM(u11, +u22, +u33);
   const Real muf = 0.5 * (coeffs(iv, CMU) + coeffs(ivm, CMU));
@@ -320,22 +321,16 @@ AMREX_GPU_DEVICE AMREX_FORCE_INLINE void compute_diff_wallflux(
     auto trans = pele::physics::PhysicsType::transport();
     auto const* ltransparm = CNS::trans_parms.device_trans_parm();
     amrex::Real rho, dummy2, dummy3, y[NUM_SPECIES];
-    
+
     for (int n = 0; n < NUM_SPECIES; ++n) y[n] = q(i, j, k, QFS + n);
 
     auto eos = pele::physics::PhysicsType::eos();
     eos.PYT2R(q(i, j, k, QPRES), y, eb_wall_temp, rho); // assume dp/dn ~ 0
 
-  //  trans.transport(1, 1, 1, 0, eb_wall_temp, rho, y, &dummy2, mu, xi, lam,
-  //                 ltransparm);
-    //  SNM change call 
-    const bool get_xi = true, get_mu = true, get_lam = true,
-               get_Ddiag = false, get_chi = false;
-    trans.transport(
-      get_xi, get_mu, get_lam, get_Ddiag, get_chi, eb_wall_temp, rho, y, nullptr,
-      nullptr, mu, xi, lam, ltransparm);
-
-
+    const bool get_xi = true, get_mu = true, get_lam = true, get_Ddiag = false,
+               get_chi = false;
+    trans.transport(get_xi, get_mu, get_lam, get_Ddiag, get_chi, eb_wall_temp, rho,
+                    y, nullptr, nullptr, mu, xi, lam, ltransparm);
 
   } else {
     // Adiabatic wall dT/dn ~ 0
@@ -711,8 +706,8 @@ AMREX_GPU_DEVICE AMREX_FORCE_INLINE void compute_diff_wallflux(
     auto eos = pele::physics::PhysicsType::eos();
     eos.PYT2R(q(i, j, k, QPRES), y, eb_wall_temp, rho); // assume dp/dn ~ 0
 
-    trans.transport(true, true, true, false, false, eb_wall_temp, rho, y, 
-                    nullptr, nullptr, mu, xi, lam, ltransparm);
+    trans.transport(true, true, true, false, false, eb_wall_temp, rho, y, nullptr,
+                    nullptr, mu, xi, lam, ltransparm);
   } else {
     // Adiabatic wall dT/dn ~ 0
     mu = coefs(i, j, k, CMU);

@@ -4,7 +4,6 @@
 #include <AMReX_REAL.H>
 
 #include "index_macros.H"
-
 #include "nscbc.H"
 
 /**
@@ -79,8 +78,9 @@ bc_isothermal_wall(amrex::Real s_ext[NVAR], const amrex::Real s_int[NVAR],
  * @param Ms         shock Mach number (if Ms = M upstream, the shock will be stationary).
  * @param dir        direction, 0:x, 1:y, 2:z.
  */
-AMREX_GPU_DEVICE AMREX_FORCE_INLINE void normal_shock_relations(
-  amrex::Real s_ext[NVAR], const amrex::Real s_int[NVAR], amrex::Real Ms, int dir=0)
+AMREX_GPU_DEVICE AMREX_FORCE_INLINE void
+normal_shock_relations(amrex::Real s_ext[NVAR], const amrex::Real s_int[NVAR],
+                       amrex::Real Ms, int dir = 0)
 {
   auto eos = pele::physics::PhysicsType::eos();
 
@@ -97,7 +97,8 @@ AMREX_GPU_DEVICE AMREX_FORCE_INLINE void normal_shock_relations(
 
   // Shocked states
   s_ext[URHO] = s_int[URHO] * (g + 1.0) * Ms * Ms / (2.0 + (g - 1.0) * Ms * Ms);
-  amrex::Real u_r = s_int[UMX + dir] / s_int[URHO] * (2.0 + (g - 1.0) * Ms * Ms) / ((g + 1.0) * Ms * Ms);
+  amrex::Real u_r = s_int[UMX + dir] / s_int[URHO] * (2.0 + (g - 1.0) * Ms * Ms) /
+                    ((g + 1.0) * Ms * Ms);
   amrex::Real p_r = p * (1.0 + (2.0 * g / (g + 1.0)) * (Ms * Ms - 1.0));
 
   // Convert back to conservative states
@@ -106,20 +107,21 @@ AMREX_GPU_DEVICE AMREX_FORCE_INLINE void normal_shock_relations(
   s_ext[UMZ] = (dir == 2) ? s_ext[URHO] * u_r : s_int[UMZ];
   amrex::Real ei_r;
   eos.RYP2E(s_ext[URHO], y, p_r, ei_r);
-  s_ext[UEDEN] = s_ext[URHO] * ei_r + 0.5 / s_ext[URHO] *
+  s_ext[UEDEN] = s_ext[URHO] * ei_r +
+                 0.5 / s_ext[URHO] *
                    (AMREX_D_TERM(s_ext[UMX] * s_ext[UMX], +s_ext[UMY] * s_ext[UMY],
                                  +s_ext[UMZ] * s_ext[UMZ]));
   for (int n = 0; n < NUM_SPECIES; ++n) s_ext[UFS + n] = s_ext[URHO] * y[n];
 }
 
 AMREX_GPU_DEVICE AMREX_FORCE_INLINE void
-bc_foextrap_outlet(const int dir, const int lo_hi, amrex::Real s_ext[NVAR], const amrex::Real s_int[NVAR])
+bc_foextrap_outlet(const int dir, const int lo_hi, amrex::Real s_ext[NVAR],
+                   const amrex::Real s_int[NVAR])
 {
   // FOExtrap
   s_ext[URHO] = s_int[URHO];
-  AMREX_D_TERM(s_ext[UMX] = s_int[UMX];,
-               s_ext[UMY] = s_int[UMY];,
-               s_ext[UMZ] = s_int[UMZ];)
+  AMREX_D_TERM(s_ext[UMX] = s_int[UMX];, s_ext[UMY] = s_int[UMY];
+               , s_ext[UMZ] = s_int[UMZ];)
   s_ext[UEDEN] = s_int[UEDEN];
   for (int n = 0; n < NUM_SPECIES; n++) s_ext[UFS + n] = s_int[UFS + n];
 

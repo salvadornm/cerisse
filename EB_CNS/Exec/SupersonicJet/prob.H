@@ -11,14 +11,14 @@
 
 #include "CNS.H"
 #include "PelePhysics.H"
+#include "bc_util.H"
 #include "index_macros.H"
 #include "mechanism.H"
 #include "prob_parm.H"
-#include "bc_util.H"
 
-AMREX_GPU_DEVICE AMREX_FORCE_INLINE void prob_initdata(
-  int i, int j, int k, amrex::Array4<amrex::Real> const& state,
-  amrex::GeometryData const& geomdata, Parm const& /*parm*/, ProbParm const& pp)
+AMREX_GPU_DEVICE AMREX_FORCE_INLINE void
+prob_initdata(int i, int j, int k, amrex::Array4<amrex::Real> const& state,
+              amrex::GeometryData const& geomdata, ProbParm const& pp)
 {
   // Geometry
   const amrex::Real* prob_lo = geomdata.ProbLo();
@@ -26,7 +26,7 @@ AMREX_GPU_DEVICE AMREX_FORCE_INLINE void prob_initdata(
   const amrex::Real x = prob_lo[0] + (i + 0.5) * dx[0];
   const amrex::Real y = prob_lo[1] + (j + 0.5) * dx[1];
   const amrex::Real z = prob_lo[2] + (k + 0.5) * dx[2];
-  const amrex::Real rsqr = AMREX_D_TERM(, y * y, + z * z);
+  const amrex::Real rsqr = AMREX_D_TERM(, y * y, +z * z);
 
   for (int nf = 0; nf <= NUM_FIELD; ++nf) {
     if (rsqr > 0.1905 * 0.1905 && rsqr < 0.889 * 0.889) { // Air inlet
@@ -102,24 +102,31 @@ AMREX_GPU_DEVICE AMREX_FORCE_INLINE void bcnormal(
       if (rsqr > 0.1905 * 0.1905 && rsqr < 0.889 * 0.889) { // Air inlet
         amrex::Real profile = 1; //- pow((sqrt(rsqr)-0.53975)/0.34925, 12);
         // profile += (pp.inflow_turbulence ? amrex::RandomNormal(0.0, 0.22) : 0.0);
-        // const amrex::Real prof_y = pp.inflow_turbulence ? amrex::RandomNormal(0.0, 0.22) : 0.0;
-        // const amrex::Real prof_z = pp.inflow_turbulence ? amrex::RandomNormal(0.0, 0.22) : 0.0;
+        // const amrex::Real prof_y = pp.inflow_turbulence ? amrex::RandomNormal(0.0,
+        // 0.22) : 0.0; const amrex::Real prof_z = pp.inflow_turbulence ?
+        // amrex::RandomNormal(0.0, 0.22) : 0.0;
         if (pp.inflow_turbulence) {
           const amrex::Real urms = 0.22; // in % of u2
           const amrex::Real D = 0.118 * 2;
-          amrex::Real shift[6] = {-2.00245639, 3.324002275, 3.649820520,
-                                  -8.356795837, 1.105199344, -9.8623468700e-2}; // random phase shift
-          amrex::Real St[8] = {0.4635502163, 0.9903689339, 0.0476839647, 0.5231130471, 
-                               0.9501858289, 0.2582944864, 0.2351456733, 0.4247815352}; // random Strouhal number
+          amrex::Real shift[6] = {
+            -2.00245639,  3.324002275, 3.649820520,
+            -8.356795837, 1.105199344, -9.8623468700e-2}; // random phase shift
+          amrex::Real St[8] = {0.4635502163, 0.9903689339, 0.0476839647,
+                               0.5231130471, 0.9501858289, 0.2582944864,
+                               0.2351456733, 0.4247815352}; // random Strouhal number
           const amrex::Real theta = std::atan(x[1] / x[2]);
           for (int imode = 1; imode <= 6; ++imode) {
-            profile += 0.5 * urms * (std::sin((St[imode-1] * M_PI * imode * pp.u2 / D) * time + imode * theta + shift[imode-1]));
+            profile += 0.5 * urms *
+                       (std::sin((St[imode - 1] * M_PI * imode * pp.u2 / D) * time +
+                                 imode * theta + shift[imode - 1]));
           }
           for (int imode = 7; imode <= 8; ++imode) {
-            profile += 0.5 * urms * std::sin((St[imode-1] * M_PI * imode * pp.u2 / D));
+            profile +=
+              0.5 * urms * std::sin((St[imode - 1] * M_PI * imode * pp.u2 / D));
           }
 
-          profile = 1 + (profile-1)*(1-pow((sqrt(rsqr)-0.53975)/0.34925, 7));
+          profile =
+            1 + (profile - 1) * (1 - pow((sqrt(rsqr) - 0.53975) / 0.34925, 7));
         }
         const amrex::Real prof_y = 0.0;
         const amrex::Real prof_z = 0.0;
@@ -128,28 +135,35 @@ AMREX_GPU_DEVICE AMREX_FORCE_INLINE void bcnormal(
         s_ext[nf * NVAR + UMY] = pp.rho1 * pp.u1 * prof_y;
         s_ext[nf * NVAR + UMZ] = pp.rho1 * pp.u1 * prof_z;
         s_ext[nf * NVAR + UEDEN] =
-          pp.rho1 * pp.ei1 + 0.5 * pp.rho1 * pp.u1 * pp.u1 * (profile * profile + prof_y * prof_y + prof_z * prof_z);
+          pp.rho1 * pp.ei1 +
+          0.5 * pp.rho1 * pp.u1 * pp.u1 *
+            (profile * profile + prof_y * prof_y + prof_z * prof_z);
         for (int n = 0; n < NUM_SPECIES; ++n) {
           s_ext[nf * NVAR + UFS + n] = pp.rho1 * pp.Y1[n];
         }
       } else if (rsqr < 0.118 * 0.118) { // Fuel jet
-        amrex::Real profile = 1; //- pow(rsqr/0.118/0.118, 6);
+        amrex::Real profile = 1;         //- pow(rsqr/0.118/0.118, 6);
         // profile += (pp.inflow_turbulence ? amrex::RandomNormal(0.0, 0.18) : 0.0);
-        // const amrex::Real prof_y = pp.inflow_turbulence ? amrex::RandomNormal(0.0, 0.18) : 0.0;
-        // const amrex::Real prof_z = pp.inflow_turbulence ? amrex::RandomNormal(0.0, 0.18) : 0.0;
+        // const amrex::Real prof_y = pp.inflow_turbulence ? amrex::RandomNormal(0.0,
+        // 0.18) : 0.0; const amrex::Real prof_z = pp.inflow_turbulence ?
+        // amrex::RandomNormal(0.0, 0.18) : 0.0;
         if (pp.inflow_turbulence) {
           const amrex::Real urms = 0.18; // in % of u2
           const amrex::Real D = 0.118 * 2;
-          amrex::Real shift[6] = {-6.92055468,  3.02412184, -4.8293441, 0.75940894,
+          amrex::Real shift[6] = {-6.92055468, 3.02412184, -4.8293441, 0.75940894,
                                   -0.73516477, -0.41647826}; // random phase shift
-          amrex::Real St[8] = {0.89085216, 0.76765755, 0.11183781, 0.40518822, 0.86026686,
-                              0.18092337, 0.32188228, 0.8291226}; // random Strouhal number
+          amrex::Real St[8] = {0.89085216, 0.76765755, 0.11183781,
+                               0.40518822, 0.86026686, 0.18092337,
+                               0.32188228, 0.8291226}; // random Strouhal number
           const amrex::Real theta = std::atan(x[1] / x[2]);
           for (int imode = 1; imode <= 6; ++imode) {
-            profile += 0.5 * urms * (std::sin((St[imode-1] * M_PI * imode * pp.u2 / D) * time + imode * theta + shift[imode-1]));
+            profile += 0.5 * urms *
+                       (std::sin((St[imode - 1] * M_PI * imode * pp.u2 / D) * time +
+                                 imode * theta + shift[imode - 1]));
           }
           for (int imode = 7; imode <= 8; ++imode) {
-            profile += 0.5 * urms * std::sin((St[imode-1] * M_PI * imode * pp.u2 / D));
+            profile +=
+              0.5 * urms * std::sin((St[imode - 1] * M_PI * imode * pp.u2 / D));
           }
         }
         const amrex::Real prof_y = 0.0;
@@ -159,7 +173,9 @@ AMREX_GPU_DEVICE AMREX_FORCE_INLINE void bcnormal(
         s_ext[nf * NVAR + UMY] = pp.rho2 * pp.u2 * prof_y;
         s_ext[nf * NVAR + UMZ] = pp.rho2 * pp.u2 * prof_z;
         s_ext[nf * NVAR + UEDEN] =
-          pp.rho2 * pp.ei2 + 0.5 * pp.rho2 * pp.u2 * pp.u2 * (profile * profile + prof_y * prof_y + prof_z * prof_z);
+          pp.rho2 * pp.ei2 +
+          0.5 * pp.rho2 * pp.u2 * pp.u2 *
+            (profile * profile + prof_y * prof_y + prof_z * prof_z);
         for (int n = 0; n < NUM_SPECIES; ++n) {
           s_ext[nf * NVAR + UFS + n] = pp.rho2 * pp.Y2[n];
         }
@@ -177,8 +193,8 @@ AMREX_GPU_DEVICE AMREX_FORCE_INLINE void bcnormal(
         s_ext[nf * NVAR + UMX] =
           -s_int
             [nf * NVAR +
-            UMX]; //* amrex::min(amrex::max((time-0.00017)/(0.000165-0.00017), 1.0),
-                  //-1.0);
+             UMX]; //* amrex::min(amrex::max((time-0.00017)/(0.000165-0.00017), 1.0),
+                   //-1.0);
         s_ext[nf * NVAR + UMY] = -s_int[nf * NVAR + UMY];
         s_ext[nf * NVAR + UMZ] = -s_int[nf * NVAR + UMZ];
         s_ext[nf * NVAR + UEDEN] = s_int[nf * NVAR + UEDEN];
@@ -187,20 +203,21 @@ AMREX_GPU_DEVICE AMREX_FORCE_INLINE void bcnormal(
         }
       }
     } else /*if (idir == 0 && sgn == -1)*/ {
-      // bc_pressure_outlet(x, &s_ext[nf * NVAR], &s_int[nf * NVAR], pp.p_a, geomdata);
+      // bc_pressure_outlet(x, &s_ext[nf * NVAR], &s_int[nf * NVAR], pp.p_a,
+      // geomdata);
       bc_foextrap_outlet(idir, sgn, &s_ext[nf * NVAR], &s_int[nf * NVAR]);
-    }    
+    }
   }
-  
+
 #if NUM_AUX > 0
   // Aux variables for storing time averages
   for (int n = 0; n < NUM_AUX; ++n) { s_ext[UFA + n] = 0.0; }
 #endif
 }
 
-AMREX_GPU_DEVICE AMREX_FORCE_INLINE void prob_post_restart(
-  int i, int j, int k, amrex::Array4<amrex::Real> const& state,
-  amrex::GeometryData const& geomdata, Parm const& parm, ProbParm const& pp)
+AMREX_GPU_DEVICE AMREX_FORCE_INLINE void
+prob_post_restart(int i, int j, int k, amrex::Array4<amrex::Real> const& state,
+                  amrex::GeometryData const& geomdata, ProbParm const& pp)
 {
   if (pp.clean_aux_on_restart) {
     // Clear time avg
@@ -212,7 +229,7 @@ AMREX_GPU_DEVICE AMREX_FORCE_INLINE void
 prob_tag_error(int i, int j, int k, amrex::Array4<char> const& tagarr,
                amrex::Array4<const amrex::Real> const& sarr, int level, char tagval,
                const amrex::Real /*time*/, amrex::GeometryData const& geomdata,
-               Parm const& /*parm*/, ProbParm const& /*pp*/)
+               ProbParm const& /*pp*/)
 {
   BL_PROFILE("prob_tag_error()");
 
@@ -244,11 +261,11 @@ prob_tag_error(int i, int j, int k, amrex::Array4<char> const& tagarr,
   // Tag magvort in input file
 }
 
-AMREX_GPU_DEVICE AMREX_FORCE_INLINE void prob_post_timestep(
-  int i, int j, int k, const amrex::Real /*curtime*/, const amrex::Real dtlev,
-  amrex::Array4<amrex::Real> const& state,
-  amrex::Array4<const amrex::Real> const& reactions,
-  amrex::GeometryData const& /*geomdata*/, Parm const& /*parm*/, ProbParm const& pp)
+AMREX_GPU_DEVICE AMREX_FORCE_INLINE void
+prob_post_timestep(int i, int j, int k, const amrex::Real /*curtime*/,
+                   const amrex::Real dtlev, amrex::Array4<amrex::Real> const& state,
+                   amrex::Array4<const amrex::Real> const& reactions,
+                   amrex::GeometryData const& /*geomdata*/, ProbParm const& pp)
 {
 #if NUM_AUX > 0
   if (pp.record_statistics) {

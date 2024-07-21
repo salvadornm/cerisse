@@ -10,10 +10,10 @@
 #include <cmath>
 
 #include "CNS.H"
+#include "PMF.H"
 #include "PelePhysics.H"
 #include "index_macros.H"
 #include "mechanism.H"
-#include "PMF.H"
 #include "prob_parm.H"
 
 /**
@@ -31,8 +31,8 @@
  */
 AMREX_GPU_DEVICE AMREX_FORCE_INLINE void
 prob_initdata(int i, int j, int k, amrex::Array4<amrex::Real> const& state,
-              amrex::GeometryData const& geomdata, Parm const& /*parm*/,
-              ProbParm const& prob_parm, pele::physics::PMF::PmfData::DataContainer const* pmf_data)
+              amrex::GeometryData const& geomdata, ProbParm const& prob_parm,
+              pele::physics::PMF::PmfData::DataContainer const* pmf_data)
 {
   using amrex::Real;
   auto eos = pele::physics::PhysicsType::eos();
@@ -45,7 +45,7 @@ prob_initdata(int i, int j, int k, amrex::Array4<amrex::Real> const& state,
   // PMF data
   const Real x1 = x - prob_parm.x_offset - 0.5 * dx[0];
   const Real x2 = x - prob_parm.x_offset + 0.5 * dx[0];
-  amrex::GpuArray<Real, NUM_SPECIES + 4> pmf_vals = {0.0};  
+  amrex::GpuArray<Real, NUM_SPECIES + 4> pmf_vals = {0.0};
   pele::physics::PMF::pmf(pmf_data, x1, x2, pmf_vals);
 
   Real T = pmf_vals[0];
@@ -62,9 +62,7 @@ prob_initdata(int i, int j, int k, amrex::Array4<amrex::Real> const& state,
   state(i, j, k, UMY) = 0.0;
   state(i, j, k, UMZ) = 0.0;
   state(i, j, k, UEDEN) = rho * ei + 0.5 * rho * u * u;
-  for (int n = 0; n < NUM_SPECIES; ++n) {
-    state(i, j, k, UFS + n) = rho * Y[n];
-  }
+  for (int n = 0; n < NUM_SPECIES; ++n) { state(i, j, k, UFS + n) = rho * Y[n]; }
 }
 
 /**
@@ -83,9 +81,10 @@ prob_initdata(int i, int j, int k, amrex::Array4<amrex::Real> const& state,
  */
 AMREX_GPU_DEVICE AMREX_FORCE_INLINE void bcnormal(
   const amrex::Real x[AMREX_SPACEDIM], const amrex::Real* /*s_int[LEN_STATE]*/,
-  const amrex::Real* /*s_refl[LEN_STATE]*/, amrex::Real s_ext[LEN_STATE], const int idir,
-  const int sgn, const amrex::Real time, amrex::GeometryData const& geomdata,
-  ProbParm const& prob_parm, pele::physics::PMF::PmfData::DataContainer const* pmf_data)
+  const amrex::Real* /*s_refl[LEN_STATE]*/, amrex::Real s_ext[LEN_STATE],
+  const int idir, const int sgn, const amrex::Real time,
+  amrex::GeometryData const& geomdata, ProbParm const& prob_parm,
+  pele::physics::PMF::PmfData::DataContainer const* pmf_data)
 {
   using amrex::Real;
   auto eos = pele::physics::PhysicsType::eos();
@@ -108,30 +107,28 @@ AMREX_GPU_DEVICE AMREX_FORCE_INLINE void bcnormal(
   s_ext[UMY] = 0.0;
   s_ext[UMZ] = 0.0;
   s_ext[UEDEN] = rho * ei + 0.5 * rho * u * u;
-  for (int n = 0; n < NUM_SPECIES; ++n) {
-    s_ext[UFS + n] = rho * Y[n];
-  }
+  for (int n = 0; n < NUM_SPECIES; ++n) { s_ext[UFS + n] = rho * Y[n]; }
 }
 
-AMREX_GPU_DEVICE AMREX_FORCE_INLINE void prob_post_restart(
-  int i, int j, int k, amrex::Array4<amrex::Real> const& state,
-  amrex::GeometryData const& geomdata, Parm const& parm, ProbParm const& prob_parm)
+AMREX_GPU_DEVICE AMREX_FORCE_INLINE void
+prob_post_restart(int i, int j, int k, amrex::Array4<amrex::Real> const& state,
+                  amrex::GeometryData const& geomdata, ProbParm const& prob_parm)
 {
 }
 
-AMREX_GPU_DEVICE AMREX_FORCE_INLINE void prob_post_timestep(
-  int i, int j, int k, const amrex::Real /*curtime*/, const amrex::Real dtlev,
-  amrex::Array4<amrex::Real> const& state,
-  amrex::Array4<const amrex::Real> const& reactions,
-  amrex::GeometryData const& /*geomdata*/, Parm const& /*parm*/, ProbParm const& pp)
+AMREX_GPU_DEVICE AMREX_FORCE_INLINE void
+prob_post_timestep(int i, int j, int k, const amrex::Real /*curtime*/,
+                   const amrex::Real dtlev, amrex::Array4<amrex::Real> const& state,
+                   amrex::Array4<const amrex::Real> const& reactions,
+                   amrex::GeometryData const& /*geomdata*/, ProbParm const& pp)
 {
 }
 
-AMREX_GPU_DEVICE AMREX_FORCE_INLINE void prob_tag_error(
-  int i, int j, int k, amrex::Array4<char> const& tagarr,
-  amrex::Array4<const amrex::Real> const& /*sarr*/, int level, char tagval,
-  const amrex::Real /*time*/, amrex::GeometryData const& geomdata,
-  Parm const& /*parm*/, ProbParm const& /*pp*/)
+AMREX_GPU_DEVICE AMREX_FORCE_INLINE void
+prob_tag_error(int i, int j, int k, amrex::Array4<char> const& tagarr,
+               amrex::Array4<const amrex::Real> const& /*sarr*/, int level,
+               char tagval, const amrex::Real /*time*/,
+               amrex::GeometryData const& geomdata, ProbParm const& /*pp*/)
 {
 }
 

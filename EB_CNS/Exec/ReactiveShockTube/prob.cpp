@@ -48,7 +48,7 @@ void CNS::fill_ext_src(int i, int j, int k, amrex::Real /*time*/,
                        amrex::GeometryData const& /*geomdata*/,
                        amrex::Array4<const amrex::Real> const& state,
                        amrex::Array4<amrex::Real> const& ext_src,
-                       Parm const& /*parm*/, ProbParm const& /*prob_parm*/)
+                       ProbParm const& /*prob_parm*/)
 {
   // Example
   // const Real g = 9.81 * 100;

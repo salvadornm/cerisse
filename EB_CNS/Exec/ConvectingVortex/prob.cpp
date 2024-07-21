@@ -19,20 +19,20 @@ void amrex_probinit(const int* /*init*/, const int* /*name*/, const int* /*namel
   eos.PYT2RE(CNS::h_prob_parm->p0, massfrac, CNS::h_prob_parm->T0,
              CNS::h_prob_parm->rho0, eint);
   eos.RTY2Cs(CNS::h_prob_parm->rho0, CNS::h_prob_parm->T0, massfrac, cs);
-  eos.TY2Cp(CNS::h_prob_parm->T0, massfrac, cp);
+  // eos.TY2Cp(CNS::h_prob_parm->T0, massfrac, cp);
+  // eos.RPY2Cs(CNS::h_prob_parm->rho0, CNS::h_prob_parm->p0, massfrac, cs);
   CNS::h_prob_parm->v0 = CNS::h_prob_parm->mach * cs;
 
   // gamma = 1.4
 
   // Output IC
-  amrex::Print() << "v0, p0, rho0, T0, beta = " << CNS::h_prob_parm->v0 << ", "
-                 << CNS::h_prob_parm->p0 << ", " << CNS::h_prob_parm->rho0 << ", "
-                 << CNS::h_prob_parm->T0 << ", " << CNS::h_prob_parm->beta
-                 << std::endl;
+  // amrex::Print() << "v0, p0, rho0, T0, beta = " << CNS::h_prob_parm->v0 << ", "
+  //                << CNS::h_prob_parm->p0 << ", " << CNS::h_prob_parm->rho0 << ", "
+  //                << CNS::h_prob_parm->T0 << ", " << CNS::h_prob_parm->beta
+  //                << std::endl;
 
-  Gpu::copyAsync(Gpu::hostToDevice, CNS::h_prob_parm, CNS::h_prob_parm + 1,
-                 CNS::d_prob_parm);
-  Gpu::streamSynchronize();
+  Gpu::copy(Gpu::hostToDevice, CNS::h_prob_parm, CNS::h_prob_parm + 1,
+            CNS::d_prob_parm);
 }
 }
 
@@ -40,6 +40,6 @@ void CNS::fill_ext_src(int i, int j, int k, amrex::Real t,
                        amrex::GeometryData const& geomdata,
                        amrex::Array4<const amrex::Real> const& state,
                        amrex::Array4<amrex::Real> const& ext_src,
-                       Parm const& /*parm*/, ProbParm const& prob_parm)
+                       ProbParm const& prob_parm)
 {
 }

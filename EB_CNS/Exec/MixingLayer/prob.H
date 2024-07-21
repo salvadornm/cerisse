@@ -15,9 +15,9 @@
 #include "mechanism.H"
 #include "prob_parm.H"
 
-AMREX_GPU_DEVICE AMREX_FORCE_INLINE void prob_initdata(
-  int i, int j, int k, amrex::Array4<amrex::Real> const& state,
-  amrex::GeometryData const& geomdata, Parm const& /*parm*/, ProbParm const& pp)
+AMREX_GPU_DEVICE AMREX_FORCE_INLINE void
+prob_initdata(int i, int j, int k, amrex::Array4<amrex::Real> const& state,
+              amrex::GeometryData const& geomdata, ProbParm const& pp)
 {
   // Geometry
   const amrex::Real* prob_lo = geomdata.ProbLo();
@@ -97,6 +97,7 @@ bcnormal(const amrex::Real x[AMREX_SPACEDIM], const amrex::Real* /*s_int[NVAR]*/
       for (int n = 0; n < NUM_SPECIES; ++n) {
         s_ext[nf * NVAR + UFS + n] = pp.rho1 * pp.massfrac1[n];
       }
+      s_ext[nf * NVAR + UTEMP] = pp.T1;
     } else {
       s_ext[nf * NVAR + URHO] = pp.rho2;
       s_ext[nf * NVAR + UMX] = pp.rho2 * (meanu /*+ stdu * rndseed * randnum*/);
@@ -109,13 +110,14 @@ bcnormal(const amrex::Real x[AMREX_SPACEDIM], const amrex::Real* /*s_int[NVAR]*/
       for (int n = 0; n < NUM_SPECIES; ++n) {
         s_ext[nf * NVAR + UFS + n] = pp.rho2 * pp.massfrac2[n];
       }
+      s_ext[nf * NVAR + UTEMP] = pp.T2;
     }
   }
 }
 
-AMREX_GPU_DEVICE AMREX_FORCE_INLINE void prob_post_restart(
-  int i, int j, int k, amrex::Array4<amrex::Real> const& state,
-  amrex::GeometryData const& geomdata, Parm const& parm, ProbParm const& pp)
+AMREX_GPU_DEVICE AMREX_FORCE_INLINE void
+prob_post_restart(int i, int j, int k, amrex::Array4<amrex::Real> const& state,
+                  amrex::GeometryData const& geomdata, ProbParm const& pp)
 {
   // Clear time avg
   if (pp.clean_aux_on_restart) {
@@ -123,11 +125,11 @@ AMREX_GPU_DEVICE AMREX_FORCE_INLINE void prob_post_restart(
   }
 }
 
-AMREX_GPU_DEVICE AMREX_FORCE_INLINE void prob_post_timestep(
-  int i, int j, int k, const amrex::Real /*curtime*/, const amrex::Real dtlev,
-  amrex::Array4<amrex::Real> const& state,
-  amrex::Array4<const amrex::Real> const& reactions,
-  amrex::GeometryData const& /*geomdata*/, Parm const& /*parm*/, ProbParm const& pp)
+AMREX_GPU_DEVICE AMREX_FORCE_INLINE void
+prob_post_timestep(int i, int j, int k, const amrex::Real /*curtime*/,
+                   const amrex::Real dtlev, amrex::Array4<amrex::Real> const& state,
+                   amrex::Array4<const amrex::Real> const& reactions,
+                   amrex::GeometryData const& /*geomdata*/, ProbParm const& pp)
 {
 #if NUM_AUX > 0
   if (pp.record_statistics) {
@@ -147,28 +149,28 @@ AMREX_GPU_DEVICE AMREX_FORCE_INLINE void prob_post_timestep(
     auto eos = pele::physics::PhysicsType::eos();
     eos.REY2T(rho, ei, massfrac, T);
 
-    state(i, j, k, UFA + 0) += state(i, j, k, URHO) * dtlev; // RHO
-    state(i, j, k, UFA + 1) += state(i, j, k, UMX) * dtlev;  // RHO*U
-    state(i, j, k, UFA + 2) += state(i, j, k, UMY) * dtlev;  // RHO*V
-    state(i, j, k, UFA + 3) += state(i, j, k, UMZ) * dtlev;  // RHO*W
-    state(i, j, k, UFA + 4) += T * dtlev; // T
-    state(i, j, k, UFA + 5) += state(i, j, k, UFS + H2_ID) * dtlev; // RHO*Y_H2
-    state(i, j, k, UFA + 6) += state(i, j, k, UFS + OH_ID) * dtlev; // RHO*Y_OH
+    state(i, j, k, UFA + 0) += state(i, j, k, URHO) * dtlev;         // RHO
+    state(i, j, k, UFA + 1) += state(i, j, k, UMX) * dtlev;          // RHO*U
+    state(i, j, k, UFA + 2) += state(i, j, k, UMY) * dtlev;          // RHO*V
+    state(i, j, k, UFA + 3) += state(i, j, k, UMZ) * dtlev;          // RHO*W
+    state(i, j, k, UFA + 4) += T * dtlev;                            // T
+    state(i, j, k, UFA + 5) += state(i, j, k, UFS + H2_ID) * dtlev;  // RHO*Y_H2
+    state(i, j, k, UFA + 6) += state(i, j, k, UFS + OH_ID) * dtlev;  // RHO*Y_OH
     state(i, j, k, UFA + 7) += state(i, j, k, UFS + H2O_ID) * dtlev; // RHO*Y_H2O
-    state(i, j, k, UFA + 8) += state(i, j, k, UFS + HO2_ID) * dtlev; // RHO*Y_HO2    
-    state(i, j, k, UFA + 9) += state(i, j, k, UMX) * vx * dtlev;  // RHO*U*U
-    state(i, j, k, UFA + 10) += state(i, j, k, UMY) * vy * dtlev; // RHO*V*V
-    state(i, j, k, UFA + 11) += state(i, j, k, UMZ) * vz * dtlev; // RHO*W*W
-    state(i, j, k, UFA + 12) += T * T * dtlev; // T*T
+    state(i, j, k, UFA + 8) += state(i, j, k, UFS + HO2_ID) * dtlev; // RHO*Y_HO2
+    state(i, j, k, UFA + 9) += state(i, j, k, UMX) * vx * dtlev;     // RHO*U*U
+    state(i, j, k, UFA + 10) += state(i, j, k, UMY) * vy * dtlev;    // RHO*V*V
+    state(i, j, k, UFA + 11) += state(i, j, k, UMZ) * vz * dtlev;    // RHO*W*W
+    state(i, j, k, UFA + 12) += T * T * dtlev;                       // T*T
   }
 #endif
 }
 
-AMREX_GPU_DEVICE AMREX_FORCE_INLINE void prob_tag_error(
-  int i, int j, int k, amrex::Array4<char> const& tagarr,
-  amrex::Array4<const amrex::Real> const& /*sarr*/, int level, char tagval,
-  const amrex::Real /*time*/, amrex::GeometryData const& geomdata,
-  Parm const& /*parm*/, ProbParm const& /*pp*/)
+AMREX_GPU_DEVICE AMREX_FORCE_INLINE void
+prob_tag_error(int i, int j, int k, amrex::Array4<char> const& tagarr,
+               amrex::Array4<const amrex::Real> const& /*sarr*/, int level,
+               char tagval, const amrex::Real /*time*/,
+               amrex::GeometryData const& geomdata, ProbParm const& /*pp*/)
 {
 }
 

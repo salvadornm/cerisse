@@ -30,7 +30,8 @@ void initialize_EB2(const Geometry& geom, const int required_coarsening_level,
     // EB2::Build(geom, required_coarsening_level, max_coarsening_level);
     // (..., ngrow, build_coarse_level_by_coarsening) what does that mean?
     EB2::Build(geom, required_coarsening_level, max_coarsening_level, 6, false);
-    // If you have a hyperbolic system and the EB surface does not intersect AMR level 
-    // boundaries, you can set it to false to improve the robustness of geometry generation.
+    // If you have a hyperbolic system and the EB surface does not intersect AMR
+    // level boundaries, you can set it to false to improve the robustness of
+    // geometry generation.
   }
 }

@@ -28,6 +28,9 @@ Eos_Model := Fuego
 Transport_Model := Simple
 Chemistry_Model := air
 
+# CNS
+NUM_FIELD = 20
+
 # GNU Make
 include ./Make.package
 include ../Make.CNS

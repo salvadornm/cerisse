@@ -1,9 +1,10 @@
-// #include <AMReX_Config.H>
+#ifndef CNS_HYDRO_EB_H_
+#define CNS_HYDRO_EB_H_
+
 #include <AMReX_REAL.H>
-#include <parm.H>
 
 #include "diffusion_eb.H"
-#include "hyperbolics.H"
+#include "hydro.H"
 
 // This version works for adiabatic or isothermal wall
 AMREX_GPU_DEVICE AMREX_FORCE_INLINE void compute_hyp_wallflux(
@@ -14,7 +15,7 @@ AMREX_GPU_DEVICE AMREX_FORCE_INLINE void compute_hyp_wallflux(
 #if (AMREX_SPACEDIM == 3)
   const amrex::Real azm, const amrex::Real azp,
 #endif
-  amrex::GpuArray<amrex::Real, NVAR>& fluxw, Parm const& parm, bool eb_isothermal,
+  amrex::GpuArray<amrex::Real, NVAR>& fluxw, bool eb_isothermal,
   amrex::Real wall_temp) noexcept
 {
   using amrex::Real;
@@ -50,7 +51,7 @@ AMREX_GPU_DEVICE AMREX_FORCE_INLINE void compute_hyp_wallflux(
 
   hllc(rhow, AMREX_D_DECL(un, 0., 0.), p, csw, ew, y, rho, AMREX_D_DECL(-un, 0., 0.),
        p, cs, e, y, fluxw[URHO], AMREX_D_DECL(momfluxn, momfluxt1, momfluxt2),
-       fluxw[UEDEN], &fluxw[UFS], parm);
+       fluxw[UEDEN], &fluxw[UFS]);
 
   fluxw[URHO] *= apnorm;
   fluxw[UEDEN] *= apnorm;
@@ -59,140 +60,6 @@ AMREX_GPU_DEVICE AMREX_FORCE_INLINE void compute_hyp_wallflux(
                , fluxw[UMY] = (aym - ayp) * momfluxn;
                , fluxw[UMZ] = (azm - azp) * momfluxn;);
 }
-
-// AMREX_GPU_DEVICE AMREX_FORCE_INLINE void
-// compute_hyp_wallflux (const amrex::Real rho,
-//                       AMREX_D_DECL(const amrex::Real u, const amrex::Real v,
-//                       const amrex::Real w), const amrex::Real p,   const
-//                       amrex::Real sp[NUM_SPECIES], const amrex::Real axm,
-//                       const amrex::Real axp, const amrex::Real aym, const
-//                       amrex::Real ayp,
-// #if (AMREX_SPACEDIM == 3)
-//                       const amrex::Real azm, const amrex::Real azp,
-// #endif
-//                       amrex::GpuArray<amrex::Real,NVAR>& fluxw, Parm const&
-//                       parm, bool /*eb_isothermal*/, amrex::Real
-//                       /*wall_temp*/) noexcept
-// {
-//   using amrex::Real;
-
-//   // Assume adiabatic wall
-
-//   Real apnorm = std::sqrt( AMREX_D_TERM((axm-axp)*(axm-axp), +
-//   (aym-ayp)*(aym-ayp), + (azm-azp)*(azm-azp)) ); if (apnorm <= 0.0)
-//   amrex::Abort("compute_hyp_wallflux: we are in trouble.");
-
-//   Real apnorminv = 1./apnorm;
-//   Real un = AMREX_D_TERM(u*(axm-axp)*apnorminv, + v*(aym-ayp)*apnorminv, +
-//   w*(azm-azp)*apnorminv); Real AMREX_D_DECL(momfluxn, momfluxt1, momfluxt2);
-//   Real y[NUM_SPECIES]; for (int n = 0; n < NUM_SPECIES; ++n) y[n] = sp[n];
-
-//   auto eos = pele::physics::PhysicsType::eos();
-//   Real e, cs;
-//   eos.RYP2E(rho, y, p, e);
-//   e += 0.5*(AMREX_D_TERM(u*u, +v*v, +w*w));
-//   eos.RPY2Cs(rho, p, y, cs);
-
-//   hllc(rho, AMREX_D_DECL( un, 0., 0.), p, cs, e, y,
-//        rho, AMREX_D_DECL(-un, 0., 0.), p, cs, e, y,
-//        fluxw[URHO], AMREX_D_DECL(momfluxn, momfluxt1, momfluxt2),
-//        fluxw[UEDEN], &fluxw[UFS], parm);
-
-//   AMREX_D_TERM(fluxw[UMX] = (axm-axp) * momfluxn;,
-//                fluxw[UMY] = (aym-ayp) * momfluxn;,
-//                fluxw[UMZ] = (azm-azp) * momfluxn;);
-// }
-
-// // TODO: This version accepts problem specific BC at EB (e.g.
-// jets/isothermal/constant heat flux) AMREX_GPU_DEVICE AMREX_FORCE_INLINE void
-// compute_hyp_wallflux (int i, int j, int k, amrex::GeometryData const&
-// geomdata, const amrex::Real t,
-//                       const amrex::Real rho,
-//                       AMREX_D_DECL(const amrex::Real u, const amrex::Real v,
-//                       const amrex::Real w), const amrex::Real p, amrex::Real
-//                       sp[NUM_SPECIES], const amrex::Real axm, const
-//                       amrex::Real axp, const amrex::Real aym, const
-//                       amrex::Real ayp,
-// #if (AMREX_SPACEDIM == 3)
-//                       const amrex::Real azm, const amrex::Real azp,
-// #endif
-//                       amrex::GpuArray<amrex::Real,NVAR>& fluxw, Parm const&
-//                       parm, bool use_prob_eb_state=false, bool
-//                       eb_isothermal=false, amrex::Real wall_temp=0) noexcept
-// {
-//   using amrex::Real;
-
-//   Real apnorm = std::sqrt( AMREX_D_TERM((axm-axp)*(axm-axp), +
-//   (aym-ayp)*(aym-ayp), + (azm-azp)*(azm-azp)) ); if (apnorm <= 0.0)
-//   amrex::Abort("compute_hyp_wallflux: we are in trouble.");
-
-//   Real apnorminv = 1./apnorm;
-//   Real AMREX_D_DECL(momfluxn, momfluxt1, momfluxt2);
-
-//   if (use_prob_eb_state)
-//   {
-//     // Fluid states
-//     Real un = AMREX_D_TERM(u*(axm-axp)*apnorminv, + v*(aym-ayp)*apnorminv, +
-//     w*(azm-azp)*apnorminv);
-
-//     auto eos = pele::physics::PhysicsType::eos();
-//     Real e, cs;
-//     eos.RYP2E(rho, sp, p, e);
-//     e += 0.5*(AMREX_D_TERM(u*u, +v*v, +w*w));
-//     eos.RPY2Cs(rho, p, sp, cs);
-
-//     // Wall states
-//     Real x[3];
-//     const amrex::Real* prob_lo = geomdata.ProbLo();
-//     const amrex::Real* dx = geomdata.CellSize();
-//     x[0] = prob_lo[0] + (i + 0.5) * dx[0];
-//     x[1] = prob_lo[1] + (j + 0.5) * dx[1];
-//     x[2] = prob_lo[2] + (k + 0.5) * dx[2];
-
-//     Real rhow, unw, pw, yw[NUM_SPECIES], csw, ew;
-//     amrex::Abort("NOT YET IMPLEMENTED");
-//     // prob_eb_state(x, t, rho, un, p, sp, e, rhow, unw, pw, yw, ew);
-
-//     hllc(rho,  AMREX_D_DECL(un,  0., 0.), p,  cs,  e,  sp,
-//          rhow, AMREX_D_DECL(unw, 0., 0.), pw, csw, ew, yw,
-//          fluxw[URHO], AMREX_D_DECL(momfluxn, momfluxt1, momfluxt2),
-//          fluxw[UEDEN], &fluxw[UFS], parm);
-//   }
-//   else if (eb_isothermal)
-//   {
-//     // Fluid states
-//     Real un = AMREX_D_TERM(u*(axm-axp)*apnorminv, + v*(aym-ayp)*apnorminv, +
-//     w*(azm-azp)*apnorminv);
-
-//     auto eos = pele::physics::PhysicsType::eos();
-//     Real e, cs;
-//     eos.RYP2E(rho, sp, p, e);
-//     e += 0.5*(AMREX_D_TERM(u*u, +v*v, +w*w));
-//     eos.RPY2Cs(rho, p, sp, cs);
-
-//     // Wall states
-//     Real rhow, ew, csw;
-//     eos.PYT2RE(p, sp, wall_temp, rhow, ew);
-//     ew += 0.5*(AMREX_D_TERM(u*u, +v*v, +w*w));
-//     eos.RPY2Cs(rhow, p, sp, csw);
-
-//     hllc(rho,  AMREX_D_DECL(un, 0., 0.), p,  cs,  e, sp,
-//          rhow, AMREX_D_DECL(un, 0., 0.), p, csw, ew, sp,
-//          fluxw[URHO], AMREX_D_DECL(momfluxn, momfluxt1, momfluxt2),
-//          fluxw[UEDEN], &fluxw[UFS], parm);
-//   }
-//   else
-//   {
-//     fluxw[URHO] = 0.0;
-//     momfluxn = p;
-//     fluxw[UEDEN] = 0.0;
-//     for (int n = 0; n < NUM_SPECIES; ++n) fluxw[UFS+n] = 0.0;
-//   }
-
-//   AMREX_D_TERM(fluxw[UMX] = (axm-axp) * momfluxn;,
-//                fluxw[UMY] = (aym-ayp) * momfluxn;,
-//                fluxw[UMZ] = (azm-azp) * momfluxn;);
-// }
 
 AMREX_GPU_DEVICE AMREX_FORCE_INLINE void eb_compute_div(
   int i, int j, int k, IntVect const& blo, IntVect const& bhi,
@@ -207,8 +74,8 @@ AMREX_GPU_DEVICE AMREX_FORCE_INLINE void eb_compute_div(
                Array4<Real const> const& apz),
   AMREX_D_DECL(Array4<Real const> const& fcx, Array4<Real const> const& fcy,
                Array4<Real const> const& fcz),
-  GpuArray<Real, AMREX_SPACEDIM> const& dxinv, Parm const& parm, bool do_visc,
-  bool eb_no_slip, bool eb_isothermal, const Real eb_wall_temp)
+  GpuArray<Real, AMREX_SPACEDIM> const& dxinv, bool do_visc, bool eb_no_slip,
+  bool eb_isothermal, const Real eb_wall_temp)
 {
   AMREX_D_TERM(bool x_high = (i == bhi[0]);, bool y_high = (j == bhi[1]);
                , bool z_high = (k == bhi[2]));
@@ -391,17 +258,6 @@ AMREX_GPU_DEVICE AMREX_FORCE_INLINE void eb_compute_div(
         (AMREX_D_TERM(dxinv[0] * (apx(i + 1, j, k) * fxp - apx(i, j, k) * fxm),
                       +dxinv[1] * (apy(i, j + 1, k) * fyp - apy(i, j, k) * fym),
                       +dxinv[2] * (apz(i, j, k + 1) * fzp - apz(i, j, k) * fzm)));
-
-      // Monitor problem cell (this may report false nan as flx may be nan but a is
-      // 0) if (isnan(divu(i, j, k, n))) {
-      //   std::cout << "div_eb(" << i << "," << j << "," << k << "," << n
-      //             << ") is nan \n";
-      //   std::cout << "fxp=" << fxp << " fxm=" << fxm << " fyp=" << fyp
-      //             << " fym=" << fym << "\n";
-      //   std::cout << "up=" << u(i + 1, j, k, n) << " um=" << u(i, j, k, n)
-      //             << " vp=" << v(i, j + 1, k, n) << " vm=" << v(i, j, k, n) <<
-      //             '\n';
-      // }
     } // end loop n
 
     // Wall fluxes
@@ -415,7 +271,7 @@ AMREX_GPU_DEVICE AMREX_FORCE_INLINE void eb_compute_div(
 #if (AMREX_SPACEDIM == 3)
       apz(i, j, k), apz(i, j, k + 1),
 #endif
-      flux_hyp_wall, parm, eb_isothermal, eb_wall_temp);
+      flux_hyp_wall, eb_isothermal, eb_wall_temp);
 
     GpuArray<Real, NVAR> flux_diff_wall = {0.0};
     if (do_visc && (eb_no_slip || eb_isothermal)) {
@@ -441,3 +297,5 @@ AMREX_GPU_DEVICE AMREX_FORCE_INLINE void eb_compute_div(
     }
   } // end if cut-cell
 }
+
+#endif

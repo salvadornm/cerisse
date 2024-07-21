@@ -6,24 +6,27 @@
 
 #include <cmath>
 
-#include "index_macros.H"
 #include "diff_ops.H"
+#include "index_macros.H"
 
 /// @brief Diffusion fluxes in idir-direction for species and enthalpy.
 AMREX_GPU_DEVICE AMREX_FORCE_INLINE void
-cns_diff_species(amrex::IntVect const& iv, const int idir, amrex::Array4<amrex::Real const> const& q,
+cns_diff_species(amrex::IntVect const& iv, const int idir,
+                 amrex::Array4<amrex::Real const> const& q,
                  amrex::Array4<amrex::Real const> const& coeffs,
                  amrex::GpuArray<amrex::Real, AMREX_SPACEDIM> const& dxinv,
-                 amrex::Array4<amrex::Real> const& flx) 
+                 amrex::Array4<amrex::Real> const& flx)
 {
 #if (NUM_SPECIES > 1) // no point doing diffusion for single species
   using amrex::Real;
-  
+
   const amrex::IntVect ivm(iv - amrex::IntVect::TheDimensionVector(idir));
 
   // Get massfrac, molefrac, enthalpy
-  Real mass1[NUM_SPECIES], mass2[NUM_SPECIES], mass3[NUM_SPECIES], mass4[NUM_SPECIES];
-  Real mole1[NUM_SPECIES], mole2[NUM_SPECIES], mole3[NUM_SPECIES], mole4[NUM_SPECIES];
+  Real mass1[NUM_SPECIES], mass2[NUM_SPECIES], mass3[NUM_SPECIES],
+    mass4[NUM_SPECIES];
+  Real mole1[NUM_SPECIES], mole2[NUM_SPECIES], mole3[NUM_SPECIES],
+    mole4[NUM_SPECIES];
   Real hi1[NUM_SPECIES], hi2[NUM_SPECIES];
   for (int n = 0; n < NUM_SPECIES; ++n) {
     // mass1[n] = q(iv, QFS + n);
@@ -65,8 +68,8 @@ cns_diff_species(amrex::IntVect const& iv, const int idir, amrex::Array4<amrex::
     const Real dXdx =
       (w1 * mole1[n] + w2 * mole2[n] + w3 * mole3[n] + w4 * mole4[n]) *
       dxinv[idir]; // 4th order
-    const Real Vd = -(interp<order>(iv, 0, CRHOD + n, coeffs)) *
-                           (dXdx + (Xface - Yface) * dlnp);
+    const Real Vd =
+      -(interp<order>(iv, 0, CRHOD + n, coeffs)) * (dXdx + (Xface - Yface) * dlnp);
     Vc += Vd;
     flx(iv, UFS + n) += Vd;
     flx(iv, UEDEN) += Vd * hface;
@@ -93,7 +96,8 @@ cns_diff_species(amrex::IntVect const& iv, const int idir, amrex::Array4<amrex::
  * @param[out] flx  output diffusion fluxes.
  */
 AMREX_GPU_DEVICE AMREX_FORCE_INLINE void
-cns_diff(const int i, const int j,const int k, const int d1, amrex::Array4<const amrex::Real> const& q,
+cns_diff(const int i, const int j, const int k, const int d1,
+         amrex::Array4<const amrex::Real> const& q,
          amrex::Array4<const amrex::Real> const& coeffs,
          amrex::GpuArray<amrex::Real, AMREX_SPACEDIM> const& dxinv,
          amrex::Array4<amrex::Real> const& flx) noexcept

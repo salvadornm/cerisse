@@ -1,8 +1,8 @@
 #include "CNS.H"
 #include "central_scheme.H"
 #include "diffusion_eb.H"
-#include "hydro.H"
-#include "hydro_eb.H"
+#include "divop_eb.H"
+#include "hyperbolics.H"
 #include "recon_eb.H"
 
 #if (AMREX_SPACEDIM == 2)
@@ -26,7 +26,7 @@ void CNS::compute_dSdt_box_eb(
                Array4<const Real> const& fcz),
   Array4<const Real> const& bcent, int as_crse, Array4<Real> const& rr_drho_crse,
   Array4<const int> const& rr_flag_crse, int as_fine, Array4<Real> const& dm_as_fine,
-  Array4<const int> const& lev_mask, Real dt, Array4<const Real>& shock_sensor)
+  Array4<const int> const& lev_mask, Real dt)
 {
   BL_PROFILE("CNS::compute_dSdt_box_eb()");
 
@@ -38,6 +38,8 @@ void CNS::compute_dSdt_box_eb(
   const auto dx = geom.CellSizeArray();
   const auto dxinv = geom.InvCellSizeArray();
   const bool do_diffusion = do_visc || do_les || buffer_box.ok();
+
+  GpuArray<const Real, 3> weights{0.0, 1.0, 0.5}; // EB weights
 
   // Prepare FABs to store data
   FArrayBox divcfab(bxg3, ncomp, The_Async_Arena()); // For redistribution
@@ -163,23 +165,20 @@ void CNS::compute_dSdt_box_eb(
         amrex::ParallelFor(reconbox, NCHAR,
                            [=] AMREX_GPU_DEVICE(int i, int j, int k, int n) {
                              cns_recon_eb(i, j, k, n, dir, w, wl, wr, recon_scheme,
-                                          plm_theta, flag, eb_recon_mode);
+                                          plm_theta, flag, 1);
                            });
         // 3. Solve Riemann problem for fluxes at cell face
         amrex::ParallelFor(flxbx, [=] AMREX_GPU_DEVICE(int i, int j, int k) {
+          // bool do_high_order_diff =
+          //   (shock_sensor_arr(i, j, k) < 0.9) &&
+          //   (shock_sensor_arr(IntVect(AMREX_D_DECL(i, j, k)) -
+          //                     IntVect::TheDimensionVector(dir)) < 0.9);
           if (!flag(IntVect(AMREX_D_DECL(i, j, k))).isCovered() &&
               !flag(IntVect(AMREX_D_DECL(i, j, k)) -
                     IntVect::TheDimensionVector(dir))
                  .isCovered()) {
-            cns_riemann(i, j, k, dir, flx, q, wl, wr, char_sys, recon_char_var);
-
-            bool do_high_order_diff =
-              (shock_sensor(i, j, k) < 0.9) &&
-              (shock_sensor(IntVect(AMREX_D_DECL(i, j, k)) -
-                            IntVect::TheDimensionVector(dir)) < 0.9);
-            if (do_high_order_diff) {
-              cns_afd_correction_eb(i, j, k, dir, q, flag, flx);
-            }
+            cns_riemann(i, j, k, dir, flx, q, wl, wr, char_sys, recon_char_var
+                        /*, do_high_order_diff*/);
           }
         });
       }
@@ -188,7 +187,7 @@ void CNS::compute_dSdt_box_eb(
       if (do_diffusion) {
         auto const& vflx = store_in_vflux ? vfluxfab[dir].array() : flx;
         amrex::ParallelFor(flxbx, [=] AMREX_GPU_DEVICE(int i, int j, int k) {
-          cns_diff_eb(i, j, k, dir, q, coefs, flag, dxinv, vflx);
+          cns_diff_eb(i, j, k, dir, q, coefs, flag, dxinv, weights, vflx);
         });
       }
     } // for dir
@@ -208,7 +207,8 @@ void CNS::compute_dSdt_box_eb(
           const int nf = 1 + nfm1;
           AMREX_D_TERM(flx(i, j, k, nf * NVAR + UMX) += invNF * vflx(i, j, k, UMX);
                        , flx(i, j, k, nf * NVAR + UMY) += invNF * vflx(i, j, k, UMY);
-                       , flx(i, j, k, nf * NVAR + UMZ) += invNF * vflx(i, j, k, UMZ);)
+                       ,
+                       flx(i, j, k, nf * NVAR + UMZ) += invNF * vflx(i, j, k, UMZ);)
           flx(i, j, k, nf * NVAR + UEDEN) += invNF * vflx(i, j, k, UEDEN);
           for (int n = 0; n < NUM_SPECIES; ++n) {
             flx(i, j, k, nf * NVAR + UFS + n) += invNF * vflx(i, j, k, UFS + n);

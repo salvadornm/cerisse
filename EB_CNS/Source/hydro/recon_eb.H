@@ -22,14 +22,14 @@ AMREX_GPU_DEVICE AMREX_FORCE_INLINE void cns_recon_eb(
   int i, int j, int k, int n, int dir, amrex::Array4<const amrex::Real> const& q,
   amrex::Array4<amrex::Real> const& ql, amrex::Array4<amrex::Real> const& qr,
   int recon_scheme, amrex::Real plm_theta,
-  amrex::Array4<amrex::EBCellFlag const> const& flag, int eb_mode = 1) noexcept
+  amrex::Array4<amrex::EBCellFlag const> const& flag, int eb_mode) noexcept
 {
   using amrex::Real;
 
   const amrex::IntVect iv(AMREX_D_DECL(i, j, k));
   const amrex::IntVect iv_dir = amrex::IntVect::TheDimensionVector(dir);
 
-  if (flag(iv).isCovered()) return; // EB covered cells do not need flux
+  if (flag(iv).isCovered()) { return; } // EB covered cells do not need flux
 
   // Fill covered stencil points
   amrex::IntVect ivm2 = iv - 2 * iv_dir;
@@ -52,29 +52,24 @@ AMREX_GPU_DEVICE AMREX_FORCE_INLINE void cns_recon_eb(
     if ((ivm2 == ivm1) || (ivp2 == ivp1)) { recon_scheme = 2; }
   }
 
-  if (recon_scheme == 1) {
-    // Simple Godunov
-    qr(iv, n) = q(iv, n);
-    ql(iv + iv_dir, n) = q(iv, n);
-
-  } else if (recon_scheme == 2) {
-    // MUSCL
-    Real s[3];
-    s[0] = q(ivm1, n);
-    s[1] = q(iv, n);
-    s[2] = q(ivp1, n);
-
-    muscl(s, qr(iv, n), ql(iv + iv_dir, n), plm_theta);
-
-  } else if (recon_scheme == 3) {
-    // WENO-Z3
-    Real s[3];
-    s[0] = q(ivm1, n);
-    s[1] = q(iv, n);
-    s[2] = q(ivp1, n);
-
-    wenoz3(s, qr(iv, n), ql(iv + iv_dir, n));
-
+  if (recon_scheme == 6) {
+    // TENO-5
+    Real s[5];
+    s[0] = q(ivm2, n);
+    s[1] = q(ivm1, n);
+    s[2] = q(iv, n);
+    s[3] = q(ivp1, n);
+    s[4] = q(ivp2, n);
+    teno5(s, qr(iv, n), ql(iv + iv_dir, n));
+  } else if (recon_scheme == 5) {
+    // WENO-Z5
+    Real s[5];
+    s[0] = q(ivm2, n);
+    s[1] = q(ivm1, n);
+    s[2] = q(iv, n);
+    s[3] = q(ivp1, n);
+    s[4] = q(ivp2, n);
+    wenoz5(s, qr(iv, n), ql(iv + iv_dir, n));
   } else if (recon_scheme == 4) {
     // WENO-JS5
     Real s[5];
@@ -83,30 +78,67 @@ AMREX_GPU_DEVICE AMREX_FORCE_INLINE void cns_recon_eb(
     s[2] = q(iv, n);
     s[3] = q(ivp1, n);
     s[4] = q(ivp2, n);
-
     wenojs5(s, qr(iv, n), ql(iv + iv_dir, n));
+  } else if (recon_scheme == 3) {
+    // WENO-Z3
+    Real s[3];
+    s[0] = q(ivm1, n);
+    s[1] = q(iv, n);
+    s[2] = q(ivp1, n);
+    wenoz3(s, qr(iv, n), ql(iv + iv_dir, n));
+  } else if (recon_scheme == 2) {
+    // MUSCL / PLM
+    Real s[3];
+    s[0] = q(ivm1, n);
+    s[1] = q(iv, n);
+    s[2] = q(ivp1, n);
+    muscl(s, qr(iv, n), ql(iv + iv_dir, n), plm_theta);
+  } else if (recon_scheme == 1) {
+    // Simple Godunov
+    qr(iv, n) = q(iv, n);
+    ql(iv + iv_dir, n) = q(iv, n);
+  }
+}
 
-  } else if (recon_scheme == 6) {
-    // TENO-5
-    Real s[5];
-    s[0] = q(ivm2, n);
-    s[1] = q(ivm1, n);
-    s[2] = q(iv, n);
-    s[3] = q(ivp1, n);
-    s[4] = q(ivp2, n);
+AMREX_GPU_DEVICE AMREX_FORCE_INLINE void cns_afd_correction_eb(
+  int i, int j, int k, int dir, amrex::Array4<const amrex::Real> const& q,
+  amrex::Array4<amrex::EBCellFlag const> const& flag,
+  amrex::Array4<amrex::Real> const& adv_flx) noexcept
+{
+  using amrex::Real;
+  const amrex::IntVect iv(AMREX_D_DECL(i, j, k));
+  const amrex::IntVect iv_dir = amrex::IntVect::TheDimensionVector(dir);
 
-    teno5(s, qr(iv, n), ql(iv + iv_dir, n));
+  // Left connectivity | i-3 | i-2 | i-1 |  i  | i+1 | i+2 |
+  //                    <-------ng------>^diff here
+  bool cn1 = flag(iv - iv_dir).isConnected(-iv_dir);
+  bool cn2 = flag(iv - 2 * iv_dir).isConnected(-iv_dir);
+  // Right connectivity
+  bool cp1 = flag(iv).isConnected(iv_dir);
+  bool cp2 = flag(iv + iv_dir).isConnected(iv_dir);
+  const int ng = (cn1 & cp1) ? ((cn2 & cp2) ? 3 : 2) : 1;
+  if (ng == 1) { return; } // Cannot do AFD correction
 
-  } else {
-    // Default: WENO-Z5
-    Real s[5];
-    s[0] = q(ivm2, n);
-    s[1] = q(ivm1, n);
-    s[2] = q(iv, n);
-    s[3] = q(ivp1, n);
-    s[4] = q(ivp2, n);
+  Real f[2 * ng][NVAR];
+  for (int m = 0; m < 2 * ng; ++m) {
+    cns_flux(iv + (m - ng) * iv_dir, dir, q, f[m]);
+  }
 
-    wenoz5(s, qr(iv, n), ql(iv + iv_dir, n));
+  if (ng == 3) {
+    for (int n = 0; n < NVAR; ++n) {
+      adv_flx(i, j, k, n) +=
+        -1.0 / 1152.0 *
+          (-5.0 * f[0][n] + 39.0 * f[1][n] - 34.0 * f[2][n] - 34.0 * f[3][n] +
+           39.0 * f[4][n] - 5.0 * f[5][n]) // dx^2*fxx/24
+        + 7.0 / 11520.0 *
+            (f[0][n] - 3.0 * f[1][n] + 2.0 * f[2][n] + 2.0 * f[3][n] -
+             3.0 * f[4][n] + f[5][n]); // dx^4*fxxxx*7/5760
+    }
+  } else if (ng == 2) {
+    for (int n = 0; n < NVAR; ++n) {
+      adv_flx(i, j, k, n) +=
+        -1.0 / 48.0 * (f[0][n] - f[1][n] - f[2][n] + f[3][n]); // dx^2*fxx/24
+    }
   }
 }
 

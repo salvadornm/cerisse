@@ -53,12 +53,11 @@ cns_KEEP2(int i, int j, int k, int dir, amrex::Array4<amrex::Real> const& flx,
 }
 
 AMREX_GPU_DEVICE AMREX_FORCE_INLINE void
-cns_KEEP_base(amrex::Real rhom, amrex::Real rho,
-              amrex::Real Ym[NUM_SPECIES], amrex::Real Y[NUM_SPECIES],
-              amrex::Real um, amrex::Real u, amrex::Real vm, amrex::Real v, 
-              amrex::Real wm, amrex::Real w, amrex::Real pm, amrex::Real p,
-              amrex::Real eim, amrex::Real ei, amrex::Real wbarm, amrex::Real wbar, 
-              amrex::Real flx[NVAR]) noexcept
+cns_KEEP_base(amrex::Real rhom, amrex::Real rho, amrex::Real Ym[NUM_SPECIES],
+              amrex::Real Y[NUM_SPECIES], amrex::Real um, amrex::Real u,
+              amrex::Real vm, amrex::Real v, amrex::Real wm, amrex::Real w,
+              amrex::Real pm, amrex::Real p, amrex::Real eim, amrex::Real ei,
+              amrex::Real wbarm, amrex::Real wbar, amrex::Real flx[NVAR]) noexcept
 {
   const amrex::Real phi = wbar / wbarm * rhom / rho;
 
@@ -90,10 +89,11 @@ cns_KEEP4(int i, int j, int k, int dir, amrex::Array4<amrex::Real> const& flx,
   const int QUN = QU + dir;
   const int QUT = QU + (dir + 1) % AMREX_SPACEDIM;
   const int QUTT = QU + (dir + 2) % AMREX_SPACEDIM;
-  
-  // (KEEP4 flux) = 4/3 * (KEEP2 flux)_{i-1,i} - 1/6 * ((KEEP2 flux)_{i-1,i+1} + (KEEP2 flux)_{i-2,i})
+
+  // (KEEP4 flux) = 4/3 * (KEEP2 flux)_{i-1,i} - 1/6 * ((KEEP2 flux)_{i-1,i+1} +
+  // (KEEP2 flux)_{i-2,i})
   Real flx_tmp[NVAR], Ym[NUM_SPECIES], Y[NUM_SPECIES];
-  
+
   // (KEEP2 flux)_{i-1,i}
   const amrex::IntVect ivm = iv - amrex::IntVect::TheDimensionVector(dir);
   for (int n = 0; n < NUM_SPECIES; ++n) {
@@ -108,7 +108,8 @@ cns_KEEP4(int i, int j, int k, int dir, amrex::Array4<amrex::Real> const& flx,
     flx(iv, UFS + n) = flx_tmp[UFS + n] * 4.0 / 3.0;
   }
   flx(iv, URHO) = flx_tmp[URHO] * 4.0 / 3.0;
-  AMREX_D_TERM(flx(iv, QUN) = flx_tmp[UMX] * 4.0 / 3.0; // we can do this because UMX = QU
+  AMREX_D_TERM(flx(iv, QUN) =
+                 flx_tmp[UMX] * 4.0 / 3.0; // we can do this because UMX = QU
                , flx(iv, QUT) = flx_tmp[UMY] * 4.0 / 3.0;
                , flx(iv, QUTT) = flx_tmp[UMZ] * 4.0 / 3.0;)
   flx(iv, UEDEN) = flx_tmp[UEDEN] * 4.0 / 3.0;
@@ -169,8 +170,8 @@ cns_KEEP4(int i, int j, int k, int dir, amrex::Array4<amrex::Real> const& flx,
 //   for (int n = 0; n < NUM_SPECIES; ++n) {
 //     flx(iv, UFS + n) =
 //       0.25 *
-//       (q(ivm, QRHO) * q(ivm, QFS + n) / phi + q(iv, QRHO) * q(iv, QFS + n) * phi) *
-//       (q(iv, QU + dir) + q(ivm, QU + dir));
+//       (q(ivm, QRHO) * q(ivm, QFS + n) / phi + q(iv, QRHO) * q(iv, QFS + n) * phi)
+//       * (q(iv, QU + dir) + q(ivm, QU + dir));
 //     flx(iv, URHO) += flx(iv, UFS + n);
 //   }
 
@@ -190,21 +191,22 @@ cns_KEEP4(int i, int j, int k, int dir, amrex::Array4<amrex::Real> const& flx,
 //   // Energy: rho * (ke + ie) * u_i + p * u_i
 //   flx(iv, UEDEN) = 0.125 * (q(ivm, QRHO) / phi + q(iv, QRHO) * phi) *
 //                      (q(ivm, QU + dir) + q(iv, QU + dir)) *
-//                      (AMREX_D_TERM(q(ivm, QU) * q(iv, QU), +q(ivm, QV) * q(iv, QV),
+//                      (AMREX_D_TERM(q(ivm, QU) * q(iv, QU), +q(ivm, QV) * q(iv,
+//                      QV),
 //                                    +q(ivm, QW) * q(iv, QW))) // ke
 //                    + 0.25 *
-//                        (q(ivm, QRHO) * q(ivm, QEINT) + q(iv, QRHO) * q(iv, QEINT)) *
-//                        (q(ivm, QU + dir) + q(iv, QU + dir)) // ie
+//                        (q(ivm, QRHO) * q(ivm, QEINT) + q(iv, QRHO) * q(iv, QEINT))
+//                        * (q(ivm, QU + dir) + q(iv, QU + dir)) // ie
 //                    + 0.5 * (q(iv, QPRES) * q(ivm, QU + dir) +
 //                             q(ivm, QPRES) * q(iv, QU + dir)); // p * u_i
 
 //   // Get KEEP2 fluxes at i+1/2, store in tmp
-//   Real tmp[NVAR];  
+//   Real tmp[NVAR];
 
 //   // shift one cell in dir direction
 //   iv += amrex::IntVect::TheDimensionVector(dir);
 //   ivm += amrex::IntVect::TheDimensionVector(dir);
-  
+
 //   // these are the same as above
 //   phi = q(iv, QWBAR) / q(ivm, QWBAR) * q(ivm, QRHO) / q(iv, QRHO);
 
@@ -212,8 +214,8 @@ cns_KEEP4(int i, int j, int k, int dir, amrex::Array4<amrex::Real> const& flx,
 //   for (int n = 0; n < NUM_SPECIES; ++n) {
 //     tmp[UFS + n] =
 //       0.125 *
-//       (q(ivm, QRHO) * q(ivm, QFS + n) / phi + q(iv, QRHO) * q(iv, QFS + n) * phi) *
-//       (q(iv, QU + dir) + q(ivm, QU + dir));
+//       (q(ivm, QRHO) * q(ivm, QFS + n) / phi + q(iv, QRHO) * q(iv, QFS + n) * phi)
+//       * (q(iv, QU + dir) + q(ivm, QU + dir));
 //     tmp[URHO] += tmp[UFS + n];
 //   }
 
@@ -238,7 +240,7 @@ cns_KEEP4(int i, int j, int k, int dir, amrex::Array4<amrex::Real> const& flx,
 //     0.5 * (q(iv, QPRES) * q(ivm, QU + dir) + q(ivm, QPRES) * q(iv, QU + dir));
 
 //   // Get KEEP4 fluxes: flx_{i-0.5} = 4/3 * flx_{i-0.5} - 1/6 * flx_{i+0.5}
-//   iv = amrex::IntVect(AMREX_D_DECL(i, j, k));  
+//   iv = amrex::IntVect(AMREX_D_DECL(i, j, k));
 //   for (int n = 0; n < NVAR; ++n) {
 //     flx(iv, n) = flx(iv, n) * 4.0 / 3.0 - tmp[n] / 6.0;
 //   }
@@ -259,7 +261,6 @@ cns_consFilter(int i, int j, int k, amrex::Array4<amrex::Real> const& flx,
   // Modify fluxes
 
   // Update dSdt (OR need to wait until all dir are done?)
-
 }
 
 #endif

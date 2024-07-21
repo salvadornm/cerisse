@@ -1,4 +1,5 @@
 #include "prob.H"
+
 #include "file_io.H"
 
 extern "C" {
@@ -63,7 +64,7 @@ void amrex_probinit(const int* /*init*/, const int* /*name*/, const int* /*namel
   assert(CNS::h_prob_parm->L == probhi[1] - problo[1]);
   assert(CNS::h_prob_parm->L == probhi[2] - problo[2]);
 
-  // Initialise velocity, density  
+  // Initialise velocity, density
   amrex::Real cs, cp;
   auto eos = pele::physics::PhysicsType::eos();
   eos.PYT2R(CNS::h_prob_parm->p0, CNS::h_prob_parm->Y.begin(), CNS::h_prob_parm->T0,
@@ -81,8 +82,8 @@ void amrex_probinit(const int* /*init*/, const int* /*name*/, const int* /*namel
   trans.transport(false, get_mu, get_lam, false, false, CNS::h_prob_parm->T0,
                   CNS::h_prob_parm->rho0, CNS::h_prob_parm->Y.begin(), nullptr,
                   nullptr, mu, dummy, lam, &trans_parm);
-  amrex::Real Re = CNS::h_prob_parm->rho0 * CNS::h_prob_parm->v0 *
-                   CNS::h_prob_parm->L / mu;
+  amrex::Real Re =
+    CNS::h_prob_parm->rho0 * CNS::h_prob_parm->v0 * CNS::h_prob_parm->L / mu;
   amrex::Real Pr = mu * cp / lam;
   amrex::Real t_ref = CNS::h_prob_parm->L / CNS::h_prob_parm->v0;
 
@@ -100,19 +101,18 @@ void amrex_probinit(const int* /*init*/, const int* /*name*/, const int* /*namel
     amrex::ParmParse pp("amr");
     std::string start_file;
     pp.query("restart", start_file);
-    if (!start_file.empty()) 
-      restart = true;
+    if (!start_file.empty()) restart = true;
   }
 
   if (!restart && CNS::h_prob_parm->mode == 1) {
 #ifdef AMREX_USE_FLOAT
     amrex::Abort("HIT cannot run in single precision at the moment.");
 #else
-// #if NUM_FIELD == 0
-//     int num_entry = 6; // x, y, z, u, v, w
-// #else
+    // #if NUM_FIELD == 0
+    //     int num_entry = 6; // x, y, z, u, v, w
+    // #else
     int num_entry = 7; // ..., k_sgs
-// #endif
+                       // #endif
     const size_t nx = CNS::h_prob_parm->inres;
     const size_t ny = CNS::h_prob_parm->inres;
     const size_t nz = CNS::h_prob_parm->inres;
@@ -128,25 +128,28 @@ void amrex_probinit(const int* /*init*/, const int* /*name*/, const int* /*namel
     CNS::prob_parm_host->h_uinput.resize(nx * ny * nz);
     CNS::prob_parm_host->h_vinput.resize(nx * ny * nz);
     CNS::prob_parm_host->h_winput.resize(nx * ny * nz);
-// #if NUM_FIELD > 0
+    // #if NUM_FIELD > 0
     CNS::prob_parm_host->h_kinput.resize(nx * ny * nz);
-// #endif
+    // #endif
     for (long i = 0; i < h_xinput.size(); i++) {
       h_xinput[i] = data[0 + i * num_entry];
-      CNS::prob_parm_host->h_uinput[i] = data[3 + i * num_entry] * CNS::h_prob_parm->v0;
-      CNS::prob_parm_host->h_vinput[i] = data[4 + i * num_entry] * CNS::h_prob_parm->v0;
-      CNS::prob_parm_host->h_winput[i] = data[5 + i * num_entry] * CNS::h_prob_parm->v0;
-// #if NUM_FIELD > 0
-      CNS::prob_parm_host->h_kinput[i] = data[6 + i * num_entry] * CNS::h_prob_parm->v0 * CNS::h_prob_parm->v0;
-      CNS::h_prob_parm->ksgs_avg += CNS::prob_parm_host->h_kinput[i] / h_xinput.size();
-// #endif
+      CNS::prob_parm_host->h_uinput[i] =
+        data[3 + i * num_entry] * CNS::h_prob_parm->v0;
+      CNS::prob_parm_host->h_vinput[i] =
+        data[4 + i * num_entry] * CNS::h_prob_parm->v0;
+      CNS::prob_parm_host->h_winput[i] =
+        data[5 + i * num_entry] * CNS::h_prob_parm->v0;
+      // #if NUM_FIELD > 0
+      CNS::prob_parm_host->h_kinput[i] =
+        data[6 + i * num_entry] * CNS::h_prob_parm->v0 * CNS::h_prob_parm->v0;
+      CNS::h_prob_parm->ksgs_avg +=
+        CNS::prob_parm_host->h_kinput[i] / h_xinput.size();
+      // #endif
     }
 
     // Get the xarray table and the differences.
     amrex::Vector<amrex::Real> h_xarray(nx);
-    for (long i = 0; i < h_xarray.size(); i++) {
-      h_xarray[i] = h_xinput[i];
-    }
+    for (long i = 0; i < h_xarray.size(); i++) { h_xarray[i] = h_xinput[i]; }
     amrex::Vector<amrex::Real> h_xdiff(nx);
     std::adjacent_difference(h_xarray.begin(), h_xarray.end(), h_xdiff.begin());
     h_xdiff[0] = h_xdiff[1];
@@ -160,9 +163,9 @@ void amrex_probinit(const int* /*init*/, const int* /*name*/, const int* /*namel
     CNS::prob_parm_host->uinput.resize(CNS::prob_parm_host->h_uinput.size());
     CNS::prob_parm_host->vinput.resize(CNS::prob_parm_host->h_vinput.size());
     CNS::prob_parm_host->winput.resize(CNS::prob_parm_host->h_winput.size());
-// #if NUM_FIELD > 0
+    // #if NUM_FIELD > 0
     CNS::prob_parm_host->kinput.resize(CNS::prob_parm_host->h_kinput.size());
-// #endif
+    // #endif
     amrex::Gpu::copyAsync(
       amrex::Gpu::hostToDevice, CNS::prob_parm_host->h_uinput.begin(),
       CNS::prob_parm_host->h_uinput.end(), CNS::prob_parm_host->uinput.begin());
@@ -172,15 +175,15 @@ void amrex_probinit(const int* /*init*/, const int* /*name*/, const int* /*namel
     amrex::Gpu::copyAsync(
       amrex::Gpu::hostToDevice, CNS::prob_parm_host->h_winput.begin(),
       CNS::prob_parm_host->h_winput.end(), CNS::prob_parm_host->winput.begin());
-// #if NUM_FIELD > 0
+    // #if NUM_FIELD > 0
     amrex::Gpu::copyAsync(
       amrex::Gpu::hostToDevice, CNS::prob_parm_host->h_kinput.begin(),
       CNS::prob_parm_host->h_kinput.end(), CNS::prob_parm_host->kinput.begin());
-// #endif    
+    // #endif
     CNS::h_prob_parm->d_uinput = CNS::prob_parm_host->uinput.data();
     CNS::h_prob_parm->d_vinput = CNS::prob_parm_host->vinput.data();
     CNS::h_prob_parm->d_winput = CNS::prob_parm_host->winput.data();
-// #if NUM_FIELD > 0
+    // #if NUM_FIELD > 0
     CNS::h_prob_parm->d_kinput = CNS::prob_parm_host->kinput.data();
 // #endif
 #endif
@@ -196,10 +199,9 @@ void CNS::fill_ext_src(int i, int j, int k, amrex::Real /*time*/,
                        amrex::GeometryData const& /*geomdata*/,
                        amrex::Array4<const amrex::Real> const& state,
                        amrex::Array4<amrex::Real> const& ext_src,
-                       Parm const& /*parm*/, ProbParm const& /*prob_parm*/)
+                       ProbParm const& /*prob_parm*/)
 {
 }
-
 
 void CNS::full_prob_post_timestep(int /*iteration*/)
 {
@@ -222,7 +224,9 @@ void CNS::full_prob_post_timestep(int /*iteration*/)
       amrex::iMultiFab ifine_mask(cns_lev.grids, cns_lev.dmap, 1, 0);
       if (lev < parent->finestLevel()) {
         // mask out fine covered cells, do not sum
-        ifine_mask = makeFineMask(cns_lev.grids, cns_lev.dmap, parent->boxArray(lev + 1), cns_lev.fine_ratio, 1, 0);
+        ifine_mask =
+          makeFineMask(cns_lev.grids, cns_lev.dmap, parent->boxArray(lev + 1),
+                       cns_lev.fine_ratio, 1, 0);
       } else {
         ifine_mask.setVal(1);
       }
@@ -243,9 +247,7 @@ void CNS::full_prob_post_timestep(int /*iteration*/)
         TypeList<Real, Real, Real, Real, Real>{}, S_new, IntVect(0),
         [=] AMREX_GPU_DEVICE(int box_no, int i, int j,
                              int k) -> GpuTuple<Real, Real, Real, Real, Real> {
-          if (marrs[box_no](i, j, k) == 0) {
-            return {0.0, 0.0, 0.0, 1.0e10, 0.0};
-          }
+          if (marrs[box_no](i, j, k) == 0) { return {0.0, 0.0, 0.0, 1.0e10, 0.0}; }
 
           const amrex::Real vol = volarrs[box_no](i, j, k);
           const amrex::Real mvt = vortarrs[box_no](i, j, k);
@@ -288,9 +290,10 @@ void CNS::full_prob_post_timestep(int /*iteration*/)
             maxT = amrex::max(maxT, T);
             minT = amrex::min(minT, T);
 
-            ksgs += vol * 0.5 * rho * (pow(mxf * rhofinv - mx * rhoinv, 2) 
-                                     + pow(myf * rhofinv - my * rhoinv, 2) 
-                                     + pow(mzf * rhofinv - mz * rhoinv, 2));
+            ksgs += vol * 0.5 * rho *
+                    (pow(mxf * rhofinv - mx * rhoinv, 2) +
+                     pow(myf * rhofinv - my * rhoinv, 2) +
+                     pow(mzf * rhofinv - mz * rhoinv, 2));
           }
           ksgs /= amrex::Real(NUM_FIELD);
           ke += ksgs;
@@ -325,9 +328,8 @@ void CNS::full_prob_post_timestep(int /*iteration*/)
       amrex::Print() << "TIME = " << time << '\n'
                      << " SUM KE        = " << kinetic_e << '\n'
                      << " SUM ENSTROPHY = " << enstrophy << '\n'
-                     << " TEMP          = " << min_temp << " .. " 
-                                            << mean_temp << " .. " 
-                                            << max_temp << '\n';
+                     << " TEMP          = " << min_temp << " .. " << mean_temp
+                     << " .. " << max_temp << '\n';
 
       // Write the quantities at this time
       const int log_index = 0;
@@ -335,9 +337,12 @@ void CNS::full_prob_post_timestep(int /*iteration*/)
       const int datwidth = 14;
       const int datprecision = 6;
       data_log << std::setw(datwidth) << time;
-      data_log << std::setw(datwidth) << std::setprecision(datprecision) << kinetic_e;
-      data_log << std::setw(datwidth) << std::setprecision(datprecision) << enstrophy;
-      data_log << std::setw(datwidth) << std::setprecision(datprecision) << mean_temp;
+      data_log << std::setw(datwidth) << std::setprecision(datprecision)
+               << kinetic_e;
+      data_log << std::setw(datwidth) << std::setprecision(datprecision)
+               << enstrophy;
+      data_log << std::setw(datwidth) << std::setprecision(datprecision)
+               << mean_temp;
       data_log << std::setw(datwidth) << std::setprecision(datprecision) << min_temp;
       data_log << std::setw(datwidth) << std::setprecision(datprecision) << max_temp;
       data_log << std::endl;

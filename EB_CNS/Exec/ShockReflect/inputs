@@ -33,6 +33,7 @@ cns.recon_scheme = 6  # 1: Godunov, 2: MUSCL, 3: WENO-Z3,
 cns.char_sys       = 0 
 cns.recon_char_var = 1 # will be sharper when turned on
 cns.teno_cutoff = -1
+cns.use_hybrid_scheme = 1
 
 # ================ VERBOSITY & DIAGNOSIS =============== #
 cns.v = 1

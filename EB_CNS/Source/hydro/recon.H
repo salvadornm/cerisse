@@ -203,67 +203,6 @@ AMREX_GPU_DEVICE AMREX_FORCE_INLINE void wenoz5(amrex::Real s[5], amrex::Real& s
        (alpha[2] * vr[2] + alpha[1] * vr[1] + alpha[0] * vr[0]);
 }
 
-// AMREX_GPU_DEVICE AMREX_FORCE_INLINE void wenoz5(amrex::Real s[5], amrex::Real& sm,
-//                                                 amrex::Real& sp) noexcept
-// {
-//   using amrex::Real;
-
-//   const Real eps = 1e-20;
-//   Real vl[3];
-//   Real vr[3];
-//   Real beta[3];
-//   Real alpha[3];
-//   Real alpha1, tau;
-
-//   beta[2] = pow(s[0] - 2.0 * s[1] + s[2], 2) +
-//             0.25 * pow(s[0] - 4.0 * s[1] + 3.0 * s[2], 2);
-//   beta[1] = pow(s[1] - 2.0 * s[3], 2) +
-//             0.25 * (s[1] - s[3]) * (s[1] - s[3]);
-//   beta[0] = pow(s[2] - 2.0 * s[3] + s[4], 2) +
-//             0.25 * pow(3.0 * s[2] - 4.0 * s[3] + s[4], 2);
-
-//   tau = amrex::Math::abs(beta[2] - beta[0]);
-//   beta[2] = 1.0 + (tau / (eps + beta[2]));// * (tau / (eps + beta[2]));
-//   beta[1] = 1.0 + (tau / (eps + beta[1]));// * (tau / (eps + beta[1]));
-//   beta[0] = 1.0 + (tau / (eps + beta[0]));// * (tau / (eps + beta[0]));
-
-//   alpha[2] = beta[2];
-//   alpha[1] = 10.0 * beta[1];
-//   alpha[0] = 5.0 * beta[0];
-//   alpha1 = 1.0 / (alpha[2] + alpha[1] + alpha[0]);
-
-//   vl[2] = 3.0 * s[0] - 10.0 * s[1] + 15.0 * s[2];
-//   vl[1] = -s[1] + 6.0 * s[2] + 3.0 * s[3];
-//   vl[0] = 3.0 * s[2] + 6.0 * s[3] - s[4];
-
-//   sp = Real(1. / 8.) * alpha1 *
-//        (alpha[2] * vl[2] + alpha[1] * vl[1] + alpha[0] * vl[0]);
-
-//   beta[2] = pow(s[4] - 2.0 * s[3] + s[2], 2) +
-//             0.25 * pow(s[4] - 4.0 * s[3] + 3.0 * s[2], 2);
-//   beta[1] = pow(s[3] - 2.0 * s[1], 2) +
-//             0.25 * (s[3] - s[1]) * (s[3] - s[1]);
-//   beta[0] = pow(s[2] - 2.0 * s[1] + s[0], 2) +
-//             0.25 * pow(3.0 * s[2] - 4.0 * s[1] + s[0], 2);
-
-//   tau = amrex::Math::abs(beta[2] - beta[0]);
-//   beta[2] = 1.0 + (tau / (eps + beta[2])) * (tau / (eps + beta[2]));
-//   beta[1] = 1.0 + (tau / (eps + beta[1])) * (tau / (eps + beta[1]));
-//   beta[0] = 1.0 + (tau / (eps + beta[0])) * (tau / (eps + beta[0]));
-
-//   alpha[2] = beta[2];
-//   alpha[1] = 10.0 * beta[1];
-//   alpha[0] = 5.0 * beta[0];
-//   alpha1 = 1.0 / (alpha[2] + alpha[1] + alpha[0]);
-
-//   vr[2] = 3.0 * s[4] - 10.0 * s[3] + 15.0 * s[2];
-//   vr[1] = -s[3] + 6.0 * s[2] + 3.0 * s[1];
-//   vr[0] = 3.0 * s[2] + 6.0 * s[1] - s[0];
-
-//   sm = Real(1. / 8.) * alpha1 *
-//        (alpha[2] * vr[2] + alpha[1] * vr[1] + alpha[0] * vr[0]);
-// }
-
 /// \brief TENO 5th order. Ref https://doi.org/10.1016/j.cpc.2018.10.009.
 AMREX_GPU_DEVICE AMREX_FORCE_INLINE void teno5(amrex::Real s[5], amrex::Real& sm,
                                                amrex::Real& sp) noexcept
@@ -294,7 +233,7 @@ AMREX_GPU_DEVICE AMREX_FORCE_INLINE void teno5(amrex::Real s[5], amrex::Real& sm
   beta[2] = pow(1.0 + xi[2], int(6));
   beta[1] = pow(1.0 + xi[1], int(6));
   beta[0] = pow(1.0 + xi[0], int(6));
-  beta1 = 1.0 / (beta[2] + beta[1] + beta[0]);  
+  beta1 = 1.0 / (beta[2] + beta[1] + beta[0]);
 
   if (CNS::teno_cutoff <= 0) {
     // Adaptive TENO, Ref: https://doi.org/10.1016/j.jcp.2020.109902
@@ -304,9 +243,8 @@ AMREX_GPU_DEVICE AMREX_FORCE_INLINE void teno5(amrex::Real s[5], amrex::Real& sm
     CT = std::pow(10.0, -m);
   } else {
     CT = CNS::teno_cutoff;
-  } 
+  }
 
-  // TODO: consider optimised high spectral resolution weights 1.235341937, 5.065006634, 3.699651429?
   alpha[2] = beta[2] * beta1 < CT ? 0.0 : 1.0;
   alpha[1] = beta[1] * beta1 < CT ? 0.0 : 10.0;
   alpha[0] = beta[0] * beta1 < CT ? 0.0 : 5.0;
@@ -316,8 +254,8 @@ AMREX_GPU_DEVICE AMREX_FORCE_INLINE void teno5(amrex::Real s[5], amrex::Real& sm
   v[1] = -s[1] + 6.0 * s[2] + 3.0 * s[3];
   v[0] = 3.0 * s[2] + 6.0 * s[3] - s[4];
 
-  sp = Real(1. / 8.) * alpha1 *
-       (alpha[2] * v[2] + alpha[1] * v[1] + alpha[0] * v[0]);
+  sp =
+    Real(1. / 8.) * alpha1 * (alpha[2] * v[2] + alpha[1] * v[1] + alpha[0] * v[0]);
 
   beta[2] = Real(13. / 12.) * pow(s[4] - 2.0 * s[3] + s[2], 2) +
             0.25 * pow(s[4] - 4.0 * s[3] + 3.0 * s[2], 2);
@@ -353,8 +291,8 @@ AMREX_GPU_DEVICE AMREX_FORCE_INLINE void teno5(amrex::Real s[5], amrex::Real& sm
   v[1] = -s[3] + 6.0 * s[2] + 3.0 * s[1];
   v[0] = 3.0 * s[2] + 6.0 * s[1] - s[0];
 
-  sm = Real(1. / 8.) * alpha1 *
-       (alpha[2] * v[2] + alpha[1] * v[1] + alpha[0] * v[0]);
+  sm =
+    Real(1. / 8.) * alpha1 * (alpha[2] * v[2] + alpha[1] * v[1] + alpha[0] * v[0]);
 }
 
 /**
@@ -388,29 +326,24 @@ AMREX_GPU_DEVICE AMREX_FORCE_INLINE void cns_recon(
   const amrex::IntVect iv(AMREX_D_DECL(i, j, k));
   const amrex::IntVect iv_dir = amrex::IntVect::TheDimensionVector(dir);
 
-  if (recon_scheme == 1) {
-    // Simple Godunov
-    qr(iv, n) = q(iv, n);
-    ql(iv + iv_dir, n) = q(iv, n);
-
-  } else if (recon_scheme == 2) {
-    // MUSCL
-    Real s[3];
-    s[0] = q(iv - iv_dir, n);
-    s[1] = q(iv, n);
-    s[2] = q(iv + iv_dir, n);
-
-    muscl(s, qr(iv, n), ql(iv + iv_dir, n), plm_theta);
-
-  } else if (recon_scheme == 3) {
-    // WENO-Z3
-    Real s[3];
-    s[0] = q(iv - iv_dir, n);
-    s[1] = q(iv, n);
-    s[2] = q(iv + iv_dir, n);
-
-    wenoz3(s, qr(iv, n), ql(iv + iv_dir, n));
-
+  if (recon_scheme == 6) {
+    // TENO-5
+    Real s[5];
+    s[0] = q(iv - 2 * iv_dir, n);
+    s[1] = q(iv - iv_dir, n);
+    s[2] = q(iv, n);
+    s[3] = q(iv + iv_dir, n);
+    s[4] = q(iv + 2 * iv_dir, n);
+    teno5(s, qr(iv, n), ql(iv + iv_dir, n));
+  } else if (recon_scheme == 5) {
+    // WENO-Z5
+    Real s[5];
+    s[0] = q(iv - 2 * iv_dir, n);
+    s[1] = q(iv - iv_dir, n);
+    s[2] = q(iv, n);
+    s[3] = q(iv + iv_dir, n);
+    s[4] = q(iv + 2 * iv_dir, n);
+    wenoz5(s, qr(iv, n), ql(iv + iv_dir, n));
   } else if (recon_scheme == 4) {
     // WENO-JS5
     Real s[5];
@@ -419,30 +352,25 @@ AMREX_GPU_DEVICE AMREX_FORCE_INLINE void cns_recon(
     s[2] = q(iv, n);
     s[3] = q(iv + iv_dir, n);
     s[4] = q(iv + 2 * iv_dir, n);
-
     wenojs5(s, qr(iv, n), ql(iv + iv_dir, n));
-
-  } else if (recon_scheme == 6) {
-    // TENO-5
-    Real s[5];
-    s[0] = q(iv - 2 * iv_dir, n);
-    s[1] = q(iv - iv_dir, n);
-    s[2] = q(iv, n);
-    s[3] = q(iv + iv_dir, n);
-    s[4] = q(iv + 2 * iv_dir, n);
-
-    teno5(s, qr(iv, n), ql(iv + iv_dir, n));
-
-  } else {
-    // Default: WENO-Z5
-    Real s[5];
-    s[0] = q(iv - 2 * iv_dir, n);
-    s[1] = q(iv - iv_dir, n);
-    s[2] = q(iv, n);
-    s[3] = q(iv + iv_dir, n);
-    s[4] = q(iv + 2 * iv_dir, n);
-
-    wenoz5(s, qr(iv, n), ql(iv + iv_dir, n));
+  } else if (recon_scheme == 3) {
+    // WENO-Z3
+    Real s[3];
+    s[0] = q(iv - iv_dir, n);
+    s[1] = q(iv, n);
+    s[2] = q(iv + iv_dir, n);
+    wenoz3(s, qr(iv, n), ql(iv + iv_dir, n));
+  } else if (recon_scheme == 2) {
+    // MUSCL / PLM
+    Real s[3];
+    s[0] = q(iv - iv_dir, n);
+    s[1] = q(iv, n);
+    s[2] = q(iv + iv_dir, n);
+    muscl(s, qr(iv, n), ql(iv + iv_dir, n), plm_theta);
+  } else if (recon_scheme == 1) {
+    // Simple Godunov
+    qr(iv, n) = q(iv, n);
+    ql(iv + iv_dir, n) = q(iv, n);
   }
 }
 

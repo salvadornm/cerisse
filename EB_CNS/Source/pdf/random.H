@@ -48,8 +48,9 @@ public:
   /**
    * @brief Generate random numbers for a coarse step
    * @param sqrtdt_coarse sqrt(dt) of the coarest level
-   * @param rand_mode 0: unmodified random normal; 1: normalised randn; 2: [1,-1]; 
-   *                  3: generate N/2 randn and flip sign to produce the other half (antithetic sampling)
+   * @param rand_mode 0: unmodified random normal; 1: normalised randn; 2: [1,-1];
+   *                  3: generate N/2 randn and flip sign to produce the other half
+   * (antithetic sampling)
    * @param sync_mode 0: randomise at finest level, sum up to coarser levels; 1:
    * randomise at coarsest level, divide to finer levels
    */
@@ -91,12 +92,12 @@ public:
           (NUM_FIELD % 2 == 0)
             ? 1.0
             : sqrt(amrex::Real(NUM_FIELD) /
-                    amrex::Real(NUM_FIELD - 1)); // to give a variance of exactly 1
+                   amrex::Real(NUM_FIELD - 1)); // to give a variance of exactly 1
         for (int s = 0; s < _num_step; ++s) {
           for (int d = 0; d < AMREX_SPACEDIM; ++d) {
             for (int nf = 0; nf < NUM_FIELD - 1; nf += 2) {
-              raw_data(s, d, nf) = sqrtdt * corr_fac *
-                                    (2.0 * amrex::Real(amrex::Random_int(2)) - 1.0);
+              raw_data(s, d, nf) =
+                sqrtdt * corr_fac * (2.0 * amrex::Real(amrex::Random_int(2)) - 1.0);
               raw_data(s, d, nf + 1) = -raw_data(s, d, nf);
             }
             if (NUM_FIELD % 2 == 1) {
@@ -107,8 +108,8 @@ public:
           }
         }
       } else if (rand_mode == 3) {
-        AMREX_ALWAYS_ASSERT_WITH_MESSAGE(NUM_FIELD % 2 == 0, 
-                                          "ERROR: Antithetic sampling must have even NUM_FIELD");
+        AMREX_ALWAYS_ASSERT_WITH_MESSAGE(
+          NUM_FIELD % 2 == 0, "ERROR: Antithetic sampling must have even NUM_FIELD");
         // generate random normal //
         for (int s = 0; s < _num_step; ++s) {
           for (int d = 0; d < _num_rand; ++d) {
@@ -142,21 +143,17 @@ public:
             // or
 
             amrex::Real sum = 0;
-            for (int s = 0; s < _num_step; ++s) {
-              sum += raw_data(s, d, nf);
-            }
+            for (int s = 0; s < _num_step; ++s) { sum += raw_data(s, d, nf); }
             sum /= _num_step;
-            for (int s = 0; s < _num_step; ++s) {
-              raw_data(s, d, nf) = sum;
-            }
+            for (int s = 0; s < _num_step; ++s) { raw_data(s, d, nf) = sum; }
           }
         }
       }
     }
 
     // broadcast to all ranks //
-    amrex::ParallelDescriptor::Bcast(
-      _data.data(), _data.size(), amrex::ParallelDescriptor::IOProcessorNumber());
+    amrex::ParallelDescriptor::Bcast(_data.data(), _data.size(),
+                                     amrex::ParallelDescriptor::IOProcessorNumber());
 
     // amrex::Print() << "** Called WienerProcess.generate_new()" << std::endl;
   }

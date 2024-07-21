@@ -17,8 +17,7 @@
 
 AMREX_GPU_DEVICE AMREX_FORCE_INLINE void
 prob_initdata(int i, int j, int k, amrex::Array4<amrex::Real> const& state,
-              amrex::GeometryData const& geomdata, Parm const& /*parm*/,
-              ProbParm const& prob_parm)
+              amrex::GeometryData const& geomdata, ProbParm const& prob_parm)
 {
   // Geometry
   const amrex::Real* prob_lo = geomdata.ProbLo();
@@ -44,7 +43,7 @@ prob_initdata(int i, int j, int k, amrex::Array4<amrex::Real> const& state,
       prob_parm.p0 + prob_parm.rho0 * prob_parm.v0 * prob_parm.v0 / 16.0 *
                        (cos(2.0 * 2.0 * M_PI * x / prob_parm.L) +
                         cos(2.0 * 2.0 * M_PI * y / prob_parm.L)) *
-                       (cos(2.0 * 2.0 * M_PI * z / prob_parm.L) + 2.0);    
+                       (cos(2.0 * 2.0 * M_PI * z / prob_parm.L) + 2.0);
     eos.PYT2RE(p, prob_parm.Y.begin(), prob_parm.T0, rho, eint);
   } else {
     // HIT functions
@@ -52,7 +51,7 @@ prob_initdata(int i, int j, int k, amrex::Array4<amrex::Real> const& state,
     u[0] = prob_parm.d_uinput[index];
     u[1] = prob_parm.d_vinput[index];
     u[2] = prob_parm.d_winput[index];
-    sd = std::sqrt(Real(2.0/3.0) * prob_parm.d_kinput[index]); // spatially varying
+    sd = std::sqrt(Real(2.0 / 3.0) * prob_parm.d_kinput[index]); // spatially varying
     // sd = std::sqrt(Real(2.0/3.0) * prob_parm.ksgs_avg); // spatially constant
     rho = prob_parm.rho0;
     eos.PYT2RE(prob_parm.p0, prob_parm.Y.begin(), prob_parm.T0, rho, eint);
@@ -78,11 +77,11 @@ prob_initdata(int i, int j, int k, amrex::Array4<amrex::Real> const& state,
       // amrex::Real usgs = amrex::RandomNormal(0.0, sd);
       // amrex::Real vsgs = amrex::RandomNormal(0.0, sd);
       // amrex::Real wsgs = amrex::RandomNormal(0.0, sd);
-      // amrex::Real usgs = sd * (2*(nf % 2)-1); // zero mean, unit variance, zero covariance
-      // amrex::Real vsgs = sd * (2*(nf <= 4)-1);
-      // amrex::Real wsgs = sd * (2*(nf % 4 < 2)-1);
-      amrex::Real Tsgs = sd*sd*2.6 * (2*(nf % 2)-1);
-      
+      // amrex::Real usgs = sd * (2*(nf % 2)-1); // zero mean, unit variance, zero
+      // covariance amrex::Real vsgs = sd * (2*(nf <= 4)-1); amrex::Real wsgs = sd *
+      // (2*(nf % 4 < 2)-1);
+      amrex::Real Tsgs = sd * sd * 2.6 * (2 * (nf % 2) - 1);
+
       // amrex::Real ei = eint + 0.5 * (u[0] * u[0] + u[1] * u[1] + u[2] * u[2]) -
       //     0.5 * ((u[0] + usgs) * (u[0] + usgs) + (u[1] + vsgs) * (u[1] + vsgs) +
       //            (u[2] + wsgs) * (u[2] + wsgs));
@@ -119,7 +118,8 @@ prob_initdata(int i, int j, int k, amrex::Array4<amrex::Real> const& state,
       // state(i, j, k, nf * NVAR + UMY) = rho * (u[1] + vsgs);
       // state(i, j, k, nf * NVAR + UMZ) = rho * (u[2] + wsgs);
       // state(i, j, k, nf * NVAR + UEDEN) =
-      //   rho * (eint + 0.5 * (u[0] * u[0] + u[1] * u[1] + u[2] * u[2]) /*+ cv * Tsgs*/);
+      //   rho * (eint + 0.5 * (u[0] * u[0] + u[1] * u[1] + u[2] * u[2]) /*+ cv *
+      //   Tsgs*/);
       // for (int n = 0; n < NUM_SPECIES; n++)
       //   state(i, j, k, nf * NVAR + UFS + n) = rho * prob_parm.Y[n];
     }
@@ -135,9 +135,9 @@ AMREX_GPU_DEVICE AMREX_FORCE_INLINE void bcnormal(
 {
 }
 
-AMREX_GPU_DEVICE AMREX_FORCE_INLINE void prob_post_restart(
-  int i, int j, int k, amrex::Array4<amrex::Real> const& state,
-  amrex::GeometryData const& geomdata, Parm const& parm, ProbParm const& prob_parm)
+AMREX_GPU_DEVICE AMREX_FORCE_INLINE void
+prob_post_restart(int i, int j, int k, amrex::Array4<amrex::Real> const& state,
+                  amrex::GeometryData const& geomdata, ProbParm const& prob_parm)
 {
 }
 
@@ -145,16 +145,16 @@ AMREX_GPU_DEVICE AMREX_FORCE_INLINE void prob_post_restart(
 //   int i, int j, int k, const amrex::Real /*curtime*/, const amrex::Real dtlev,
 //   amrex::Array4<amrex::Real> const& state,
 //   amrex::Array4<const amrex::Real> const& reactions,
-//   amrex::GeometryData const& /*geomdata*/, Parm const& /*parm*/, ProbParm const&
+//   amrex::GeometryData const& /*geomdata*/,  ProbParm const&
 //   pp)
 // {
 // }
 
-AMREX_GPU_DEVICE AMREX_FORCE_INLINE void prob_tag_error(
-  int i, int j, int k, amrex::Array4<char> const& tagarr,
-  amrex::Array4<const amrex::Real> const& /*sarr*/, int level, char tagval,
-  const amrex::Real /*time*/, amrex::GeometryData const& geomdata,
-  Parm const& /*parm*/, ProbParm const& /*pp*/)
+AMREX_GPU_DEVICE AMREX_FORCE_INLINE void
+prob_tag_error(int i, int j, int k, amrex::Array4<char> const& tagarr,
+               amrex::Array4<const amrex::Real> const& /*sarr*/, int level,
+               char tagval, const amrex::Real /*time*/,
+               amrex::GeometryData const& geomdata, ProbParm const& /*pp*/)
 {
 }
 

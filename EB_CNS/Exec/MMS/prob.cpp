@@ -47,7 +47,7 @@ void amrex_probinit(const int* /*init*/, const int* /*name*/, const int* /*namel
     pp.query("a_py", CNS::h_prob_parm->a_py);
     pp.query("a_pz", CNS::h_prob_parm->a_pz);
     // pp.query("masa_solution_name", masa_solution_name);
-    
+
     amrex::ParmParse ppc("cns");
     ppc.query("do_visc", do_visc);
   }
@@ -72,7 +72,7 @@ void amrex_probinit(const int* /*init*/, const int* /*name*/, const int* /*namel
     trans_parm.const_bulk_viscosity = 0.0;
     trans_parm.const_diffusivity = 0.0;
     trans_parm.const_viscosity = CNS::h_prob_parm->rho0 * CNS::h_prob_parm->u0 *
-                                CNS::h_prob_parm->L / CNS::h_prob_parm->reynolds;
+                                 CNS::h_prob_parm->L / CNS::h_prob_parm->reynolds;
     trans_parm.const_conductivity =
       trans_parm.const_viscosity * cp / CNS::h_prob_parm->prandtl;
   } else {
@@ -134,9 +134,7 @@ void amrex_probinit(const int* /*init*/, const int* /*name*/, const int* /*namel
   masa_set_param("a_py", CNS::h_prob_parm->a_py);
   masa_set_param("a_pz", CNS::h_prob_parm->a_pz);
 
-  if (amrex::ParallelDescriptor::IOProcessor()) {
-    masa_display_param();
-  }
+  if (amrex::ParallelDescriptor::IOProcessor()) { masa_display_param(); }
   masa_sanity_check();
 }
 }
@@ -145,7 +143,7 @@ void CNS::fill_ext_src(int i, int j, int k, amrex::Real time,
                        amrex::GeometryData const& geomdata,
                        amrex::Array4<const amrex::Real> const& state,
                        amrex::Array4<amrex::Real> const& ext_src,
-                       Parm const& /*parm*/, ProbParm const& /*prob_parm*/)
+                       ProbParm const& /*prob_parm*/)
 {
   // Geometry
   const amrex::Real* prob_lo = geomdata.ProbLo();
@@ -155,26 +153,7 @@ void CNS::fill_ext_src(int i, int j, int k, amrex::Real time,
   const amrex::Real z = prob_lo[2] + (k + 0.5) * dx[2];
 
   // Get source term from MASA
-  amrex::Real source_term[5] = {0.0};
-  // // std::vector<amrex::Real> weights = {1.0, 1.0};
-  // // std::vector<amrex::Real> points = {-std::sqrt(1.0 / 3.0), std::sqrt(1.0 / 3.0)};
-  // std::vector<amrex::Real> weights = {5.0 / 9.0, 8.0 / 9.0, 5.0 / 9.0};
-  // std::vector<amrex::Real> points = {-std::sqrt(3.0 / 5.0), 0.0, std::sqrt(3.0 / 5.0)};
-  // for (int i1 = 0; i1 < points.size(); ++i1) {
-  // for (int i2 = 0; i2 < points.size(); ++i2) {
-  // for (int i3 = 0; i3 < points.size(); ++i3) {
-  //   amrex::Real n = points[i1];
-  //   amrex::Real m = points[i2];
-  //   amrex::Real o = points[i3];
-  //   amrex::Real prod_w = 0.125 * weights[i1] * weights[i2] * weights[i3];
-  //   source_term[0] += prod_w * masa_eval_3d_source_rho(x + 0.5 * n * dx[0], y + 0.5 * m * dx[1], z + 0.5 * o * dx[2]);
-  //   source_term[1] += prod_w * masa_eval_3d_source_rho_u(x + 0.5 * n * dx[0], y + 0.5 * m * dx[1], z + 0.5 * o * dx[2]);
-  //   source_term[2] += prod_w * masa_eval_3d_source_rho_v(x + 0.5 * n * dx[0], y + 0.5 * m * dx[1], z + 0.5 * o * dx[2]);
-  //   source_term[3] += prod_w * masa_eval_3d_source_rho_w(x + 0.5 * n * dx[0], y + 0.5 * m * dx[1], z + 0.5 * o * dx[2]);
-  //   source_term[4] += prod_w * masa_eval_3d_source_rho_e(x + 0.5 * n * dx[0], y + 0.5 * m * dx[1], z + 0.5 * o * dx[2]);
-  // }
-  // }
-  // }
+  amrex::Real source_term[5] = {0.0};  
   source_term[0] = masa_eval_3d_source_rho(x, y, z);
   source_term[1] = masa_eval_3d_source_rho_u(x, y, z);
   source_term[2] = masa_eval_3d_source_rho_v(x, y, z);
@@ -225,7 +204,9 @@ void CNS::full_prob_post_timestep(int /*iteration*/)
       amrex::MultiFab& S_old = cns_lev.get_old_data(State_Type);
       amrex::iMultiFab ifine_mask(cns_lev.grids, cns_lev.dmap, 1, 0);
       if (lev < parent->finestLevel()) {
-        ifine_mask = makeFineMask(cns_lev.grids, cns_lev.dmap, parent->boxArray(lev + 1), cns_lev.fine_ratio, 1, 0);
+        ifine_mask =
+          makeFineMask(cns_lev.grids, cns_lev.dmap, parent->boxArray(lev + 1),
+                       cns_lev.fine_ratio, 1, 0);
       } else {
         ifine_mask.setVal(1);
       }
@@ -254,34 +235,7 @@ void CNS::full_prob_post_timestep(int /*iteration*/)
           const amrex::Real v_exact = masa_eval_3d_exact_v(x, y, z);
           const amrex::Real w_exact = masa_eval_3d_exact_w(x, y, z);
           const amrex::Real p_exact = masa_eval_3d_exact_p(x, y, z);
-
-          // Get exact solution (cell average, Gauss quadrature 3rd order)
-          // amrex::Real rho_exact = 0.0;
-          // amrex::Real u_exact = 0.0;
-          // amrex::Real v_exact = 0.0;
-          // amrex::Real w_exact = 0.0;
-          // amrex::Real p_exact = 0.0;
-          // // std::vector<amrex::Real> weights = {1.0, 1.0};
-          // // std::vector<amrex::Real> points = {-std::sqrt(1.0 / 3.0), std::sqrt(1.0 / 3.0)};
-          // std::vector<amrex::Real> weights = {5.0 / 9.0, 8.0 / 9.0, 5.0 / 9.0};
-          // std::vector<amrex::Real> points = {-std::sqrt(3.0 / 5.0), 0.0, std::sqrt(3.0 / 5.0)};
-          // for (int i1 = 0; i1 < points.size(); ++i1) {
-          // for (int i2 = 0; i2 < points.size(); ++i2) {
-          //   amrex::Real n = points[i1];
-          //   amrex::Real m = points[i2];
-          //   rho_exact += 0.25 * weights[i1] * weights[i2] * masa_eval_3d_exact_rho(x + 0.5 * n * dx[0], y + 0.5 * m * dx[1], z);
-          //   u_exact += 0.25 * weights[i1] * weights[i2] * masa_eval_3d_exact_u(x + 0.5 * n * dx[0], y + 0.5 * m * dx[1], z);
-          //   v_exact += 0.25 * weights[i1] * weights[i2] * masa_eval_3d_exact_v(x + 0.5 * n * dx[0], y + 0.5 * m * dx[1], z);
-          //   w_exact += 0.25 * weights[i1] * weights[i2] * masa_eval_3d_exact_w(x + 0.5 * n * dx[0], y + 0.5 * m * dx[1], z);
-          //   p_exact += 0.25 * weights[i1] * weights[i2] * masa_eval_3d_exact_p(x + 0.5 * n * dx[0], y + 0.5 * m * dx[1], z);
-          // }
-          // }
-          // rho_exact = masa_eval_3d_exact_rho(x, y, z);
-          // u_exact = masa_eval_3d_exact_u(x, y, z);
-          // v_exact = masa_eval_3d_exact_v(x, y, z);
-          // w_exact = masa_eval_3d_exact_w(x, y, z);
-          // p_exact = masa_eval_3d_exact_p(x, y, z);
-
+                    
           // Get numerical solution
           const amrex::Real rho = sarrs[box_no](i, j, k, URHO);
           const amrex::Real rhoinv = 1.0 / rho;
@@ -421,122 +375,3 @@ void CNS::full_prob_post_timestep(int /*iteration*/)
     }
   }
 }
-
-// void CNS::prob_post_coarsetimestep(amrex::Real time)
-// {
-//   if (level > 0) return;
-
-//   if (amrex::ParallelDescriptor::IOProcessor())
-//     amrex::Print() << "Calculating MMS errors" << std::endl;
-
-//   // Calculate errors
-//   amrex::Real rho_mms_err = 0.0;
-//   amrex::Real u_mms_err = 0.0;
-//   amrex::Real v_mms_err = 0.0;
-//   amrex::Real w_mms_err = 0.0;
-//   amrex::Real p_mms_err = 0.0;
-//   for (int lev = 0; lev <= parent->finestLevel(); lev++) {
-//     CNS& cns_level = getLevel(lev);
-//     amrex::MultiFab& S = cns_level.get_new_data(State_Type);
-//     amrex::iMultiFab ifine_mask(cns_level.grids, cns_level.dmap, 1, 0);
-//     if (lev < parent->finestLevel()) {
-//       ifine_mask = makeFineMask(cns_level.grids, cns_level.dmap, parent->boxArray(lev + 1), cns_level.fine_ratio, 1, 0);
-//     } else {
-//       ifine_mask.setVal(1);
-//     }    
-//     const auto geomdata = cns_level.geom.data();
-//     auto const& sarrs = S.const_arrays();
-//     auto const& marrs = ifine_mask.const_arrays();
-
-//     GpuTuple<Real, Real, Real, Real, Real> errors = amrex::ParReduce(
-//       TypeList<ReduceOpSum, ReduceOpSum, ReduceOpSum, ReduceOpSum, ReduceOpSum>{},
-//       TypeList<Real, Real, Real, Real, Real>{}, S, IntVect(0),
-//       [=] AMREX_GPU_DEVICE(int box_no, int i, int j,
-//                           int k) -> GpuTuple<Real, Real, Real, Real, Real> {
-//         const amrex::Real* prob_lo = geomdata.ProbLo();
-//         const amrex::Real* dx = geomdata.CellSize();
-//         const amrex::Real x = prob_lo[0] + (i + 0.5) * dx[0];
-//         const amrex::Real y = prob_lo[1] + (j + 0.5) * dx[1];
-//         const amrex::Real z = prob_lo[2] + (k + 0.5) * dx[2];
-
-//         // Get exact solution
-//         const amrex::Real rho_exact = masa_eval_3d_exact_rho(x, y, z);
-//         const amrex::Real u_exact = masa_eval_3d_exact_u(x, y, z);
-//         const amrex::Real v_exact = masa_eval_3d_exact_v(x, y, z);
-//         const amrex::Real w_exact = masa_eval_3d_exact_w(x, y, z);
-//         const amrex::Real p_exact = masa_eval_3d_exact_p(x, y, z);
-
-//         // Get numerical solution
-//         const amrex::Real rho = sarrs[box_no](i, j, k, URHO);
-//         const amrex::Real rhoinv = 1.0 / rho;
-//         const amrex::Real u = sarrs[box_no](i, j, k, UMX) * rhoinv;
-//         const amrex::Real v = sarrs[box_no](i, j, k, UMY) * rhoinv;
-//         const amrex::Real w = sarrs[box_no](i, j, k, UMZ) * rhoinv;
-//         const amrex::Real ei =
-//           sarrs[box_no](i, j, k, UEDEN) * rhoinv - 0.5 * (u * u + v * v + w * w);
-//         amrex::Real Y[NUM_SPECIES] = {0.0};
-//         for (int n = 0; n < NUM_SPECIES; n++)
-//           Y[n] = sarrs[box_no](i, j, k, UFS + n) * rhoinv;
-//         amrex::Real T, p;
-//         auto eos = pele::physics::PhysicsType::eos();
-//         eos.REY2T(rho, ei, Y, T);
-//         eos.RTY2P(rho, T, Y, p);
-
-//         // Calculate errors
-//         const amrex::Real mask =
-//           amrex::Real(marrs[box_no](i, j, k)); // mask out fine-covered cells
-//         const amrex::Real vol = amrex::Geometry::Volume({i, j, k}, geomdata);
-//         amrex::Real rho_err = mask * vol * (rho - rho_exact) * (rho - rho_exact);
-//         amrex::Real u_err = mask * vol * (u - u_exact) * (u - u_exact);
-//         amrex::Real v_err = mask * vol * (v - v_exact) * (v - v_exact);
-//         amrex::Real w_err = mask * vol * (w - w_exact) * (w - w_exact);
-//         amrex::Real p_err = mask * vol * (p - p_exact) * (p - p_exact);
-
-//         return {rho_err, u_err, v_err, w_err, p_err};
-//       });
-
-//     rho_mms_err += amrex::get<0>(errors);
-//     u_mms_err += amrex::get<1>(errors);
-//     v_mms_err += amrex::get<2>(errors);
-//     w_mms_err += amrex::get<3>(errors);
-//     p_mms_err += amrex::get<4>(errors);
-//   }
-
-//   if (amrex::ParallelDescriptor::IOProcessor()) {
-//     amrex::Real time = state[State_Type].curTime();
-//     amrex::Print() << "TIME= " << time << " RHO MMS ERROR = " << rho_mms_err << '\n';
-//     amrex::Print() << "TIME= " << time << " U MMS ERROR   = " << u_mms_err << '\n';
-//     amrex::Print() << "TIME= " << time << " V MMS ERROR   = " << v_mms_err << '\n';
-//     amrex::Print() << "TIME= " << time << " W MMS ERROR   = " << w_mms_err << '\n';
-//     amrex::Print() << "TIME= " << time << " P MMS ERROR   = " << p_mms_err << '\n';
-
-//     // Write the errors to the datalog
-//     // std::string data_log_name = "mms.log";
-//     // Find data_log index
-//     // int log_index = -1;
-//     // for (int ii = 0; ii < parent->NumDataLogs(); ii++) {
-//     //   if (parent->DataLogName(ii) == data_log_name) {
-//     //     log_index = ii;
-//     //   }
-//     // }
-//     int log_index = 0;
-//     // Write data to the log file
-//     if (log_index >= 0) {
-//       std::ostream& data_log2 = parent->DataLog(log_index);
-//       const int datwidth = 14;
-//       const int datprecision = 6;
-//       data_log2 << std::setw(datwidth) << time;
-//       data_log2 << std::setw(datwidth) << std::setprecision(datprecision)
-//                 << rho_mms_err;
-//       data_log2 << std::setw(datwidth) << std::setprecision(datprecision)
-//                 << u_mms_err;
-//       data_log2 << std::setw(datwidth) << std::setprecision(datprecision)
-//                 << v_mms_err;
-//       data_log2 << std::setw(datwidth) << std::setprecision(datprecision)
-//                 << w_mms_err;
-//       data_log2 << std::setw(datwidth) << std::setprecision(datprecision)
-//                 << p_mms_err;
-//       data_log2 << std::endl;
-//     }
-//   }
-// }

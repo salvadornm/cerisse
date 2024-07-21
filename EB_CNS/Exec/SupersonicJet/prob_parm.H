@@ -7,7 +7,7 @@
 struct ProbParm
 {
   // Vitiated air inlet
-  amrex::Real T1 = 1350; //1250;
+  amrex::Real T1 = 1350; // 1250;
   amrex::Real u1 = 142000;
   amrex::Real p1 = 1070000;
   amrex::Real rho1;

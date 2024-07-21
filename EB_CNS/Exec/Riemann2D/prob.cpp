@@ -59,7 +59,6 @@ void amrex_probinit(const int* /*init*/, const int* /*name*/, const int* /*namel
 void CNS::fill_ext_src(int i, int j, int k, amrex::Real time,
                        amrex::GeometryData const& geomdata,
                        amrex::Array4<const amrex::Real> const& /*state*/,
-                       amrex::Array4<amrex::Real> const& ext_src,
-                       Parm const& /*parm*/, ProbParm const& pp)
+                       amrex::Array4<amrex::Real> const& ext_src, ProbParm const& pp)
 {
 }

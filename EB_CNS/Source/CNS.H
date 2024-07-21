@@ -17,8 +17,8 @@
 #include <turbinflow.H>
 
 #include "LES.H"
+#include "constants.H"
 #include "index_macros.H"
-#include "parm.H"
 #include "prob_parm.H"
 #include "random.H"
 
@@ -147,7 +147,8 @@ public:
                            amrex::Array4<amrex::Real> const& drho_as_crse,
                            amrex::Array4<int const> const& rrflag_as_crse,
                            int as_fine, amrex::Array4<amrex::Real> const& dm_as_fine,
-                           amrex::Array4<int const> const& lev_mask, amrex::Real dt);
+                           amrex::Array4<int const> const& lev_mask, amrex::Real dt,
+                           amrex::Array4<const amrex::Real>& shock_sensor);
 #endif
 
   void computeAvg(amrex::MultiFab& State);
@@ -158,6 +159,8 @@ public:
   amrex::Real estTimeStep();
 
   void enforce_consistent_state();
+
+  void enforce_consistent_state(amrex::MultiFab& State);
 
   static void apply_nscbc(const amrex::Box& bx,
                           const amrex::Array4<amrex::Real>& data, int start_comp,
@@ -247,7 +250,7 @@ protected:
   void fill_ext_src(int i, int j, int k, amrex::Real time,
                     amrex::GeometryData const& geomdata,
                     amrex::Array4<const amrex::Real> const& state,
-                    amrex::Array4<amrex::Real> const& ext_src, Parm const& parm,
+                    amrex::Array4<amrex::Real> const& ext_src,
                     ProbParm const& prob_parm);
 
 #ifdef USE_FULL_PROB_POST_TIMESTEP
@@ -331,6 +334,7 @@ protected:
   static amrex::Real cfl;
   static amrex::Real fixed_dt;
   static amrex::Real dt_cutoff;
+  static amrex::Real dt_max_change;
   static int rk_order;
   static int amr_interp_order;
   static int verbose;
@@ -400,9 +404,6 @@ protected:
   static amrex::Vector<amrex::Real> refine_tke;
   static int refine_tke_max_lev;
   // static amrex::Vector<amrex::AMRErrorTag> errtagger;
-
-  static Parm* h_parm;
-  static Parm* d_parm;
 };
 
 #endif

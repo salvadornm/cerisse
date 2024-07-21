@@ -17,8 +17,7 @@
 
 AMREX_GPU_DEVICE AMREX_FORCE_INLINE void
 prob_initdata(int i, int j, int k, amrex::Array4<amrex::Real> const& state,
-              amrex::GeometryData const& geomdata, Parm const& /*parm*/,
-              ProbParm const& prob_parm)
+              amrex::GeometryData const& geomdata, ProbParm const& prob_parm)
 {
   // Geometry
   const amrex::Real* prob_lo = geomdata.ProbLo();
@@ -36,20 +35,23 @@ prob_initdata(int i, int j, int k, amrex::Array4<amrex::Real> const& state,
 
   auto eos = pele::physics::PhysicsType::eos();
   amrex::Real massfrac[NUM_SPECIES] = {1.0};
-  amrex::Real cv, cp;
-  eos.TY2Cv(CNS::h_prob_parm->T0, massfrac, cv);
-  eos.TY2Cp(CNS::h_prob_parm->T0, massfrac, cp);
+  // amrex::Real cv, cp;
+  // eos.TY2Cv(CNS::h_prob_parm->T0, massfrac, cv);
+  // eos.TY2Cp(CNS::h_prob_parm->T0, massfrac, cp);
 
   for (int nf = 0; nf <= NUM_FIELD; ++nf) {
-    amrex::Real u[3], T;
+    amrex::Real u[3], T, p;
     // if (rsq < R*R) {
     u[0] =
       prob_parm.v0 * (1 - prob_parm.beta * (y - yc) / R * exp(-0.5 * rsq / R / R));
     u[1] = prob_parm.v0 * prob_parm.beta * (x - xc) / R * exp(-0.5 * rsq / R / R);
     u[2] = 0.0;
-    T = prob_parm.T0 -
-        0.5 * (prob_parm.v0 * prob_parm.beta * prob_parm.v0 * prob_parm.beta) / cp *
-          exp(-rsq / R / R);
+    // T = prob_parm.T0 -
+    //     0.5 * (prob_parm.v0 * prob_parm.beta * prob_parm.v0 * prob_parm.beta) / cv
+    //     *
+    //       exp(-rsq / R / R);
+    p = prob_parm.p0 - 0.5 * prob_parm.rho0 * prob_parm.v0 * prob_parm.beta *
+                         prob_parm.v0 * prob_parm.beta * exp(-rsq / R / R);
     // } else {
     //   u[0] = prob_parm.v0;
     //   u[1] = 0.0;
@@ -57,9 +59,11 @@ prob_initdata(int i, int j, int k, amrex::Array4<amrex::Real> const& state,
     //   T = prob_parm.T0;
     // }
 
-    amrex::Real rho;  //= prob_parm.rho0 * pow(T/prob_parm.T0, 1/(eos.gamma-1));
-    amrex::Real eint; //= cv * T;
-    eos.PYT2RE(prob_parm.p0, massfrac, T, rho, eint);
+    amrex::Real rho = prob_parm.rho0; // * pow(T/prob_parm.T0, 1/(eos.gamma-1));
+    amrex::Real eint;                 //= cv * T;
+    // eos.PYT2RE(prob_parm.p0, massfrac, T, rho, eint);
+    eos.RYP2E(prob_parm.rho0, massfrac, p, eint);
+    // eos.RTY2E(prob_parm.rho0, T, massfrac, eint);
 
     // Set the state
     state(i, j, k, nf * NVAR + URHO) = rho;
@@ -80,25 +84,25 @@ AMREX_GPU_DEVICE AMREX_FORCE_INLINE void bcnormal(
 {
 }
 
-AMREX_GPU_DEVICE AMREX_FORCE_INLINE void prob_post_restart(
-  int i, int j, int k, amrex::Array4<amrex::Real> const& state,
-  amrex::GeometryData const& geomdata, Parm const& parm, ProbParm const& prob_parm)
+AMREX_GPU_DEVICE AMREX_FORCE_INLINE void
+prob_post_restart(int i, int j, int k, amrex::Array4<amrex::Real> const& state,
+                  amrex::GeometryData const& geomdata, ProbParm const& prob_parm)
 {
 }
 
-AMREX_GPU_DEVICE AMREX_FORCE_INLINE void prob_post_timestep(
-  int i, int j, int k, const amrex::Real /*curtime*/, const amrex::Real dtlev,
-  amrex::Array4<amrex::Real> const& state,
-  amrex::Array4<const amrex::Real> const& reactions,
-  amrex::GeometryData const& /*geomdata*/, Parm const& /*parm*/, ProbParm const& pp)
+AMREX_GPU_DEVICE AMREX_FORCE_INLINE void
+prob_post_timestep(int i, int j, int k, const amrex::Real /*curtime*/,
+                   const amrex::Real dtlev, amrex::Array4<amrex::Real> const& state,
+                   amrex::Array4<const amrex::Real> const& reactions,
+                   amrex::GeometryData const& /*geomdata*/, ProbParm const& pp)
 {
 }
 
-AMREX_GPU_DEVICE AMREX_FORCE_INLINE void prob_tag_error(
-  int i, int j, int k, amrex::Array4<char> const& tagarr,
-  amrex::Array4<const amrex::Real> const& /*sarr*/, int level, char tagval,
-  const amrex::Real /*time*/, amrex::GeometryData const& geomdata,
-  Parm const& /*parm*/, ProbParm const& /*pp*/)
+AMREX_GPU_DEVICE AMREX_FORCE_INLINE void
+prob_tag_error(int i, int j, int k, amrex::Array4<char> const& tagarr,
+               amrex::Array4<const amrex::Real> const& /*sarr*/, int level,
+               char tagval, const amrex::Real /*time*/,
+               amrex::GeometryData const& geomdata, ProbParm const& /*pp*/)
 {
 }
 

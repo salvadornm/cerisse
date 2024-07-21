@@ -45,7 +45,7 @@ void CNS::compute_pdf_model(amrex::MultiFab& S, amrex::Real dt, int iteration)
     amrex::Print() << std::endl;
   }
   if (do_species_langevin) {
-    amrex::Print() << " >> [WARNING: FOR TESTING ONLY] Species Langevin model" << std::endl;
+    amrex::Print() << " >> [WARNING: FOR TESTING ONLY] Species Langevin model\n";
   }
 
   const auto* dx = geom.CellSize();
@@ -73,8 +73,7 @@ void CNS::compute_pdf_model(amrex::MultiFab& S, amrex::Real dt, int iteration)
 
 #if CNS_USE_EB
       const auto& flag = flags[mfi];
-      if (flag.getType(bx) !=
-          amrex::FabType::covered) // Just to save some computation
+      if (flag.getType(bx) != amrex::FabType::covered)
 #endif
       {
         amrex::Array4<Real> sarr = S.array(mfi);
@@ -89,11 +88,12 @@ void CNS::compute_pdf_model(amrex::MultiFab& S, amrex::Real dt, int iteration)
 
         if (do_spdf) { spdf_iem_model(bx, sarr, dt, dW, dx); }
 
-        if (do_species_langevin) { species_langevin(bx, sarr, dt, dW, dx); } // FOR TESTING ONLY!
-      }
+        if (do_species_langevin) {
+          species_langevin(bx, sarr, dt, dW, dx); // FOR TESTING ONLY!
+        }
+      } // if not covered
 
       amrex::Gpu::streamSynchronize();
-
       wt = (amrex::second() - wt) / bx.d_numPts();
       cost[mfi].plus<amrex::RunOn::Device>(wt, bx);
     } // mfi loop

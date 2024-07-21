@@ -7,7 +7,7 @@
 struct ProbParm
 {
   int mode = 0; // 0: TGV, 1: HIT
-  int inres; // HIT input resolution
+  int inres;    // HIT input resolution
 
   amrex::Real T0 = 800.0; // [K]
   amrex::Real p0 = 2.0e5; // [Ba]

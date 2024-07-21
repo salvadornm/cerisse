@@ -1,7 +1,7 @@
 #include "CNS.H"
 #include "central_scheme.H"
 #include "diffusion.H"
-#include "hyperbolics.H"
+#include "hydro.H"
 #include "recon.H"
 
 using namespace amrex;
@@ -9,16 +9,15 @@ using namespace amrex;
 void CNS::compute_dSdt_box(Box const& bx, Array4<const Real>& sarr,
                            Array4<Real>& dsdt,
                            std::array<FArrayBox*, AMREX_SPACEDIM> const& flxfab,
-                           Array4<const Real>& shock_sensor_arr)
+                           Array4<const Real>& shock_sensor)
 {
   BL_PROFILE("CNS::compute_dSdt_box()");
 
-  const int ncomp = UFA;  // UFA because we don't want to change time averages
+  const int ncomp = UFA; // UFA because we don't want to change time averages
   const Box& bxg2 = amrex::grow(bx, 2);
   const Box& bxg3 = amrex::grow(bx, 3);
   const auto dx = geom.CellSizeArray();
   const auto dxinv = geom.InvCellSizeArray();
-  Parm const* lparm = d_parm;
   const bool do_diffusion = do_visc || do_les || buffer_box.ok();
 
   // Prepare FABs to store data
@@ -35,7 +34,7 @@ void CNS::compute_dSdt_box(Box const& bx, Array4<const Real>& sarr,
   auto const& coefs = coefsfab.array();
 
   // Store viscous fluxes separately in V/VSPDF
-  std::array<FArrayBox, amrex::SpaceDim> vfluxfab; 
+  std::array<FArrayBox, amrex::SpaceDim> vfluxfab;
   const bool store_in_vflux = do_diffusion && (NUM_FIELD > 0) && do_vpdf;
   if (store_in_vflux) {
     for (int dir = 0; dir < amrex::SpaceDim; ++dir) {
@@ -54,7 +53,7 @@ void CNS::compute_dSdt_box(Box const& bx, Array4<const Real>& sarr,
   {
     // Prepare primitive variables
     amrex::ParallelFor(bxg3, [=] AMREX_GPU_DEVICE(int i, int j, int k) {
-      cns_ctoprim(i, j, k, nf * NVAR, sarr, q, *lparm);
+      cns_ctoprim(i, j, k, nf * NVAR, sarr, q);
     });
 
     // Prepare transport coefs
@@ -118,6 +117,23 @@ void CNS::compute_dSdt_box(Box const& bx, Array4<const Real>& sarr,
           }
         });
       }
+    } // if do_diffusion
+
+    int num_scheme_switch = 0;
+    if (use_hybrid_scheme) {
+      ReduceOps<ReduceOpMax> reduce_op;
+      ReduceData<Real> reduce_data(reduce_op);
+      using ReduceTuple = typename decltype(reduce_data)::Type;
+      reduce_op.eval(bxg2, reduce_data,
+                     [=] AMREX_GPU_DEVICE(int i, int j, int k) -> ReduceTuple {
+                       return {shock_sensor(i, j, k)};
+                     });
+      Real max_shock_sensor = amrex::get<0>(reduce_data.value());
+
+      if (max_shock_sensor < 0.7) {
+        num_scheme_switch = 1; // all smooth, use central scheme
+                               // else, use shock-capturing scheme
+      }
     }
 
     // Compute fluxes for each space direction
@@ -127,28 +143,35 @@ void CNS::compute_dSdt_box(Box const& bx, Array4<const Real>& sarr,
 
       // Hydro/hyperbolic fluxes
       if (do_hydro) {
-        // Shock-capturing scheme
-        // 1. Convert primitive to characteristic at cell centre
-        const Box& charbox = amrex::grow(bx, dir, 3);
-        amrex::ParallelFor(charbox, [=] AMREX_GPU_DEVICE(int i, int j, int k) {
-          cns_ctochar(i, j, k, dir, q, w, char_sys);
-        });
-        // 2. FD interpolation to cell face
-        const Box& reconbox = amrex::grow(bx, dir, 1);
-        amrex::ParallelFor(
-          reconbox, NCHAR, [=] AMREX_GPU_DEVICE(int i, int j, int k, int n) {
-            cns_recon(i, j, k, n, dir, w, wl, wr, recon_scheme, plm_theta);
+        if (num_scheme_switch == 0) {
+          // Shock-capturing scheme
+          // 1. Convert primitive to characteristic at cell centre
+          const Box& charbox = amrex::grow(bx, dir, 3);
+          amrex::ParallelFor(charbox, [=] AMREX_GPU_DEVICE(int i, int j, int k) {
+            cns_ctochar(i, j, k, dir, q, w, char_sys);
           });
-        // 3. Solve Riemann problem for fluxes at cell face
-        amrex::ParallelFor(flxbx, [=] AMREX_GPU_DEVICE(int i, int j, int k) {
-          // bool do_high_order_diff =
-          //   (shock_sensor_arr(i, j, k) < 0.9) &&
-          //   (shock_sensor_arr(IntVect(AMREX_D_DECL(i, j, k)) -
-          //                     IntVect::TheDimensionVector(dir)) < 0.9);
+          // 2. FD interpolation to cell face
+          const Box& reconbox = amrex::grow(bx, dir, 1);
+          amrex::ParallelFor(
+            reconbox, NCHAR, [=] AMREX_GPU_DEVICE(int i, int j, int k, int n) {
+              cns_recon(i, j, k, n, dir, w, wl, wr, recon_scheme, plm_theta);
+            });
+          // 3. Solve Riemann problem for fluxes at cell face
+          amrex::ParallelFor(flxbx, [=] AMREX_GPU_DEVICE(int i, int j, int k) {
+            cns_riemann(i, j, k, dir, flx, q, wl, wr, char_sys, recon_char_var);
 
-          cns_riemann(i, j, k, dir, flx, q, wl, wr, char_sys, recon_char_var,
-                      *lparm /*, do_high_order_diff*/);
-        });
+            bool do_high_order_diff =
+              (shock_sensor(i, j, k) < 0.9) &&
+              (shock_sensor(IntVect(AMREX_D_DECL(i, j, k)) -
+                            IntVect::TheDimensionVector(dir)) < 0.9);
+            if (do_high_order_diff) { cns_afd_correction(i, j, k, dir, q, flx); }
+          });
+        } else {
+          // Central scheme
+          amrex::ParallelFor(flxbx, [=] AMREX_GPU_DEVICE(int i, int j, int k) {
+            cns_KEEP4(i, j, k, dir, flx, q);
+          });
+        }
       }
 
       // Viscous fluxes
@@ -159,7 +182,7 @@ void CNS::compute_dSdt_box(Box const& bx, Array4<const Real>& sarr,
         });
       }
     } // for dir
-  } // for fields
+  }   // for fields
 
 #if NUM_FIELD > 0
   // Average viscous fluxes for V/VSPDF and add to flx
@@ -173,10 +196,9 @@ void CNS::compute_dSdt_box(Box const& bx, Array4<const Real>& sarr,
         flxbx, NUM_FIELD, [=] AMREX_GPU_DEVICE(int i, int j, int k, int nfm1) {
           const Real invNF = Real(1.0) / Real(NUM_FIELD);
           const int nf = 1 + nfm1;
-          AMREX_D_TERM(
-            flx(i, j, k, nf * NVAR + UMX) += invNF * vflx(i, j, k, UMX);
-            , flx(i, j, k, nf * NVAR + UMY) += invNF * vflx(i, j, k, UMY);
-            , flx(i, j, k, nf * NVAR + UMZ) += invNF * vflx(i, j, k, UMZ);)
+          AMREX_D_TERM(flx(i, j, k, nf * NVAR + UMX) += invNF * vflx(i, j, k, UMX);
+                       , flx(i, j, k, nf * NVAR + UMY) += invNF * vflx(i, j, k, UMY);
+                       , flx(i, j, k, nf * NVAR + UMZ) += invNF * vflx(i, j, k, UMZ);)
           flx(i, j, k, nf * NVAR + UEDEN) += invNF * vflx(i, j, k, UEDEN);
           for (int n = 0; n < NUM_SPECIES; ++n) {
             flx(i, j, k, nf * NVAR + UFS + n) += invNF * vflx(i, j, k, UFS + n);
@@ -202,7 +224,7 @@ void CNS::compute_dSdt_box(Box const& bx, Array4<const Real>& sarr,
     const amrex::Real time = state[State_Type].curTime();
 
     amrex::ParallelFor(bx, [=] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {
-      fill_ext_src(i, j, k, time, geomdata, sarr, dsdt, *lparm, *lprobparm);
+      fill_ext_src(i, j, k, time, geomdata, sarr, dsdt, *lprobparm);
     });
   }
 }

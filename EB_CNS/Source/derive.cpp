@@ -1,36 +1,8 @@
 #include "derive.H"
 
 #include "CNS.H"
-#include "parm.H"
 
 using namespace amrex;
-
-// void cns_dertemp(const Box& bx, FArrayBox& derfab, int dcomp, int /*ncomp*/,
-//                  const FArrayBox& datafab, const Geometry& /*geomdata*/,
-//                  Real /*time*/, const int* /*bcrec*/, int /*level*/)
-// {
-//   auto const dat = datafab.const_array();
-//   auto Tfab = derfab.array(dcomp);
-
-//   amrex::ParallelFor(bx, [=] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {
-//     // const amrex::Real rho = dat(i, j, k, URHO);
-//     // const amrex::Real rhoinv = 1.0 / rho;
-//     // AMREX_D_TERM(amrex::Real vx = dat(i, j, k, UMX) * rhoinv;
-//     //              , amrex::Real vy = dat(i, j, k, UMY) * rhoinv;
-//     //              , amrex::Real vz = dat(i, j, k, UMZ) * rhoinv;);
-//     // amrex::Real massfrac[NUM_SPECIES];
-//     // for (int n = 0; n < NUM_SPECIES; ++n) {
-//     //   massfrac[n] = dat(i, j, k, UFS + n) * rhoinv;
-//     // }
-//     // amrex::Real ei = dat(i, j, k, UEDEN) * rhoinv -
-//     //                  0.5 * (AMREX_D_TERM(vx * vx, +vy * vy, +vz * vz));
-//     // amrex::Real T = 150.0;
-//     // auto eos = pele::physics::PhysicsType::eos();
-//     // eos.REY2T(rho, ei, massfrac, T);
-
-//     Tfab(i, j, k) = dat(i, j, k, UTEMP); //T;
-//   });
-// }
 
 void cns_derpres(const Box& bx, FArrayBox& derfab, int dcomp, int /*ncomp*/,
                  const FArrayBox& datafab, const Geometry& /*geomdata*/,
@@ -89,7 +61,9 @@ void cns_dervel(const Box& bx, FArrayBox& derfab, int dcomp, int /*ncomp*/,
   auto const dat = datafab.const_array();
   auto vel = derfab.array();
   amrex::ParallelFor(bx, [=] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {
-    vel(i, j, k, dcomp) = dat(i, j, k, 1) / dat(i, j, k, 0);
+    AMREX_D_TERM(vel(i, j, k, dcomp) = dat(i, j, k, UMX) / dat(i, j, k, URHO);
+                 , vel(i, j, k, dcomp + 1) = dat(i, j, k, UMY) / dat(i, j, k, URHO);
+                 , vel(i, j, k, dcomp + 2) = dat(i, j, k, UMZ) / dat(i, j, k, URHO);)
   });
 }
 
@@ -301,13 +275,12 @@ void cns_dermachnumber(const Box& bx, FArrayBox& derfab, int dcomp, int /*ncomp*
 //   auto const sarr = datafab.const_array();
 //   auto srcarr = derfab.array(dcomp);
 
-//   Parm const* lparm = d_parm;
 //   ProbParm const* lprobparm = d_prob_parm;
 //   const auto geomdata = geom.data();
 
 //   amrex::ParallelFor(bx,
 //   [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept {
-//     CNS::fill_ext_src(i, j, k, time, geomdata, sarr, srcarr, *lparm, *lprobparm);
+//     CNS::fill_ext_src(i, j, k, time, geomdata, sarr, srcarr, *lprobparm);
 //   });
 // }
 
@@ -410,10 +383,11 @@ void CNS::cns_dertranscoef(const amrex::Box& bx, amrex::FArrayBox& derfab, int d
 
     amrex::Real mu, xi, lam;
     amrex::Real Ddiag[NUM_SPECIES];
-    const bool get_xi = true, get_mu = true, get_lam = true, get_Ddiag = true, get_chi = false;
+    const bool get_xi = true, get_mu = true, get_lam = true, get_Ddiag = true,
+               get_chi = false;
     auto trans = pele::physics::PhysicsType::transport();
-    trans.transport(get_xi, get_mu, get_lam, get_Ddiag, get_chi, T, rho, massfrac, Ddiag, nullptr, 
-                    mu, xi, lam, ltransparm);
+    trans.transport(get_xi, get_mu, get_lam, get_Ddiag, get_chi, T, rho, massfrac,
+                    Ddiag, nullptr, mu, xi, lam, ltransparm);
 
     mu_arr(i, j, k) = mu;
     xi_arr(i, j, k) = xi;
@@ -544,15 +518,17 @@ void cns_dervarp(const Box& bx, FArrayBox& derfab, int dcomp, int /*ncomp*/,
 
   amrex::ParallelFor(bx, [=] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {
     varp(i, j, k) = 0.0;
-    amrex::Real p[NUM_FIELD+1];
+    amrex::Real p[NUM_FIELD + 1];
     for (int nf = 0; nf <= NUM_FIELD; ++nf) {
       amrex::Real rho = dat(i, j, k, nf * NVAR + URHO);
       amrex::Real rhoinv = 1.0 / rho;
       AMREX_D_TERM(amrex::Real ux = dat(i, j, k, nf * NVAR + UMX) * rhoinv;
                   , amrex::Real uy = dat(i, j, k, nf * NVAR + UMY) * rhoinv;
                   , amrex::Real uz = dat(i, j, k, nf * NVAR + UMZ) * rhoinv;);
-      amrex::Real ei = dat(i, j, k, nf * NVAR + UEDEN) * rhoinv 
-                       - amrex::Real(0.5) * (AMREX_D_TERM(ux * ux, +uy * uy, +uz * uz));;
+      amrex::Real ei =
+        dat(i, j, k, nf * NVAR + UEDEN) * rhoinv -
+        amrex::Real(0.5) * (AMREX_D_TERM(ux * ux, +uy * uy, +uz * uz));
+      ;
       amrex::Real Y[NUM_SPECIES];
       for (int n = 0; n < NUM_SPECIES; ++n)
         Y[n] = dat(i, j, k, nf * NVAR + UFS + n) * rhoinv;
@@ -562,8 +538,7 @@ void cns_dervarp(const Box& bx, FArrayBox& derfab, int dcomp, int /*ncomp*/,
       // eos.REY2T(rho, ei, Y, T);
       eos.RTY2P(rho, T, Y, p[nf]);
 
-      if (nf > 0) 
-        varp(i, j, k) += (p[nf] - p[0]) * (p[nf] - p[0]);
+      if (nf > 0) varp(i, j, k) += (p[nf] - p[0]) * (p[nf] - p[0]);
     }
     varp(i, j, k) /= amrex::Real(NUM_FIELD - 1);    
   });
@@ -578,15 +553,17 @@ void cns_dervarT(const Box& bx, FArrayBox& derfab, int dcomp, int /*ncomp*/,
 
   amrex::ParallelFor(bx, [=] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {
     varT(i, j, k) = 0.0;
-    amrex::Real T[NUM_FIELD+1] = {0.0};
+    amrex::Real T[NUM_FIELD + 1] = {0.0};
     for (int nf = 0; nf <= NUM_FIELD; ++nf) {
       amrex::Real rho = dat(i, j, k, nf * NVAR + URHO);
       amrex::Real rhoinv = 1.0 / rho;
       AMREX_D_TERM(amrex::Real ux = dat(i, j, k, nf * NVAR + UMX) * rhoinv;
                   , amrex::Real uy = dat(i, j, k, nf * NVAR + UMY) * rhoinv;
                   , amrex::Real uz = dat(i, j, k, nf * NVAR + UMZ) * rhoinv;);
-      amrex::Real ei = dat(i, j, k, nf * NVAR + UEDEN) * rhoinv 
-                       - amrex::Real(0.5) * (AMREX_D_TERM(ux * ux, +uy * uy, +uz * uz));;
+      amrex::Real ei =
+        dat(i, j, k, nf * NVAR + UEDEN) * rhoinv -
+        amrex::Real(0.5) * (AMREX_D_TERM(ux * ux, +uy * uy, +uz * uz));
+      ;
       amrex::Real Y[NUM_SPECIES];
       for (int n = 0; n < NUM_SPECIES; ++n)
         Y[n] = dat(i, j, k, nf * NVAR + UFS + n) * rhoinv;
@@ -595,8 +572,7 @@ void cns_dervarT(const Box& bx, FArrayBox& derfab, int dcomp, int /*ncomp*/,
       T[nf] = dat(i, j, k, nf * NVAR + UTEMP);
       // eos.REY2T(rho, ei, Y, T[nf]);
 
-      if (nf > 0) 
-        varT(i, j, k) += (T[nf] - T[0]) * (T[nf] - T[0]);
+      if (nf > 0) varT(i, j, k) += (T[nf] - T[0]) * (T[nf] - T[0]);
     }
     varT(i, j, k) /= amrex::Real(NUM_FIELD - 1);    
   });
@@ -674,102 +650,10 @@ void cns_dervelgrad(const Box& bx, FArrayBox& derfab, int dcomp, int /*ncomp*/,
   });
 }
 
-// void cns_dershocksensor(const Box& bx, FArrayBox& derfab, int dcomp, int /*ncomp*/,
-//                         const FArrayBox& datafab, const Geometry& geomdata, Real /*time*/,
-//                         const int* /*bcrec*/, int /*level*/)
-// {
-//   auto const dat = datafab.const_array();
-//   auto shock_sensor = derfab.array(dcomp);
-
-//   amrex::ParallelFor(bx, [=] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {
-//     amrex::IntVect iv(AMREX_D_DECL(i,j,k));
-//     shock_sensor(iv) = 0.0;
-//     for (int dir = 0; dir < AMREX_SPACEDIM; ++dir){
-//       amrex::IntVect iv_dir = amrex::IntVect::TheDimensionVector(dir);
-//       amrex::Real pp[3];
-//         for (int i: {-1, 0, 1}) {
-//           amrex::Real rho = dat(iv+i*iv_dir, URHO);
-//           // pp[i+1]=rho;
-//           amrex::Real rhoinv = 1.0 / rho;
-//           AMREX_D_TERM(amrex::Real ux = dat(iv+i*iv_dir, UMX) * rhoinv;
-//                       , amrex::Real uy = dat(iv+i*iv_dir, UMY) * rhoinv;
-//                       , amrex::Real uz = dat(iv+i*iv_dir, UMZ) * rhoinv;);
-//           amrex::Real ei = dat(iv+i*iv_dir, UEDEN) * rhoinv 
-//                           - amrex::Real(0.5) * (AMREX_D_TERM(ux * ux, +uy * uy, +uz * uz));;
-//           amrex::Real Y[NUM_SPECIES];
-//           for (int n = 0; n < NUM_SPECIES; ++n)
-//             Y[n] = dat(iv+i*iv_dir, UFS+n) * rhoinv;
-
-//           amrex::Real T = 0.0;
-//           auto eos = pele::physics::PhysicsType::eos();
-//           eos.REY2T(rho, ei, Y, T);
-//           eos.RTY2P(rho, T, Y, pp[i+1]);
-//         }
-//         // shock_sensor(iv) = amrex::max(amrex::Math::abs(pp[2]-2*pp[1]+pp[0])/(pp[2]+2*pp[1]+pp[0]), shock_sensor(iv));
-//         // shock_sensor(iv) = amrex::max((pp[2]+pp[0])/(2*pp[1]), shock_sensor(iv));
-//     }
-//   });
-// }
-
-// // Larsson shock sensor 
-// void cns_dershocksensor(const Box& bx, FArrayBox& derfab, int dcomp, int /*ncomp*/,
-//                         const FArrayBox& datafab, const Geometry& geomdata, Real time,
-//                         const int* bcrec, int level)
-// {
-//   // Get divu and magvort
-//   FArrayBox divu_fab(bx, 1, amrex::The_Async_Arena());
-//   FArrayBox magvort_fab(bx, 1, amrex::The_Async_Arena());
-//   cns_derdivu(bx, divu_fab, 0, 1, datafab, geomdata, time, bcrec, level);
-//   cns_dermagvort(bx, magvort_fab, 0, 1, datafab, geomdata, time, bcrec, level);
-  
-//   FArrayBox tmp_fab(amrex::grow(bx, 2), 1, amrex::The_Async_Arena());
-//   tmp_fab.setVal(0.0);
-//   auto const dat = datafab.const_array();  
-//   auto const divu = divu_fab.const_array();
-//   auto const magvort = magvort_fab.const_array();
-//   auto const& tmp = tmp_fab.array(); // store shock sensor before adding buffer
-//   amrex::ParallelFor(bx, [=] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {
-//     // Get speed of sound and dx
-//     const Real rho = dat(i, j, k, URHO);
-//     const Real rhoinv = 1.0 / rho;
-//     const Real ei = dat(i, j, k, UEDEN) * rhoinv -
-//                     0.5 * rhoinv * rhoinv *
-//                       (AMREX_D_TERM(dat(i, j, k, UMX) * dat(i, j, k, UMX),
-//                                     +dat(i, j, k, UMY) * dat(i, j, k, UMY),
-//                                     +dat(i, j, k, UMZ) * dat(i, j, k, UMZ)));
-//     Real Y[NUM_SPECIES];
-//     for (int n = 0; n < NUM_SPECIES; ++n) { Y[n] = dat(i, j, k, UFS + n) * rhoinv; }
-//     amrex::Real T, cs;
-//     auto eos = pele::physics::PhysicsType::eos();
-//     eos.REY2T(rho, ei, Y, T);
-//     eos.RTY2Cs(rho, T, Y, cs);
-//     const Real dx = std::pow(AMREX_D_TERM(geomdata.CellSize(0), *geomdata.CellSize(1),
-//                                     *geomdata.CellSize(2)), 1.0 / amrex::SpaceDim);
-    
-//     // Get shock sensor
-//     tmp(i, j, k) = -divu(i, j, k) / amrex::max(0.05 * cs / dx, 5.0 * magvort(i, j, k));
-//   });
-
-//   // Add 2 cell buffer
-//   auto shock_sensor = derfab.array(dcomp);
-//   amrex::ParallelFor(bx, [=] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {
-//     Real max_neighbour = amrex::max(tmp(i, j, k), tmp(i + 1, j, k), tmp(i - 1, j, k), tmp(i + 2, j, k), tmp(i - 3, j, k));
-// #if AMREX_SPACEDIM >= 2
-//     max_neighbour = amrex::max(max_neighbour, tmp(i, j + 1, k), tmp(i, j - 1, k), tmp(i, j + 2, k), tmp(i, j - 2, k), tmp(i + 1, j + 1, k), tmp(i + 1, j - 1, k), tmp(i - 1, j + 1, k), tmp(i - 1, j - 1, k));
-// #endif
-// #if AMREX_SPACEDIM == 3
-//     max_neighbour = amrex::max(max_neighbour, tmp(i, j, k + 1), tmp(i, j, k - 1));
-// #endif
-//     shock_sensor(i, j, k) = amrex::min(max_neighbour, 1.0);
-//     // shock_sensor(i, j, k) = (max_neighbour >= 1.0) ? 1.0 : 0.0;
-//     // shock_sensor(i, j, k) = (tmp(i, j, k) >= 1.0) ? 1.0 : 0.0;
-//   });
-// }
-
 // Shock sensor 
 void cns_dershocksensor(const Box& bx, FArrayBox& derfab, int dcomp, int /*ncomp*/,
-                        const FArrayBox& datafab, const Geometry& geomdata, Real time,
-                        const int* bcrec, int level)
+                        const FArrayBox& datafab, const Geometry& geomdata,
+                        Real time, const int* bcrec, int level)
 {
   // Get divu and magvort
   FArrayBox divu_fab(bx, 1, amrex::The_Async_Arena());
@@ -786,59 +670,34 @@ void cns_dershocksensor(const Box& bx, FArrayBox& derfab, int dcomp, int /*ncomp
     // "Shock" sensor
     Real divu2 = divu(i, j, k) * divu(i, j, k);
     Real magvort2 = magvort(i, j, k) * magvort(i, j, k);    
-    shock_sensor(i, j, k) = divu2 / (divu2 + magvort2 + 1.0e-3); // Ducros
-    // Real magvel2 = (AMREX_D_TERM(sarr(i, j, k, UMX) * sarr(i, j, k, UMX),
-    //                              +sarr(i, j, k, UMY) * sarr(i, j, k, UMY),
-    //                              +sarr(i, j, k, UMZ) * sarr(i, j, k, UMZ))) /
-    //                sarr(i, j, k, URHO) / sarr(i, j, k, URHO);
-    Real cellsize2 = std::pow(AMREX_D_TERM(dx[0], * dx[1], * dx[2]), 2.0 / Real(amrex::SpaceDim));
+    // shock_sensor(i, j, k) = divu2 / (divu2 + magvort2 + 1.0e-3); // Ducros
+    Real magvel2 = (AMREX_D_TERM(sarr(i, j, k, UMX) * sarr(i, j, k, UMX),
+                                 +sarr(i, j, k, UMY) * sarr(i, j, k, UMY),
+                                 +sarr(i, j, k, UMZ) * sarr(i, j, k, UMZ))) /
+                   sarr(i, j, k, URHO) / sarr(i, j, k, URHO);
+    Real cellsize2 =
+      std::pow(AMREX_D_TERM(dx[0], *dx[1], *dx[2]), 2.0 / Real(amrex::SpaceDim));
     // shock_sensor(i, j, k) = divu2 / (divu2 + magvel2 / cellsize2 + 1.0e-6); // Hendrickson, Kartha, Candler
+    shock_sensor(i, j, k) = divu2 / (divu2 + magvort2 + std::sqrt(magvel2 / cellsize2)); // mixed
+    // shock_sensor(i, j, k) *= divu(i, j, k) < 0.0 ? 1.0 : 0.0; // only tag compression
 
     // Partial density discontinuity sensor
     for (int ns = 0; ns < NUM_SPECIES; ++ns) {
       AMREX_D_TERM(
-        Real drYdx = (sarr(i + 1, j, k, UFS + ns) - sarr(i - 1, j, k, UFS + ns)) / dx[0];,
-        Real drYdy = (sarr(i, j + 1, k, UFS + ns) - sarr(i, j - 1, k, UFS + ns)) / dx[1];,
-        Real drYdz = (sarr(i, j, k + 1, UFS + ns) - sarr(i, j, k - 1, UFS + ns)) / dx[2];)
-      Real drY2 = std::sqrt(AMREX_D_TERM(drYdx * drYdx, +drYdy * drYdy, +drYdz * drYdz));
+        Real drYdx =
+          (sarr(i + 1, j, k, UFS + ns) - sarr(i - 1, j, k, UFS + ns)) / dx[0];
+        , Real drYdy =
+            (sarr(i, j + 1, k, UFS + ns) - sarr(i, j - 1, k, UFS + ns)) / dx[1];
+        , Real drYdz =
+            (sarr(i, j, k + 1, UFS + ns) - sarr(i, j, k - 1, UFS + ns)) / dx[2];)
+      Real drY2 =
+        std::sqrt(AMREX_D_TERM(drYdx * drYdx, +drYdy * drYdy, +drYdz * drYdz));
       Real rY2 = sarr(i, j, k, UFS + ns) * sarr(i, j, k, UFS + ns);
-      shock_sensor(i, j, k) = amrex::max(shock_sensor(i, j, k), drY2 / (drY2 + rY2 / cellsize2 + 1.0e-6));
+      shock_sensor(i, j, k) =
+        amrex::max(shock_sensor(i, j, k), drY2 / (drY2 + rY2 / cellsize2 + 1.0e-6));
     }
   });
 }
-
-// void cns_dermut(const Box& bx, FArrayBox& derfab, int dcomp, int /*ncomp*/,
-//                 const FArrayBox& datafab, const Geometry& geomdata, Real /*time*/,
-//                 const int* /*bcrec*/, int /*level*/)
-// {
-//   auto const dat = datafab.const_array();
-//   auto mu_T = derfab.array(dcomp);
-
-//   const auto dxinv = geomdata.InvCellSizeArray();
-
-//   const amrex::Box& gbx = amrex::grow(bx, 1);
-//   amrex::FArrayBox local(gbx, AMREX_SPACEDIM + 1,
-//                          amrex::The_Async_Arena()); // [rho, u, v, w]
-//   auto larr = local.array();
-
-//   amrex::ParallelFor(gbx, [=] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {
-//     const amrex::Real rhoinv = 1.0 / dat(i, j, k, URHO);
-//     larr(i, j, k, QRHO) = dat(i, j, k, URHO);
-//     AMREX_D_TERM(larr(i, j, k, QU) = dat(i, j, k, UMX) * rhoinv;
-//                  , larr(i, j, k, QV) = dat(i, j, k, UMY) * rhoinv;
-//                  , larr(i, j, k, QW) = dat(i, j, k, UMZ) * rhoinv;)
-//   });
-
-//   amrex::ParallelFor(bx, [=] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {
-// #if AMREX_SPACEDIM == 2
-//     Real delta = 1.0 / std::sqrt(dxinv[0] * dxinv[1]);
-// #else
-//     Real delta = std::pow(dxinv[0]*dxinv[1]*dxinv[2], -1./3.);
-// #endif
-
-//     CNS::les_model->mu_T_cc(i, j, k, larr, dxinv, delta, CNS::Cs, mu_T(i, j, k));
-//   });
-// }
 
 void cns_derturbvisc(const Box& bx, FArrayBox& derfab, int dcomp, int /*ncomp*/,
                      const FArrayBox& datafab, const Geometry& geomdata,

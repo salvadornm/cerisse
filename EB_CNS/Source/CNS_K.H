@@ -16,8 +16,7 @@
  */
 AMREX_GPU_DEVICE AMREX_FORCE_INLINE amrex::Real
 cns_estdt_hydro(int i, int j, int k, amrex::Array4<const amrex::Real> const& state,
-                amrex::GpuArray<amrex::Real, AMREX_SPACEDIM> const& dx,
-                Parm const& /*parm*/) noexcept
+                amrex::GpuArray<amrex::Real, AMREX_SPACEDIM> const& dx) noexcept
 {
   amrex::Real rho = state(i, j, k, URHO);
   amrex::Real rhoinv = amrex::Real(1.0) / rho;
@@ -51,7 +50,7 @@ cns_estdt_hydro(int i, int j, int k, amrex::Array4<const amrex::Real> const& sta
  */
 AMREX_GPU_DEVICE AMREX_FORCE_INLINE amrex::Real cns_estdt_visc(
   int i, int j, int k, amrex::Array4<const amrex::Real> const& state,
-  amrex::GpuArray<amrex::Real, AMREX_SPACEDIM> const& dx, Parm const& parm,
+  amrex::GpuArray<amrex::Real, AMREX_SPACEDIM> const& dx,
   pele::physics::transport::TransParm<
     pele::physics::PhysicsType::eos_type,
     pele::physics::PhysicsType::transport_type> const* trans_parm) noexcept
@@ -75,11 +74,11 @@ AMREX_GPU_DEVICE AMREX_FORCE_INLINE amrex::Real cns_estdt_visc(
   eos.RTY2Cv(rho, T, massfrac, cv);
 
   amrex::Real mu, xi, lam;
-  bool get_xi = false, get_mu = true, get_lam = true, get_Ddiag = false, get_chi = false;
+  bool get_xi = false, get_mu = true, get_lam = true, get_Ddiag = false,
+       get_chi = false;
   auto trans = pele::physics::PhysicsType::transport();
-  trans.transport(get_xi, get_mu, get_lam, get_Ddiag, get_chi, T, rho, massfrac, 
+  trans.transport(get_xi, get_mu, get_lam, get_Ddiag, get_chi, T, rho, massfrac,
                   nullptr, nullptr, mu, xi, lam, trans_parm);
-
 
   amrex::Real D =
     amrex::max(mu, lam / cv); // no need to check lam/cp because cv < cp

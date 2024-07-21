@@ -137,30 +137,30 @@ void CNS::initData()
   MultiFab& S_new = get_new_data(State_Type);
   S_new.setVal(0.0);
 
-  Parm const* lparm = d_parm;
-  ProbParm const* lprobparm =
-    d_prob_parm; // <T> const* = pointer to constant <T>; const <T>* == <T> const*
+  // <T> const* = pointer to constant <T>; const <T>* == <T> const*
+  ProbParm const* lprobparm = d_prob_parm;
   const auto geomdata = geom.data();
 #ifdef USE_PMFDATA
-  pele::physics::PMF::PmfData::DataContainer const* lpmfdata = pmf_data.getDeviceData();
+  pele::physics::PMF::PmfData::DataContainer const* lpmfdata =
+    pmf_data.getDeviceData();
 #endif
 
   auto const& sarrs = S_new.arrays();
-  amrex::ParallelFor(
-    S_new, [=] AMREX_GPU_DEVICE(int box_no, int i, int j, int k) noexcept {
-      prob_initdata(i, j, k, sarrs[box_no], geomdata, *lparm, *lprobparm
+  amrex::ParallelFor(S_new,
+                     [=] AMREX_GPU_DEVICE(int box_no, int i, int j, int k) noexcept {
+                       prob_initdata(i, j, k, sarrs[box_no], geomdata, *lprobparm
 #ifdef USE_PMFDATA
-      , lpmfdata
+                                     ,
+                                     lpmfdata
 #endif
       );
 
-      cns_check_species_sum_to_one(i, j, k,
-        sarrs[box_no]); // Verify that the sum of (rho Y)_i = rho at every cell
+                       // Verify that the sum of (rho Y)_i = rho at every cell
+                       cns_check_species_sum_to_one(i, j, k, sarrs[box_no]);
     });
-  enforce_consistent_state();
+  enforce_consistent_state(S_new);
 
   get_new_data(Reactions_Type).setVal(0.0);
-
   get_new_data(Cost_Type).setVal(1.0);
 }
 
@@ -211,18 +211,17 @@ void CNS::computeNewDt(int finest_level, int /*sub_cycle*/, Vector<int>& n_cycle
     }
   } else {
     // Limit dt's by change_max * old dt (TODO: Do we really need this?)
-    static Real change_max = 1.1;
     for (int i = 0; i <= finest_level; i++) {
       if ((verbose > 0) && ParallelDescriptor::IOProcessor()) {
         Print() << " >> Compute new dt: limiting dt at level " << i << '\n';
         Print() << "    new dt computed: " << dt_min[i] << '\n';
-        if (dt_min[i] > change_max * dt_level[i]) {
-          Print() << "    but limited to: " << change_max * dt_level[i] << " = "
-                  << change_max << " * " << dt_level[i] << '\n';
+        if (dt_min[i] > dt_max_change * dt_level[i]) {
+          Print() << "    but limited to: " << dt_max_change * dt_level[i] << " = "
+                  << dt_max_change << " * " << dt_level[i] << '\n';
         }
       }
 
-      dt_min[i] = std::min(dt_min[i], change_max * dt_level[i]);
+      dt_min[i] = std::min(dt_min[i], dt_max_change * dt_level[i]);
     }
   }
 
@@ -262,18 +261,17 @@ void CNS::post_timestep(int iteration)
   BL_PROFILE("CNS::post_timestep()");
 
   if (do_reflux && level < parent->finestLevel()) {
+    if (verbose > 0) { amrex::Print() << " >> Reflux() at level " << level << '\n'; }
+
     CNS& fine_level = getLevel(level + 1);
     MultiFab& S_crse = get_new_data(State_Type);
-    MultiFab& S_fine = fine_level.get_new_data(State_Type);
 #if CNS_USE_EB
+    MultiFab& S_fine = fine_level.get_new_data(State_Type);
     fine_level.flux_reg.Reflux(S_crse, *volfrac, S_fine, *fine_level.volfrac);
 #else
     fine_level.flux_reg.Reflux(S_crse);
 #endif
-
-    if (verbose != 0) {
-      amrex::Print() << " >> Reflux() at level " << level << '\n';
-    }
+    enforce_consistent_state(S_crse);
   }
 
   if (level < parent->finestLevel()) {
@@ -288,20 +286,17 @@ void CNS::post_timestep(int iteration)
   MultiFab& IR = get_new_data(Reactions_Type);
   Real curtime = state[State_Type].curTime();
   Real dtlev = parent->dtLevel(level);
-  Parm const* lparm = d_parm;
   ProbParm const* lprobparm = d_prob_parm;
   const auto geomdata = geom.data();
   auto const& sarrs = S.arrays();
   auto const& irarrs = IR.const_arrays();
-  amrex::ParallelFor(
-    S, [=] AMREX_GPU_DEVICE(int box_no, int i, int j, int k) noexcept {
+  amrex::ParallelFor(S,
+                     [=] AMREX_GPU_DEVICE(int box_no, int i, int j, int k) noexcept {
       // Do sth here, e.g. calculate time statistics
-      prob_post_timestep(i, j, k, curtime, dtlev, sarrs[box_no], irarrs[box_no],
-                         geomdata, *lparm, *lprobparm);
+                       prob_post_timestep(i, j, k, curtime, dtlev, sarrs[box_no],
+                                          irarrs[box_no], geomdata, *lprobparm);
     });
 #endif
-
-  enforce_consistent_state(); // enforce Y and T after avgDown and reflux
 
   if (do_react && use_typical_vals_chem &&
       parent->levelSteps(0) % reset_typical_vals_int == 0) {
@@ -421,17 +416,15 @@ void CNS::post_restart()
   }
 #endif
 
-  Parm const* lparm = d_parm;
   ProbParm const* lprobparm = d_prob_parm;
   const auto geomdata = geom.data();
   auto const& sarrs = S_new.arrays();
   amrex::ParallelFor(
     S_new, [=] AMREX_GPU_DEVICE(int box_no, int i, int j, int k) noexcept {
       // Modify restarted data and/or add turbulence
-      prob_post_restart(i, j, k, sarrs[box_no], geomdata, *lparm, *lprobparm);
+      prob_post_restart(i, j, k, sarrs[box_no], geomdata, *lprobparm);
     });
-
-  enforce_consistent_state();
+  enforce_consistent_state(S_new);
 }
 
 void CNS::errorEst(TagBoxArray& tags, int /*clearval*/, int tagval, Real time,
@@ -605,7 +598,6 @@ void CNS::errorEst(TagBoxArray& tags, int /*clearval*/, int tagval, Real time,
   // }
 
   // Problem specific taggings
-  Parm const* lparm = d_parm;
   ProbParm const* lprobparm = d_prob_parm;
   const auto geomdata = geom.data();
   auto tagarr = tags.arrays();
@@ -613,7 +605,7 @@ void CNS::errorEst(TagBoxArray& tags, int /*clearval*/, int tagval, Real time,
   amrex::ParallelFor(tags,
                      [=] AMREX_GPU_DEVICE(int box_no, int i, int j, int k) noexcept {
                        prob_tag_error(i, j, k, tagarr[box_no], sarrs[box_no], level,
-                                      tagval, time, geomdata, *lparm, *lprobparm);
+                                      tagval, time, geomdata, *lprobparm);
                      });
 
   Gpu::streamSynchronize();
@@ -658,7 +650,11 @@ void CNS::printTotalandCheckNan() const
 #endif
 
   // Nan detector for soft exit
-  if (isnan(tot[0]) || AMREX_D_TERM(isnan(tot[1]), || isnan(tot[2]), || isnan(tot[3])) || isnan(tot[4])) { signalStopJob = true; }
+  if (isnan(tot[0]) ||
+      AMREX_D_TERM(isnan(tot[1]), || isnan(tot[2]), || isnan(tot[3])) ||
+      isnan(tot[4])) {
+    signalStopJob = true;
+  }
   amrex::ParallelDescriptor::ReduceBoolOr(signalStopJob);
 }
 
@@ -722,6 +718,7 @@ void CNS::read_params()
   pp.query("cfl", cfl);
   pp.query("fixed_dt", fixed_dt);
   pp.query("dt_cutoff", dt_cutoff);
+  pp.query("dt_max_change", dt_max_change);
 
   pp.query("recon_char_var", recon_char_var);
   pp.query("char_sys", char_sys);
@@ -879,13 +876,11 @@ void CNS::read_params()
 #endif
   }
 
-  if (
-    pp.queryarr("buffer_box_lo", refboxlo)) {
+  if (pp.queryarr("buffer_box_lo", refboxlo)) {
     pp.getarr("buffer_box_hi", refboxhi);
     buffer_box.setLo(refboxlo.data());
     buffer_box.setHi(refboxhi.data());
-    if (!buffer_box.ok())
-      amrex::Abort("CNS: buffer_box has negative volume");
+    if (!buffer_box.ok()) { amrex::Abort("CNS: buffer_box has negative volume"); }
   }
 
   pp.query("do_hydro", do_hydro);
@@ -952,10 +947,8 @@ void CNS::read_params()
   pp.query("eb_no_slip", eb_no_slip);
   pp.query("eb_isothermal", eb_isothermal);
   if (eb_isothermal) { pp.get("eb_wall_temp", eb_wall_temp); }
+  pp.query("eb_recon_mode", eb_recon_mode); // 0: fill stencil, 1: return to PLM
 #endif
-
-  amrex::Gpu::copyAsync(amrex::Gpu::hostToDevice, h_parm, h_parm + 1, d_parm);
-  amrex::Gpu::streamSynchronize();
 }
 
 void CNS::avgDown()
@@ -1019,14 +1012,13 @@ void CNS::buildMetrics()
   areafrac = ebfactory.getAreaFrac();
   facecent = ebfactory.getFaceCent();
 
-  Parm const* l_parm = d_parm;
-
   // Level mask for legacy redistribution
   level_mask.clear();
   level_mask.define(grids, dmap, 1, 3);
-  level_mask.BuildMask(geom.Domain(), geom.periodicity(), l_parm->level_mask_covered,
-                       l_parm->level_mask_notcovered, l_parm->level_mask_physbnd,
-                       l_parm->level_mask_interior);
+  level_mask.BuildMask(
+    geom.Domain(), geom.periodicity(), CNSConstants::level_mask_covered,
+    CNSConstants::level_mask_notcovered, CNSConstants::level_mask_physbnd,
+    CNSConstants::level_mask_interior);
 #endif
 }
 
@@ -1038,7 +1030,6 @@ Real CNS::estTimeStep()
 
   const auto dx = geom.CellSizeArray();
   const MultiFab& S = get_new_data(State_Type);
-  Parm const* lparm = d_parm;
 
 #if CNS_USE_EB
   auto const& fact = dynamic_cast<EBFArrayBoxFactory const&>(S.Factory());
@@ -1065,14 +1056,14 @@ Real CNS::estTimeStep()
     {
       reduce_op.eval(bx, reduce_data,
                      [=] AMREX_GPU_DEVICE(int i, int j, int k) -> ReduceTuple {
-                       return cns_estdt_hydro(i, j, k, s_arr, dx, *lparm);
+                       return cns_estdt_hydro(i, j, k, s_arr, dx);
                      });
 
       if (do_visc) {
         auto const* ltransparm = trans_parms.device_trans_parm();
-        reduce_op.eval(
-          bx, reduce_data, [=] AMREX_GPU_DEVICE(int i, int j, int k) -> ReduceTuple {
-            return cns_estdt_visc(i, j, k, s_arr, dx, *lparm, ltransparm);
+        reduce_op.eval(bx, reduce_data,
+                       [=] AMREX_GPU_DEVICE(int i, int j, int k) -> ReduceTuple {
+                         return cns_estdt_visc(i, j, k, s_arr, dx, ltransparm);
           });
       }
     } // if not covered

@@ -18,8 +18,7 @@
 
 AMREX_GPU_DEVICE AMREX_FORCE_INLINE void
 prob_initdata(int i, int j, int k, amrex::Array4<amrex::Real> const& state,
-              amrex::GeometryData const& geomdata, Parm const& /*parm*/,
-              ProbParm const& prob_parm)
+              amrex::GeometryData const& geomdata, ProbParm const& prob_parm)
 {
   // Geometry
   const amrex::Real* prob_lo = geomdata.ProbLo();
@@ -34,26 +33,12 @@ prob_initdata(int i, int j, int k, amrex::Array4<amrex::Real> const& state,
                                          masa_eval_3d_exact_v(x, y, z),
                                          masa_eval_3d_exact_w(x, y, z)};
   const amrex::Real p = masa_eval_3d_exact_p(x, y, z);
-  // amrex::Real rho = 0.0, u[AMREX_SPACEDIM] = {0.0}, p = 0.0;
-  // std::vector<amrex::Real> weights = {5.0 / 9.0, 8.0 / 9.0, 5.0 / 9.0};
-  // std::vector<amrex::Real> points = {-std::sqrt(3.0 / 5.0), 0.0, std::sqrt(3.0 / 5.0)};
-  // for (int i1 = 0; i1 < points.size(); ++i1) {
-  // for (int i2 = 0; i2 < points.size(); ++i2) {
-  //   amrex::Real n = points[i1];
-  //   amrex::Real m = points[i2];
-  //   rho += 0.25 * weights[i1] * weights[i2] * masa_eval_3d_exact_rho(x + 0.5 * n * dx[0], y + 0.5 * m * dx[1], z);
-  //   u[0] += 0.25 * weights[i1] * weights[i2] * masa_eval_3d_exact_u(x + 0.5 * n * dx[0], y + 0.5 * m * dx[1], z);
-  //   u[1] += 0.25 * weights[i1] * weights[i2] * masa_eval_3d_exact_v(x + 0.5 * n * dx[0], y + 0.5 * m * dx[1], z);
-  //   u[2] += 0.25 * weights[i1] * weights[i2] * masa_eval_3d_exact_w(x + 0.5 * n * dx[0], y + 0.5 * m * dx[1], z);
-  //   p += 0.25 * weights[i1] * weights[i2] * masa_eval_3d_exact_p(x + 0.5 * n * dx[0], y + 0.5 * m * dx[1], z);
-  // }
-  // }
   amrex::Real massfrac[NUM_SPECIES] = {1.0};
 
   amrex::Real eint;
   auto eos = pele::physics::PhysicsType::eos();
   eos.RYP2E(rho, massfrac, p, eint);
-  
+
   // Set the state
   for (int nf = 0; nf <= NUM_FIELD; ++nf) {
     state(i, j, k, nf * NVAR + URHO) = rho;
@@ -75,9 +60,9 @@ AMREX_GPU_DEVICE AMREX_FORCE_INLINE void bcnormal(
 {
 }
 
-AMREX_GPU_DEVICE AMREX_FORCE_INLINE void prob_post_restart(
-  int i, int j, int k, amrex::Array4<amrex::Real> const& state,
-  amrex::GeometryData const& geomdata, Parm const& parm, ProbParm const& prob_parm)
+AMREX_GPU_DEVICE AMREX_FORCE_INLINE void
+prob_post_restart(int i, int j, int k, amrex::Array4<amrex::Real> const& state,
+                  amrex::GeometryData const& geomdata, ProbParm const& prob_parm)
 {
 }
 
@@ -85,15 +70,15 @@ AMREX_GPU_DEVICE AMREX_FORCE_INLINE void prob_post_restart(
 //   int i, int j, int k, const amrex::Real /*curtime*/, const amrex::Real dtlev,
 //   amrex::Array4<amrex::Real> const& state,
 //   amrex::Array4<const amrex::Real> const& reactions,
-//   amrex::GeometryData const& /*geomdata*/, Parm const& /*parm*/, ProbParm const& pp)
+//   amrex::GeometryData const& /*geomdata*/,  ProbParm const& pp)
 // {
 // }
 
-AMREX_GPU_DEVICE AMREX_FORCE_INLINE void prob_tag_error(
-  int i, int j, int k, amrex::Array4<char> const& tagarr,
-  amrex::Array4<const amrex::Real> const& /*sarr*/, int level, char tagval,
-  const amrex::Real /*time*/, amrex::GeometryData const& geomdata,
-  Parm const& /*parm*/, ProbParm const& /*pp*/)
+AMREX_GPU_DEVICE AMREX_FORCE_INLINE void
+prob_tag_error(int i, int j, int k, amrex::Array4<char> const& tagarr,
+               amrex::Array4<const amrex::Real> const& /*sarr*/, int level,
+               char tagval, const amrex::Real /*time*/,
+               amrex::GeometryData const& geomdata, ProbParm const& /*pp*/)
 {
 }
 
