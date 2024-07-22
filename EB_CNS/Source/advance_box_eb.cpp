@@ -192,7 +192,7 @@ void CNS::compute_dSdt_box_eb(
         });
       }
     } // for dir
-  }   // for fields
+  } // for fields
 
 #if NUM_FIELD > 0
   // Average viscous fluxes for V/VSPDF and add to flx
@@ -305,4 +305,10 @@ void CNS::compute_dSdt_box_eb(
       }
     });
   }
+
+  // Zero dsdt for aux variables
+  amrex::ParallelFor(bx, NUM_AUX,
+                     [=] AMREX_GPU_DEVICE(int i, int j, int k, int n) noexcept {
+                       dsdt(i, j, k, UFA + n) = 0.0;
+                     });
 }

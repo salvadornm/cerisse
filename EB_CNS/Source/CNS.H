@@ -10,7 +10,7 @@
 #else
 #include <AMReX_YAFluxRegister.H>
 #endif
-// #include <AMReX_ErrorList.H>
+#include <AMReX_ErrorList.H>
 #include <PMFData.H>
 #include <PelePhysics.H>
 #include <ReactorBase.H>
@@ -388,7 +388,7 @@ protected:
 
   // AMR controls
 
-  static int refine_cutcells;
+  static bool refine_cutcells;
   static int refine_cutcells_max_lev;
   static amrex::Vector<amrex::RealBox> refine_boxes;
   static amrex::Vector<int> refine_boxes_max_lev;
@@ -403,7 +403,17 @@ protected:
   static int refine_magvort_max_lev;
   static amrex::Vector<amrex::Real> refine_tke;
   static int refine_tke_max_lev;
-  // static amrex::Vector<amrex::AMRErrorTag> errtagger;
+  static amrex::Vector<amrex::AMRErrorTag> errtags;
 };
+
+void cns_bcfill(amrex::Box const& bx, amrex::FArrayBox& data, const int dcomp,
+                const int numcomp, amrex::Geometry const& geom,
+                const amrex::Real time, const amrex::Vector<amrex::BCRec>& bcr,
+                const int bcomp, const int scomp);
+
+void cns_react_bcfill(amrex::Box const& bx, amrex::FArrayBox& data, const int dcomp,
+                      const int numcomp, amrex::Geometry const& geom,
+                      const amrex::Real time, const amrex::Vector<amrex::BCRec>& bcr,
+                      const int bcomp, const int scomp);
 
 #endif

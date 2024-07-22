@@ -1,7 +1,6 @@
 #include <AMReX_ParmParse.H>
 
 #include <climits>
-// #include <AMReX_ErrorList.H>
 #if CNS_USE_EB
 #include <AMReX_EBAmrUtil.H>
 #include <AMReX_EBFArrayBox.H>
@@ -34,9 +33,9 @@ CNS::CNS(Amr& papa, int lev, const Geometry& level_geom, const BoxArray& bl,
   : AmrLevel(papa, lev, level_geom, bl, dm, time)
 {
   if (do_reflux && level > 0) {
-    flux_reg.define(
-      bl, papa.boxArray(level - 1), dm, papa.DistributionMap(level - 1), level_geom,
-      papa.Geom(level - 1), papa.refRatio(level - 1), level, LEN_STATE);
+    flux_reg.define(bl, papa.boxArray(level - 1), dm,
+                    papa.DistributionMap(level - 1), level_geom,
+                    papa.Geom(level - 1), papa.refRatio(level - 1), level, UFA);
   }
 
   buildMetrics();
@@ -153,11 +152,11 @@ void CNS::initData()
                                      ,
                                      lpmfdata
 #endif
-      );
+                       );
 
                        // Verify that the sum of (rho Y)_i = rho at every cell
                        cns_check_species_sum_to_one(i, j, k, sarrs[box_no]);
-    });
+                     });
   enforce_consistent_state(S_new);
 
   get_new_data(Reactions_Type).setVal(0.0);
@@ -265,11 +264,13 @@ void CNS::post_timestep(int iteration)
 
     CNS& fine_level = getLevel(level + 1);
     MultiFab& S_crse = get_new_data(State_Type);
+    const int ncomp = UFA;
 #if CNS_USE_EB
     MultiFab& S_fine = fine_level.get_new_data(State_Type);
-    fine_level.flux_reg.Reflux(S_crse, *volfrac, S_fine, *fine_level.volfrac);
+    fine_level.flux_reg.Reflux(S_crse, *volfrac, S_fine, *fine_level.volfrac, 0, 0,
+                               ncomp);
 #else
-    fine_level.flux_reg.Reflux(S_crse);
+    fine_level.flux_reg.Reflux(S_crse, 0, 0, ncomp);
 #endif
     enforce_consistent_state(S_crse);
   }
@@ -292,10 +293,10 @@ void CNS::post_timestep(int iteration)
   auto const& irarrs = IR.const_arrays();
   amrex::ParallelFor(S,
                      [=] AMREX_GPU_DEVICE(int box_no, int i, int j, int k) noexcept {
-      // Do sth here, e.g. calculate time statistics
+                       // Do sth here, e.g. calculate time statistics
                        prob_post_timestep(i, j, k, curtime, dtlev, sarrs[box_no],
                                           irarrs[box_no], geomdata, *lprobparm);
-    });
+                     });
 #endif
 
   if (do_react && use_typical_vals_chem &&
@@ -314,7 +315,7 @@ void CNS::postCoarseTimeStep(Real time)
   prob_post_coarsetimestep(time);
 #endif
 
-  printTotalandCheckNan(); // must do because this checks for nan as well  
+  printTotalandCheckNan(); // must do because this checks for nan as well
 }
 
 void CNS::post_init(Real /*stop_time*/)
@@ -334,7 +335,8 @@ void CNS::post_init(Real /*stop_time*/)
   //     [=] AMREX_GPU_DEVICE(int box_no, int i, int j, int k) noexcept {
   //       ifmp_arrs[box_no](i, j, k) = ifm_arrs[box_no](i, j, k);
   //     });
-  //   amrex::WriteSingleLevelPlotfile("plt_lev" + std::to_string(level), ifine_mask_plot, {"mask"}, geom, 0.0, 0);
+  //   amrex::WriteSingleLevelPlotfile("plt_lev" + std::to_string(level),
+  //   ifine_mask_plot, {"mask"}, geom, 0.0, 0);
   // }
 
   if (level > 0) return;
@@ -343,7 +345,7 @@ void CNS::post_init(Real /*stop_time*/)
   // so that conserved data is consistent between levels
   for (int k = parent->finestLevel() - 1; k >= 0; --k) { getLevel(k).avgDown(); }
 
-  printTotalandCheckNan();  
+  printTotalandCheckNan();
 }
 
 void CNS::post_restart()
@@ -364,7 +366,7 @@ void CNS::post_restart()
   shock_sensor_mf.define(grids, dmap, 1, 3, MFInfo(), Factory());
   if (!use_hybrid_scheme) {
     shock_sensor_mf.setVal(1.0); // default to shock-capturing scheme
-  }  
+  }
   // ifine_mask.define(grids, dmap, 1, 0, MFInfo());
   // fillFineMask();
 
@@ -427,7 +429,7 @@ void CNS::post_restart()
   enforce_consistent_state(S_new);
 }
 
-void CNS::errorEst(TagBoxArray& tags, int /*clearval*/, int tagval, Real time,
+void CNS::errorEst(TagBoxArray& tags, int clearval, int tagval, Real time,
                    int /*n_error_buf = 0*/, int /*ngrow*/)
 {
   BL_PROFILE("CNS::errorEst()");
@@ -439,13 +441,13 @@ void CNS::errorEst(TagBoxArray& tags, int /*clearval*/, int tagval, Real time,
   }
 #endif
 
-  // for (int j = 0; j < errtagger.size(); ++j) {
-  //     std::unique_ptr<MultiFab> mf;
-  //     if (errtagger[j].Field() != std::string()) {
-  //         mf = derive(errtagger[j].Field(), time, errtagger[j].NGrow());
-  //     }
-  //     errtagger[j](tags, mf.get(), clearval, tagval, time, level, geom);
-  // }
+  for (int j = 0; j < errtags.size(); ++j) {
+    std::unique_ptr<MultiFab> mf;
+    if (errtags[j].Field() != std::string()) {
+      mf = derive(errtags[j].Field(), time, errtags[j].NGrow());
+    }
+    errtags[j](tags, mf.get(), clearval, tagval, time, level, geom);
+  }
 
   // Tag user specified box(es)
   if (!refine_boxes.empty()) {
@@ -466,7 +468,6 @@ void CNS::errorEst(TagBoxArray& tags, int /*clearval*/, int tagval, Real time,
           }
         }
       });
-    // Gpu::streamSynchronize();
   }
 
   const MultiFab& S_new = get_new_data(State_Type);
@@ -486,7 +487,6 @@ void CNS::errorEst(TagBoxArray& tags, int /*clearval*/, int tagval, Real time,
     ParallelFor(rho, [=] AMREX_GPU_DEVICE(int box_no, int i, int j, int k) noexcept {
       cns_tag_grad(i, j, k, tagma[box_no], rhoma[box_no], dxinv, threshold, tagval);
     });
-    // Gpu::streamSynchronize();
   }
 
   if (level < refine_velgrad_max_lev) {
@@ -505,7 +505,6 @@ void CNS::errorEst(TagBoxArray& tags, int /*clearval*/, int tagval, Real time,
         cns_tag_error(i, j, k, tagarr, mvarr, threshold, tagval);
       });
     }
-    // Gpu::streamSynchronize();
   }
 
   if (level < refine_presgrad_max_lev) {
@@ -525,7 +524,6 @@ void CNS::errorEst(TagBoxArray& tags, int /*clearval*/, int tagval, Real time,
         cns_tag_grad(i, j, k, tagarr, parr, dxinv, threshold, tagval);
       });
     }
-    // Gpu::streamSynchronize();
   }
 
   if (level < refine_magvort_max_lev) {
@@ -544,7 +542,6 @@ void CNS::errorEst(TagBoxArray& tags, int /*clearval*/, int tagval, Real time,
         cns_tag_error(i, j, k, tagarr, mvarr, threshold, tagval);
       });
     }
-    // Gpu::streamSynchronize();
   }
 
 #if (NUM_FIELD > 0) // cannot calculate tke if no SF
@@ -564,38 +561,8 @@ void CNS::errorEst(TagBoxArray& tags, int /*clearval*/, int tagval, Real time,
         cns_tag_error(i, j, k, tagarr, karr, threshold, tagval);
       });
     }
-    // Gpu::streamSynchronize();
   }
 #endif
-
-  // // Tagging flame tracer
-  // if (!flame_trac_name.empty()) {
-  //     auto it = std::find(spec_names.begin(), spec_names.end(), flame_trac_name);
-
-  //     if (it != spec_names.end()) {
-  //         const auto idx = std::distance(spec_names.begin(), it);
-
-  //         if (level < max_ftracer_lev) {
-  //         const amrex::Real captured_ftracerr = tagging_parm->ftracerr;
-  //         amrex::ParallelFor(
-  //             tilebox, [=] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {
-  //             tag_error(
-  //                 i, j, k, tag_arr, S_derarr, captured_ftracerr, tagval);
-  //             });
-  //         }
-  //         if (level < tagging_parm->max_ftracgrad_lev) {
-  //         const amrex::Real captured_ftracgrad = tagging_parm->ftracgrad;
-  //         amrex::ParallelFor(
-  //             tilebox, [=] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {
-  //             tag_graderror(
-  //                 i, j, k, tag_arr, S_derarr, captured_ftracgrad, tagval);
-  //             });
-  //         }
-
-  //     } else {
-  //         amrex::Abort("Unknown species identified as flame_trac_name");
-  //     }
-  // }
 
   // Problem specific taggings
   ProbParm const* lprobparm = d_prob_parm;
@@ -720,6 +687,23 @@ void CNS::read_params()
   pp.query("dt_cutoff", dt_cutoff);
   pp.query("dt_max_change", dt_max_change);
 
+#if CNS_USE_EB
+  // eb_weight in redist
+  pp.query("eb_weight", eb_weight);
+
+  pp.query("redistribution_type", redistribution_type);
+  if (redistribution_type != "StateRedist" && redistribution_type != "FluxRedist" &&
+      redistribution_type != "NoRedist") {
+    amrex::Abort(
+      "CNS: redistribution_type must be StateRedist or FluxRedist or NoRedist");
+  }
+
+  pp.query("eb_no_slip", eb_no_slip);
+  pp.query("eb_isothermal", eb_isothermal);
+  if (eb_isothermal) { pp.get("eb_wall_temp", eb_wall_temp); }
+  pp.query("eb_recon_mode", eb_recon_mode); // 0: fill stencil, 1: return to PLM
+#endif
+
   pp.query("recon_char_var", recon_char_var);
   pp.query("char_sys", char_sys);
   if (char_sys != 0 && char_sys != 1) {
@@ -729,10 +713,14 @@ void CNS::read_params()
   //  1 -- piecewise constant; 2 -- piecewise linear; 3 -- WENO-Z 3rd order
   //  4 -- WENO-JS 5th order;  5 -- WENO-Z 5th order; 6 -- TENO 5
   pp.query("recon_scheme", recon_scheme);
-  // if (recon_scheme == 2) { // because we return to PLM near EBs, so give this
-  // option to users
-  pp.query("limiter_theta", plm_theta); // MUSCL specific parameter
-  // }
+  if (recon_scheme == 2
+#if CNS_USE_EB
+      // because return to PLM near EBs, so give this option to users
+      || eb_recon_mode == 1
+#endif
+  ) {
+    pp.query("limiter_theta", plm_theta); // MUSCL limiter parameter
+  }
   pp.query("use_hybrid_scheme", use_hybrid_scheme);
   pp.query("teno_cutoff", teno_cutoff);
 
@@ -767,13 +755,10 @@ void CNS::read_params()
     }
   }
 
+#if CNS_USE_EB
   pp.query("refine_cutcells", refine_cutcells);
   pp.query("refine_cutcells_max_lev", refine_cutcells_max_lev);
-  if (refine_cutcells_max_lev < max_level) {
-    amrex::Warning(
-      "refine_cutcells_max_lev < max_level! Make sure EB does not cross "
-      "Coarse/Fine boundary");
-  }
+#endif
 
   pp.query("refine_velgrad_max_lev", refine_velgrad_max_lev);
   numvals = pp.countval("refine_velgrad");
@@ -909,7 +894,6 @@ void CNS::read_params()
   }
   pp.query("rk_order", rk_order); // 1-4
   if (rk_order != 1 && rk_order != 2) {
-    // amrex::Abort("CNS: rk_order must be 1 or 2");
     if (do_react || do_psgs || do_pd_model || do_vpdf || do_spdf) {
       amrex::Abort("CNS: rk_order must be 1 or 2 for reaction and/or SF");
     }
@@ -932,23 +916,6 @@ void CNS::read_params()
   pp.query("nscbc_relax_u", nscbc_relax_u);
   pp.query("nscbc_relax_T", nscbc_relax_T);
   pp.query("ambient_p", ambient_p);
-
-#if CNS_USE_EB
-  // eb_weight in redist
-  pp.query("eb_weight", eb_weight);
-
-  pp.query("redistribution_type", redistribution_type);
-  if (redistribution_type != "StateRedist" && redistribution_type != "FluxRedist" &&
-      redistribution_type != "NoRedist") {
-    amrex::Abort(
-      "CNS: redistribution_type must be StateRedist or FluxRedist or NoRedist");
-  }
-
-  pp.query("eb_no_slip", eb_no_slip);
-  pp.query("eb_isothermal", eb_isothermal);
-  if (eb_isothermal) { pp.get("eb_wall_temp", eb_wall_temp); }
-  pp.query("eb_recon_mode", eb_recon_mode); // 0: fill stencil, 1: return to PLM
-#endif
 }
 
 void CNS::avgDown()
@@ -990,20 +957,19 @@ void CNS::buildMetrics()
   BL_PROFILE("CNS::buildMetrics()");
 
 #if CNS_USE_EB
-  // make sure dx == dy == dz if use EB
-  const Real* dx = geom.CellSize();
+  static_assert(AMREX_SPACEDIM > 1, "EB only supports 2D and 3D");
 
   ParmParse ppeb2("eb2");
   std::string geom_type = "all_regular";
   ppeb2.query("geom_type", geom_type);
 
   if (geom_type != "all_regular") {
+    // make sure dx == dy == dz if use EB
+    const Real* dx = geom.CellSize();
     if (AMREX_D_TERM(, std::abs(dx[0] - dx[1]) > 1.e-12 * dx[0],
                      || std::abs(dx[0] - dx[2]) > 1.e-12 * dx[0])) {
       amrex::Abort("EB must have dx == dy == dz (for cut surface fluxes)\n");
     }
-
-    if ((AMREX_SPACEDIM == 1) && (CNS_USE_EB)) { amrex::Abort("1D cannot do EB\n"); }
   }
 
   const auto& ebfactory = dynamic_cast<EBFArrayBoxFactory const&>(Factory());
@@ -1012,7 +978,7 @@ void CNS::buildMetrics()
   areafrac = ebfactory.getAreaFrac();
   facecent = ebfactory.getFaceCent();
 
-  // Level mask for legacy redistribution
+  // Level mask for redistribution
   level_mask.clear();
   level_mask.define(grids, dmap, 1, 3);
   level_mask.BuildMask(
@@ -1064,10 +1030,10 @@ Real CNS::estTimeStep()
         reduce_op.eval(bx, reduce_data,
                        [=] AMREX_GPU_DEVICE(int i, int j, int k) -> ReduceTuple {
                          return cns_estdt_visc(i, j, k, s_arr, dx, ltransparm);
-          });
+                       });
       }
     } // if not covered
-  }   // mfi
+  } // mfi
 
   ReduceTuple host_tuple = reduce_data.value();
   estdt = amrex::min(estdt, amrex::get<0>(host_tuple));
@@ -1087,7 +1053,8 @@ Real CNS::estTimeStep()
 //   }
 
 //   iMultiFab tmp_mask(grids, dmap, 1, 2, MFInfo());
-//   tmp_mask = makeFineMask(tmp_mask, parent->boxArray(level + 1), fine_ratio, geom.periodicity(), 1, 0);
+//   tmp_mask = makeFineMask(tmp_mask, parent->boxArray(level + 1), fine_ratio,
+//   geom.periodicity(), 1, 0);
 
 //   // Grow by 2 cells
 //   auto const& tmask_arrs = tmp_mask.const_arrays();
@@ -1104,5 +1071,5 @@ Real CNS::estTimeStep()
 //           }
 //         }
 //       }
-//     });  
+//     });
 // }

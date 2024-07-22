@@ -120,14 +120,7 @@ void CNS::react_state(Real time, Real dt, bool init_react)
                               +sold_arr(i, j, k, UMZ) * sold_arr(i, j, k, UMZ))) /
                 rho_old;
 
-            // const Real ei = rEi(i, j, k) / rho_old;
-            // auto eos = pele::physics::PhysicsType::eos();
-            // eos.REY2T(rho_old, ei, Y, T(i, j, k));
             T(i, j, k) = sold_arr(i, j, k, UTEMP);
-
-            // if (T(i, j, k) <= 0.0)
-            //   std::cout << "Before reaction T=" << T(i, j, k) << " @ " << i << ","
-            //             << j << "," << k << std::endl;
 
             // calculate d[rY, rEi]/dt
             for (int n = 0; n < NUM_SPECIES; ++n) {
@@ -159,7 +152,6 @@ void CNS::react_state(Real time, Real dt, bool init_react)
                          amrex::Gpu::gpuStream()
 #endif
           );
-          // amrex::Gpu::Device::streamSynchronize();
 
           //////////////////////// Unpack data ////////////////////////
           // Prepare (rho, velocities, mu) for PaSR
@@ -219,10 +211,12 @@ void CNS::react_state(Real time, Real dt, bool init_react)
             if (mask(i, j, k) != -1) {
               // Monitor problem cell
               bool any_rY_unbounded = false;
-              for (int n = 0; n < NUM_SPECIES; ++n)
+              for (int n = 0; n < NUM_SPECIES; ++n) {
                 any_rY_unbounded |=
                   (rY(i, j, k, n) < -1e-5 || rY(i, j, k, n) > 1.0 + 1e-5 ||
                    std::isnan(rY(i, j, k, n)));
+              }
+#ifndef AMREX_USE_GPU
               if (any_rY_unbounded) {
                 std::cout << "Reaction causing rY=[ ";
                 for (int n = 0; n < NUM_SPECIES; ++n)
@@ -230,13 +224,14 @@ void CNS::react_state(Real time, Real dt, bool init_react)
                 std::cout << "] @ " << i << "," << j << "," << k << '\n';
               }
               if (T(i, j, k) < clip_temp) {
-                std::cout << "Reaction causing T=" << T(i, j, k) << " @ " << i << ","
-                          << j << "," << k << '\n';
+                std::cout << "Reaction causing T=" << snew_arr(i, j, k, UTEMP)
+                          << "->" << T(i, j, k) << " @ " << i << "," << j << "," << k
+                          << '\n';
               }
-
+#endif
               // update U^{n+1} = U^** + dt*I_R^{n+1}
               if (!init_react) {
-                amrex::Real new_rho = 0.0;
+                Real new_rho = 0.0;
                 if (do_pasr) {
                   unpack_pasr(i, j, k, snew_arr, new_rho, sold_arr, rY, rYsrc, qarr,
                               muarr, dx, dxinv, dt);
@@ -283,17 +278,19 @@ void CNS::react_state(Real time, Real dt, bool init_react)
                   I_R_mean_arr(i, j, k, n) += I_R_arr(i, j, k, n) * invNF;
                 }
               }
-            }
+            } // if mask != -1
           });
-        } // end fields loop
-      }   // end EB not covered block
+        } // for fields
+      } // if EB not covered
 
       // Record runtime for load balancing
-      amrex::Gpu::streamSynchronize();
-      wt = (amrex::ParallelDescriptor::second() - wt) / bx.d_numPts();
-      get_new_data(Cost_Type)[mfi].plus<amrex::RunOn::Device>(wt, bx);
-    } // end mfi loop
-  }   // end omp block
+      if (do_load_balance) {
+        amrex::Gpu::streamSynchronize();
+        wt = (amrex::ParallelDescriptor::second() - wt) / bx.d_numPts();
+        get_new_data(Cost_Type)[mfi].plus<amrex::RunOn::Device>(wt, bx);
+      }
+    } // for mfi
+  } // omp
 
   if (Snew.nGrow() > 0) { Snew.FillBoundary(geom.periodicity()); }
 

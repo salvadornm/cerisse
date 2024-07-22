@@ -57,9 +57,6 @@ Real CNS::advance(Real time, Real dt, int iteration, int ncycle)
     MultiFab& S_old = get_old_data(State_Type);
     MultiFab dSdt_old(grids, dmap, LEN_STATE, 0, MFInfo(), Factory());
     MultiFab dSdt_new(grids, dmap, LEN_STATE, 0, MFInfo(), Factory());
-    dSdt_old.setVal(0.0);
-    dSdt_new.setVal(0.0);
-
     MultiFab& I_R = get_new_data(Reactions_Type);
 
     // Predictor-corrector RK2
@@ -182,7 +179,7 @@ void CNS::compute_dSdt(const MultiFab& S, MultiFab& dSdt, Real dt,
 #if CNS_USE_EB
       const auto& flag = flags[mfi];
       if (flag.getType(bx) == FabType::covered) {
-        dSdt[mfi].setVal<RunOn::Device>(0.0, bx, 0, ncomp);
+        dSdt[mfi].setVal<RunOn::Device>(0.0, bx, 0, LEN_STATE);
       } else
 #endif
       {
@@ -274,9 +271,11 @@ void CNS::compute_dSdt(const MultiFab& S, MultiFab& dSdt, Real dt,
       } // end EB not covered block
 
       // Record runtime for load balancing
-      Gpu::streamSynchronize();
-      wt = (amrex::ParallelDescriptor::second() - wt) / bx.d_numPts();
-      get_new_data(Cost_Type)[mfi].plus<RunOn::Device>(wt, bx);
+      if (do_load_balance) {
+        Gpu::streamSynchronize();
+        wt = (amrex::ParallelDescriptor::second() - wt) / bx.d_numPts();
+        get_new_data(Cost_Type)[mfi].plus<RunOn::Device>(wt, bx);
+      }
     } // end mfi loop
   }   // end omp block
 }

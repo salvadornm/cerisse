@@ -169,6 +169,8 @@ AMREX_GPU_DEVICE AMREX_FORCE_INLINE void bcnormal(
       }
     }
   }
+
+  for (int na = 0; na < NUM_AUX; ++na) { s_ext[UFA + na] = 0.0; }
 }
 
 AMREX_GPU_DEVICE AMREX_FORCE_INLINE void

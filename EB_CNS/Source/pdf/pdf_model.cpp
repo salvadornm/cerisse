@@ -93,9 +93,12 @@ void CNS::compute_pdf_model(amrex::MultiFab& S, amrex::Real dt, int iteration)
         }
       } // if not covered
 
-      amrex::Gpu::streamSynchronize();
-      wt = (amrex::second() - wt) / bx.d_numPts();
-      cost[mfi].plus<amrex::RunOn::Device>(wt, bx);
+      // Record runtime for load balancing
+      if (do_load_balance) {
+        amrex::Gpu::streamSynchronize();
+        wt = (amrex::second() - wt) / bx.d_numPts();
+        cost[mfi].plus<amrex::RunOn::Device>(wt, bx);
+      }
     } // mfi loop
   }   // omp parallel
 }

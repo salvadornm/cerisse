@@ -182,7 +182,7 @@ void CNS::compute_dSdt_box(Box const& bx, Array4<const Real>& sarr,
         });
       }
     } // for dir
-  }   // for fields
+  } // for fields
 
 #if NUM_FIELD > 0
   // Average viscous fluxes for V/VSPDF and add to flx
@@ -215,7 +215,7 @@ void CNS::compute_dSdt_box(Box const& bx, Array4<const Real>& sarr,
                                AMREX_D_DECL(flxfab[0]->array(), flxfab[1]->array(),
                                             flxfab[2]->array()),
                                dxinv);
-                     });
+                     });  
 
   // External source term
   if (do_ext_src) {
@@ -227,4 +227,10 @@ void CNS::compute_dSdt_box(Box const& bx, Array4<const Real>& sarr,
       fill_ext_src(i, j, k, time, geomdata, sarr, dsdt, *lprobparm);
     });
   }
+  
+  // Zero dsdt for aux variables
+  amrex::ParallelFor(bx, NUM_AUX,
+                     [=] AMREX_GPU_DEVICE(int i, int j, int k, int n) noexcept {
+                       dsdt(i, j, k, UFA + n) = 0.0;
+                     });
 }

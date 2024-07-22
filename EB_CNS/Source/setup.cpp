@@ -1,7 +1,6 @@
 #include <AMReX_Derive.H>
 
 #include "CNS.H"
-#include "bcfill.H"
 #include "derive.H"
 #include "prob.H"
 
@@ -16,9 +15,7 @@ ProbParmHost* CNS::prob_parm_host = nullptr;
 using BndryFunc = StateDescriptor::BndryFunc;
 
 // Components are:
-// Interior,       Inflow = UserBC,
-// Outflow,        Symmetry = SlipWall,
-// SlipWall,       NoSlipWall,
+// Interior, Inflow = UserBC, Outflow, Symmetry = SlipWall, SlipWall, NoSlipWall,
 // UserBC
 static int scalar_bc[] = {
   BCType::int_dir,      BCType::ext_dir,      BCType::foextrap, BCType::reflect_even,
@@ -118,8 +115,9 @@ void CNS::variableSetUp()
   // - quartic_interp  : Quartic polynomial conservative interpolation.
   Interpolater* interp;
 #if CNS_USE_EB
-  interp = &eb_lincc_interp;
-  // interp = &eb_cell_cons_interp;
+    // EB only supports lincc or cell_cons
+    interp = &eb_lincc_interp;
+    // interp = &eb_cell_cons_interp;
 #else
   if (amr_interp_order == 1) {
     interp = &pc_interp;
@@ -424,69 +422,75 @@ void CNS::variableSetUp()
                  DeriveRec::TheSameBox);
   derive_lst.addComponent("var_T", desc_lst, State_Type, 0, LEN_STATE);
 #endif
-  // //
-  // // Dynamically generated error tagging functions
-  // //
-  // ParmParse ppamr("amr");
-  // Vector<std::string> refinement_indicators;
-  // ppamr.queryarr("refinement_indicators", refinement_indicators, 0,
-  // ppamr.countval("refinement_indicators")); for (int i = 0; i <
-  // refinement_indicators.size(); ++i) {
-  //   ParmParse ppr("amr." + refinement_indicators[i]);
-  //   RealBox realbox;
-  //   if (ppr.countval("in_box_lo")) {
-  //     std::vector<Real> box_lo(BL_SPACEDIM), box_hi(BL_SPACEDIM);
-  //     ppr.getarr("in_box_lo", box_lo, 0, box_lo.size());
-  //     ppr.getarr("in_box_hi", box_hi, 0, box_hi.size());
-  //     realbox = RealBox(&(box_lo[0]),&(box_hi[0]));
-  //   }
 
-  //   AMRErrorTagInfo info;
+  //
+  // Dynamically generated error tagging functions
+  //
+  ParmParse pp("cns");
+  Vector<std::string> refinement_indicators;
+  pp.queryarr("refinement_indicators", refinement_indicators);
 
-  //   if (realbox.ok()) {
-  //     info.SetRealBox(realbox);
-  //   }
-  //   if (ppr.countval("start_time") > 0) {
-  //     Real min_time; ppr.get("start_time",min_time);
-  //     info.SetMinTime(min_time);
-  //   }
-  //   if (ppr.countval("end_time") > 0) {
-  //     Real max_time; ppr.get("end_time",max_time);
-  //     info.SetMaxTime(max_time);
-  //   }
-  //   if (ppr.countval("max_level") > 0) {
-  //     int max_level;  ppr.get("max_level", max_level);
-  //     info.SetMaxLevel(max_level);
-  //   }
+  for (int i = 0; i < refinement_indicators.size(); ++i) {
+    std::string ref_prefix = "cns." + refinement_indicators[i];
+    ParmParse ppr(ref_prefix);
 
-  //   if (ppr.countval("value_greater")) {
-  //     Vector<Real> value;  ppr.getarr("value_greater", value);
-  //     std::string field;   ppr.get("field_name", field);
-  //     errtagger.push_back(AMRErrorTag(value, AMRErrorTag::GREATER, field, info));
-  //   }
-  //   else if (ppr.countval("value_less")) {
-  //     Vector<Real> value;  ppr.getarr("value_less", value);
-  //     std::string field;   ppr.get("field_name", field);
-  //     errtagger.push_back(AMRErrorTag(value, AMRErrorTag::LESS, field, info));
-  //   }
-  //   else if (ppr.countval("difference_greater")) {
-  //     Vector<Real> value;  ppr.getarr("difference_greater",value);
-  //     std::string field;   ppr.get("field_name", field);
-  //     errtagger.push_back(AMRErrorTag(value, AMRErrorTag::GRAD, field, info));
-  //   }
-  //   else if (ppr.countval("vorticity_greater")) {
-  //     Vector<Real> value;  ppr.getarr("vorticity_greater", value);
-  //     const std::string field="magvort";
-  //     errtagger.push_back(AMRErrorTag(value, AMRErrorTag::VORT, field, info));
-  //   }
-  //   else if (realbox.ok()) {
-  //     errtagger.push_back(AMRErrorTag(info));
-  //   }
-  //   else {
-  //     Abort(std::string("Unrecognized refinement indicator for " +
-  //     refinement_indicators[i]).c_str());
-  //   }
-  // }
+    RealBox realbox;
+    if (ppr.countval("in_box_lo")) {
+      std::vector<Real> box_lo(amrex::SpaceDim), box_hi(amrex::SpaceDim);
+      ppr.getarr("in_box_lo", box_lo, 0, box_lo.size());
+      ppr.getarr("in_box_hi", box_hi, 0, box_hi.size());
+      realbox = RealBox(&(box_lo[0]), &(box_hi[0]));
+    }
+
+    AMRErrorTagInfo info;
+    if (realbox.ok()) { info.SetRealBox(realbox); }
+    if (ppr.countval("start_time") > 0) {
+      Real min_time;
+      ppr.get("start_time", min_time);
+      info.SetMinTime(min_time);
+    }
+    if (ppr.countval("end_time") > 0) {
+      Real max_time;
+      ppr.get("end_time", max_time);
+      info.SetMaxTime(max_time);
+    }
+    if (ppr.countval("max_level") > 0) {
+      int max_level;
+      ppr.get("max_level", max_level);
+      info.SetMaxLevel(max_level);
+    }
+
+    if (ppr.countval("value_greater")) {
+      Real value;
+      ppr.get("value_greater", value);
+      std::string field;
+      ppr.get("field_name", field);
+      errtags.push_back(AMRErrorTag(value, AMRErrorTag::GREATER, field, info));
+    } else if (ppr.countval("value_less")) {
+      Real value;
+      ppr.get("value_less", value);
+      std::string field;
+      ppr.get("field_name", field);
+      errtags.push_back(AMRErrorTag(value, AMRErrorTag::LESS, field, info));
+    } else if (ppr.countval("vorticity_greater")) {
+      Real value;
+      ppr.get("vorticity_greater", value);
+      const std::string field = "mag_vort";
+      errtags.push_back(AMRErrorTag(value, AMRErrorTag::VORT, field, info));
+    } else if (ppr.countval("adjacent_difference_greater")) {
+      Real value;
+      ppr.get("adjacent_difference_greater", value);
+      std::string field;
+      ppr.get("field_name", field);
+      errtags.push_back(AMRErrorTag(value, AMRErrorTag::GRAD, field, info));
+    } else if (realbox.ok()) {
+      errtags.push_back(AMRErrorTag(info));
+    } else {
+      Abort(std::string("Unrecognised refinement indicator for " +
+                        refinement_indicators[i])
+              .c_str());
+    }
+  }
 }
 
 void CNS::variableCleanUp()
