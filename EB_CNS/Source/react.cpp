@@ -125,9 +125,9 @@ void CNS::react_state(Real time, Real dt, bool init_react)
             // eos.REY2T(rho_old, ei, Y, T(i, j, k));
             T(i, j, k) = sold_arr(i, j, k, UTEMP);
 
-            if (T(i, j, k) <= 0.0)
-              std::cout << "Before reaction T=" << T(i, j, k) << " @ " << i << ","
-                        << j << "," << k << std::endl;
+            // if (T(i, j, k) <= 0.0)
+            //   std::cout << "Before reaction T=" << T(i, j, k) << " @ " << i << ","
+            //             << j << "," << k << std::endl;
 
             // calculate d[rY, rEi]/dt
             for (int n = 0; n < NUM_SPECIES; ++n) {

@@ -8,7 +8,7 @@
 #include "PelePhysics.H"
 #include "index_macros.H"
 
-#define MONITOR_PROBLEM_CELL
+// #define MONITOR_PROBLEM_CELL
 
 /**
  * \brief Convert state variable to primitive variable
