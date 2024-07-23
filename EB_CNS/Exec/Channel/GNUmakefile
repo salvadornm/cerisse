@@ -26,7 +26,7 @@ THREAD_SANITIZER = FALSE
 # PeleC
 Eos_Model := GammaLaw
 Transport_Model := Sutherland
-Custom_Chemistry_Model := ../FlatPlate/Null2
+Custom_Chemistry_Model := ../../Source/chem/NullSutherland
 
 # CNS
 NUM_FIELD = 0

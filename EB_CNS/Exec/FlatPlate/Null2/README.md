@@ -1,1 +1,0 @@
-CKCPBS implementation is added to mechanism.H so that Sutherland transport law can be used. Constants are copied from PhysicsConstants.H and are hardcoded.

@@ -94,39 +94,28 @@ cns_ctochar(int i, int j, int k, int dir, amrex::Array4<const amrex::Real> const
 {
   using amrex::Real;
 
-  int QUN, QUT, QUTT;
-  if (dir == 0) {
-    QUN = QU;
-    QUT = QV;
-    QUTT = QW;
-  } else if (dir == 1) {
-    QUN = QV;
-    QUT = QU;
-    QUTT = QW;
-  } else {
-    QUN = QW;
-    QUT = QU;
-    QUTT = QV;
-  }
+  const int QU1 = QU + dir;
+  const int QU2 = (dir == 0) ? QV : QU;
+  const int QU3 = (dir == 2) ? QV : QW;
 
   if (sys == 0) { // speed of sound system
     w(i, j, k, WRHO) = q(i, j, k, QRHO) - q(i, j, k, QPRES) / q(i, j, k, QC) /
                                             q(i, j, k, QC); // rho minus p over c^2
     w(i, j, k, WACO) = 0.5 * (q(i, j, k, QPRES) / q(i, j, k, QC) +
-                              q(i, j, k, QRHO) * q(i, j, k, QUN));
+                              q(i, j, k, QRHO) * q(i, j, k, QU1));
     w(i, j, k, WACO + 1) = 0.5 * (q(i, j, k, QPRES) / q(i, j, k, QC) -
-                                  q(i, j, k, QRHO) * q(i, j, k, QUN));
+                                  q(i, j, k, QRHO) * q(i, j, k, QU1));
     w(i, j, k, WTHER) = q(i, j, k, QC);
   } else if (sys == 1) { // gamma system
     w(i, j, k, WRHO) = q(i, j, k, QRHO) * (1.0 - 1.0 / q(i, j, k, QG));
     w(i, j, k, WACO) =
       0.5 * (q(i, j, k, QPRES) +
              std::sqrt(q(i, j, k, QG) * q(i, j, k, QRHO) * q(i, j, k, QPRES)) *
-               q(i, j, k, QUN));
+               q(i, j, k, QU1));
     w(i, j, k, WACO + 1) =
       0.5 * (q(i, j, k, QPRES) -
              std::sqrt(q(i, j, k, QG) * q(i, j, k, QRHO) * q(i, j, k, QPRES)) *
-               q(i, j, k, QUN));
+               q(i, j, k, QU1));
     w(i, j, k, WTHER) = q(i, j, k, QG);
   } else {
     amrex::Abort(
@@ -135,8 +124,8 @@ cns_ctochar(int i, int j, int k, int dir, amrex::Array4<const amrex::Real> const
 
   // Passive scalars are the same for both systems
   for (int n = 0; n < NUM_SPECIES; ++n) { w(i, j, k, WY + n) = q(i, j, k, QFS + n); }
-  AMREX_D_TERM(, w(i, j, k, WUT) = q(i, j, k, QUT);
-               , w(i, j, k, WUT + 1) = q(i, j, k, QUTT););
+  AMREX_D_TERM(, w(i, j, k, WUT) = q(i, j, k, QU2);
+               , w(i, j, k, WUT + 1) = q(i, j, k, QU3););
 }
 
 /**
@@ -503,29 +492,12 @@ AMREX_GPU_DEVICE AMREX_FORCE_INLINE void cns_riemann(
   const amrex::IntVect iv(AMREX_D_DECL(i, j, k));
   const amrex::IntVect iv_dir = amrex::IntVect::TheDimensionVector(dir);
 
-  int UMN, UMT, UMTT, QUN, QUT, QUTT;
-  if (dir == 0) {
-    UMN = UMX;
-    UMT = UMY;
-    UMTT = UMZ;
-    QUN = QU;
-    QUT = QV;
-    QUTT = QW;
-  } else if (dir == 1) {
-    UMN = UMY;
-    UMT = UMX;
-    UMTT = UMZ;
-    QUN = QV;
-    QUT = QU;
-    QUTT = QW;
-  } else {
-    UMN = UMZ;
-    UMT = UMX;
-    UMTT = UMY;
-    QUN = QW;
-    QUT = QU;
-    QUTT = QV;
-  }
+  const int QU1 = QU + dir;
+  const int QU2 = (dir == 0) ? QV : QU;
+  const int QU3 = (dir == 2) ? QV : QW;
+  const int UM1 = UMX + dir;
+  const int UM2 = (dir == 0) ? UMY : UMX;
+  const int UM3 = (dir == 2) ? UMY : UMZ;
 
   auto eos = pele::physics::PhysicsType::eos();
 
@@ -584,13 +556,13 @@ AMREX_GPU_DEVICE AMREX_FORCE_INLINE void cns_riemann(
       isnan(AMREX_D_TERM(ul + ur, +ut1l + ut1r, +ut2l + ut2r))) {
     // Revert to piecewise linear (Godunov) recon if any value is non-physical
     rl = q(iv - iv_dir, QRHO);
-    AMREX_D_TERM(ul = q(iv - iv_dir, QUN);, ut1l = q(iv - iv_dir, QUT);
-                 , ut2l = q(iv - iv_dir, QUTT););
+    AMREX_D_TERM(ul = q(iv - iv_dir, QU1);, ut1l = q(iv - iv_dir, QU2);
+                 , ut2l = q(iv - iv_dir, QU3););
     pl = q(iv - iv_dir, QPRES);
     for (int n = 0; n < NUM_SPECIES; ++n) { yl[n] = q(iv - iv_dir, QFS + n); }
 
     rr = q(iv, QRHO);
-    AMREX_D_TERM(ur = q(iv, QUN);, ut1r = q(iv, QUT);, ut2r = q(iv, QUTT););
+    AMREX_D_TERM(ur = q(iv, QU1);, ut1r = q(iv, QU2);, ut2r = q(iv, QU3););
     pr = q(iv, QPRES);
     for (int n = 0; n < NUM_SPECIES; ++n) { yr[n] = q(iv, QFS + n); }
   }
@@ -612,13 +584,12 @@ AMREX_GPU_DEVICE AMREX_FORCE_INLINE void cns_riemann(
   Real ry_flx[NUM_SPECIES] = {0.0};
   hllc(rl, AMREX_D_DECL(ul, ut1l, ut2l), pl, cl, el, yl, rr,
        AMREX_D_DECL(ur, ut1r, ut2r), pr, cr, er, yr, adv_flx(i, j, k, URHO),
-       AMREX_D_DECL(adv_flx(i, j, k, UMN), adv_flx(i, j, k, UMT),
-                    adv_flx(i, j, k, UMTT)),
+       AMREX_D_DECL(adv_flx(i, j, k, UM1), adv_flx(i, j, k, UM2),
+                    adv_flx(i, j, k, UM3)),
        adv_flx(i, j, k, UEDEN), ry_flx);
-  // colella_glaz(rl, ul, ut1l, 0.0, pl, cl, el, yl, rr, ur, ut1r, 0.0, pr, cr, er,
-  // yr,
-  //              adv_flx(i, j, k, URHO), adv_flx(i, j, k, UMN), adv_flx(i, j, k,
-  //              UMT), adv_flx(i, j, k, UMTT), adv_flx(i, j, k, UEDEN), ry_flx);
+  // colella_glaz(rl, ul, ut1l, 0.0, pl, cl, el, yl, rr, ur, ut1r, 0.0, pr, cr, er, yr,
+  //              adv_flx(i, j, k, URHO), adv_flx(i, j, k, UM1), adv_flx(i, j, k, UM2),
+  //              adv_flx(i, j, k, UM3), adv_flx(i, j, k, UEDEN), ry_flx);
 
   for (int n = 0; n < NUM_SPECIES; ++n) { adv_flx(i, j, k, UFS + n) = ry_flx[n]; }
 

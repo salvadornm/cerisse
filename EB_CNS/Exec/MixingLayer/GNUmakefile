@@ -26,10 +26,10 @@ THREAD_SANITIZER = FALSE
 # PelePhysics
 Eos_Model := Fuego
 Transport_Model := Simple
-Custom_Chemistry_Model := OConaire
+Custom_Chemistry_Model := ../../Source/chem/OConaire-9-21
 
 # CNS
-#NUM_FIELD = 16
+NUM_FIELD = 0
 NUM_AUX = 13 # for time averages
 
 # GNU Make

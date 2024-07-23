@@ -26,7 +26,7 @@ THREAD_SANITIZER = FALSE
 # PelePhysics
 Eos_Model := GammaLaw
 Transport_Model := Sutherland
-Custom_Chemistry_Model := Null2
+Custom_Chemistry_Model := ../../Source/chem/NullSutherland
 
 # CNS
 USE_EB = FALSE

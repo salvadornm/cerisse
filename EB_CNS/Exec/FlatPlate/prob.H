@@ -67,8 +67,11 @@ bcnormal(const amrex::Real x[AMREX_SPACEDIM], const amrex::Real s_int[LEN_STATE]
   } else if (x[0] < 0.5) {
     bc_adiabatic_wall(s_ext, s_int, idir, false);
   } else {
-    bc_adiabatic_wall(s_ext, s_int, idir, true);
-    // bc_isothermal_wall(s_ext, s_int, prob_parm.Tw, idir, true);
+    if (prob_parm.Tw > 0.0) {
+      bc_isothermal_wall(s_ext, s_int, prob_parm.Tw, idir, true);
+    } else {
+      bc_adiabatic_wall(s_ext, s_int, idir, true);
+    }
   }
 }
 
