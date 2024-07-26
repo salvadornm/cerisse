@@ -26,11 +26,11 @@ THREAD_SANITIZER = FALSE
 # PelePhysics
 Eos_Model := GammaLaw
 Transport_Model := Sutherland
-Custom_Chemistry_Model := ../FlatPlate/Null2
+Custom_Chemistry_Model := ../../Source/chem/NullSutherland
 
 # CNS
 USE_EB = TRUE
 
 # GNU Make
 include ./Make.package
-include ../Make.CNS
+include ../../Source/Make.CNS

@@ -34,4 +34,4 @@ NUM_AUX = 13 # for time averages
 
 # GNU Make
 include ./Make.package
-include ../Make.CNS
+include ../../Source/Make.CNS

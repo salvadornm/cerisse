@@ -35,4 +35,4 @@ USE_PMFDATA = TRUE
 
 # GNU Make
 include ./Make.package
-include ../Make.CNS
+include ../../Source/Make.CNS

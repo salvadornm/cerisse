@@ -41,4 +41,4 @@ LIBRARIES += -Wl,-rpath,${MASA_HOME}/lib -lmasa
 # GNU Make
 CEXE_headers += prob.H prob_parm.H
 CEXE_sources += prob.cpp
-include ../Make.CNS
+include ../../Source/Make.CNS

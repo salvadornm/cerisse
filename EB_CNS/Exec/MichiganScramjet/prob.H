@@ -97,7 +97,10 @@ prob_initdata(int i, int j, int k, amrex::Array4<amrex::Real> const& state,
       rho * ei + 0.5 * rho * u * u * Real(y > -dx[1]);
     for (int n = 0; n < NUM_SPECIES; ++n)
       state(i, j, k, nf * NVAR + UFS + n) = rho * pp.Y[n];
+    state(i, j, k, nf * NVAR + UTEMP) = pp.T;
   }
+
+  for (int na = 0; na < NUM_AUX; ++na) { state(i, j, k, UFA + na) = 0.0; }
 }
 
 AMREX_GPU_DEVICE AMREX_FORCE_INLINE void bcnormal(
@@ -111,13 +114,14 @@ AMREX_GPU_DEVICE AMREX_FORCE_INLINE void bcnormal(
     amrex::Real rho = pp.rho;
     amrex::Real u = pp.u;
     amrex::Real ei = pp.ei;
+    amrex::Real T = pp.T;
     if (pp.do_bl) {
       bl_profile(x[1], (amrex::SpaceDim == 3 ? x[2] : Real(0.0)), pp, rho, u, ei);
+      auto eos = pele::physics::PhysicsType::eos();
+      amrex::Real Y[NUM_SPECIES];
+      for (int n = 0; n < NUM_SPECIES; ++n) { Y[n] = pp.Y[n]; }
+      eos.REY2T(rho, ei, Y, T);
     }
-    auto eos = pele::physics::PhysicsType::eos();
-    amrex::Real Y[NUM_SPECIES], T;
-    for (int n = 0; n < NUM_SPECIES; ++n) { Y[n] = pp.Y[n]; }
-    eos.REY2T(rho, ei, Y, T);
     for (int nf = 0; nf <= NUM_FIELD; ++nf) {
       s_ext[nf * NVAR + URHO] = rho;
       s_ext[nf * NVAR + UMX] = rho * u;
@@ -126,7 +130,7 @@ AMREX_GPU_DEVICE AMREX_FORCE_INLINE void bcnormal(
       s_ext[nf * NVAR + UEDEN] = rho * ei + 0.5 * rho * u * u;
       for (int n = 0; n < NUM_SPECIES; ++n)
         s_ext[nf * NVAR + UFS + n] = rho * pp.Y[n];
-      s_ext[nf * NVAR + UTEMP] = T;
+      s_ext[nf * NVAR + UTEMP] = T;      
     }
   } else if (idir == 1) {
     const amrex::Real rsqr = AMREX_D_TERM(, x[0] * x[0], +x[2] * x[2]);
@@ -151,10 +155,6 @@ AMREX_GPU_DEVICE AMREX_FORCE_INLINE void bcnormal(
       //   amrex::Real r_over_D = sqrt(rsqr) / (0.1245 * 2.0);
       //   jet_profile = r_over_D < 0.35 ? 1.0 : 1.0 - pow(6.67*(r_over_D-0.35), 2.5);
       // }
-      auto eos = pele::physics::PhysicsType::eos();
-      amrex::Real Y[NUM_SPECIES], T;
-      for (int n = 0; n < NUM_SPECIES; ++n) { Y[n] = pp.Y_jet[n]; }
-      eos.REY2T(pp.rho_j, pp.ei_j, Y, T);
       for (int nf = 0; nf <= NUM_FIELD; ++nf) {
         s_ext[nf * NVAR + URHO] = pp.rho_j;
         s_ext[nf * NVAR + UMX] = 0.0;
@@ -165,7 +165,7 @@ AMREX_GPU_DEVICE AMREX_FORCE_INLINE void bcnormal(
           0.5 * s_ext[nf * NVAR + UMY] * s_ext[nf * NVAR + UMY] / pp.rho_j;
         for (int n = 0; n < NUM_SPECIES; ++n)
           s_ext[nf * NVAR + UFS + n] = pp.rho_j * pp.Y_jet[n];
-        s_ext[nf * NVAR + UTEMP] = T;
+        s_ext[nf * NVAR + UTEMP] = pp.T_j;
       }
     }
   }
@@ -265,7 +265,7 @@ prob_post_timestep(int i, int j, int k, const amrex::Real /*curtime*/,
     for (int n = 0; n < NUM_SPECIES; ++n) {
       Y[n] = state(i, j, k, UFS + n) * rhoinv;
     }
-    amrex::Real T = 0.0, p = 0.0;
+    amrex::Real T = state(i, j, k, UTEMP), p;
     auto eos = pele::physics::PhysicsType::eos();
     eos.REY2T(rho, ei, Y, T);
     eos.RTY2P(rho, T, Y, p);

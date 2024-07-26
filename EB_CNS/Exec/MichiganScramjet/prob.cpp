@@ -84,6 +84,7 @@ void amrex_probinit(const int* /*init*/, const int* /*name*/, const int* /*namel
     eos.PYT2R(p, CNS::h_prob_parm->Y.begin(), T, rho);
     eos.RTY2G(rho, T, CNS::h_prob_parm->Y.begin(), gamma);
   }
+  CNS::h_prob_parm->T = T;
   amrex::Print() << "Inflow (gamma, T, p) = " << gamma << ", " << T << ", " << p
                  << '\n';
   // Real p = 55.410e4;
@@ -120,6 +121,7 @@ void amrex_probinit(const int* /*init*/, const int* /*name*/, const int* /*namel
     eos.PYT2R(p, CNS::h_prob_parm->Y_jet.begin(), T, rho);
     eos.RTY2G(rho, T, CNS::h_prob_parm->Y_jet.begin(), gamma);
   }
+  CNS::h_prob_parm->T_j = T;
   amrex::Print() << "Fuel (gamma, T, p) = " << gamma << ", " << T << ", " << p
                  << '\n';
 

@@ -35,4 +35,4 @@ USE_FULL_PROB_POST_TIMESTEP = TRUE
 # GNU Make
 CEXE_headers += prob.H prob_parm.H
 CEXE_sources += prob.cpp
-include ../Make.CNS
+include ../../Source/Make.CNS

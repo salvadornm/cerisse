@@ -34,4 +34,4 @@ Chemistry_Model := LiDryer
 
 # GNU Make
 include ./Make.package
-include ../Make.CNS
+include ../../Source/Make.CNS
