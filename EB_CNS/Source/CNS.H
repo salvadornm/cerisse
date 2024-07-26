@@ -265,6 +265,8 @@ protected:
 
   void printTotalandCheckNan() const;
 
+  void checkRuntimeMessages();
+
   // void writeTimeStat (); // TODO
 
   void react_state(amrex::Real time, amrex::Real dt, bool init_react = false);
@@ -341,6 +343,7 @@ protected:
   static bool do_reflux;
   static bool do_load_balance;
   static bool signalStopJob;
+  static int check_message_int;
 
   static bool do_hydro;
   static bool do_visc;
@@ -411,9 +414,9 @@ void cns_bcfill(amrex::Box const& bx, amrex::FArrayBox& data, const int dcomp,
                 const amrex::Real time, const amrex::Vector<amrex::BCRec>& bcr,
                 const int bcomp, const int scomp);
 
-void cns_react_bcfill(amrex::Box const& bx, amrex::FArrayBox& data, const int dcomp,
-                      const int numcomp, amrex::Geometry const& geom,
-                      const amrex::Real time, const amrex::Vector<amrex::BCRec>& bcr,
-                      const int bcomp, const int scomp);
+void cns_null_bcfill(amrex::Box const& bx, amrex::FArrayBox& data, const int dcomp,
+                     const int numcomp, amrex::Geometry const& geom,
+                     const amrex::Real time, const amrex::Vector<amrex::BCRec>& bcr,
+                     const int bcomp, const int scomp);
 
 #endif

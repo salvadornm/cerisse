@@ -3,7 +3,7 @@
 
 // Control parameters
 
-int  CNS::verbose       = 2;      // Verbosity
+int  CNS::verbose       = 2;      // Verbosity (0: silent, 1: basic, 2: dianostic, 3: warning/error)
 Real CNS::cfl           = 0.3;    // Courant number (must be < 1)
 Real CNS::fixed_dt      = -1;     // Fixed time step size (if < 0, dt is computed from the CFL condition)
 Real CNS::dt_cutoff     = 5.e-20; // Minimum allowed time step size
@@ -14,6 +14,7 @@ int  CNS::amr_interp_order = 2;   // Interpolation order for AMR coarse-fine bou
 bool CNS::do_reflux       = true; // Correct flux at coarse-fine interfaces?
 bool CNS::do_load_balance = true; // Load balance?
 bool CNS::signalStopJob  = false; // Signal to stop the job?
+int  CNS::check_message_int = 100; // Check runtime message interval
 
 // Physics parameters
 

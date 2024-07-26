@@ -99,7 +99,7 @@ struct CnsFillExtDir
   }
 };
 
-struct CnsReactFillExtDir
+struct CnsNullFillExtDir
 {
   AMREX_GPU_DEVICE
   void operator()(const amrex::IntVect& /*iv*/,
@@ -201,10 +201,10 @@ void cns_bcfill(Box const& bx, FArrayBox& data, const int dcomp, const int numco
   }
 }
 
-void cns_react_bcfill(Box const& bx, FArrayBox& data, const int dcomp,
+void cns_null_bcfill(Box const& bx, FArrayBox& data, const int dcomp,
                       const int numcomp, Geometry const& geom, const Real time,
                       const Vector<BCRec>& bcr, const int bcomp, const int scomp)
 {
-  GpuBndryFuncFab<CnsReactFillExtDir> gpu_react_bndry_func(CnsReactFillExtDir{});
-  gpu_react_bndry_func(bx, data, dcomp, numcomp, geom, time, bcr, bcomp, scomp);
+  GpuBndryFuncFab<CnsNullFillExtDir> gpu_null_bndry_func(CnsNullFillExtDir{});
+  gpu_null_bndry_func(bx, data, dcomp, numcomp, geom, time, bcr, bcomp, scomp);
 }

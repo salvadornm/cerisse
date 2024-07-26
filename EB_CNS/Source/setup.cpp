@@ -250,7 +250,7 @@ void CNS::variableSetUp()
   desc_lst.setComponent(State_Type, 0, name, bcs, bndryfunc);
 
   // Setup React_Type
-  store_in_checkpoint = do_react;
+  store_in_checkpoint = false;
   desc_lst.addDescriptor(Reactions_Type, IndexType::TheCellType(),
                          StateDescriptor::Point, 0, LEN_REACT, interp,
                          state_data_extrap, store_in_checkpoint);
@@ -287,15 +287,15 @@ void CNS::variableSetUp()
   }
 
   StateDescriptor::BndryFunc bndryfunc2(
-    cns_react_bcfill); // <--- need for all fields
+    cns_null_bcfill); // <--- need for all fields
   bndryfunc2.setRunOnGPU(true);
 
   desc_lst.setComponent(Reactions_Type, 0, react_name, react_bcs, bndryfunc2);
 
   // Setup Cost_Type
   desc_lst.addDescriptor(Cost_Type, IndexType::TheCellType(), StateDescriptor::Point,
-                         0, 1, &pc_interp);
-  desc_lst.setComponent(Cost_Type, 0, "Cost", bc, bndryfunc);
+                         0, 1, &pc_interp, state_data_extrap, store_in_checkpoint);
+  desc_lst.setComponent(Cost_Type, 0, "Cost", bc, bndryfunc2);
 
   // SNM: commeted
   // assert(num_state_data_types == desc_lst.size());
@@ -475,7 +475,7 @@ void CNS::variableSetUp()
     } else if (ppr.countval("vorticity_greater")) {
       Real value;
       ppr.get("vorticity_greater", value);
-      const std::string field = "mag_vort";
+      const std::string field = "magvort";
       errtags.push_back(AMRErrorTag(value, AMRErrorTag::VORT, field, info));
     } else if (ppr.countval("adjacent_difference_greater")) {
       Real value;

@@ -42,9 +42,9 @@ CNS::CNS(Amr& papa, int lev, const Geometry& level_geom, const BoxArray& bl,
 
   Sborder.define(grids, dmap, LEN_STATE, NUM_GROW, MFInfo(), Factory());
   shock_sensor_mf.define(grids, dmap, 1, 3, MFInfo(), Factory());
-  if (!use_hybrid_scheme) {
-    shock_sensor_mf.setVal(1.0); // default to shock-capturing scheme
-  }
+  // if (!use_hybrid_scheme) {
+  //   shock_sensor_mf.setVal(1.0); // default to shock-capturing scheme
+  // }
   // ifine_mask.define(grids, dmap, 1, 0, MFInfo());
   // fillFineMask();
 
@@ -316,6 +316,8 @@ void CNS::postCoarseTimeStep(Real time)
 #endif
 
   printTotalandCheckNan(); // must do because this checks for nan as well
+
+  checkRuntimeMessages();  // re-read inputs or soft exit simulation
 }
 
 void CNS::post_init(Real /*stop_time*/)
@@ -364,9 +366,9 @@ void CNS::post_restart()
 
   Sborder.define(grids, dmap, LEN_STATE, NUM_GROW, MFInfo(), Factory());
   shock_sensor_mf.define(grids, dmap, 1, 3, MFInfo(), Factory());
-  if (!use_hybrid_scheme) {
-    shock_sensor_mf.setVal(1.0); // default to shock-capturing scheme
-  }
+  // if (!use_hybrid_scheme) {
+  //   shock_sensor_mf.setVal(1.0); // default to shock-capturing scheme
+  // }
   // ifine_mask.define(grids, dmap, 1, 0, MFInfo());
   // fillFineMask();
 
@@ -381,6 +383,8 @@ void CNS::post_restart()
     reactor->init(1, 1);
 
     if (use_typical_vals_chem) { set_typical_values_chem(); }
+
+    react_state(parent->cumTime(), parent->dtLevel(level), true);
   }
 
   MultiFab& S_new = get_new_data(State_Type);
@@ -625,6 +629,47 @@ void CNS::printTotalandCheckNan() const
   amrex::ParallelDescriptor::ReduceBoolOr(signalStopJob);
 }
 
+/**
+ * \brief Allow re-reading inputs file or soft exit of simulation at runtime
+ */
+void CNS::checkRuntimeMessages() 
+{
+  if (parent->levelSteps(0) % check_message_int == 0) {    
+    int action_flag = 0;
+    if (ParallelDescriptor::IOProcessor()) {
+      std::string action_file = "reread_inputs";
+      FILE* fp = fopen(action_file.c_str(), "r");
+      if (fp != nullptr) {
+        remove(action_file.c_str());
+        action_flag = 1;
+        fclose(fp);
+      }
+
+      action_file = "stop_simulation";
+      fp = fopen(action_file.c_str(), "r");
+      if (fp != nullptr) {
+        remove(action_file.c_str());
+        action_flag = 2;
+        fclose(fp);
+      }
+    }
+
+    amrex::ParallelDescriptor::Bcast(
+      &action_flag, 1, ParallelDescriptor::IOProcessorNumber());
+
+    // if (action_flag == 1) {
+    //   amrex::Print() << " >> Re-reading inputs ...\n";
+    //   for (int lev = 0; lev <= parent->finestLevel(); ++lev) {
+    //     getLevel(lev).read_params(); // Cannot do, need to reinit paramparse
+    //   }
+    // } else 
+    if (action_flag == 2) {
+      amrex::Print() << " >> Stopping simulation ...\n";
+      signalStopJob = true;
+    }
+  }
+}
+
 // /**
 //  * \brief Write time statistics to a file
 //  */
@@ -686,6 +731,7 @@ void CNS::read_params()
   pp.query("fixed_dt", fixed_dt);
   pp.query("dt_cutoff", dt_cutoff);
   pp.query("dt_max_change", dt_max_change);
+  pp.query("check_message_int", check_message_int);
 
 #if CNS_USE_EB
   // eb_weight in redist

@@ -6,24 +6,22 @@
 using namespace amrex;
 
 /**
- * @brief TODO: Set typical values to help ODE solver.
+ * @brief Set typical values to help ODE solver. (How?)
  */
 void CNS::set_typical_values_chem()
 {
-  // amrex::MultiFab& S_new = get_new_data(State_Type);
-  // // amrex::Real minTemp = S_new.min(UTEMP);
-  // // amrex::Real maxTemp = S_new.max(UTEMP);
-  // amrex::Vector<amrex::Real> typical_values_chem(NUM_SPECIES + 1, 1e-10);
+  MultiFab& S_new = get_new_data(State_Type);
+  Real minTemp = S_new.min(UTEMP);
+  Real maxTemp = S_new.max(UTEMP);
+  Vector<Real> typical_values_chem(NUM_SPECIES + 1, 1e-10);
 
-  // for (int n = 0; n < NUM_SPECIES; n++) {
-  //   amrex::Real rhoYs_min = S_new.min(UFS + n);
-  //   amrex::Real rhoYs_max = S_new.max(UFS + n);
-  //   typical_values_chem[n] = amrex::max<amrex::Real>(
-  //     0.5 * (rhoYs_min + rhoYs_max), 1.e-10);
-  // }
-  // // typical_values_chem[NUM_SPECIES] = 0.5 * (minTemp + maxTemp);
-  // typical_values_chem[NUM_SPECIES] = 1500.0; // temp
-  // reactor->set_typ_vals_ode(typical_values_chem);
+  for (int n = 0; n < NUM_SPECIES; n++) {
+    Real rhoYs_min = S_new.min(UFS + n);
+    Real rhoYs_max = S_new.max(UFS + n);
+    typical_values_chem[n] = std::max(0.5 * (rhoYs_min + rhoYs_max), 1.e-10);
+  }
+  typical_values_chem[NUM_SPECIES] = 0.5 * (minTemp + maxTemp);
+  reactor->set_typ_vals_ode(typical_values_chem);
 }
 
 /**
@@ -37,18 +35,17 @@ void CNS::react_state(Real time, Real dt, bool init_react)
   if ((verbose > 0) && amrex::ParallelDescriptor::IOProcessor()) {
     if (init_react) {
       amrex::Print() << "Initialising reactions, using interval dt = " << dt
-                     << std::endl;
+                     << '\n';
     } else {
       amrex::Print() << " >> Computing reactions";
-      if (do_pasr) amrex::Print() << " (PaSR)";
-      amrex::Print() << std::endl;
+      if (do_pasr) amrex::Print() << " (w/ PaSR)";
+      amrex::Print() << '\n';
     }
   }
 
   // State Fabs
-  MultiFab Sold(grids, dmap, LEN_STATE, 1, MFInfo(),
-                Factory()); //= get_old_data(State_Type);
-  if (!init_react) FillPatch(*this, Sold, 1, time, State_Type, 0, LEN_STATE);
+  MultiFab Sold(grids, dmap, UFA, 1, MFInfo(), Factory()); //= get_old_data(State_Type);
+  if (!init_react) FillPatch(*this, Sold, 1, time, State_Type, 0, UFA);
   MultiFab& Snew = get_new_data(State_Type);
   MultiFab& I_R = get_new_data(Reactions_Type);
   I_R.setVal(0.0);
@@ -156,7 +153,7 @@ void CNS::react_state(Real time, Real dt, bool init_react)
           //////////////////////// Unpack data ////////////////////////
           // Prepare (rho, velocities, mu) for PaSR
           FArrayBox qfab, mufab;
-          if (do_pasr && !init_react) {
+          if (do_pasr) {
             const Box bxg1 = amrex::grow(bx, 1);
             qfab.resize(bxg1, 4, The_Async_Arena()); // [rho, u, v, w]
             auto const& qarr = qfab.array();
@@ -204,7 +201,6 @@ void CNS::react_state(Real time, Real dt, bool init_react)
           // For unpack_pasr
           auto const& qarr = qfab.array();
           auto const& muarr = mufab.array();
-          const auto dx = geom.CellSizeArray();
           const auto dxinv = geom.InvCellSizeArray();
 
           amrex::ParallelFor(bx, [=] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {
@@ -229,55 +225,55 @@ void CNS::react_state(Real time, Real dt, bool init_react)
                           << '\n';
               }
 #endif
-              // update U^{n+1} = U^** + dt*I_R^{n+1}
-              if (!init_react) {
-                Real new_rho = 0.0;
-                if (do_pasr) {
-                  unpack_pasr(i, j, k, snew_arr, new_rho, sold_arr, rY, rYsrc, qarr,
-                              muarr, dx, dxinv, dt);
-                } else {
-                  for (int n = 0; n < NUM_SPECIES; ++n) {
-                    snew_arr(i, j, k, UFS + n) = amrex::max(0.0, rY(i, j, k, n));
-                    new_rho += snew_arr(i, j, k, UFS + n);
-                  }
+              // update drY/dt in I_R
+              Real new_rho = 0.0;
+              if (do_pasr) {
+                // Modify rY if PaSR is on
+                unpack_pasr(i, j, k, new_rho, sold_arr, rY, rYsrc, qarr, muarr,
+                            dxinv, dt);
+              } else {
+                for (int n = 0; n < NUM_SPECIES; ++n) {
+                  rY(i, j, k, n) = std::max(0.0, rY(i, j, k, n));
+                  new_rho += rY(i, j, k, n);
                 }
-
-                // Enforce conservation of rho
-                // for (int n = 0; n < NUM_SPECIES; ++n) {
-                //   snew_arr(i, j, k, UFS + n) *= snew_arr(i, j, k, URHO) / new_rho;
-                // }
-                snew_arr(i, j, k, URHO) = new_rho;
               }
 
-              // update drY/dt
               for (int n = 0; n < NUM_SPECIES; ++n) {
                 I_R_arr(i, j, k, n) =
-                  (snew_arr(i, j, k, UFS + n) - sold_arr(i, j, k, UFS + n)) / dt -
+                  (rY(i, j, k, n) - sold_arr(i, j, k, UFS + n)) / dt -
                   rYsrc(i, j, k, n);
               }
 
-              // update heat release rate
+              // update heat release rate (this is not used, just to plot)
               if (update_heat_release) {
                 Real Y[NUM_SPECIES];
                 for (int n = 0; n < NUM_SPECIES; n++) {
-                  Y[n] = snew_arr(i, j, k, UFS + n) / snew_arr(i, j, k, URHO);
+                  Y[n] = rY(i, j, k, n) / new_rho;
                 }
                 Real hi[NUM_SPECIES];
                 auto eos = pele::physics::PhysicsType::eos();
-                eos.RTY2Hi(snew_arr(i, j, k, URHO), T(i, j, k), Y, hi);
+                eos.RTY2Hi(new_rho, T(i, j, k), Y, hi);
                 I_R_arr(i, j, k, NUM_SPECIES) = 0.0;
                 for (int n = 0; n < NUM_SPECIES; n++) {
                   I_R_arr(i, j, k, NUM_SPECIES) -= hi[n] * I_R_arr(i, j, k, n);
                 }
               }
 
-              // average I_R and put into the front NREACT entries
-              if (NUM_FIELD > 0) {
-                Real invNF = Real(1.0) / Real(NUM_FIELD);
-                for (int n = 0; n < NREACT; ++n) {
-                  I_R_mean_arr(i, j, k, n) += I_R_arr(i, j, k, n) * invNF;
+              // write to Snew if not init_react
+              if (!init_react) {
+                for (int n = 0; n < NUM_SPECIES; ++n) {
+                  snew_arr(i, j, k, UFS + n) = rY(i, j, k, n);
                 }
+                snew_arr(i, j, k, URHO) = new_rho;
               }
+
+              // average I_R and put into the front NREACT entries
+#if (NUM_FIELD > 0)
+              const Real invNF = Real(1.0) / Real(NUM_FIELD);
+              for (int n = 0; n < NREACT; ++n) {
+                I_R_mean_arr(i, j, k, n) += I_R_arr(i, j, k, n) * invNF;
+              }
+#endif
             } // if mask != -1
           });
         } // for fields
@@ -294,7 +290,7 @@ void CNS::react_state(Real time, Real dt, bool init_react)
 
   if (Snew.nGrow() > 0) { Snew.FillBoundary(geom.periodicity()); }
 
-  if (verbose >= 2) {
+  if (verbose > 1) {
     const int IOProc = amrex::ParallelDescriptor::IOProcessorNumber();
     const int NProcs = amrex::ParallelDescriptor::NProcs();
 

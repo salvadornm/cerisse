@@ -7,8 +7,6 @@
 
 #include "index_macros.H"
 
-using namespace amrex;
-
 /**
  * @brief Base class to register eddy viscosity type LES models.
  */
@@ -20,20 +18,24 @@ public:
   ~LESModel() override = default;
 
   virtual void mu_T_cc(const int i, const int j, const int k,
-                       const Array4<const Real>& q,
-                       const GpuArray<Real, AMREX_SPACEDIM>& dxinv,
-                       const Real deltabar, const Real Cs, Real& mu_T) = 0;
+                       const amrex::Array4<const amrex::Real>& q,
+                       const amrex::GpuArray<amrex::Real, AMREX_SPACEDIM>& dxinv,
+                       const amrex::Real deltabar, const amrex::Real Cs,
+                       amrex::Real& mu_T) = 0;
 
-  virtual void mu_T_fc(const Real dudx, const Real dudy, const Real dudz,
-                       const Real dvdx, const Real dvdy, const Real dvdz,
-                       const Real dwdx, const Real dwdy, const Real dwdz,
-                       const Real rho, const Real deltabar, const Real Cs,
-                       Real& mu_T) = 0;
+  virtual void mu_T_fc(const amrex::Real dudx, const amrex::Real dudy,
+                       const amrex::Real dudz, const amrex::Real dvdx,
+                       const amrex::Real dvdy, const amrex::Real dvdz,
+                       const amrex::Real dwdx, const amrex::Real dwdy,
+                       const amrex::Real dwdz, const amrex::Real rho,
+                       const amrex::Real deltabar, const amrex::Real Cs,
+                       amrex::Real& mu_T) = 0;
 
   virtual void xi_T_cc(const int i, const int j, const int k,
-                       const Array4<const Real>& q,
-                       const GpuArray<Real, AMREX_SPACEDIM>& dxinv,
-                       const Real deltabar, const Real CI, Real& xi_T);
+                       const amrex::Array4<const amrex::Real>& q,
+                       const amrex::GpuArray<amrex::Real, AMREX_SPACEDIM>& dxinv,
+                       const amrex::Real deltabar, const amrex::Real CI,
+                       amrex::Real& xi_T);
 };
 
 /**
@@ -47,11 +49,13 @@ public:
  * @param CI        Yoshizawa constant
  * @param xi_T[out] output turbulent bulk viscosity
  */
-AMREX_GPU_DEVICE AMREX_FORCE_INLINE void
-LESModel::xi_T_cc(const int i, const int j, const int k, const Array4<const Real>& q,
-                  const GpuArray<Real, AMREX_SPACEDIM>& dxinv, const Real deltabar,
-                  const Real CI, Real& xi_T)
+AMREX_GPU_DEVICE AMREX_FORCE_INLINE void LESModel::xi_T_cc(
+  const int i, const int j, const int k, const amrex::Array4<const amrex::Real>& q,
+  const amrex::GpuArray<amrex::Real, AMREX_SPACEDIM>& dxinv,
+  const amrex::Real deltabar, const amrex::Real CI, amrex::Real& xi_T)
 {
+  using amrex::Real;
+
   // Calculate derivatives at cell centers, second order central difference
   Real dUdx[3][3] = {{0.0}};
   dUdx[0][0] = 0.5 * dxinv[0] * (q(i + 1, j, k, QU) - q(i - 1, j, k, QU)); // dudx
@@ -91,14 +95,19 @@ class Smagorinsky : public LESModel::Register<Smagorinsky>
 public:
   static const std::string identifier() { return "Smagorinsky"; }
 
-  void mu_T_cc(const int i, const int j, const int k, const Array4<const Real>& q,
-               const GpuArray<Real, AMREX_SPACEDIM>& dxinv, const Real deltabar,
-               const Real Cs, Real& mu_T) override;
+  void mu_T_cc(const int i, const int j, const int k,
+               const amrex::Array4<const amrex::Real>& q,
+               const amrex::GpuArray<amrex::Real, AMREX_SPACEDIM>& dxinv,
+               const amrex::Real deltabar, const amrex::Real Cs,
+               amrex::Real& mu_T) override;
 
-  void mu_T_fc(const Real dudx, const Real dudy, const Real dudz, const Real dvdx,
-               const Real dvdy, const Real dvdz, const Real dwdx, const Real dwdy,
-               const Real dwdz, const Real rho, const Real deltabar, const Real Cs,
-               Real& mu_T) override;
+  void mu_T_fc(const amrex::Real dudx, const amrex::Real dudy,
+               const amrex::Real dudz, const amrex::Real dvdx,
+               const amrex::Real dvdy, const amrex::Real dvdz,
+               const amrex::Real dwdx, const amrex::Real dwdy,
+               const amrex::Real dwdz, const amrex::Real rho,
+               const amrex::Real deltabar, const amrex::Real Cs,
+               amrex::Real& mu_T) override;
 };
 
 // Nicoud & Ducros (1999) https://doi.org/10.1023/A:1009995426001
@@ -107,14 +116,19 @@ class WALE : public LESModel::Register<WALE>
 public:
   static const std::string identifier() { return "WALE"; }
 
-  void mu_T_cc(const int i, const int j, const int k, const Array4<const Real>& q,
-               const GpuArray<Real, AMREX_SPACEDIM>& dxinv, const Real deltabar,
-               const Real Cs, Real& mu_T) override;
+  void mu_T_cc(const int i, const int j, const int k,
+               const amrex::Array4<const amrex::Real>& q,
+               const amrex::GpuArray<amrex::Real, AMREX_SPACEDIM>& dxinv,
+               const amrex::Real deltabar, const amrex::Real Cs,
+               amrex::Real& mu_T) override;
 
-  void mu_T_fc(const Real dudx, const Real dudy, const Real dudz, const Real dvdx,
-               const Real dvdy, const Real dvdz, const Real dwdx, const Real dwdy,
-               const Real dwdz, const Real rho, const Real deltabar, const Real Cs,
-               Real& mu_T) override;
+  void mu_T_fc(const amrex::Real dudx, const amrex::Real dudy,
+               const amrex::Real dudz, const amrex::Real dvdx,
+               const amrex::Real dvdy, const amrex::Real dvdz,
+               const amrex::Real dwdx, const amrex::Real dwdy,
+               const amrex::Real dwdz, const amrex::Real rho,
+               const amrex::Real deltabar, const amrex::Real Cs,
+               amrex::Real& mu_T) override;
 };
 
 #endif

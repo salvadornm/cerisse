@@ -55,8 +55,8 @@ Real CNS::advance(Real time, Real dt, int iteration, int ncycle)
   if (rk_order <= 2) {
     MultiFab& S_new = get_new_data(State_Type);
     MultiFab& S_old = get_old_data(State_Type);
-    MultiFab dSdt_old(grids, dmap, LEN_STATE, 0, MFInfo(), Factory());
-    MultiFab dSdt_new(grids, dmap, LEN_STATE, 0, MFInfo(), Factory());
+    MultiFab dSdt_old(grids, dmap, UFA, 0, MFInfo(), Factory());
+    MultiFab dSdt_new(grids, dmap, UFA, 0, MFInfo(), Factory());
     MultiFab& I_R = get_new_data(Reactions_Type);
 
     // Predictor-corrector RK2
@@ -65,9 +65,9 @@ Real CNS::advance(Real time, Real dt, int iteration, int ncycle)
       amrex::Print() << " >> AMR Cycle " << iteration << " of " << ncycle << "\n";
     }
     if (verbose > 0) { amrex::Print() << " >> RK Step 1: Computing dSdt^{n}\n"; }
-    FillPatch(*this, Sborder, NUM_GROW, time, State_Type, 0, LEN_STATE);
+    FillPatch(*this, Sborder, NUM_GROW, time, State_Type, 0, UFA);
     compute_dSdt(Sborder, dSdt_old, 0.5 * dt, fr_as_crse, fr_as_fine, true);
-    MultiFab::LinComb(S_new, 1.0, Sborder, 0, dt, dSdt_old, 0, 0, LEN_STATE, 0);
+    MultiFab::LinComb(S_new, 1.0, Sborder, 0, dt, dSdt_old, 0, 0, UFA, 0);
 
     if (rk_order == 2) {
       if (do_react) {
@@ -80,20 +80,20 @@ Real CNS::advance(Real time, Real dt, int iteration, int ncycle)
 
       // RK2 stage 2: U^{n+1} = U^n + 0.5*dt*(dUdt^n + dUdt^{n+1}) + dt*I_R^{n+1}
       if (verbose > 0) { amrex::Print() << " >> RK Step 2: Computing dSdt^{n+1}\n"; }
-      FillPatch(*this, Sborder, NUM_GROW, time + dt, State_Type, 0, LEN_STATE);
+      FillPatch(*this, Sborder, NUM_GROW, time + dt, State_Type, 0, UFA);
       compute_dSdt(Sborder, dSdt_new, 0.5 * dt, fr_as_crse, fr_as_fine,
                    (rk_reaction_iter < 1));
       MultiFab::LinComb(S_new, 0.5 * dt, dSdt_new, 0, 0.5 * dt, dSdt_old, 0, 0,
-                        LEN_STATE, 0);
-      MultiFab::Add(S_new, S_old, 0, 0, LEN_STATE, 0);
+                        UFA, 0);
+      MultiFab::Add(S_new, S_old, 0, 0, UFA, 0);
     }
     enforce_consistent_state(S_new); // Enforce rho = sum(rhoY)
 
 #if (NUM_FIELD > 0)
     computeAvg(S_new);
-    FillPatch(*this, Sborder, 1, time + dt, State_Type, 0, LEN_STATE);
+    FillPatch(*this, Sborder, 1, time + dt, State_Type, 0, UFA);
     compute_pdf_model(Sborder, dt, iteration);
-    MultiFab::Copy(S_new, Sborder, 0, 0, LEN_STATE, 0);
+    MultiFab::Copy(S_new, Sborder, 0, 0, UFA, 0);
     // enforce_consistent_state(S_new); // Enforce rho = sum(rhoY)
     // computeAvg(S_new);
 #endif
@@ -108,13 +108,13 @@ Real CNS::advance(Real time, Real dt, int iteration, int ncycle)
     if (do_react && (rk_reaction_iter > 1)) {
       for (int iter = 1; iter < rk_reaction_iter; ++iter) {
         if (verbose > 0) { amrex::Print() << " >> Re-computing dSdt^{n+1}\n"; }
-        FillPatch(*this, Sborder, NUM_GROW, time + dt, State_Type, 0, LEN_STATE);
+        FillPatch(*this, Sborder, NUM_GROW, time + dt, State_Type, 0, UFA);
         compute_dSdt(Sborder, dSdt_new, 0.5 * dt, fr_as_crse, fr_as_fine,
                      (iter == rk_reaction_iter));
 
         MultiFab::LinComb(S_new, 0.5 * dt, dSdt_new, 0, 0.5 * dt, dSdt_old, 0, 0,
-                          LEN_STATE, 0);
-        MultiFab::Add(S_new, S_old, 0, 0, LEN_STATE, 0);
+                          UFA, 0);
+        MultiFab::Add(S_new, S_old, 0, 0, UFA, 0);
         react_state(time, dt);
 
         enforce_consistent_state(S_new); // Enforce rho = sum(rhoY)
@@ -179,7 +179,7 @@ void CNS::compute_dSdt(const MultiFab& S, MultiFab& dSdt, Real dt,
 #if CNS_USE_EB
       const auto& flag = flags[mfi];
       if (flag.getType(bx) == FabType::covered) {
-        dSdt[mfi].setVal<RunOn::Device>(0.0, bx, 0, LEN_STATE);
+        dSdt[mfi].setVal<RunOn::Device>(0.0, bx, 0, ncomp);
       } else
 #endif
       {
@@ -332,7 +332,7 @@ void CNS::enforce_consistent_state(MultiFab& S)
             }
             if (rhoNew <= 0.0) {
 #ifndef AMREX_USE_GPU
-              if (verbose > 1) {
+              if (verbose > 2) {
                 std::cout << "enforce_consistent_state: rhoNew" << iv << "," << nf
                           << "=" << rhoNew << "! Fixed \n";
               }
@@ -410,7 +410,7 @@ void CNS::enforce_consistent_state(MultiFab& S)
                 auto eos = pele::physics::PhysicsType::eos();
 
                 // // Option 1: Keep KE, add ei to increase T
-                // if (verbose > 1) {
+                // if (verbose > 2) {
                 //   std::cout << "Energy added to cell " << iv
                 //             << ": T=" << s_arr(iv, UTEMP) << "->" << target_temp
                 //             << " ei=" << ei << "->";
@@ -419,12 +419,12 @@ void CNS::enforce_consistent_state(MultiFab& S)
                 // s_arr(iv, UEDEN) -= ei * rhoNew;
                 // eos.RTY2E(rhoNew, target_temp, Y, ei);
                 // s_arr(iv, UEDEN) += ei * rhoNew;
-                // if (verbose > 1) { std::cout << ei << "\n"; }
+                // if (verbose > 2) { std::cout << ei << "\n"; }
 
                 // Option 2: Keep total E, reduce vel
                 // (because it usually fails at high ke/ei region)
 #ifndef AMREX_USE_GPU
-                if (verbose > 1) {
+                if (verbose > 2) {
                   std::cout << "Momentum removed from cell " << iv
                             << ": T=" << s_arr(iv, UTEMP) << "->" << target_temp
                             << " rhoE=" << s_arr(iv, UEDEN) << "->";
@@ -444,7 +444,7 @@ void CNS::enforce_consistent_state(MultiFab& S)
                 s_arr(iv, UEDEN) +=
                   rhoNew * amrex::max(diff_ei - ctrl_parm * ke, 0.0);
 #ifndef AMREX_USE_GPU
-                if (verbose > 1) { std::cout << s_arr(iv, UEDEN) << '\n'; }
+                if (verbose > 2) { std::cout << s_arr(iv, UEDEN) << '\n'; }
 #endif
               } // if T < clip_temp
 
@@ -467,7 +467,7 @@ void CNS::enforce_consistent_state(MultiFab& S)
 
                 // Option 1: Keep KE, add (remove) ei to increase (decrease) T
 #ifndef AMREX_USE_GPU
-                if (verbose > 1) {
+                if (verbose > 2) {
                   std::cout << "Energy added to cell " << iv
                             << ": T=" << s_arr(iv, UTEMP) << "->" << target_temp
                             << " ei=" << ei << "->";
@@ -478,7 +478,7 @@ void CNS::enforce_consistent_state(MultiFab& S)
                 eos.RTY2E(rhoNew, target_temp, Y, ei);
                 s_arr(iv, UEDEN) += ei * rhoNew;
 #ifndef AMREX_USE_GPU
-                if (verbose > 1) { std::cout << ei << "\n"; }
+                if (verbose > 2) { std::cout << ei << "\n"; }
 #endif
               } // if T > 5000
             });
