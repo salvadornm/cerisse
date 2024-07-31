@@ -20,7 +20,7 @@ cns.verbose = 1       # 0=quiet, 1=verbose
 
 
 #-------------------------------- IMMERSED BOUNDARY ---------------------------#
-ib.filename = DPW6_CRM_Symmetric.stl
+ib.filename = DPW6_CRM_Symmetric_remesh.stl
 #ib.fields   = 2 #
 
 #-------------------------------- COMPUTATIONAL DOMAIN ------------------------#

@@ -17,7 +17,7 @@ struct ProbParm
 { 
   Real p_inf = 1.0e5;
   Real T_inf = 300.0;
-  Real u_inf = 1200.0;
+  Real u_inf = 600.0;
 
   Real x0 = 1.0_rt;
   Real y0 = 2.0_rt;
@@ -32,7 +32,7 @@ typedef closures_dt<indicies_t, visc_suth_t, cond_suth_t,
 typedef rhs_dt<rusanov_t<ProbClosures>, no_diffusive_t, no_source_t>
     ProbRHS;
 
-typedef std::ratio<8,5> d_image;
+typedef std::ratio<2,5> d_image;
 typedef eib_t<1,1,d_image,ProbClosures> ProbIB;
 
 void inline inputs() {
