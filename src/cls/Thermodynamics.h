@@ -49,10 +49,12 @@ class calorifically_perfect_gas_t {
                                   cons(i, j, k, idx_t::UMX) * rhoinv,
                                   cons(i, j, k, idx_t::UMY) * rhoinv,
                                   cons(i, j, k, idx_t::UMZ) * rhoinv)};
-    Real ke = Real(0.5) * rho * AMREX_D_PICK(
+
+    Real ke = AMREX_D_PICK(
                                 vel[0]*vel[0],
                                 vel[0]*vel[0] + vel[1]*vel[1], 
                                 vel[0]*vel[0] + vel[1]*vel[1] + vel[2]*vel[2]);
+    ke = Real(0.5)*rho*ke;
     Real eint = (cons(i,j,k,idx_t::UET) - ke)/rho;
     Real T = eint / cv;
 

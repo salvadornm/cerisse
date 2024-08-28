@@ -26,7 +26,9 @@
 
 #lib folder, excluding install script
 /lib/*
-!/lib/install_script
+!/lib/install.sh
+!/lib/autodiff
+!/lib/clad
 
 /tst/AMReX_regtests/output/AMReX-benchmarks/*
 /tst/AMReX_regtests/output/AMReX-tests/*

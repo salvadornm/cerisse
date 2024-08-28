@@ -23,17 +23,8 @@ typedef rhs_dt<keep_euler_t<false, false, 4, ProbClosures>, no_diffusive_t,
 void inline inputs() {
   ParmParse pp;
 
-  //-1 = N/A (Incase of periodic)
-  // 0 = Interior           3 = Symmetry
-  // 1 = Inflow             4 = SlipWall
-  // 2 = Outflow            5 = NoSlipWall
-  // 6 = user defined
-  pp.addarr("cns.lo_bc", std::vector<int>{1, 1, 1});
-  pp.addarr("cns.hi_bc", std::vector<int>{1, 1, 1});
   pp.add("cns.order_rk", 3);  // -2, 1, 2 or 3"
   pp.add("cns.stages_rk", 4); // 1, 2 or 3
-  pp.add("cns.screen_output", 100000); //
-  pp.add("cns.verbose", 0);            // 0=quiet, 1=verbose
 }
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -88,11 +79,11 @@ prob_initdata(int i, int j, int k, Array4<Real> const &state,
   Real eint = cls.cv * pparm.T0;
 
   // Set the state
-  state(i, j, k, cls.URHO) = rho;
-  state(i, j, k, cls.UMX) = rho * u[0];
-  state(i, j, k, cls.UMY) = rho * u[1];
-  state(i, j, k, cls.UMZ) = rho * u[2];
-  state(i, j, k, cls.UET) =
+  state(i, j, k, ProbClosures::URHO) = rho;
+  state(i, j, k, ProbClosures::UMX) = rho * u[0];
+  state(i, j, k, ProbClosures::UMY) = rho * u[1];
+  state(i, j, k, ProbClosures::UMZ) = rho * u[2];
+  state(i, j, k, ProbClosures::UET) =
       rho * (eint + Real(0.5) * (u[0] * u[0] + u[1] * u[1] + u[2] * u[2]));
 }
 

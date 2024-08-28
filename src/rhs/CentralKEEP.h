@@ -55,10 +55,10 @@ class keep_euler_t {
   void inline eflux(const Geometry& geom, const MFIter& mfi,
                     const Array4<Real>& prims, const Array4<Real>& flx,
                     const Array4<Real>& rhs,
-                    const cls_t& cls) {
+                    const cls_t* cls) {
     const GpuArray<Real, AMREX_SPACEDIM> dxinv = geom.InvCellSizeArray();
     const Box& bx  = mfi.growntilebox(0);
-    const Box& bxg = mfi.growntilebox(cls.NGHOST);
+    const Box& bxg = mfi.growntilebox(cls_t::NGHOST);
     const Box& bxgnodal = mfi.grownnodaltilebox(
         -1, 0);  // extent is 0,N_cell+1 in all directions -- -1 means for all
                  // directions. amrex::surroundingNodes(bx) does the same
@@ -98,7 +98,7 @@ class keep_euler_t {
   AMREX_GPU_DEVICE AMREX_FORCE_INLINE void flux_dir(
       int i, int j, int k, int dir, const Array1D<Real, 0, 2>& coefs,
       const Array4<Real>& prims, const Array4<Real>& flx,
-      const cls_t& cls) const {
+      const cls_t* cls) const {
     for (int n = 0; n < cls_t::NCONS; n++) {
       flx(i, j, k, n) = 0.0;
     };
@@ -115,38 +115,38 @@ class keep_euler_t {
         i1 = i + m * vdir[0];
         j1 = j + m * vdir[1];
         k1 = k + m * vdir[2];
-        rho1 = prims(i1, j1, k1, cls.QRHO);
-        ux1 = prims(i1, j1, k1, cls.QU);
-        uy1 = prims(i1, j1, k1, cls.QV);
-        uz1 = prims(i1, j1, k1, cls.QW);
-        uu1 = prims(i1, j1, k1, cls.QU + dir);
-        ie1 = cls.cv * prims(i1, j1, k1, cls.QT);
-        p1 = prims(i1, j1, k1, cls.QPRES);
+        rho1= prims(i1, j1, k1, cls_t::QRHO);
+        ux1 = prims(i1, j1, k1, cls_t::QU);
+        uy1 = prims(i1, j1, k1, cls_t::QV);
+        uz1 = prims(i1, j1, k1, cls_t::QW);
+        uu1 = prims(i1, j1, k1, cls_t::QU + dir);
+        ie1 = cls->cv * prims(i1, j1, k1, cls_t::QT);
+        p1 = prims(i1, j1, k1, cls_t::QPRES);
 
         i2 = i + (m - l) * vdir[0];
         j2 = j + (m - l) * vdir[1];
         k2 = k + (m - l) * vdir[2];
-        rho2 = prims(i2, j2, k2, cls.QRHO);
-        ux2 = prims(i2, j2, k2, cls.QU);
-        uy2 = prims(i2, j2, k2, cls.QV);
-        uz2 = prims(i2, j2, k2, cls.QW);
-        uu2 = prims(i2, j2, k2, cls.QU + dir);
-        ie2 = cls.cv * prims(i2, j2, k2, cls.QT);
-        p2 = prims(i2, j2, k2, cls.QPRES);
+        rho2 = prims(i2, j2, k2, cls_t::QRHO);
+        ux2 = prims(i2, j2, k2, cls_t::QU);
+        uy2 = prims(i2, j2, k2, cls_t::QV);
+        uz2 = prims(i2, j2, k2, cls_t::QW);
+        uu2 = prims(i2, j2, k2, cls_t::QU + dir);
+        ie2 = cls->cv * prims(i2, j2, k2, cls->QT);
+        p2 = prims(i2, j2, k2, cls_t::QPRES);
 
         massflx = fgQuad(rho1, rho2, uu1, uu2);
         ke = 0.5_rt * (ux1 * ux2 + uy1 * uy2 + uz1 * uz2);
-        flx(i, j, k, cls.URHO) += coefs(l - 1) * massflx;
-        flx(i, j, k, cls.UMX) +=
+        flx(i, j, k, cls_t::URHO) += coefs(l - 1) * massflx;
+        flx(i, j, k, cls_t::UMX) +=
             coefs(l - 1) *
             (fghCubic(rho1, rho2, uu1, uu2, ux1, ux2) + vdir[0] * fDiv(p1, p2));
-        flx(i, j, k, cls.UMY) +=
+        flx(i, j, k, cls_t::UMY) +=
             coefs(l - 1) *
             (fghCubic(rho1, rho2, uu1, uu2, uy1, uy2) + vdir[1] * fDiv(p1, p2));
-        flx(i, j, k, cls.UMZ) +=
+        flx(i, j, k, cls_t::UMZ) +=
             coefs(l - 1) *
             (fghCubic(rho1, rho2, uu1, uu2, uz1, uz2) + vdir[2] * fDiv(p1, p2));
-        flx(i, j, k, cls.UET) +=
+        flx(i, j, k, cls_t::UET) +=
             coefs(l - 1) *
             (massflx * ke + fghCubic(rho1, rho2, uu1, uu2, ie1, ie2) +
              fgDiv(p1, p2, uu1, uu2));

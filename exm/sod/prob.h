@@ -31,7 +31,6 @@ typedef rhs_dt<riemann_t<false, ProbClosures>, no_diffusive_t, no_source_t>
 
 void inline inputs() {
   ParmParse pp;
-
   pp.add("cns.order_rk", 3);   // -2, 1, 2 or 3"
   pp.add("cns.stages_rk", 3);  // 1, 2 or 3
 }
