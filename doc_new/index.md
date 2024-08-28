@@ -41,7 +41,7 @@ and check for more options
 
 ## Start
 
-To finih installation see [QuickStart](quickrun.md)
+To finish installation see [QuickStart](quickrun.md)
 
 ## Folder layout
 

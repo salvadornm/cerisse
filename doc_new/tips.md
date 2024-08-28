@@ -1,11 +1,5 @@
 # Tips
 
-### Units
-
-Due to chemistry database PelePhysics, Cerisse uses cgs system.  
-(is a pain, minor price for a bit faster chemistry and integration)
-
-CHECKS
 
 ### Install yt
 
@@ -26,8 +20,7 @@ Check [yt Website](https://yt-project.org) for details and tutorials.
 ### Use cerisse script
 
 The **cerisse** script can help to clean directories, create backups, create visit files for movies quickly. It is useful for day to day running and avoid file creep-up.
-Is installed in `bin`
-and can be used by  
+The script is installed in `bin` and can be used by  
 
 ```
 $ /bin/cerisse [options]
@@ -39,7 +32,7 @@ or by setting the path in `.bashrc` or `.profile` by adding the line at the end
 PATH="/home/snm/work/cerisse/bin:$PATH"
 ```
 
-where the `/home/snm/work/cerisse`corresponds to the installation dir
+where  `/home/snm/work/cerisse` corresponds to the installation directory.
 
 
 ### Running on Imperial's HPC
