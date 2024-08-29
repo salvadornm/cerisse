@@ -50,7 +50,7 @@ NOTE: In the tables below, DIM means the number of dimensions, Int means integer
 | amr.grid_eff                | Real          | 0.7     | Taget value of the percentage of tagged cells in the grids   |
 | amr.loadbalance_level0_int  | Int           | 2       | How often to do load balance (in number of steps). For single level (i.e., amr.max_level=0) only |
 | amr.loadbalance_with_workestimates | Bool   | 0       | For multi-level runs, load balance is done during regrid and thus the load balance interval is controlled by `regrid_int` |
-| amr.loadbalance_max_fac     | Real          | 1.5     | A parameter to control the load balancing                    |
+| amr.loadbalance_max_fac     | Real          | 1.5     | This controls the change in the maximum number of boxes that can be assigned to an MPI rank in load balancing |
 
 ### Outputs & restarting
 
