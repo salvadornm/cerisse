@@ -7,6 +7,7 @@
 #include <Riemann.h>
 #include <Rusanov.h>
 #include <Skew.h>
+#include <CentralDif.h>
 
 #ifdef USE_PELEPHYSICS
 #include "react.h"

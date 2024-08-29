@@ -11,7 +11,7 @@ nav:
   - Equations: equations.md
   - tips: tips.md  
   - errors: errors.md
-  - Class: new_class.md
+  - Solver: new_rhs.md
   - Code:  code.md
   - Develop: doc.md
 extra_javascript:

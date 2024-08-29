@@ -1,60 +1,47 @@
-#ifndef Skew_H_
-#define Skew_H_
+#ifndef CentralDif_H_
+#define CentralDif_H_
 
 #include <AMReX_FArrayBox.H>
 #include <CNS.h>
 
 template <bool isAD, bool isIB, int order, typename cls_t>
-class skew_t {
+class centraldif_t {
   public:
 
   AMREX_GPU_HOST_DEVICE
-  skew_t() {
+  centraldif_t() {
     
-    // initialize coefficients for skew-symmetric
+    // initialize coefficients for symmetrical interpolation based on order
     switch (order)
     {
     case 2:
-      coefskew(0,0) =  Real(0.25);
-      coefskew(1,0) =  Real(0.25);
-      coefskew(0,1) =  Real(0.25);
-      coefskew(1,1) =  Real(0.25);
+      coefdif(0,0) =  Real(0.5);
+      coefdif(1,0) =  Real(0.5);
       break;
     case 4:
-      coefskew(1,1) =  Real(1.0/3.0) - Real(1.0/24.0); 
-      coefskew(2,1) =  Real(1.0/3.0);       
-      coefskew(1,2) =  Real(1.0/3.0); 
-      coefskew(2,2) =  Real(1.0/3.0) - Real(1.0/24.0);     
-      coefskew(0,0) =  - Real(1.0/24.0);
-      coefskew(0,1) =  - Real(1.0/24.0);
-      coefskew(1,3) =  - Real(1.0/24.0);
-      coefskew(2,0) =  - Real(1.0/24.0);                     
-      coefskew(3,1) =  - Real(1.0/24.0);
-      coefskew(3,2) =  - Real(1.0/24.0);
-      // FV correction (following Ducros)
-      coefskew(1,1) +=  Real(1.0/6.0) - Real(1.0/12.0);  
-      coefskew(2,2) +=  Real(1.0/6.0) - Real(1.0/12.0);  
-      coefskew(1,2) -= Real(1.0/12.0);  
-      coefskew(2,1) -=  Real(1.0/6.0) - Real(1.0/12.0);  
+      coefdif(0,0) = -Real(1.0/12.0);
+      coefdif(1,0) =  Real(7.0/12.0);
+      coefdif(2,0) =  Real(7.0/12.0);
+      coefdif(3,0) = -Real(1.0/12.0);                     
       break; 
-    case 6:    //TODO         
-      // coefskew(0,0) = -Real(1.0/12.0);
-      // coefskew(1,0) =  Real(7.0/12.0);
-      // coefskew(2,0) =  Real(7.0/12.0);
-      // coefskew(3,0) = -Real(1.0/12.0);    
+    case 6:             
+      coefdif(0,0) = Real(1.0/60.0);
+      coefdif(1,0) = -Real(8.0/60.0);
+      coefdif(2,0) = Real(37.0/60.0);
+      coefdif(3,0) = Real(37.0/60.0);        
+      coefdif(4,0) = -Real(8.0/60.0);
+      coefdif(5,0) = Real(1.0/60.0);
       break;
     default: //second order
-      coefskew(0,0) =  Real(0.25);
-      coefskew(1,0) =  Real(0.25);
-      coefskew(0,1) =  Real(0.25);
-      coefskew(1,1) =  Real(0.25);
+      coefdif(0,0) =  Real(0.5);
+      coefdif(1,0) =  Real(0.5);
       break;
     }
   
   }
 
   AMREX_GPU_HOST_DEVICE
-  ~skew_t() {}
+  ~centraldif_t() {}
 
   void inline eflux(const Geometry& geom, const MFIter& mfi,
                     const Array4<Real>& prims, const Array4<Real>& flx,
@@ -96,87 +83,73 @@ class skew_t {
 
       // add dissipative fluxes            
 
-      // add flux derivative to rhs, i.e.  rhs[n] + = (fi[n] - fi+1[n])/dx
+      // add flux derivative to rhs, i.e.  rhs[n] += (fi[n] - fi+1[n])/dx
       ParallelFor(bx, cls_t::NCONS,
                   [=] AMREX_GPU_DEVICE(int i, int j, int k, int n) noexcept {
                     rhs(i, j, k, n) +=
                         dxinv[dir] * (flx(i, j, k, n) - flx(i+vdir[0], j+vdir[1], k+vdir[2], n));
                   });
-
-    // if constexpr (isIB) {
-    //   eflux_ibm();
-    // }
-
-    // if constexpr (isAD) {
-    //   art_dissipation_flux();
-    // }
-
     }
-  }
+
+  }  
 
   // compute flux in each direction at i-1/2 //  
-  // skew-symmetric formulation following f = U*V
-  // U vector of conservative  vars (rho, rho ux, rho uy, rho uz rho e) //
-  // V velocity vector               (ux,uy,uz)    //
-  // fi = 1/2 ( U + Ui-1) * 1/2 *(V + Vi-1)
+  // central formulation following f = 1/2 (fi + fi+1)
   AMREX_GPU_DEVICE AMREX_FORCE_INLINE void flux_dir(
     int i, int j, int k, int Qdir,const GpuArray<int, 3>& vdir, const Array4<Real>& cons, const Array4<Real>& prims, const Array4<Real>& lambda_max, const Array4<Real>& flx,
     const cls_t* cls) const {
     
-    Real rho,eint,kin,fluxskew[cls_t::NCONS];
-    Real V[order];
-    Real U[order][cls_t::NCONS];
-    
-    // prepare arrays
+    Real rho,eint,kin,rhou,UN;
+    Real flux[order][cls_t::NCONS];
+     
+    // prepare flux arrays
     int il= i-order*vdir[0]; int jl= j-order*vdir[1]; int kl= k-order*vdir[2];   
     for (int l = 0; l < order; l++) {  
       il +=  vdir[0];jl +=  vdir[1];kl +=  vdir[2];
-      rho =prims(il,jl,kl,cls_t::QRHO);
-      V[l] = prims(il,jl,kl,Qdir); 
-      U[l][cls_t::QRHO] = rho;
-      U[l][cls_t::QU] = rho*prims(il,jl,kl,cls_t::QU);
-      U[l][cls_t::QV] = rho*prims(il,jl,kl,cls_t::QV);
-      U[l][cls_t::QW] = rho*prims(il,jl,kl,cls_t::QW);      
+      rho  = prims(il,jl,kl,cls_t::QRHO); UN   = prims(il,jl,kl,Qdir);
+      rhou = rho*UN;
+      flux[l][cls_t::URHO] = rhou;
+      flux[l][cls_t::UMX]  = rhou*prims(il,jl,kl,cls_t::QU);
+      flux[l][cls_t::UMY]  = rhou*prims(il,jl,kl,cls_t::QV);
+      flux[l][cls_t::UMZ]  = rhou*prims(il,jl,kl,cls_t::QW);
+      flux[l][Qdir-1]     +=  prims(il,jl,kl,cls_t::QPRES);
       kin  = prims(il,jl,kl,cls_t::QU)*prims(il,jl,kl,cls_t::QU);
       kin += prims(il,jl,kl,cls_t::QV)*prims(il,jl,kl,cls_t::QV);
       kin += prims(il,jl,kl,cls_t::QW)*prims(il,jl,kl,cls_t::QW);
-      eint= prims(il, jl, kl, cls_t::QEINT) + Real(0.5)*kin;
-      U[l][cls_t::NCONS-1] = rho*eint  + prims(il,jl,kl,cls_t::QPRES);
+      eint= prims(il, jl, kl, cls_t::QEINT) + 0.5_rt*kin; 
+      //eint = cls->cv * prims(il, jl, kl, cls_t::QT) + Real(0.5)*kin;
+      flux[l][cls_t::UET]  = rhou*eint + UN*prims(il,jl,kl,cls_t::QPRES);      
     }
 
     // compute fluxes
     for (int nvar = 0; nvar < cls_t::NCONS; nvar++) {
-      fluxskew[nvar] =  Real(0.0);     
+      flx(i, j, k, nvar) =  0.0_rt;     
       for (int l = 0; l < order; l++) { 
-        for (int m = 0; m < order; m++) { 
-          fluxskew[nvar]+= coefskew(l,m)*U[l][nvar]*V[m]; // +coef*U*V
-          }
+        flx(i, j, k, nvar) +=  flux[l][nvar]*coefdif(l,0);     
       }
     }  
 
-    // pressure flux (linear interpolation pressure)
-    const Real P  = (prims(il,jl,kl,cls_t::QPRES) + prims(i,j,k,cls_t::QPRES))*Real(0.5);
-    fluxskew[Qdir] += P;
-  
-    // fluxskew (primitive notartion)-->flux (conervative notation)  //
-    flx(i, j, k, cls_t::URHO) = fluxskew[cls_t::QRHO];
-    flx(i, j, k, cls_t::UMX)  = fluxskew[cls_t::QU];
-    flx(i, j, k, cls_t::UMX)  = fluxskew[cls_t::QV];
-    flx(i, j, k, cls_t::UMY)  = fluxskew[cls_t::QW];
-    flx(i, j, k, cls_t::UET)  = fluxskew[cls_t::NCONS-1];
-        
-    }
+    // adding high freq damping?
+
+    // for (int nvar = 0; nvar < cls_t::NCONS; nvar++) {
+    //   flx(i, j, k, nvar) += 
+    // }  
+
+    
+  }
 
   // immersed boundary ghost point  NOT READY YET
-  void inline eflux_ibm() { amrex::Print() << "IBM eflux (skew)" << std::endl; }
+  void inline eflux_ibm() { amrex::Print() << "IBM eflux (central dif)" << std::endl; }
 
-  // artificial dissipation flux
+  // artificial dissipation flux NOT READY YET
   void inline art_dissipation_flux() {
-    amrex::Print() << "AD eflux (skew)" << std::endl;
+    amrex::Print() << "AD eflux (central dif)" << std::endl;
   }
 
   typedef Array2D<Real, 0, order, 0, order> arrCoeff_t;
-  arrCoeff_t coefskew;
+  arrCoeff_t coefdif;
+
+
 
   };
 
