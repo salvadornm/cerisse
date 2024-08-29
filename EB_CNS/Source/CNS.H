@@ -203,7 +203,6 @@ public:
 
   static bool do_les;
   static bool do_pasr;
-  static std::string les_model_name;
   static amrex::Real Cs;
   static amrex::Real C_I;
   static amrex::Real Pr_T;

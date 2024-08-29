@@ -161,9 +161,9 @@ void CNS::compute_dSdt_box(Box const& bx, Array4<const Real>& sarr,
             cns_riemann(i, j, k, dir, flx, q, wl, wr, char_sys, recon_char_var);
 
             bool do_high_order_diff =
-              (shock_sensor(i, j, k) < 0.9) &&
+              (shock_sensor(i, j, k) < 0.95) &&
               (shock_sensor(IntVect(AMREX_D_DECL(i, j, k)) -
-                            IntVect::TheDimensionVector(dir)) < 0.9);
+                            IntVect::TheDimensionVector(dir)) < 0.95);
             if (do_high_order_diff) { cns_afd_correction(i, j, k, dir, q, flx); }
           });
         } else {
@@ -173,7 +173,7 @@ void CNS::compute_dSdt_box(Box const& bx, Array4<const Real>& sarr,
           });
         }
       }
-
+     
       // Viscous fluxes
       if (do_diffusion) {
         auto const& vflx = store_in_vflux ? vfluxfab[dir].array() : flx;

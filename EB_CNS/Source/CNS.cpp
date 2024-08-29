@@ -71,7 +71,12 @@ CNS::CNS(Amr& papa, int lev, const Geometry& level_geom, const BoxArray& bl,
 #endif
 
   // Initialise LES model
-  if (do_les || do_pasr) { les_model = LESModel::create(les_model_name); }
+  if (do_les || do_pasr) {
+    ParmParse pp("cns");
+    std::string les_model_name;
+    pp.get("les_model", les_model_name);
+    les_model = LESModel::create(les_model_name);
+  }
 }
 
 CNS::~CNS()
@@ -317,7 +322,7 @@ void CNS::postCoarseTimeStep(Real time)
 
   printTotalandCheckNan(); // must do because this checks for nan as well
 
-  checkRuntimeMessages();  // re-read inputs or soft exit simulation
+  checkRuntimeMessages(); // re-read inputs or soft exit simulation
 }
 
 void CNS::post_init(Real /*stop_time*/)
@@ -488,7 +493,7 @@ void CNS::errorEst(TagBoxArray& tags, int clearval, int tagval, Real time,
     MultiFab rho(Sg1, amrex::make_alias, URHO, 1);
     auto const& rhoma = rho.const_arrays();
 
-    ParallelFor(rho, [=] AMREX_GPU_DEVICE(int box_no, int i, int j, int k) noexcept {
+    ParallelFor(rho, IntVect(-1), [=] AMREX_GPU_DEVICE(int box_no, int i, int j, int k) noexcept {
       cns_tag_grad(i, j, k, tagma[box_no], rhoma[box_no], dxinv, threshold, tagval);
     });
   }
@@ -949,7 +954,6 @@ void CNS::read_params()
   pp.query("do_pasr", do_pasr);
   if (do_les || do_pasr) {
     if (AMREX_SPACEDIM == 1) amrex::Abort("CNS: LES not supporting 1D");
-    pp.get("les_model", les_model_name);
     pp.query("C_s", Cs);
     pp.query("C_I", C_I);
     pp.query("Pr_T", Pr_T);

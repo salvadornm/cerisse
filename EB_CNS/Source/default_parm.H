@@ -61,8 +61,7 @@ Real CNS::ambient_p = 1013250.0; // for outflow
 
 bool CNS::do_les  = false;       // Enable eddy viscosity type SGS model?
 bool CNS::do_pasr = false;       // Enable partially stirred reactor model?
-std::string CNS::les_model_name; // Avaliable models are "Smagorinsky" or "WALE"
-std::unique_ptr<LESModel> CNS::les_model;
+std::unique_ptr<LESModel> CNS::les_model; // Avaliable models are "Smagorinsky" or "WALE"
 Real CNS::Cs   = 0.1;    // Smagorinsky constant
 Real CNS::C_I  = 0.0066; // Yoshizawa constant (not used)
 Real CNS::Pr_T = 0.7;    // Turbulent Prandtl number = mu_T/(cp*kappa_T)

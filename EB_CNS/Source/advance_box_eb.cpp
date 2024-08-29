@@ -174,9 +174,9 @@ void CNS::compute_dSdt_box_eb(
             cns_riemann(i, j, k, dir, flx, q, wl, wr, char_sys, recon_char_var);
 
             bool do_high_order_diff =
-              (shock_sensor(i, j, k) < 0.9) &&
+              (shock_sensor(i, j, k) < 0.95) &&
               (shock_sensor(IntVect(AMREX_D_DECL(i, j, k)) -
-                            IntVect::TheDimensionVector(dir)) < 0.9);
+                            IntVect::TheDimensionVector(dir)) < 0.95);
             if (do_high_order_diff) {
               cns_afd_correction_eb(i, j, k, dir, q, flag, flx);
             }

@@ -35,7 +35,9 @@ Real CNS::advance(Real time, Real dt, int iteration, int ncycle)
       state[i].swapTimeLevels(dt);
     }
   }
-  get_new_data(Cost_Type).setVal(0.0);
+  if (do_load_balance) {
+    get_new_data(Cost_Type).setVal(0.0);
+  }
 
   // Prepare flux register
 #if CNS_USE_EB
