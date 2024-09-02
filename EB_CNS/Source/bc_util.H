@@ -40,33 +40,55 @@ AMREX_GPU_DEVICE AMREX_FORCE_INLINE void
 bc_isothermal_wall(amrex::Real s_ext[NVAR], const amrex::Real s_int[NVAR],
                    amrex::Real Tw, int dir, bool no_slip = true)
 {
-  auto eos = pele::physics::PhysicsType::eos();
+  // auto eos = pele::physics::PhysicsType::eos();
 
-  // Fluid states
-  amrex::Real rhoinv = 1.0 / s_int[URHO];
-  amrex::Real y[NUM_SPECIES], T = Tw, p;
-  for (int n = 0; n < NUM_SPECIES; ++n) y[n] = s_int[UFS + n] * rhoinv;
-  amrex::Real ke = 0.5 * rhoinv * rhoinv *
-                   (AMREX_D_TERM(s_int[UMX] * s_int[UMX], +s_int[UMY] * s_int[UMY],
-                                 +s_int[UMZ] * s_int[UMZ]));
-  amrex::Real ei = rhoinv * s_int[UEDEN] - ke;
-  eos.REY2T(s_int[URHO], ei, y, T);
-  eos.RTY2P(s_int[URHO], T, y, p);
+  // // Fluid states
+  // amrex::Real rhoinv = 1.0 / s_int[URHO];
+  // amrex::Real y[NUM_SPECIES], T = Tw, p;
+  // for (int n = 0; n < NUM_SPECIES; ++n) y[n] = s_int[UFS + n] * rhoinv;
+  // amrex::Real ke = 0.5 * rhoinv * rhoinv *
+  //                  (AMREX_D_TERM(s_int[UMX] * s_int[UMX], +s_int[UMY] * s_int[UMY],
+  //                                +s_int[UMZ] * s_int[UMZ]));
+  // amrex::Real ei = rhoinv * s_int[UEDEN] - ke;
+  // eos.REY2T(s_int[URHO], ei, y, T);
+  // eos.RTY2P(s_int[URHO], T, y, p);
 
-  // Wall states (extrapolate p and y, calculate rhow, ew based on Tw)
-  amrex::Real rhow, ew;
-  amrex::Real Tg =
-    amrex::max(1e-5, 2 * Tw - T); // temp of ghost cell, prevent negative temp
-  eos.PYT2RE(p, y, Tg, rhow, ew);
-  ew += ke;
+  // // Wall states (extrapolate p and y, calculate rhow, ew based on Tw)
+  // amrex::Real rhow, ew;
+  // amrex::Real Tg =
+  //   amrex::max(1e-5, 2 * Tw - T); // temp of ghost cell, prevent negative temp
+  // eos.PYT2RE(p, y, Tg, rhow, ew);
+  // ew += ke;
 
-  s_ext[URHO] = rhow;
-  s_ext[UMX] = ((dir == 0 || no_slip) ? -1 : 1) * rhow * rhoinv * s_int[UMX];
-  s_ext[UMY] = ((dir == 1 || no_slip) ? -1 : 1) * rhow * rhoinv * s_int[UMY];
-  s_ext[UMZ] = ((dir == 2 || no_slip) ? -1 : 1) * rhow * rhoinv * s_int[UMZ];
-  s_ext[UEDEN] = rhow * ew;
-  for (int n = 0; n < NUM_SPECIES; ++n) s_ext[UFS + n] = rhow * y[n];
-  s_ext[UTEMP] = Tw;
+  // s_ext[URHO] = rhow;
+  // s_ext[UMX] = ((dir == 0 || no_slip) ? -1 : 1) * rhow * rhoinv * s_int[UMX];
+  // s_ext[UMY] = ((dir == 1 || no_slip) ? -1 : 1) * rhow * rhoinv * s_int[UMY];
+  // s_ext[UMZ] = ((dir == 2 || no_slip) ? -1 : 1) * rhow * rhoinv * s_int[UMZ];
+  // s_ext[UEDEN] = rhow * ew;
+  // for (int n = 0; n < NUM_SPECIES; ++n) s_ext[UFS + n] = rhow * y[n];
+  // s_ext[UTEMP] = Tg;
+
+  // amrex::Real rhoinv = 1.0 / s_int[URHO];
+  // amrex::Real Y[NUM_SPECIES];
+  // for (int n = 0; n < NUM_SPECIES; ++n) Y[n] = s_int[UFS + n] * rhoinv;
+  // amrex::Real ke = 0.5 * rhoinv * rhoinv *
+  //                  (AMREX_D_TERM(s_int[UMX] * s_int[UMX], +s_int[UMY] * s_int[UMY],
+  //                                +s_int[UMZ] * s_int[UMZ]));
+  amrex::Real T = s_int[UTEMP];
+  
+  // // Ghost cell states
+  amrex::Real Tg = amrex::max(1e-5, 2 * Tw - T); // prevent negative temp
+  // amrex::Real eg;
+  // eos.RTY2E(s_int[URHO], Tg, Y, eg);
+  // eg += ke;
+
+  s_ext[URHO] = s_int[URHO];
+  s_ext[UMX] = ((dir == 0 || no_slip) ? -1 : 1) * s_int[UMX];
+  s_ext[UMY] = ((dir == 1 || no_slip) ? -1 : 1) * s_int[UMY];
+  s_ext[UMZ] = ((dir == 2 || no_slip) ? -1 : 1) * s_int[UMZ];
+  for (int n = 0; n < NUM_SPECIES; ++n) s_ext[UFS + n] = s_int[UFS + n];
+  s_ext[UEDEN] = s_int[UEDEN];
+  s_ext[UTEMP] = Tg;
 }
 
 /**

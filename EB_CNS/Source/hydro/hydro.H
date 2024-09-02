@@ -54,7 +54,8 @@ cns_ctoprim(int i, int j, int k, int ns, amrex::Array4<amrex::Real const> const&
   q(i, j, k, QC) = cs;
   q(i, j, k, QG) = gamma;
   q(i, j, k, QEINT) = ei;
-  q(i, j, k, QTEMP) = T;
+  // q(i, j, k, QTEMP) = T;
+  q(i, j, k, QTEMP) = u(i, j, k, ns + UTEMP);
   q(i, j, k, QWBAR) = wbar;
 
 #ifdef MONITOR_PROBLEM_CELL
