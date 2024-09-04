@@ -1,7 +1,7 @@
 # Understanding  a numerical solver
 
-This page expalins the rationale between a new finite volume sovler. 
-The Skew-symmetric will be used as an example
+This page expalins the rationale between a new finite volume solver. 
+The central differemce will be used as an example
 
 ## Finite volume solver
 
@@ -10,8 +10,8 @@ $$
 \left. \frac{\partial U}{\partial t} \right|_{i} = ( F_{i+1/2} -  F_{i-1/2} )
 $$
 
-Where  $$U$ = ( \rho, \rho u, \rho e_T) $ the vector of conservative variables and 
-$$F = ( \rho u, \rho u^2 + P, \rho u e_T + u P  )$$ would be a flux function.
+where  $$U = ( \rho, \rho u, \rho e_T) $$ is the vector of conservative variables and 
+$$F = ( \rho u, \rho u^2 + P, \rho u e_T + u P  )$$ would be the convective flux function.
 
 The main looop is
 
@@ -49,35 +49,52 @@ AMREX_GPU_DEVICE AMREX_FORCE_INLINE void flux_dir(
     int i, int j, int k, int Qdir,const GpuArray<int, 3>& vdir, const Array4<Real>& cons, const Array4<Real>& prims, const Array4<Real>& lambda_max, const Array4<Real>& flx,
     const cls_t* cls) const {
     
-        // prepare arrays
-    int il= i-order_skew*vdir[0]; int jl= j-order_skew*vdir[1]; int kl= k-order_skew*vdir[2];   
-    for (int l = 0; l < order_skew; l++) {  
+    // prepare flux arrays
+    int il= i-halfsten*vdir[0]; int jl= j-halfsten*vdir[1]; int kl= k-halfsten*vdir[2];   
+        
+    for (int l = 0; l < order; l++) {  
+
+      rho  = prims(il,jl,kl,cls_t::QRHO); UN   = prims(il,jl,kl,Qdir);
+      rhou = rho*UN;
+      flux[l][cls_t::URHO] = rhou;
+      flux[l][cls_t::UMX]  = rhou*prims(il,jl,kl,cls_t::QU);
+      flux[l][cls_t::UMY]  = rhou*prims(il,jl,kl,cls_t::QV);
+      flux[l][cls_t::UMZ]  = rhou*prims(il,jl,kl,cls_t::QW);
+      flux[l][Qdir-1]     +=  prims(il,jl,kl,cls_t::QPRES);
+      kin  = prims(il,jl,kl,cls_t::QU)*prims(il,jl,kl,cls_t::QU);
+      kin += prims(il,jl,kl,cls_t::QV)*prims(il,jl,kl,cls_t::QV);
+      kin += prims(il,jl,kl,cls_t::QW)*prims(il,jl,kl,cls_t::QW);
+      eint= prims(il, jl, kl, cls_t::QEINT) + 0.5_rt*kin; 
+      flux[l][cls_t::UET]  = rhou*eint + UN*prims(il,jl,kl,cls_t::QPRES);     
+
       il +=  vdir[0];jl +=  vdir[1];kl +=  vdir[2];
-      rho =prims(il,jl,kl,cls_t::QRHO);
-      V[l] = prims(il,jl,kl,Qdir); 
-      U[l][cls_t::QRHO] = rho;
-      U[l][cls_t::QU] = rho*prims(il,jl,kl,cls_t::QU);
-      U[l][cls_t::QV] = rho*prims(il,jl,kl,cls_t::QV);
-      U[l][cls_t::QW] = rho*prims(il,jl,kl,cls_t::QW);
-      eint=cls->cv * prims(il, jl, kl, cls_t::QT);
-      U[l][cls_t::NCONS-1] = rho*(eint + kin) + prims(il,jl,kl,cls_t::QPRES);
     }
+
 
     ....
 
     }
 ```    
-In this example, the flux is a  skew-symmetric formulation, in a second order is
+The indices `il`,`jl` and `kl` loop over cells required for the fluxes using the direction, so if the function is called within `idir=0` (x-direction), `il=i-1`,`jl=j` and `kl=k`, similarly with  `idir=1` (y-direction), `il=i1`,`jl=j-1` and `kl=k`.
+
+Before the ```for``` loop, the cell index wil be ```il= i-halfsten*vdir[0]```. Using a one-dimensional, second order ```halfsten=1``` (half-stencil lenght)  and therefore the loop will traverse  cells ***i-1*** to ***i*** which  are the ones needed to define the 
+flux in a second order central difference.
 
 $$
-F_{i-1/2} = \frac{1}{2} \left( U(i-1) + U(i) \right) \frac{1}{2} \left( V(i-1) + V(i) \right)
+F_{i-1/2} = \frac{1}{2} \left( F_{i-1} + F_{i} \right)
 $$
 
+In a fourth order the flux is
 
-`il`,`jl` and `kl` are `i-1`,`j-1` and `k-1` but using the direction, so if the function is called within `idir=0` (x-direction), `il=i-1`,`jl=j` and `kl=k`, similarly with 
-`idir=1` (y-direction), `il=i1`,`jl=j-1` and `kl=k`.
-The `prepare arrays` section will build the conservative variable arrays 
-$$ U_{i-order/2} , ... , U_{i+order/2} $$ 
+$$
+F_{i-1/2} = \frac{1}{12} \left( - F_{i-2} + 7 F_{i-1}  + 7 F_{i} - F_{i+1} \right)
+$$
+
+and therefore the loop traverse cells from ***i-2*** to ***i+1*** 
+
+
+The `prepare arrays` section will build the conservative flux arrays 
+$$ F_{i-order/2} ,  ... , F_{i+order/2} $$ depending on the order
 
 
 

@@ -117,9 +117,11 @@ typedef rhs_dt<riemann_t<false, ProbClosures>, no_diffusive_t, no_source_t>
 
 ### RHS
 
-| RHS                     | Type          | Use | Description                                                  |
+| RHS                     | Options          | Use | Description                                                  |
 | --------------------------- | ------------- |:-------:| ------------------------------------------------------------ |
 | ```riemann_t```             |            |   often      | Riemann Solver                 |
+| ```centraldif_t```             |  AD,IB, order           |   often      | Central Scheme                 |
+| ```skew_t```             |  AD, IB, order           |   often      | Skew-symmetric Scheme                 |
 | ```no_diffusive_t```        |            |   often      | No diffusive part (Euler)                |
 | ```no_source_t```           |            |   often      | No source term    |
 

@@ -103,9 +103,10 @@ class centraldif_t {
     Real flux[order][cls_t::NCONS];
      
     // prepare flux arrays
-    int il= i-order*vdir[0]; int jl= j-order*vdir[1]; int kl= k-order*vdir[2];   
+    int il= i-halfsten*vdir[0]; int jl= j-halfsten*vdir[1]; int kl= k-halfsten*vdir[2];   
+        
     for (int l = 0; l < order; l++) {  
-      il +=  vdir[0];jl +=  vdir[1];kl +=  vdir[2];
+
       rho  = prims(il,jl,kl,cls_t::QRHO); UN   = prims(il,jl,kl,Qdir);
       rhou = rho*UN;
       flux[l][cls_t::URHO] = rhou;
@@ -117,8 +118,9 @@ class centraldif_t {
       kin += prims(il,jl,kl,cls_t::QV)*prims(il,jl,kl,cls_t::QV);
       kin += prims(il,jl,kl,cls_t::QW)*prims(il,jl,kl,cls_t::QW);
       eint= prims(il, jl, kl, cls_t::QEINT) + 0.5_rt*kin; 
-      //eint = cls->cv * prims(il, jl, kl, cls_t::QT) + Real(0.5)*kin;
-      flux[l][cls_t::UET]  = rhou*eint + UN*prims(il,jl,kl,cls_t::QPRES);      
+      flux[l][cls_t::UET]  = rhou*eint + UN*prims(il,jl,kl,cls_t::QPRES);     
+
+      il +=  vdir[0];jl +=  vdir[1];kl +=  vdir[2];
     }
 
     // compute fluxes
@@ -149,7 +151,7 @@ class centraldif_t {
   typedef Array2D<Real, 0, order, 0, order> arrCoeff_t;
   arrCoeff_t coefdif;
 
-
+  int halfsten = order / 2;
 
   };
 

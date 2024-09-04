@@ -60,7 +60,7 @@ datasets = [latest_file]
 x, v, rho = VortexLineoutX(datasets, xc, yc)
 
 for (xs, vs, rhos) in zip(x, v, rho): 
-  plt.plot(xs, vs/rhos, label='Riemann-MUSCL')
+  plt.plot(xs, vs/rhos, label='cerisse++')
   plt.ylabel("vy")
   plt.xlabel(' x ', horizontalalignment='center')
 

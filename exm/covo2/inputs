@@ -1,9 +1,9 @@
 # Simulation time
 # start time is assumed to be 0, unless re-starting
-max_step  = 200
+max_step  = 20000
 stop_time =  0.008891428571
-time_step = 0.000001
-#cfl = 0.5
+#time_step = 0.000005
+cfl = 0.5
 
 # Geometry 
 geometry.is_periodic = 1 1
@@ -22,7 +22,7 @@ cns.screen_output = 0 # 0=quiet, 1=verbose
 cns.verbose = 0       # 0=quiet, 1=verbose
 
 # Refinement and regridding 
-amr.n_cell          = 128 128
+amr.n_cell          = 256 256
 amr.max_level       = 0     # maximum level number allowed
 amr.ref_ratio       = 2 2 # refinement ratio per level
 amr.regrid_int      = 2 2 # how often to regrid per level
@@ -42,5 +42,5 @@ amr.check_file              = chk    # root name of checkpoint file
 amr.check_int               = 10000    # number of timesteps between checkpoints
 amr.plot_files_output = 1
 amr.plot_file         = ./plot/plt # root name of plotfile
-amr.plot_int          = 5         # number of timesteps between plotfiles
+amr.plot_int          = 100         # number of timesteps between plotfiles
 amr.derive_plot_vars  = pressure x_velocity y_velocity temperature
