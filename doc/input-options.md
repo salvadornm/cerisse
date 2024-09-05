@@ -17,12 +17,18 @@ The reference is available on [AMReX's documentation](https://amrex-codes.github
 
 NOTE: In the tables below, DIM means the number of dimensions, Int means integer, and Bool means boolean value (0 for False and 1 for True). If the option has no default value, a value must be given by the user.
 
+
+**TAKEN FROM CERISSE NOT CHECKED**
+
+
 ### Problem definition & time-stepping
 
 | Option                      | Type          | Default | Description                                                  |
 | --------------------------- | ------------- |:-------:| ------------------------------------------------------------ |
-| max_step                    | Int           |         | Maximum number of time steps to take                         |
-| stop_time                   | Real          |         | Maximum time to reach                                        |
+| **max_step**                    | Int           |         | Maximum number of time steps to take                         |
+| **stop_time**                   | Real          |         | Maximum time to reach                                        |
+| **time_step**                   | Real          |         | dt (base level), higher level time step is computed based on the number of subcycles                                        |
+| **cfl**                   | Real          |         | CFL  (incompatible option with time_step)  |
 | geometry.is_periodic        | DIM * Int     | 0 0 0   | 1 for true, 0 for false (one value for each coordinate direction) |
 | geometry.coord_sys          | Int           | 0       | 0 = Cartesian; 1 = Cylindrical; 2 = Spherical (only support Cartesian) |
 | geometry.prob_lo            | DIM * Real    | 0 0 0   | Low corner of physical domain (physical not index space)     |
@@ -34,9 +40,9 @@ NOTE: In the tables below, DIM means the number of dimensions, Int means integer
 
 | Option                      | Type          | Default | Description                                                  |
 | --------------------------- | ------------- |:-------:| ------------------------------------------------------------ |
-| amr.max_level               | Int           | 0       | Maximum level of refinement allowed (0 when single-level)    |
-| amr.ref_ratio               | Ints          |         | Refinment ratio in each level, number of levels - 1 values can be used. If the number of `ref_ratio` supplied is less than the number of levels - 1, the last entry will be automatically propagated |
-| amr.regrid_int              | Int           | -1      | How often to regrid (in number of steps). No regridding will occur if set to < 0 |
+| **amr.max_level**               | Int           | 0       | Maximum level of refinement allowed (0 when single-level)    |
+| **amr.ref_ratio**               | Ints          |         | Refinment ratio in each level, number of levels - 1 values can be used. If the number of `ref_ratio` supplied is less than the number of levels - 1, the last entry will be automatically propagated |
+| **amr.regrid_int**              | Int           | -1      | How often to regrid (in number of steps). No regridding will occur if set to < 0 |
 | amr.max_grid_size[^1]       | Int           | 32      | Maximum number of cells in each grid in all directions       |
 | amr.blocking_factor[^1]     | Int           | 8       | Each grid must be divisible by blocking_factor in all directions (must be 1 or power of 2) |
 | amr.refine_grid_layout[^1]  | Bool          | 1       | Split grids in half until the number of grids is no less than the number of procs |
@@ -44,7 +50,7 @@ NOTE: In the tables below, DIM means the number of dimensions, Int means integer
 | amr.grid_eff                | Real          | 0.7     | Taget value of the percentage of tagged cells in the grids   |
 | amr.loadbalance_level0_int  | Int           | 2       | How often to do load balance (in number of steps). For single level (i.e., amr.max_level=0) only |
 | amr.loadbalance_with_workestimates | Bool   | 0       | For multi-level runs, load balance is done during regrid and thus the load balance interval is controlled by `regrid_int` |
-| amr.loadbalance_max_fac     | Real          | 1.5     | A parameter to control the load balancing                    |
+| amr.loadbalance_max_fac     | Real          | 1.5     | This controls the change in the maximum number of boxes that can be assigned to an MPI rank in load balancing |
 
 ### Outputs & restarting
 
@@ -59,6 +65,7 @@ NOTE: In the tables below, DIM means the number of dimensions, Int means integer
 | amr.check_int               | Int           | -1      | Frequency of checkpoint file output; if -1 then no plotfiles will be   written |
 | amr.restart                 | String        |         | If present, then the name of checkpoint file to restart from |
 | amr.plotfile_on_restart     | Bool          | 0       | Write a plotfile when immediately after restart or not       |
+
 
 ### GPU-related parameters
 | Option                      | Type          | Default | Description                                                  |
@@ -130,7 +137,7 @@ cns.dt_cutoff      | Real             | 5.e-20    | Minimum timestep size allowe
 cns.fixed_dt       | Real             | 0         | Run with constant dt
 cns.recon_scheme   | Int (1 to 6)     | 5         | Reconstruction scheme 
 cns.char_sys       | Int (0 or 1)     | 0 (sos)   | System for characteristic variable conversion
-cns.recon_char_var | Int (0 or 1)     | 0         | Reconstruct characteristic system variable or not
+cns.recon_char_var | Int (0 or 1)     | 1         | Reconstruct characteristic system variable or not (solver order will reduce if this is off)
 cns.limiter_theta  | Real             | 2.0       | Parameter in MUSCL limiter, between 1 and 2; 1: minmod, 2: van Leer's MC (higher sharper) 
 cns.rk_order       | Int (1 or 2)     | 1         | Switch between forward Euler and 2nd-order Runge-Kutta (note that WENO is not stable with forward Euler)
 cns.clip_temp      | Real             | [C++ epsilon](https://en.cppreference.com/w/cpp/types/numeric_limits/epsilon) | The `enforce_consistent_state()` routine adds energy to cells below this temperature to enforce non-negative temperature |
@@ -143,7 +150,7 @@ Two types of LES models are available, traditional eddy-viscosity type and stoch
 | --------------------------- | ------------- |:-------:| ------------------------------------------------------------ |
 | cns.do_les                  | Bool          | 0       | Use eddy viscosity type subgrid-scale model or not           |
 | cns.do_pasr                 | Bool          | 0       | Use partially stirred reactor in reaction or not             |
-| cns.les_model_name          | String        |         | Avaliable models are "Smagorinsky" or "WALE"                 |
+| cns.les_model               | String        |         | Avaliable models are "Smagorinsky" or "WALE"                 |
 | cns.C_s                     | Real          | 0.1     | Smagorinsky constant                                         |
 | cns.C_I                     | Real          | 0.0066  | Yoshizawa constant (not used currently)                      |
 | cns.Pr_T                    | Real          | 0.7     | Turbulent Prandtl number = mu_T/(cp*kappa_T)                 |
@@ -203,7 +210,7 @@ In the **input** file, users should specify the geometry of the embedded boundar
 | `combustor`   | `far_wall_loc`, `ramp_plane1_point`,  `ramp_plane2_point`, `ramp_plane2_normal`, `ramp_plane3_point`, `pipe_lo`, `pipe_hi`
 | `converging-nozzle` | `d_inlet`, `l_inlet`, `d_exit`, `l_nozzle`
 
-NOTE: You can only choose one geometry type and one geometry. If you want to use multiple geometries, you need to [define your own geometry](run.md#embedded-boundary-geometries).
+NOTE: You can only choose one geometry type and one geometry. If you want to use multiple geometries, you need to define your own geometry
 
 Below are some examples:
 ```ini

@@ -19,6 +19,11 @@ $$
 
 ### Mass Fraction of specie k
 
+$$
+\frac{\partial \rho Y_k }{\partial t} + \frac{\partial \rho u_j Y_k}{\partial x_j}   
+=   \frac{\partial J_j^k}{\partial x_j} +  \rho \dot{\omega}_k
+$$
+
 
 
 ### Total Energy

@@ -1,10 +1,9 @@
-# Inmesred Boundaries
+# Immersed Boundaries
 
 
 ## Theory
 
-
-RHS adds..
+In *Immersed Boundary Methods * (IBM), boundary conditions are enforced by introducing source terms,  using interpolation  to impose the influence of the boundary on the fluid flow.
 
 ## Set-up input
 

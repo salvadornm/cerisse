@@ -1,5 +1,5 @@
 site_name: cerisse++
-docs_dir: doc_new
+docs_dir: doc
 nav:
   - Home: index.md
   - Quick: quickrun.md
