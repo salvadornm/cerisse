@@ -16,7 +16,6 @@ namespace PROB {
 
 // problem parameters  (1:bottom   2:top)
 struct ProbParm {
-  Real mach = 0.05;
   Real p0 = 101300.0;    
   Real rho0 =  1.17170407;
   Real v0 = 35.0;
@@ -34,8 +33,7 @@ typedef closures_dt<indicies_t, visc_suth_t, cond_suth_t,
 template <typename cls_t > class user_source_t;
 
 
-//typedef rhs_dt<riemann_t<false, ProbClosures>, no_diffusive_t, no_source_t > ProbRHS;
-typedef rhs_dt<skew_t<false,false, 6, ProbClosures>, no_diffusive_t, no_source_t > ProbRHS;
+typedef rhs_dt<riemann_t<false, ProbClosures>, no_diffusive_t, no_source_t > ProbRHS;
 
 
 void inline inputs() {
