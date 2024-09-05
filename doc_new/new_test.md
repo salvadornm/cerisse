@@ -24,6 +24,9 @@ The code will be tested periodically against these regression tests to validate 
 
 # Other examples
 
+These example are classical tests designed to compare  numerical schemes and 
+are located under ```tst/other```
+
 ## Convection of a Vortex
 
 --8<-- "exm/covo/README.md"
