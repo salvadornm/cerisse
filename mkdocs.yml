@@ -6,7 +6,8 @@ nav:
   - input: input-options.md
   - Run: new_run.md
   - Tests: new_test.md
-  - IBM: ibm.md
+  - Examples: examples.md  
+  - BC: ibm.md
   - Tutorial: tutorial.md
   - Equations: equations.md
   - tips: tips.md  
