@@ -1,5 +1,5 @@
 # Simulation time
-max_step  =   10
+max_step  =   500
 stop_time =  0.2
 cfl = 0.3
 
@@ -20,19 +20,21 @@ amr.v               = 1
 
 # Refinement and regridding 
 amr.n_cell            = 56 16
-amr.max_level         = 0       # maximum level number allowed
+amr.max_level         = 3       # maximum level number allowed
 amr.ref_ratio         = 2 2    # refinement ratio per level
-amr.regrid_int        = 2 2    # how often to regrid per level
-amr.blocking_factor_x = 8 8    # blocking factor in x per level
-amr.blocking_factor_y = 8 8    # blocking factor in x per level
-amr.max_grid_size_x   = 64 64  # maximum grid size in x per level
-amr.max_grid_size_y   = 64 64  # maximum grid size in y per level
+amr.regrid_int        = 2    # how often to regrid per level
+amr.blocking_factor_x = 8    # blocking factor in x per level
+amr.blocking_factor_y = 8    # blocking factor in y per level
+amr.max_grid_size_x   = 64  # maximum grid size in x per level
+amr.max_grid_size_y   = 64  # maximum grid size in y per level
 amr.n_error_buf       = 2 2    # number of buffer cells in error est
 amr.grid_eff          = 0.9    # what constitutes an efficient grid
 
 # refiment conditions
+cns.refine_dengrad = 0.01
+cns.refine_dengrad_max_lev = 10
 
-fabarray.mfiter_tile_size = 8 8
+#fabarray.mfiter_tile_size = 8 8
 
 # Plot and checkpoint
 amr.checkpoint_files_output = 0
@@ -40,5 +42,5 @@ amr.check_file              = chk     # root name of checkpoint file
 amr.check_int               = 10000   # number of timesteps between checkpoints
 amr.plot_files_output = 1
 amr.plot_file         = ./plot/plt    # root name of plotfile
-amr.plot_int          = 1            # number of timesteps between plotfiles
+amr.plot_int          = 50            # number of timesteps between plotfiles
 amr.derive_plot_vars  = pressure x_velocity y_velocity temperature

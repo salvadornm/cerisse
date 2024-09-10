@@ -84,8 +84,6 @@ prob_initdata(int i, int j, int k, Array4<Real> const &state,
     eint =  prob_parm.eint_r;
   }
 
-  //std::cout << " gam=" << cls.gamma << std::endl;
-  // che
   eint =  Pt / (cls.gamma - Real(1.0));
 
   
@@ -109,67 +107,66 @@ bcnormal(const Real x[AMREX_SPACEDIM], Real dratio, const Real s_int[ProbClosure
   const int UMZ  = ProbClosures::UMZ;
   const int UET  = ProbClosures::UET;
    
+  const int face = (idir+1)*sgn;
 
-  // x low
-  if (idir == 0 && sgn == 1) { 
-    // post shock conditions
-    s_ext[URHO] = prob_parm.rho_l;
-    s_ext[UMX]  = prob_parm.rho_l * prob_parm.u_l;
-    s_ext[UMY]  = prob_parm.rho_l * prob_parm.v_l;
-    s_ext[UMZ]  = 0.0;    
-    s_ext[UET]  =   prob_parm.eint_l + 0.5 *prob_parm.rho_l*
-      (prob_parm.u_l * prob_parm.u_l + prob_parm.v_l * prob_parm.v_l);
-  }
-  // x top
-  if (idir == 0 && sgn == -1) { 
-    // post shock conditions
-    s_ext[URHO] = prob_parm.rho_l;
-    s_ext[UMX]  = prob_parm.rho_l * prob_parm.u_l;
-    s_ext[UMY]  = prob_parm.rho_l * prob_parm.v_l;
-    s_ext[UMZ]  = 0.0;    
-    s_ext[UET]  =   prob_parm.eint_l + 0.5 *prob_parm.rho_l*
-      (prob_parm.u_l * prob_parm.u_l + prob_parm.v_l * prob_parm.v_l);  }
-  // y low
-  if (idir == 1 && sgn == 1) { 
-    if (x[0] < 1. / 6.) {
+  Real us = 10. * prob_parm.c_r / sqrt(3.) * 2.;
+
+  switch(face)
+  {
+    case  2:  // SOUTH
+     if (x[0] < 1. / 6.) {
       // post-shock conditions
       s_ext[URHO] = prob_parm.rho_l;
       s_ext[UMX]  = prob_parm.rho_l * prob_parm.u_l;
       s_ext[UMY]  = prob_parm.rho_l * prob_parm.v_l;
       s_ext[UMZ]  = 0.0;
-    }
-    else {
+      s_ext[UET]  =   prob_parm.eint_l + 0.5 *prob_parm.rho_l*
+      (prob_parm.u_l * prob_parm.u_l + prob_parm.v_l * prob_parm.v_l);
+      }
+      else {
       // slip wall
       s_ext[URHO] = s_int[URHO];
       s_ext[UMX]  = s_int[UMX];
       s_ext[UMY]  = -s_int[UMY];
       s_ext[UMZ]  = s_int[UMZ];
       s_ext[UET]  = s_int[UET];
-    }
-  }
-  // y top
-  if (idir == 1 && sgn == -1) { 
-    Real us = 10. * prob_parm.c_r / sqrt(3.) * 2.; // shock speed
-    if (x[0] - us * time < 1. / 6. + 1. / sqrt(3.) * x[1]) {
+      }
+      break;
+    case  1:  // WEST
+      // post-shock conditions
       s_ext[URHO] = prob_parm.rho_l;
-      s_ext[UMX] = prob_parm.rho_l * prob_parm.u_l;
-      s_ext[UMY] = prob_parm.rho_l * prob_parm.v_l;
-      s_ext[UMZ] = 0.0; 
+      s_ext[UMX]  = prob_parm.rho_l * prob_parm.u_l;
+      s_ext[UMY]  = prob_parm.rho_l * prob_parm.v_l;
+      s_ext[UMZ]  = 0.0;    
       s_ext[UET]  =   prob_parm.eint_l + 0.5 *prob_parm.rho_l*
       (prob_parm.u_l * prob_parm.u_l + prob_parm.v_l * prob_parm.v_l);
-    }
-    else {
-      s_ext[URHO] = prob_parm.rho_r;
-      s_ext[UMX] = 0.0;
-      s_ext[UMY] = 0.0;
-      s_ext[UMZ] = 0.0;
-      s_ext[UET] = prob_parm.eint_r;
-    }
-  
-  } 
-   
-  //-----
+      break;
+    case -1:  // EAST
+      // 0-grad       
+      break;
+    case -2:   // NORTH
+      
+      if (x[0] - us * time < 1. / 6. + 1. / sqrt(3.) * x[1]) {
+        s_ext[URHO] = prob_parm.rho_l;
+        s_ext[UMX] = prob_parm.rho_l * prob_parm.u_l;
+        s_ext[UMY] = prob_parm.rho_l * prob_parm.v_l;
+        s_ext[UMZ] = 0.0; 
+        s_ext[UET]  =   prob_parm.eint_l + 0.5 *prob_parm.rho_l*
+          (prob_parm.u_l * prob_parm.u_l + prob_parm.v_l * prob_parm.v_l);
+      }
+      else {
+        // undisturbed conditions
+        s_ext[URHO] = prob_parm.rho_r;
+        s_ext[UMX] = 0.0;
+        s_ext[UMY] = 0.0;
+        s_ext[UMZ] = 0.0;
+        s_ext[UET] = prob_parm.eint_r;
+      }
+      break;
+    default:
 
+      break; 
+  }
 }
 ///////////////////////////////AMR//////////////////////////////////////////////
 AMREX_GPU_DEVICE AMREX_FORCE_INLINE void
@@ -187,19 +184,21 @@ user_tagging(int i, int j, int k, int nt_level, auto &tagfab,
   Real drhoy = Math::abs(sdatafab(i,j+1,k,ProbClosures::URHO) -
    sdatafab(i,j-1,k,ProbClosures::URHO))/rhot;
 
+  Real gradrho= sqrt(drhox*drhox+drhoy*drhoy);        
+
   if (nt_level > 0)
   {
-    // tag cells based on density values
+    //tag cells based on density gradient
     switch (level)
     {
       case 0:
-        tagfab(i,j,k) = (rhot > 1.1 && rhot < 1.9);
+        tagfab(i,j,k) = (gradrho > 0.3);        
         break;
       case 1:
-        tagfab(i,j,k) = (rhot > 1.2 && rhot < 1.8);
+        tagfab(i,j,k) = (gradrho > 0.2);        
         break;
       default:
-        tagfab(i,j,k) = (rhot > 1.3 && rhot < 1.7);
+        tagfab(i,j,k) = (gradrho > 0.1);        
         break;
     }
   }
