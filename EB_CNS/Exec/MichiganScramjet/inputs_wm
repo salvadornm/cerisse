@@ -1,0 +1,119 @@
+# ====================================================== #
+#                  CERISSE INPUT SCRIPT                  #
+# ====================================================== #
+# For using wall model with EB walls
+max_step = 40000
+stop_time = 0.1
+amrex.fpe_trap_invalid = 0
+
+# ================ COMPUTATIONAL DOMAIN ================ #
+geometry.is_periodic = 0 0 0
+geometry.coord_sys   = 0  # 0: cart, 1: RZ, 2:spherical
+geometry.prob_lo     = -35.8 -1.35 -1.95
+geometry.prob_hi     =  18.8  2.55  1.95
+amr.n_cell           =  448   32    32
+
+eb2.geom_type = Scramjet
+cns.eb_no_slip = 1
+cns.eb_isothermal = 0
+cns.eb_wall_model = 1
+cns.redistribution_type = StateRedist
+
+# ================ BOUNDARY CONDITIONS ================= #
+# 0 = Interior             3 = Symmetry
+# 1 = Inflow / UserBC      4 = SlipWall = 3
+# 2 = Outflow (FOExtrap)   5 = NoSlipWall (adiabatic)
+cns.lo_bc = 1 1 5
+cns.hi_bc = 2 5 5
+
+# ==================== WHAT PHYSICS ==================== #
+cns.do_hydro = 1
+cns.do_visc  = 1
+cns.do_react = 1
+#cns.do_vpdf = 1
+#cns.do_spdf = 1
+
+# ==================== WHAT NUMERICS =================== #
+cns.cfl = 0.3
+cns.dt_cutoff = 5.e-20
+cns.recon_scheme = 5   # 1: Godunov,  2: MUSCL,   3: WENO-Z3, 
+                       # 4: WENO-JS5, 5: WENO-Z5, 6: TENO-5
+cns.char_sys     = 0   # characteristic system, 0:sos, 1:gamma
+cns.recon_char_var = 1
+cns.clip_temp    = 90  # clip minimum temperature [K] (this is consistent with the chem mechanism)
+cns.use_hybrid_scheme = 0
+
+# ================== REACTION SETTINGS ================= #
+cns.chem_integrator = "ReactorCvode"
+cvode.solve_type = "denseAJ_direct"
+ode.clean_init_massfrac = 1 # ensure 0 <= Y <= 1 before integration
+cns.use_typical_vals_chem = 0
+cns.min_react_temp = 500    # no reaction in cells below this temp (can reduce runtime in ReactorCvode)
+cns.update_heat_release = 1
+#cns.rk_reaction_iter = 0
+
+# ================ VERBOSITY & DIAGNOSIS =============== #
+cns.v = 1 # 0/1/2
+amr.v = 1
+ode.verbose = 0
+
+# ==================== LOAD BALANCE ==================== #
+amr.loadbalance_with_workestimates = 1 # loadbalance_int = regrid_int
+
+# =============== REFINEMENT / REGRIDDING ============== #
+amr.max_level       = 2     # maximum level number allowed
+amr.ref_ratio       = 2 2 2 # refinement ratio
+amr.regrid_int      = 20    # how often to regrid
+amr.blocking_factor = 8
+amr.max_grid_size   = 32
+amr.n_error_buf     = 2 2 2 # number of buffer cells in error est
+amr.grid_eff        = 0.8
+
+# ================== TAGGING CRITERIA ================== #
+cns.refinement_indicators = refinebox gradp magvort #gradrYH2
+# For shocks
+cns.gradp.field_name = pressure
+cns.gradp.adjacent_difference_greater = 1.1e5
+cns.gradp.max_level = 3
+# For fuel
+#cns.gradrYH2.field_name = rho_H2
+#cns.gradrYH2.adjacent_difference_greater = 2e-5
+#cns.gradrYH2.max_level = 2
+# For boundary layer
+cns.magvort.vorticity_greater = 5e5 1e6
+cns.magvort.max_level = 2
+# Near injector
+cns.refinebox.in_box_lo = -0.4 0.0 -0.25
+cns.refinebox.in_box_hi =  0.5 0.5  0.25
+cns.refinebox.max_level = 3
+
+cns.refine_cutcells = 1
+cns.refine_cutcells_max_lev = 2
+
+# ==================== OUTPUT FILES ==================== #
+amr.checkpoint_files_output = 1
+amr.check_file      = chk    # root name of checkpoint file
+amr.check_int       = 100    # number of timesteps between checkpoints
+#amr.check_per # interval physical time between checkpoints
+
+amr.plot_files_output = 1
+amr.plot_file         = plt  # root name of plotfile
+amr.plot_int          = 100  # number of timesteps between plotfiles
+#amr.plot_per # interval physical time between plotfiles
+amr.derive_plot_vars  = pressure velocity MachNumber magvort shock_sensor
+cns.plot_rhoy = 0
+cns.plot_molefrac = 0
+cns.plot_massfrac = 1
+cns.plot_fields = 0
+
+# ================= PROBLEM PARAMETERS ================= #
+prob.T0 = 1370 # total temperature [K]
+prob.spark = 0
+prob.micka_fuel_cond = 1
+prob.do_bl = 0
+prob.make_bl_on_restart = 0
+prob.record_statistics = 1
+
+#prob.clean_aux_on_restart = 1
+#amr.plotfile_on_restart = 1
+#amr.restart = chk00000
