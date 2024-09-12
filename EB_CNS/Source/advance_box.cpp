@@ -13,7 +13,15 @@ void CNS::compute_dSdt_box(Box const& bx, Array4<const Real>& sarr,
 {
   BL_PROFILE("CNS::compute_dSdt_box()");
 
-  const int ncomp = UFA; // UFA because we don't want to change time averages
+#if NUM_FIELD > 0
+  // auto const& geomdata = geom.data();
+  // const Real x = geomdata.ProbLo(0) + (bx.bigEnd(0) + 0.5) * geomdata.CellSize(0);
+  // const bool update_fields = (x > -1.0) && (x < 5.0); // Do SF or just the mean? TODO: make this a tagging
+  const bool update_fields = true;
+#else
+  const bool update_fields = false;
+#endif
+  const int ncomp = update_fields ? UFA : NVAR; // we don't want to change time averages
   const Box& bxg2 = amrex::grow(bx, 2);
   const Box& bxg3 = amrex::grow(bx, 3);
   const auto dx = geom.CellSizeArray();
@@ -35,7 +43,7 @@ void CNS::compute_dSdt_box(Box const& bx, Array4<const Real>& sarr,
 
   // Store viscous fluxes separately in V/VSPDF
   std::array<FArrayBox, amrex::SpaceDim> vfluxfab;
-  const bool store_in_vflux = do_diffusion && (NUM_FIELD > 0) && do_vpdf;
+  const bool store_in_vflux = do_diffusion && do_vpdf && update_fields;
   if (store_in_vflux) {
     for (int dir = 0; dir < amrex::SpaceDim; ++dir) {
       vfluxfab[dir].resize(amrex::surroundingNodes(bx, dir), NVAR,
@@ -46,7 +54,9 @@ void CNS::compute_dSdt_box(Box const& bx, Array4<const Real>& sarr,
 
   // Advance
 #if NUM_FIELD > 0
-  for (int nf = 1; nf <= NUM_FIELD; ++nf)
+  const int nf_start = update_fields ? 1 : 0;
+  const int nf_end = update_fields ? NUM_FIELD : 0;
+  for (int nf = nf_start; nf <= nf_end; ++nf)
 #else
   const int nf = 0;
 #endif
@@ -69,9 +79,9 @@ void CNS::compute_dSdt_box(Box const& bx, Array4<const Real>& sarr,
       // Physical transport coefs
       if (do_visc) {
         BL_PROFILE("PelePhysics::get_transport_coeffs()");
-        amrex::Array4<amrex::Real> chi; // dummy Soret effect coef
+        Array4<Real> chi; // dummy Soret effect coef
         auto const* ltransparm = trans_parms.device_trans_parm();
-        amrex::launch(bxg2, [=] AMREX_GPU_DEVICE(amrex::Box const& tbx) {
+        amrex::launch(bxg2, [=] AMREX_GPU_DEVICE(Box const& tbx) {
           auto trans = pele::physics::PhysicsType::transport();
           trans.get_transport_coeffs(tbx, qar_yin, qar_Tin, qar_rhoin, rhoD, chi, mu,
                                      xi, lambda, ltransparm);
@@ -215,7 +225,54 @@ void CNS::compute_dSdt_box(Box const& bx, Array4<const Real>& sarr,
                                AMREX_D_DECL(flxfab[0]->array(), flxfab[1]->array(),
                                             flxfab[2]->array()),
                                dxinv);
-                     });  
+                     });
+
+#if NUM_FIELD > 0
+{
+  // BL_PROFILE("New_field_averaging");
+  // Copy mean field to all fields if not doing SF, average to mean if doing SF
+  for (int dir = 0; dir < amrex::SpaceDim; ++dir) {
+    const Box& flxbx = amrex::surroundingNodes(bx, dir);
+    auto const& flx = flxfab[dir]->array();
+
+    amrex::ParallelFor(
+      flxbx, NUM_FIELD, [=] AMREX_GPU_DEVICE(int i, int j, int k, int nfm1) {
+        const int nf = 1 + nfm1;
+        const Real fac = update_fields ? Real(1.0) / Real(NUM_FIELD) : 1.0;
+        const int from_id = update_fields ? nf * NVAR : 0;
+        const int to_id = update_fields ? 0 : nf * NVAR;
+
+        flx(i, j, k, to_id + URHO) += fac * flx(i, j, k, from_id + URHO);
+        AMREX_D_TERM(
+          flx(i, j, k, to_id + UMX) += fac * flx(i, j, k, from_id + UMX);
+          , flx(i, j, k, to_id + UMY) += fac * flx(i, j, k, from_id + UMY);
+          , flx(i, j, k, to_id + UMZ) += fac * flx(i, j, k, from_id + UMZ);)
+        flx(i, j, k, to_id + UEDEN) += fac * flx(i, j, k, from_id + UEDEN);
+        for (int ns = 0; ns < NUM_SPECIES; ++ns) {
+          flx(i, j, k, to_id + UFS + ns) += fac * flx(i, j, k, from_id + UFS + ns);
+        }
+      });
+  } // for dir
+
+  amrex::ParallelFor(
+    bx, NUM_FIELD, [=] AMREX_GPU_DEVICE(int i, int j, int k, int nfm1) {
+      const int nf = 1 + nfm1;
+      const Real fac = update_fields ? Real(1.0) / Real(NUM_FIELD) : 1.0;
+      const int from_id = update_fields ? nf * NVAR : 0;
+      const int to_id = update_fields ? 0 : nf * NVAR;
+
+      dsdt(i, j, k, to_id + URHO) += fac * dsdt(i, j, k, from_id + URHO);
+      AMREX_D_TERM(
+        dsdt(i, j, k, to_id + UMX) += fac * dsdt(i, j, k, from_id + UMX);
+        , dsdt(i, j, k, to_id + UMY) += fac * dsdt(i, j, k, from_id + UMY);
+        , dsdt(i, j, k, to_id + UMZ) += fac * dsdt(i, j, k, from_id + UMZ);)
+      dsdt(i, j, k, to_id + UEDEN) += fac * dsdt(i, j, k, from_id + UEDEN);
+      for (int ns = 0; ns < NUM_SPECIES; ++ns) {
+        dsdt(i, j, k, to_id + UFS + ns) += fac * dsdt(i, j, k, from_id + UFS + ns);
+      }
+    });
+}
+#endif
 
   // External source term
   if (do_ext_src) {

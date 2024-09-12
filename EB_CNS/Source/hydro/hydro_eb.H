@@ -15,8 +15,8 @@ AMREX_GPU_DEVICE AMREX_FORCE_INLINE void compute_hyp_wallflux(
 #if (AMREX_SPACEDIM == 3)
   const amrex::Real azm, const amrex::Real azp,
 #endif
-  amrex::GpuArray<amrex::Real, NVAR>& fluxw, bool eb_isothermal,
-  amrex::Real wall_temp) noexcept
+  amrex::GpuArray<amrex::Real, NVAR>& fluxw, bool /*eb_isothermal*/,
+  amrex::Real /*wall_temp*/) noexcept
 {
   using amrex::Real;
 
@@ -35,19 +35,21 @@ AMREX_GPU_DEVICE AMREX_FORCE_INLINE void compute_hyp_wallflux(
   auto eos = pele::physics::PhysicsType::eos();
   Real e, cs;
   eos.RYP2E(rho, y, p, e);
+  // Real T; // TODO for non ideal eos
+  // eos.RE2T(rho, e, y, T);
   e += 0.5 * (AMREX_D_TERM(u * u, +v * v, +w * w));
   eos.RPY2Cs(rho, p, y, cs);
 
   Real rhow, csw, ew;
-  if (eb_isothermal) {
-    eos.PYT2RE(p, y, wall_temp, rhow, ew);
-    ew += 0.5 * (AMREX_D_TERM(u * u, +v * v, +w * w));
-    eos.RPY2Cs(rhow, p, y, csw);
-  } else {
+  // if (eb_isothermal) {
+  //   eos.PYT2RE(p, y, wall_temp, rhow, ew); // TODO: 2 * wall_temp - T
+  //   ew += 0.5 * (AMREX_D_TERM(u * u, +v * v, +w * w));
+  //   eos.RPY2Cs(rhow, p, y, csw);
+  // } else {
     rhow = rho;
     csw = cs;
     ew = e;
-  }
+  // }
 
   hllc(rhow, AMREX_D_DECL(un, 0., 0.), p, csw, ew, y, rho, AMREX_D_DECL(-un, 0., 0.),
        p, cs, e, y, fluxw[URHO], AMREX_D_DECL(momfluxn, momfluxt1, momfluxt2),
@@ -58,25 +60,34 @@ AMREX_GPU_DEVICE AMREX_FORCE_INLINE void compute_hyp_wallflux(
   for (int n = 0; n < NUM_SPECIES; ++n) fluxw[UFS + n] *= apnorm;
   AMREX_D_TERM(fluxw[UMX] = (axm - axp) * momfluxn;
                , fluxw[UMY] = (aym - ayp) * momfluxn;
-               , fluxw[UMZ] = (azm - azp) * momfluxn;);
+               , fluxw[UMZ] = (azm - azp) * momfluxn;)
 }
 
 AMREX_GPU_DEVICE AMREX_FORCE_INLINE void eb_compute_div(
-  int i, int j, int k, IntVect const& blo, IntVect const& bhi,
-  Array4<const Real> const& q, Array4<Real> const& divu,
-  AMREX_D_DECL(Array4<Real const> const& u, Array4<Real const> const& v,
-               Array4<Real const> const& w),
-  AMREX_D_DECL(Array4<Real> const& fx, Array4<Real> const& fy,
-               Array4<Real> const& fz),
-  Array4<EBCellFlag const> const& flag, Array4<Real const> const& vfrc,
-  Array4<Real const> const& bcent, Array4<Real const> const& coefs,
-  AMREX_D_DECL(Array4<Real const> const& apx, Array4<Real const> const& apy,
-               Array4<Real const> const& apz),
-  AMREX_D_DECL(Array4<Real const> const& fcx, Array4<Real const> const& fcy,
-               Array4<Real const> const& fcz),
-  GpuArray<Real, AMREX_SPACEDIM> const& dxinv, bool do_visc, bool eb_no_slip,
-  bool eb_isothermal, const Real eb_wall_temp)
+  int i, int j, int k, amrex::IntVect const& blo,
+  amrex::IntVect const& bhi, amrex::Array4<const amrex::Real> const& q,
+  amrex::Array4<amrex::Real> const& divu,
+  AMREX_D_DECL(Array4<amrex::Real const> const& u,
+               amrex::Array4<amrex::Real const> const& v,
+               amrex::Array4<amrex::Real const> const& w),
+  AMREX_D_DECL(Array4<amrex::Real> const& fx, amrex::Array4<amrex::Real> const& fy,
+               amrex::Array4<amrex::Real> const& fz),
+  amrex::Array4<EBCellFlag const> const& flag,
+  amrex::Array4<amrex::Real const> const& vfrc,
+  amrex::Array4<amrex::Real const> const& bcent,
+  amrex::Array4<amrex::Real const> const& coefs,
+  AMREX_D_DECL(amrex::Array4<amrex::Real const> const& apx,
+               amrex::Array4<amrex::Real const> const& apy,
+               amrex::Array4<amrex::Real const> const& apz),
+  AMREX_D_DECL(amrex::Array4<amrex::Real const> const& fcx,
+               amrex::Array4<amrex::Real const> const& fcy,
+               amrex::Array4<amrex::Real const> const& fcz),
+  amrex::GpuArray<amrex::Real, AMREX_SPACEDIM> const& dxinv, const bool do_hydro,
+  const bool do_visc, const bool eb_no_slip, const bool eb_isothermal,
+  const amrex::Real eb_wall_temp, const bool eb_wall_model)
 {
+  using amrex::Real;
+
   AMREX_D_TERM(bool x_high = (i == bhi[0]);, bool y_high = (j == bhi[1]);
                , bool z_high = (k == bhi[2]));
   bool valid_cell =
@@ -261,27 +272,62 @@ AMREX_GPU_DEVICE AMREX_FORCE_INLINE void eb_compute_div(
     } // end loop n
 
     // Wall fluxes
-    GpuArray<Real, NVAR> flux_hyp_wall = {0.0};
-    Real sp[NUM_SPECIES];
-    for (int n = 0; n < NUM_SPECIES; ++n) sp[n] = q(i, j, k, QFS + n);
-    compute_hyp_wallflux(
-      q(i, j, k, QRHO), AMREX_D_DECL(q(i, j, k, QU), q(i, j, k, QV), q(i, j, k, QW)),
-      q(i, j, k, QPRES), sp, apx(i, j, k), apx(i + 1, j, k), apy(i, j, k),
-      apy(i, j + 1, k),
+    amrex::GpuArray<Real, NVAR> flux_hyp_wall = {0.0};
+    if (do_hydro) {
+      Real sp[NUM_SPECIES];
+      for (int n = 0; n < NUM_SPECIES; ++n) sp[n] = q(i, j, k, QFS + n);
+      compute_hyp_wallflux(
+        q(i, j, k, QRHO),
+        AMREX_D_DECL(q(i, j, k, QU), q(i, j, k, QV), q(i, j, k, QW)),
+        q(i, j, k, QPRES), sp, apx(i, j, k), apx(i + 1, j, k), apy(i, j, k),
+        apy(i, j + 1, k),
 #if (AMREX_SPACEDIM == 3)
-      apz(i, j, k), apz(i, j, k + 1),
+        apz(i, j, k), apz(i, j, k + 1),
 #endif
-      flux_hyp_wall, eb_isothermal, eb_wall_temp);
+        flux_hyp_wall, eb_isothermal, eb_wall_temp);
+    }
 
-    GpuArray<Real, NVAR> flux_diff_wall = {0.0};
+#ifdef MONITOR_PROBLEM_CELL
+    if (std::isnan(flux_hyp_wall[URHO]) || std::isnan(flux_hyp_wall[UMX]) ||
+        std::isnan(flux_hyp_wall[UMY]) || std::isnan(flux_hyp_wall[UMZ]) ||
+        std::isnan(flux_hyp_wall[UEDEN])) {
+      std::cout << "flux_hyp_wall at " << i << "," << j << "," << k << " = ";
+      for (int n = 0; n < NVAR; ++n) {
+        std::cout << flux_hyp_wall[n] << " ";
+      }
+      std::cout << std::endl;
+      
+      std::cout << "q = ";
+      for (int n = 0; n < NPRIM; ++n) {
+        std::cout << q(i,j,k,n) << " ";
+      }
+      std::cout << std::endl;
+    }
+#endif
+
+    amrex::GpuArray<Real, NVAR> flux_diff_wall = {0.0};
     if (do_visc && (eb_no_slip || eb_isothermal)) {
       compute_diff_wallflux(i, j, k, q, coefs, bcent, apx(i, j, k), apx(i + 1, j, k),
                             apy(i, j, k), apy(i, j + 1, k),
 #if (AMREX_SPACEDIM == 3)
                             apz(i, j, k), apz(i, j, k + 1),
 #endif
-                            flux_diff_wall, eb_no_slip, eb_isothermal, eb_wall_temp);
+                            dxinv, flux_diff_wall, eb_no_slip, eb_isothermal,
+                            eb_wall_temp, eb_wall_model);
     }
+
+#ifdef MONITOR_PROBLEM_CELL
+    if (std::isnan(flux_diff_wall[URHO]) || std::isnan(flux_diff_wall[UMX]) ||
+        std::isnan(flux_diff_wall[UMY]) || std::isnan(flux_diff_wall[UMZ]) ||
+        std::isnan(flux_diff_wall[UEDEN])) {
+      std::cout << "flux_diff_wall at " << i << "," << j << "," << k << " = ";
+      for (int n = 0; n < NVAR; ++n) {
+        std::cout << flux_diff_wall[n] << " ";
+      }
+      std::cout << std::endl;
+      amrex::Abort();
+    }
+#endif
 
     for (int n = 0; n < NVAR; ++n) {
       // Assume dx == dy == dz, A_wall/V = apnorm/dx/vfrc
@@ -295,6 +341,27 @@ AMREX_GPU_DEVICE AMREX_FORCE_INLINE void eb_compute_div(
       // the divergence of fluxes.
       divu(i, j, k, n) *= -1.0;
     }
+
+#ifdef MONITOR_PROBLEM_CELL
+  // Monitor problem cell
+  for (int n = 0; n < NVAR; ++n) {
+    if (isnan(divu(i, j, k, n))) {
+      std::cout << "div_eb(" << i << "," << j << "," << k << "," << n
+                << ") is nan = " << divu(i, j, k, n) << '\n';
+      std::cout << "fx=" << fx(i, j, k, n) << "/" << u(i, j, k, n) << " "
+                << fx(i + 1, j, k, n) << "/" << u(i + 1, j, k, n) << '\n';
+#if AMREX_SPACEDIM > 1
+      std::cout << "fy=" << fy(i, j, k, n) << "/" << v(i, j, k, n) << " "
+                << fy(i, j + 1, k, n) << "/" << v(i, j + 1, k, n) << '\n';
+#endif
+#if AMREX_SPACEDIM == 3
+      std::cout << "fz=" << fz(i, j, k, n) << "/" << w(i, j, k, n) << " "
+                << fz(i, j, k + 1, n) << "/" << w(i, j, k + 1, n) << '\n';
+#endif
+    // amrex::Abort();
+    }
+  }
+#endif
   } // end if cut-cell
 }
 

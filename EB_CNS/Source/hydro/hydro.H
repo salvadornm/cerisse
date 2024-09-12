@@ -8,7 +8,7 @@
 #include "PelePhysics.H"
 #include "index_macros.H"
 
-// #define MONITOR_PROBLEM_CELL
+// #define MONITOR_PROBLEM_CELL  // Debugging only; Cannot be used in GPU!
 
 /**
  * \brief Convert state variable to primitive variable
@@ -36,7 +36,7 @@ cns_ctoprim(int i, int j, int k, int ns, amrex::Array4<amrex::Real const> const&
   amrex::Real Y[NUM_SPECIES];
   for (int n = 0; n < NUM_SPECIES; ++n) {
     Y[n] = u(i, j, k, ns + UFS + n) * rhoinv;
-    q(i, j, k, QFS + n) = Y[n];
+    q(i, j, k, QFS + n) = std::max(Y[n], 0.0);
   }
 
   auto eos = pele::physics::PhysicsType::eos();
@@ -54,7 +54,6 @@ cns_ctoprim(int i, int j, int k, int ns, amrex::Array4<amrex::Real const> const&
   q(i, j, k, QC) = cs;
   q(i, j, k, QG) = gamma;
   q(i, j, k, QEINT) = ei;
-  // q(i, j, k, QTEMP) = T;
   q(i, j, k, QTEMP) = u(i, j, k, ns + UTEMP);
   q(i, j, k, QWBAR) = wbar;
 
@@ -63,8 +62,16 @@ cns_ctoprim(int i, int j, int k, int ns, amrex::Array4<amrex::Real const> const&
   // std::ostringstream ss;
   std::ostream& ss = std::cout;
 
-  if ((T <= 0.0) || amrex::isnan(cs) || amrex::isnan(ux) || (rho <= 0.0) ||
-      (p <= 0.0)) {
+  bool any_Y_lt_0 = false;
+  for (int n = 0; n < NUM_SPECIES; ++n) {
+    if (!std::isgreaterequal(Y[n], -1e-5)) {
+      any_Y_lt_0 = true;
+      break;
+    }
+  }
+  if ((T <= 0.0) || (T > 5000.0) || (q(i, j, k, QTEMP) <= 0.0) ||
+      (q(i, j, k, QTEMP) > 5000.0) || !std::isgreaterequal(cs, 0.0) || amrex::isnan(ux) ||
+      !std::isgreaterequal(rho, 0.0) || !std::isgreaterequal(p, 0.0) || any_Y_lt_0) {
     ss << "cns_ctoprim @" << i << "," << j << "," << k << "(ns=" << ns
        << "): rho=" << rho << " T=" << u(i, j, k, ns + UTEMP) << "/" << T
        << " p=" << p << " cs=" << cs << " gamma=" << gamma << " u=" << ux

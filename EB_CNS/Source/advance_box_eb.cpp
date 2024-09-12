@@ -29,8 +29,16 @@ void CNS::compute_dSdt_box_eb(
   Array4<const int> const& lev_mask, Real dt, Array4<const Real>& shock_sensor)
 {
   BL_PROFILE("CNS::compute_dSdt_box_eb()");
-
-  const int ncomp = UFA; // UFA because we don't want to change time averages
+  
+#if NUM_FIELD > 0
+  // auto const& geomdata = geom.data();
+  // const Real x = geomdata.ProbLo(0) + (bx.bigEnd(0) + 0.5) * geomdata.CellSize(0);
+  // const bool update_fields = (x > -1.0) && (x < 5.0); // Do SF or just the mean? TODO: make this a tagging
+  const bool update_fields = true;
+#else
+  const bool update_fields = false;
+#endif
+  const int ncomp = update_fields ? UFA : NVAR;
   const Box& bxg3 = amrex::grow(bx, 3);
   const Box& bxg4 = amrex::grow(bx, 4);
   const Box& bxg5 = amrex::grow(bx, 5);
@@ -60,7 +68,8 @@ void CNS::compute_dSdt_box_eb(
   }
   // Store viscous fluxes separately in V/VSPDF
   std::array<FArrayBox, amrex::SpaceDim> vfluxfab;
-  const bool store_in_vflux = do_diffusion && (NUM_FIELD > 0) && do_vpdf;
+
+  const bool store_in_vflux = do_diffusion && do_vpdf && update_fields;  
   if (store_in_vflux) {
     for (int dir = 0; dir < amrex::SpaceDim; ++dir) {
       vfluxfab[dir].resize(amrex::surroundingNodes(bxg3, dir), NVAR,
@@ -71,7 +80,9 @@ void CNS::compute_dSdt_box_eb(
 
   // Advance
 #if NUM_FIELD > 0
-  for (int nf = 1; nf <= NUM_FIELD; ++nf)
+  const int nf_start = update_fields ? 1 : 0;
+  const int nf_end = update_fields ? NUM_FIELD : 0;
+  for (int nf = nf_start; nf <= nf_end; ++nf)
 #else
   const int nf = 0;
 #endif
@@ -222,7 +233,7 @@ void CNS::compute_dSdt_box_eb(
 
   // Compute flux divergence for EB
 #if NUM_FIELD > 0
-  for (int nf = 0; nf <= NUM_FIELD; ++nf)
+  for (int nf = nf_start; nf <= nf_end; ++nf)
   // #else const int nf = 0; declared before
 #endif
   {
@@ -251,7 +262,8 @@ void CNS::compute_dSdt_box_eb(
       eb_compute_div(i, j, k, blo, bhi, q, divc, AMREX_D_DECL(fx_in, fy_in, fz_in),
                      AMREX_D_DECL(fx_out, fy_out, fz_out), flag, vfrac, bcent, coefs,
                      AMREX_D_DECL(apx, apy, apz), AMREX_D_DECL(fcx, fcy, fcz), dxinv,
-                     do_visc, eb_no_slip, eb_isothermal, eb_wall_temp);
+                     do_hydro, do_visc, eb_no_slip, eb_isothermal, eb_wall_temp,
+                     eb_wall_model);
     });
   } // for fields
 
@@ -292,6 +304,107 @@ void CNS::compute_dSdt_box_eb(
   }
 
   //////////////////////// END EB CALCULATIONS ////////////////////////
+
+#if NUM_FIELD > 0
+{
+  // BL_PROFILE("New_field_averaging_EB");
+  // Copy mean field to all fields if not doing SF, average to mean if doing SF
+  for (int dir = 0; dir < amrex::SpaceDim; ++dir) {
+    const Box& flxbx = amrex::surroundingNodes(bx, dir);
+    auto const& flx = flxfab[dir]->array();
+
+    amrex::ParallelFor(
+      flxbx, NUM_FIELD, [=] AMREX_GPU_DEVICE(int i, int j, int k, int nfm1) {
+        const int nf = 1 + nfm1;
+        const Real fac = update_fields ? Real(1.0) / Real(NUM_FIELD) : 1.0;
+        const int from_id = update_fields ? nf * NVAR : 0;
+        const int to_id = update_fields ? 0 : nf * NVAR;
+
+        flx(i, j, k, to_id + URHO) += fac * flx(i, j, k, from_id + URHO);
+        AMREX_D_TERM(
+          flx(i, j, k, to_id + UMX) += fac * flx(i, j, k, from_id + UMX);
+          , flx(i, j, k, to_id + UMY) += fac * flx(i, j, k, from_id + UMY);
+          , flx(i, j, k, to_id + UMZ) += fac * flx(i, j, k, from_id + UMZ);)
+        flx(i, j, k, to_id + UEDEN) += fac * flx(i, j, k, from_id + UEDEN);
+        for (int ns = 0; ns < NUM_SPECIES; ++ns) {
+          flx(i, j, k, to_id + UFS + ns) += fac * flx(i, j, k, from_id + UFS + ns);
+        }
+      });
+  } // for dir
+
+  amrex::ParallelFor(
+    bx, NUM_FIELD, [=] AMREX_GPU_DEVICE(int i, int j, int k, int nfm1) {
+      const int nf = 1 + nfm1;
+      const Real fac = update_fields ? Real(1.0) / Real(NUM_FIELD) : 1.0;
+      const int from_id = update_fields ? nf * NVAR : 0;
+      const int to_id = update_fields ? 0 : nf * NVAR;
+
+      dsdt(i, j, k, to_id + URHO) += fac * dsdt(i, j, k, from_id + URHO);
+      AMREX_D_TERM(
+        dsdt(i, j, k, to_id + UMX) += fac * dsdt(i, j, k, from_id + UMX);
+        , dsdt(i, j, k, to_id + UMY) += fac * dsdt(i, j, k, from_id + UMY);
+        , dsdt(i, j, k, to_id + UMZ) += fac * dsdt(i, j, k, from_id + UMZ);)
+      dsdt(i, j, k, to_id + UEDEN) += fac * dsdt(i, j, k, from_id + UEDEN);
+      for (int ns = 0; ns < NUM_SPECIES; ++ns) {
+        dsdt(i, j, k, to_id + UFS + ns) += fac * dsdt(i, j, k, from_id + UFS + ns);
+      }
+    });
+
+//   // Copy mean field to all fields if not doing SF
+//   if (!update_fields) {
+//     for (int dir = 0; dir < amrex::SpaceDim; ++dir) {
+//       const Box& flxbx = amrex::surroundingNodes(bx, dir);
+//       auto const& flx = flxfab[dir]->array();
+
+//       amrex::ParallelFor(
+//         flxbx, NUM_FIELD, [=] AMREX_GPU_DEVICE(int i, int j, int k, int nfm1) {
+//           const int nf = 1 + nfm1;
+//           flx(i, j, k, nf * NVAR + URHO) = flx(i, j, k, URHO);
+//           AMREX_D_TERM(flx(i, j, k, nf * NVAR + UMX) = flx(i, j, k, UMX);
+//                        , flx(i, j, k, nf * NVAR + UMY) = flx(i, j, k, UMY);
+//                        , flx(i, j, k, nf * NVAR + UMZ) = flx(i, j, k, UMZ);)
+//           flx(i, j, k, nf * NVAR + UEDEN) = flx(i, j, k, UEDEN);
+//           for (int ns = 0; ns < NUM_SPECIES; ++ns) {
+//             flx(i, j, k, nf * NVAR + UFS + ns) = flx(i, j, k, UFS + ns);
+//           }
+//         });
+//     } // for dir
+
+//     amrex::ParallelFor(
+//       bx, NUM_FIELD, [=] AMREX_GPU_DEVICE(int i, int j, int k, int nfm1) {
+//         const int nf = 1 + nfm1;
+//         dsdt(i, j, k, nf * NVAR + URHO) = dsdt(i, j, k, URHO);
+//         AMREX_D_TERM(dsdt(i, j, k, nf * NVAR + UMX) = dsdt(i, j, k, UMX);
+//                      , dsdt(i, j, k, nf * NVAR + UMY) = dsdt(i, j, k, UMY);
+//                      , dsdt(i, j, k, nf * NVAR + UMZ) = dsdt(i, j, k, UMZ);)
+//         dsdt(i, j, k, nf * NVAR + UEDEN) = dsdt(i, j, k, UEDEN);
+//         for (int ns = 0; ns < NUM_SPECIES; ++ns) {
+//           dsdt(i, j, k, nf * NVAR + UFS + ns) = dsdt(i, j, k, UFS + ns);
+//         }
+//       });
+//   } else {
+//     // Average to mean
+//     for (int dir = 0; dir < amrex::SpaceDim; ++dir) {
+//       const Box& flxbx = amrex::surroundingNodes(bx, dir);
+//       auto const& flx = flxfab[dir]->array();
+
+//       amrex::ParallelFor(
+//         flxbx, NUM_FIELD, [=] AMREX_GPU_DEVICE(int i, int j, int k, int nfm1) {
+//           const int nf = 1 + nfm1;
+//           const Real invNF = Real(1.0) / Real(NUM_FIELD);
+//           flx(i, j, k, URHO) += invNF * flx(i, j, k, nf * NVAR + URHO);
+//           AMREX_D_TERM(flx(i, j, k, UMX) += invNF * flx(i, j, k, nf * NVAR + UMX);
+//                        , flx(i, j, k, UMY) += invNF * flx(i, j, k, nf * NVAR + UMY);
+//                        , flx(i, j, k, UMZ) += invNF * flx(i, j, k, nf * NVAR + UMZ);)
+//           flx(i, j, k, UEDEN) += invNF * flx(i, j, k, nf * NVAR + UEDEN);
+//           for (int ns = 0; ns < NUM_SPECIES; ++ns) {
+//             flx(i, j, k, UFS + ns) += invNF * flx(i, j, k, nf * NVAR + UFS + ns);
+//           }          
+//         });
+//     } // for dir
+//   }
+}
+#endif
 
   // External source term
   if (do_ext_src) {

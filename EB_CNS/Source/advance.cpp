@@ -79,7 +79,9 @@ Real CNS::advance(Real time, Real dt, int iteration, int ncycle)
         }
       }
       enforce_consistent_state(S_new); // Enforce rho = sum(rhoY) and clip temp
-
+#if (NUM_FIELD > 0)
+      computeAvg(S_new);
+#endif
       // RK2 stage 2: U^{n+1} = U^n + 0.5*dt*(dUdt^n + dUdt^{n+1}) + dt*I_R^{n+1}
       if (verbose > 0) { amrex::Print() << " >> RK Step 2: Computing dSdt^{n+1}\n"; }
       FillPatch(*this, Sborder, NUM_GROW, time + dt, State_Type, 0, UFA);
@@ -120,6 +122,9 @@ Real CNS::advance(Real time, Real dt, int iteration, int ncycle)
         react_state(time, dt);
 
         enforce_consistent_state(S_new); // Enforce rho = sum(rhoY)
+#if (NUM_FIELD > 0)
+        computeAvg(S_new);
+#endif
       }
     }
   } else {
@@ -176,13 +181,13 @@ void CNS::compute_dSdt(const MultiFab& S, MultiFab& dSdt, Real dt,
 
     for (MFIter mfi(S, TilingIfNotGPU()); mfi.isValid(); ++mfi) {
       const Box& bx = mfi.tilebox();
-      amrex::Real wt = amrex::ParallelDescriptor::second();
+      Real wt = amrex::ParallelDescriptor::second();
+      
+      dSdt[mfi].setVal<RunOn::Device>(0.0, bx, 0, ncomp);
 
 #if CNS_USE_EB
       const auto& flag = flags[mfi];
-      if (flag.getType(bx) == FabType::covered) {
-        dSdt[mfi].setVal<RunOn::Device>(0.0, bx, 0, ncomp);
-      } else
+      if (flag.getType(bx) != FabType::covered)
 #endif
       {
         // flux is used to store centroid flux needed for reflux
