@@ -7,6 +7,7 @@
 #include <cmath>
 
 #include "index_macros.H"
+#include "wall_model.H"
 
 AMREX_GPU_DEVICE AMREX_FORCE_INLINE void
 cns_diff_species_eb(amrex::IntVect const& iv, const int idir,
@@ -147,18 +148,17 @@ cns_diff_eb(const int i, const int j, const int k, const int d1,
   cns_diff_species_eb(iv, d1, q, coeffs, dxinv, flx);
 }
 
-AMREX_GPU_DEVICE AMREX_FORCE_INLINE Real compute_interp1d(amrex::Real cym,
-                                                          amrex::Real cy0,
-                                                          amrex::Real cyp,
-                                                          Array1D<Real, 1, 3>& v)
+AMREX_GPU_DEVICE AMREX_FORCE_INLINE amrex::Real
+compute_interp1d(amrex::Real cym, amrex::Real cy0, amrex::Real cyp,
+                 amrex::Array1D<amrex::Real, 1, 3>& v)
 {
   Real x = cym * v(1) + cy0 * v(2) + cyp * v(3);
   return x;
 }
 
-AMREX_GPU_DEVICE AMREX_FORCE_INLINE Real
-compute_interp2d(amrex::Real cym, amrex::Real cy0, amrex::Real cyp, amrex::Real czm,
-                 amrex::Real cz0, amrex::Real czp, Array2D<Real, 1, 3, 1, 3>& v)
+AMREX_GPU_DEVICE AMREX_FORCE_INLINE amrex::Real compute_interp2d(
+  amrex::Real cym, amrex::Real cy0, amrex::Real cyp, amrex::Real czm,
+  amrex::Real cz0, amrex::Real czp, amrex::Array2D<amrex::Real, 1, 3, 1, 3>& v)
 {
   Real x = czm * (cym * v(1, 1) + cy0 * v(2, 1) + cyp * v(3, 1)) +
            cz0 * (cym * v(1, 2) + cy0 * v(2, 2) + cyp * v(3, 2)) +
@@ -172,8 +172,9 @@ AMREX_GPU_DEVICE AMREX_FORCE_INLINE void compute_diff_wallflux(
   amrex::Array4<amrex::Real const> const& coefs,
   amrex::Array4<amrex::Real const> const& bcent, const amrex::Real axm,
   const amrex::Real axp, const amrex::Real aym, const amrex::Real ayp,
+  const amrex::GpuArray<amrex::Real, 2> dxinv,
   amrex::GpuArray<amrex::Real, NVAR>& viscw, bool eb_no_slip, bool eb_isothermal,
-  amrex::Real eb_wall_temp) noexcept
+  amrex::Real eb_wall_temp, const bool do_wall_model) noexcept
 {
   //  This implementation assumes adiabatic or isothermal walls
 
@@ -184,7 +185,7 @@ AMREX_GPU_DEVICE AMREX_FORCE_INLINE void compute_diff_wallflux(
   Real dapx = axp - axm;
   Real dapy = ayp - aym;
 
-  Real apnorm = std::sqrt(dapx * dapx + dapy * dapy);
+  Real apnorm = std::sqrt(dapx * dapx + dapy * dapy); // this is cut-face area / dx
   if (apnorm <= 0.0) amrex::Abort("compute_diff_wallflux: we are in trouble.");
 
   Real apnorminv = 1.0 / apnorm;
@@ -264,6 +265,12 @@ AMREX_GPU_DEVICE AMREX_FORCE_INLINE void compute_diff_wallflux(
     }
     T2 = compute_interp1d(cym, cy0, cyp, v);
 
+    // Tangent pressure gradient for wall model
+
+    // Real p1 = q(i + 2 * is, iyit - 1, QPRES);
+    // Real p2 = q(i + 2 * is, iyit + 1, QPRES);
+    // dpdy = (p2 + p1) * yit + 0.5 * (p2 - p1);
+
   } else {
     // x line
     Real s = -anrmy > 0. ? 1. : -1.;
@@ -309,50 +316,50 @@ AMREX_GPU_DEVICE AMREX_FORCE_INLINE void compute_diff_wallflux(
       v(ii) = q(ixit - 2 + ii, j + 2 * is, k, QTEMP);
     }
     T2 = compute_interp1d(cxm, cx0, cxp, v);
+
+    // Tangent pressure gradient for wall model
+
+    // Real p1 = q(ixit - 1, j + 2 * is, k, QPRES);
+    // Real p2 = q(ixit + 1, j + 2 * is, k, QPRES);
+    // dpdx = ((p2 + p1) * xit + 0.5 * (p2 - p1));
   }
+  // Real dpdt = - dpdx * anrmy - dpdy * anrmx;
 
-  // compute derivatives on the wall given that velocity is zero on the wall.
-
-  Real ddinv = 1. / (d1 * d2 * (d2 - d1));
-
-  // get transport coefficients
-  amrex::Real mu, xi, lam;
+  // get density and transport coefficients 
+  Real rho, mu, xi, lam;
+  Real p = q(i, j, k, QPRES), Y[NUM_SPECIES]; // assume dp/dn, dY/dn ~ 0
+  for (int n = 0; n < NUM_SPECIES; ++n) { Y[n] = q(i, j, k, QFS + n); }
   if (eb_isothermal) {
     auto trans = pele::physics::PhysicsType::transport();
     auto const* ltransparm = CNS::trans_parms.device_trans_parm();
-    amrex::Real rho, dummy2, dummy3, y[NUM_SPECIES];
-
-    for (int n = 0; n < NUM_SPECIES; ++n) y[n] = q(i, j, k, QFS + n);
-
     auto eos = pele::physics::PhysicsType::eos();
-    eos.PYT2R(q(i, j, k, QPRES), y, eb_wall_temp, rho); // assume dp/dn ~ 0
+    eos.PYT2R(p, Y, eb_wall_temp, rho);
 
     const bool get_xi = true, get_mu = true, get_lam = true, get_Ddiag = false,
                get_chi = false;
     trans.transport(get_xi, get_mu, get_lam, get_Ddiag, get_chi, eb_wall_temp, rho,
-                    y, nullptr, nullptr, mu, xi, lam, ltransparm);
-
+                    Y, nullptr, nullptr, mu, xi, lam, ltransparm);
   } else {
     // Adiabatic wall dT/dn ~ 0
+    rho = q(i, j, k, QRHO);
     mu = coefs(i, j, k, CMU);
     xi = coefs(i, j, k, CXI);
     lam = coefs(i, j, k, CLAM);
   }
 
+  Real ddinv = 1. / (d1 * d2 * (d2 - d1));
+
   if (eb_no_slip) {
-    Real dudn =
-      -ddinv * (d2 * d2 * u1 -
-                d1 * d1 * u2); // note that the normal vector points toward the wall
+    // compute derivatives on the wall given that velocity is zero on the wall
+    // note that the normal vector points toward the wall
+    Real dudn = -ddinv * (d2 * d2 * u1 - d1 * d1 * u2);
     Real dvdn = -ddinv * (d2 * d2 * v1 - d1 * d1 * v2);
 
     // transform them to d/dx, d/dy and d/dz given transverse derivatives are zero
-
     Real dudx = dudn * anrmx;
     Real dudy = dudn * anrmy;
-
     Real dvdx = dvdn * anrmx;
     Real dvdy = dvdn * anrmy;
-
     Real divu = dudx + dvdy;
 
     Real tautmp = (xi - (2.0 / 3.0) * mu) * divu;
@@ -366,11 +373,50 @@ AMREX_GPU_DEVICE AMREX_FORCE_INLINE void compute_diff_wallflux(
   }
 
   if (eb_isothermal) {
-    Real dTdn = ddinv * (d2 * d2 * T1 - d1 * d1 * T2 +
-                         (d1 * d1 - d2 * d2) *
-                           eb_wall_temp); // normal (into cell) temp gradient
+    // normal (into cell) temp gradient
+    Real dTdn =
+      ddinv * (d2 * d2 * T1 - d1 * d1 * T2 + (d1 * d1 - d2 * d2) * eb_wall_temp);
 
-    viscw[UEDEN] = apnorm * lam * dTdn; // coefs(i,j,k,CLAM)
+    viscw[UEDEN] = apnorm * lam * dTdn;
+  }
+
+  // Modify if using a wall model
+  if (do_wall_model) {
+    // Check y+
+    const Real dx = 1.0 / dxinv[0]; // dx == dy
+    const Real cfarea = apnorm * dx; // cut-face area / dx
+    Real tau = std::sqrt(viscw[UMX] * viscw[UMX] + viscw[UMY] * viscw[UMY]) / cfarea;
+    Real utau = std::sqrt(tau / rho);
+    Real yplus = rho * utau / mu * dx;
+
+    if (yplus > 11.0) {
+      // Wall model
+      // LawOfTheWall wm;
+      EquilibriumODE wm;
+      Real u_parallel = u2 * anrmy - v2 * anrmx; // u dot tangent
+      Real ts = (u_parallel > 0.0) ? 1.0 : -1.0;
+      u_parallel *= ts; // abs(u)
+      if (u_parallel > 1e-3 && T2 > 90.0 && T2 < 5000.0 && rho > 0.0) {
+        Real T_wall = eb_isothermal ? eb_wall_temp : -1.0;
+        Real h = d2 * dx;
+        Real tauw, qw;
+        wm.parallel_wall_stress(u_parallel, T2, rho, Y, h, mu, lam, T_wall, tauw, qw);
+        // Real dudy = -ddinv * (d2 * d2 * u1 - d1 * d1 * u2);
+        // std::cout << u_parallel << " " << h << " " << mu*dudy/dx << " " << tau << "  ";
+        // std::cout << "y+: " << yplus << " -> " << rho * std::sqrt(tauw / rho) / mu * dx;
+        // std::cout << "  viscous wall stress: " << tau * cfarea << " (" << viscw[UMX] << ", " << viscw[UMY]
+        //           << ") -> ";
+
+        viscw[UMX] = cfarea * ts * anrmy * tauw;
+        viscw[UMY] = -cfarea * ts * anrmx * tauw;
+        // std::cout << tauw * cfarea << " (" << viscw[UMX] << ", " << viscw[UMY] << ")";
+        viscw[UEDEN] = cfarea * qw;
+        // std::cout << "  " << apnorm << " (" << anrmx << ", " << anrmy << ")\n";
+      }
+    } 
+    // else {
+    //   std::cout << "y+: " << yplus << std::endl;
+    // }
   }
 }
 
@@ -382,8 +428,9 @@ AMREX_GPU_DEVICE AMREX_FORCE_INLINE void compute_diff_wallflux(
   amrex::Array4<amrex::Real const> const& bcent, const amrex::Real axm,
   const amrex::Real axp, const amrex::Real aym, const amrex::Real ayp,
   const amrex::Real azm, const amrex::Real azp,
+  const amrex::GpuArray<amrex::Real, 3> dxinv,
   amrex::GpuArray<amrex::Real, NVAR>& viscw, bool eb_no_slip, bool eb_isothermal,
-  amrex::Real eb_wall_temp) noexcept
+  amrex::Real eb_wall_temp, const bool do_wall_model) noexcept
 {
   //  This implementation assumes adiabatic or isothermal walls
 
@@ -695,25 +742,43 @@ AMREX_GPU_DEVICE AMREX_FORCE_INLINE void compute_diff_wallflux(
 
   Real ddinv = 1. / (d1 * d2 * (d2 - d1));
 
-  // get transport coefficients
-  amrex::Real mu, xi, lam;
+  // get density and transport coefficients
+  Real rho, mu, xi, lam;
+  Real p = q(i, j, k, QPRES), Y[NUM_SPECIES]; // assume dp/dn, dY/dn ~ 0
+  for (int n = 0; n < NUM_SPECIES; ++n) { Y[n] = q(i, j, k, QFS + n); }
   if (eb_isothermal) {
     auto trans = pele::physics::PhysicsType::transport();
     auto const* ltransparm = CNS::trans_parms.device_trans_parm();
-    amrex::Real rho, dummy2, y[NUM_SPECIES];
-    for (int n = 0; n < NUM_SPECIES; ++n) y[n] = q(i, j, k, QFS + n);
+    Real dummy2;
 
     auto eos = pele::physics::PhysicsType::eos();
-    eos.PYT2R(q(i, j, k, QPRES), y, eb_wall_temp, rho); // assume dp/dn ~ 0
+    eos.PYT2R(p, Y, eb_wall_temp, rho); // assume dp/dn ~ 0
 
-    trans.transport(true, true, true, false, false, eb_wall_temp, rho, y, nullptr,
+    trans.transport(true, true, true, false, false, eb_wall_temp, rho, Y, nullptr,
                     nullptr, mu, xi, lam, ltransparm);
   } else {
     // Adiabatic wall dT/dn ~ 0
+    rho = q(i, j, k, QRHO);
     mu = coefs(i, j, k, CMU);
     xi = coefs(i, j, k, CXI);
     lam = coefs(i, j, k, CLAM);
   }
+
+// #ifdef MONITOR_PROBLEM_CELL
+  // if (!std::isgreater(rho, 0.0) || !std::isgreater(mu, 0.0) ||
+  //     !std::isgreater(lam, 0.0)) {
+  //   std::cout << "p: " << p << ", Tw: " << eb_wall_temp << ", Y:";
+  //   for (int n = 0; n < NUM_SPECIES; ++n) { std::cout << Y[n] << " "; }
+  //   std::cout << " rho: " << rho << ", mu: " << mu << ", lam: " << lam << std::endl;
+  // }
+  // if (std::isnan(v1) || std::isnan(v2) || std::isnan(u1) || std::isnan(u2) ||
+  //     std::isnan(w1) || std::isnan(w2) || 
+  //     !std::isgreater(T1, 0.0) || !std::isgreater(T2, 0.0)) {
+  //   std::cout << "d1: " << d1 << ", d2: " << d2 << " v1: " << v1 << ", v2: " << v2
+  //             << ", u1: " << u1 << ", u2: " << u2 << ", w1: " << w1 << ", w2: " << w2
+  //             << ", T1: " << T1 << ", T2: " << T2 << std::endl;
+  // }
+// #endif
 
   if (eb_no_slip) {
     Real dudn =
@@ -759,6 +824,72 @@ AMREX_GPU_DEVICE AMREX_FORCE_INLINE void compute_diff_wallflux(
                            eb_wall_temp); // normal (into cell) temp gradient
 
     viscw[UEDEN] = apnorm * lam * dTdn;
+  }
+
+// #ifdef MONITOR_PROBLEM_CELL
+  // if (std::isnan(viscw[UMX]) || std::isnan(viscw[UMY]) || std::isnan(viscw[UMZ]) ||
+  //     std::isnan(viscw[UEDEN])) {
+  //   std::cout << "viscous wall flux: " << viscw[UMX] << ", " << viscw[UMY] << ", "
+  //             << viscw[UMZ] << ", " << viscw[UEDEN] << std::endl;
+  //   // amrex::Abort("Problem with wall flux");
+  // }
+// #endif
+
+  // Modify if using a wall model
+  if (do_wall_model) {
+    // Check y+
+    const Real dx = 1.0 / dxinv[0]; // dx == dy == dz
+    const Real cfarea = apnorm * dx; // cut-face area / dx
+    Real tau = std::sqrt(viscw[UMX] * viscw[UMX] + viscw[UMY] * viscw[UMY] +
+                         viscw[UMZ] * viscw[UMZ]) / cfarea;
+    Real utau = std::sqrt(tau / rho);
+    Real yplus = rho * utau / mu * dx;
+
+    if (yplus > 11.0) {
+      BL_PROFILE("EB_WallModel");
+      // Wall model
+      // LawOfTheWall wm;
+      EquilibriumODE wm;
+      // Tangent vectors (t1.n = 0, t2.t1 = 0, u.t2 = 0)
+      Real t1[3];
+      Real udotn = u2 * anrmx + v2 * anrmy + w2 * anrmz;
+      t1[0] = u2 - udotn * anrmx;
+      t1[1] = v2 - udotn * anrmy;
+      t1[2] = w2 - udotn * anrmz;
+      Real tnorm = std::sqrt(t1[0] * t1[0] + t1[1] * t1[1] + t1[2] * t1[2]);
+      t1[0] /= tnorm;
+      t1[1] /= tnorm;
+      t1[2] /= tnorm;
+      // if(std::abs(t1[0] * anrmx + t1[1] * anrmy + t1[2] * anrmz) > 1.e-10) {
+      //   std::cout << t1[0] << " " << t1[1] << " " << t1[2] << "; " 
+      //             << anrmx << " " << anrmy << " " << anrmz << "; "
+      //             << u2 << " " << v2 << " " << w2 << "; "
+      //             << std::abs(t1[0] * anrmx + t1[1] * anrmy + t1[2] * anrmz)
+      //             << std::endl;
+      //   amrex::Abort("Tangent vector is not orthogonal to the normal vector");
+      // }
+      Real u_parallel = u2 * t1[0] + v2 * t1[1] + w2 * t1[2]; // u dot tangent
+      Real ts = (u_parallel > 0.0) ? 1.0 : -1.0;
+      u_parallel *= ts; // abs(u)
+      if (u_parallel > 1e-3 && T2 > 90.0 && T2 < 5000.0 && rho > 0.0) {
+        Real T_wall = eb_isothermal ? eb_wall_temp : -1.0;
+        Real h = d2 * dx;
+        Real tauw, qw;
+        wm.parallel_wall_stress(u_parallel, T2, rho, Y, h, mu, lam, T_wall, tauw, qw);
+        // std::cout << "y+: " << yplus << " -> "
+        //           << rho * std::sqrt(tauw / rho) / mu * dx;
+        // std::cout << "  viscous wall stress: " << tau * cfarea << " (" << viscw[UMX]
+        //           << ", " << viscw[UMY] << ", " << viscw[UMY] << ") -> ";
+        viscw[UMX] = cfarea * ts * t1[0] * tauw;
+        viscw[UMY] = cfarea * ts * t1[1] * tauw;
+        viscw[UMZ] = cfarea * ts * t1[2] * tauw;
+        // std::cout << tauw * cfarea << " (" << viscw[UMX] << ", " << viscw[UMY]
+        //           << ", " << viscw[UMZ] << ")";
+        viscw[UEDEN] = cfarea * qw;
+        // std::cout << "  " << apnorm << " (" << anrmx << ", " << anrmy << ", "
+        //           << anrmz << ")\n";
+      }
+    }
   }
 }
 #endif

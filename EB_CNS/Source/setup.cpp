@@ -84,6 +84,319 @@ static void set_react_src_bc(BCRec& bc, const BCRec& phys_bc)
   }
 }
 
+
+void CNS::read_params()
+{
+  ParmParse pp("cns");
+  ParmParse pa("amr");
+
+  pp.query("v", verbose);
+  pp.query("cfl", cfl);
+  pp.query("fixed_dt", fixed_dt);
+  pp.query("dt_cutoff", dt_cutoff);
+  pp.query("dt_max_change", dt_max_change);
+  pp.query("check_message_int", check_message_int);
+
+#if CNS_USE_EB
+  // eb_weight in redist
+  pp.query("eb_weight", eb_weight);
+
+  pp.query("redistribution_type", redistribution_type);
+  if (redistribution_type != "StateRedist" && redistribution_type != "FluxRedist" &&
+      redistribution_type != "NoRedist") {
+    amrex::Abort(
+      "CNS: redistribution_type must be StateRedist or FluxRedist or NoRedist");
+  }
+
+  pp.query("eb_no_slip", eb_no_slip);
+  pp.query("eb_isothermal", eb_isothermal);
+  if (eb_isothermal) { pp.get("eb_wall_temp", eb_wall_temp); }
+  pp.query("eb_recon_mode", eb_recon_mode); // 0: fill stencil, 1: return to PLM
+
+  pp.query("eb_wall_model", eb_wall_model);
+#endif
+
+  pp.query("recon_char_var", recon_char_var);
+  pp.query("char_sys", char_sys);
+  if (char_sys != 0 && char_sys != 1) {
+    amrex::Abort("CNS: char_sys must be 0 (speed of sound) or 1 (gamma)");
+  }
+  // recon_scheme
+  //  1 -- piecewise constant; 2 -- piecewise linear; 3 -- WENO-Z 3rd order
+  //  4 -- WENO-JS 5th order;  5 -- WENO-Z 5th order; 6 -- TENO 5
+  pp.query("recon_scheme", recon_scheme);
+  if (recon_scheme == 2
+#if CNS_USE_EB
+      // because return to PLM near EBs, so give this option to users
+      || eb_recon_mode == 1
+#endif
+  ) {
+    pp.query("limiter_theta", plm_theta); // MUSCL limiter parameter
+  }
+  pp.query("use_hybrid_scheme", use_hybrid_scheme);
+  pp.query("teno_cutoff", teno_cutoff);
+
+  Vector<int> lo_bc(AMREX_SPACEDIM), hi_bc(AMREX_SPACEDIM);
+  pp.getarr("lo_bc", lo_bc, 0, AMREX_SPACEDIM);
+  pp.getarr("hi_bc", hi_bc, 0, AMREX_SPACEDIM);
+  for (int i = 0; i < AMREX_SPACEDIM; ++i) {
+    phys_bc.setLo(i, lo_bc[i]);
+    phys_bc.setHi(i, hi_bc[i]);
+  }
+
+  pp.query("do_reflux", do_reflux); // How can you not do reflux?!
+
+  pp.query("refine_dengrad_max_lev", refine_dengrad_max_lev);
+  int numvals = pp.countval("refine_dengrad");
+  int max_level;
+  pa.query("max_level", max_level);
+  if (numvals > 0) {
+    if (numvals == max_level) {
+      pp.queryarr("refine_dengrad", refine_dengrad);
+    } else if (max_level > 0) {
+      refine_dengrad.resize(max_level);
+      Vector<Real> refine_tmp;
+      pp.queryarr("refine_dengrad", refine_tmp);
+      int lev = 0;
+      for (; lev < std::min<int>(numvals, max_level); ++lev) {
+        refine_dengrad[lev] = refine_tmp[lev];
+      }
+      for (; lev < max_level; ++lev) {
+        refine_dengrad[lev] = refine_tmp[numvals - 1];
+      }
+    }
+  }
+
+#if CNS_USE_EB
+  pp.query("refine_cutcells", refine_cutcells);
+  pp.query("refine_cutcells_max_lev", refine_cutcells_max_lev);
+#endif
+
+  pp.query("refine_velgrad_max_lev", refine_velgrad_max_lev);
+  numvals = pp.countval("refine_velgrad");
+  if (numvals > 0) {
+    if (numvals == max_level) {
+      pp.queryarr("refine_velgrad", refine_velgrad);
+    } else if (max_level > 0) {
+      refine_velgrad.resize(max_level);
+      Vector<Real> refine_tmp;
+      pp.queryarr("refine_velgrad", refine_tmp);
+      int lev = 0;
+      for (; lev < std::min<int>(numvals, max_level); ++lev) {
+        refine_velgrad[lev] = refine_tmp[lev];
+      }
+      for (; lev < max_level; ++lev) {
+        refine_velgrad[lev] = refine_tmp[numvals - 1];
+      }
+    }
+  }
+
+  pp.query("refine_presgrad_max_lev", refine_presgrad_max_lev);
+  numvals = pp.countval("refine_presgrad");
+  if (numvals > 0) {
+    if (numvals == max_level) {
+      pp.queryarr("refine_presgrad", refine_presgrad);
+    } else if (max_level > 0) {
+      refine_presgrad.resize(max_level);
+      Vector<Real> refine_tmp;
+      pp.queryarr("refine_presgrad", refine_tmp);
+      int lev = 0;
+      for (; lev < std::min<int>(numvals, max_level); ++lev) {
+        refine_presgrad[lev] = refine_tmp[lev];
+      }
+      for (; lev < max_level; ++lev) {
+        refine_presgrad[lev] = refine_tmp[numvals - 1];
+      }
+    }
+  }
+
+  pp.query("refine_magvort_max_lev", refine_magvort_max_lev);
+  numvals = pp.countval("refine_magvort");
+  if (numvals > 0) {
+    if (numvals == max_level) {
+      pp.queryarr("refine_magvort", refine_magvort);
+    } else if (max_level > 0) {
+      refine_magvort.resize(max_level);
+      Vector<Real> refine_tmp;
+      pp.queryarr("refine_magvort", refine_tmp);
+      int lev = 0;
+      for (; lev < std::min<int>(numvals, max_level); ++lev) {
+        refine_magvort[lev] = refine_tmp[lev];
+      }
+      for (; lev < max_level; ++lev) {
+        refine_magvort[lev] = refine_tmp[numvals - 1];
+      }
+    }
+  }
+
+#if (NUM_FIELD > 0) // cannot calculate tke if no SF
+  pp.query("refine_tke_max_lev", refine_tke_max_lev);
+  numvals = pp.countval("refine_tke");
+  if (numvals > 0) {
+    if (numvals == max_level) {
+      pp.queryarr("refine_tke", refine_tke);
+    } else if (max_level > 0) {
+      refine_tke.resize(max_level);
+      Vector<Real> refine_tmp;
+      pp.queryarr("refine_tke", refine_tmp);
+      int lev = 0;
+      for (; lev < std::min<int>(numvals, max_level); ++lev) {
+        refine_tke[lev] = refine_tmp[lev];
+      }
+      for (; lev < max_level; ++lev) { refine_tke[lev] = refine_tmp[numvals - 1]; }
+    }
+  }
+#endif
+
+  int irefbox = 0;
+  Vector<Real> refboxlo, refboxhi;
+  int refbox_maxlev;
+  while (
+    pp.queryarr(("refine_box_lo_" + std::to_string(irefbox)).c_str(), refboxlo)) {
+    pp.getarr(("refine_box_hi_" + std::to_string(irefbox)).c_str(), refboxhi);
+    refine_boxes.emplace_back(refboxlo.data(), refboxhi.data());
+
+    refbox_maxlev = 10;
+    pp.query(("refine_box_max_level_" + std::to_string(irefbox)).c_str(),
+             refbox_maxlev);
+    refine_boxes_max_lev.emplace_back(refbox_maxlev);
+    ++irefbox;
+  }
+  if (!refine_boxes.empty()) {
+#ifdef AMREX_USE_GPU
+    dp_refine_boxes =
+      (RealBox*)The_Arena()->alloc(sizeof(RealBox) * refine_boxes.size());
+    Gpu::htod_memcpy_async(dp_refine_boxes, refine_boxes.data(),
+                           sizeof(RealBox) * refine_boxes.size());
+#else
+    dp_refine_boxes = refine_boxes.data();
+#endif
+  }
+
+  if (pp.queryarr("buffer_box_lo", refboxlo)) {
+    pp.getarr("buffer_box_hi", refboxhi);
+    buffer_box.setLo(refboxlo.data());
+    buffer_box.setHi(refboxhi.data());
+    if (!buffer_box.ok()) { amrex::Abort("CNS: buffer_box has negative volume"); }
+  }
+
+  pp.query("do_hydro", do_hydro);
+  pp.query("do_visc", do_visc);
+  pp.query("do_ext_src", do_ext_src);
+
+  pp.query("do_react", do_react);
+  pp.query("chem_integrator", chem_integrator);
+  pp.query("rk_reaction_iter", rk_reaction_iter);
+  pp.query("use_typical_vals_chem", use_typical_vals_chem);
+  pp.query("reset_typical_vals_int", reset_typical_vals_int);
+  pp.query("min_react_temp", min_react_temp);
+  pp.query("clip_temp", clip_temp);
+  pp.query("update_heat_release", update_heat_release);
+
+  pp.query("do_restart_fields", do_restart_fields);
+  pp.query("do_psgs", do_psgs);
+  pp.query("do_pd_model", do_pd_model);
+  pp.query("do_vpdf", do_vpdf);
+  pp.query("do_spdf", do_spdf);
+  pp.query("do_species_langevin", do_species_langevin);
+
+  pp.query("amr_interp_order", amr_interp_order);
+  if (amr_interp_order == 3 && amrex::SpaceDim == 1) {
+    amrex::Abort("CNS: quadratic_interp does not support 1D.");
+  }
+  pp.query("rk_order", rk_order); // 1-4
+  if (rk_order != 1 && rk_order != 2) {
+    if (do_react || do_psgs || do_pd_model || do_vpdf || do_spdf) {
+      amrex::Abort("CNS: rk_order must be 1 or 2 for reaction and/or SF");
+    }
+  }
+
+  pp.query("do_les", do_les);
+  pp.query("do_pasr", do_pasr);
+  if (do_les || do_pasr) {
+    if (AMREX_SPACEDIM == 1) amrex::Abort("CNS: LES not supporting 1D");
+    pp.query("C_s", Cs);
+    pp.query("C_I", C_I);
+    pp.query("Pr_T", Pr_T);
+    pp.query("Sc_T", Sc_T);
+    pp.query("Cm", Cm);
+  }
+
+  pp.query("do_nscbc", do_nscbc);
+  pp.query("nscbc_relax_p", nscbc_relax_p);
+  pp.query("nscbc_relax_u", nscbc_relax_u);
+  pp.query("nscbc_relax_T", nscbc_relax_T);
+  pp.query("ambient_p", ambient_p);
+}
+
+void CNS::read_errtags() {
+  ParmParse pp("cns");
+  Vector<std::string> refinement_indicators;
+  pp.queryarr("refinement_indicators", refinement_indicators);
+
+  for (int i = 0; i < refinement_indicators.size(); ++i) {
+    std::string ref_prefix = "cns." + refinement_indicators[i];
+    ParmParse ppr(ref_prefix);
+
+    RealBox realbox;
+    if (ppr.countval("in_box_lo")) {
+      std::vector<Real> box_lo(amrex::SpaceDim), box_hi(amrex::SpaceDim);
+      ppr.getarr("in_box_lo", box_lo, 0, box_lo.size());
+      ppr.getarr("in_box_hi", box_hi, 0, box_hi.size());
+      realbox = RealBox(&(box_lo[0]), &(box_hi[0]));
+    }
+
+    AMRErrorTagInfo info;
+    if (realbox.ok()) { info.SetRealBox(realbox); }
+    if (ppr.countval("start_time") > 0) {
+      Real min_time;
+      ppr.get("start_time", min_time);
+      info.SetMinTime(min_time);
+    }
+    if (ppr.countval("end_time") > 0) {
+      Real max_time;
+      ppr.get("end_time", max_time);
+      info.SetMaxTime(max_time);
+    }
+    if (ppr.countval("max_level") > 0) {
+      int max_level;
+      ppr.get("max_level", max_level);
+      info.SetMaxLevel(max_level);
+    }
+
+    if (ppr.countval("value_greater")) {
+      Real value;
+      ppr.get("value_greater", value);
+      std::string field;
+      ppr.get("field_name", field);
+      errtags.push_back(AMRErrorTag(value, AMRErrorTag::GREATER, field, info));
+    } else if (ppr.countval("value_less")) {
+      Real value;
+      ppr.get("value_less", value);
+      std::string field;
+      ppr.get("field_name", field);
+      errtags.push_back(AMRErrorTag(value, AMRErrorTag::LESS, field, info));
+    } else if (ppr.countval("vorticity_greater")) {
+      Real value;
+      ppr.get("vorticity_greater", value);
+      const std::string field = "magvort";
+      errtags.push_back(AMRErrorTag(value, AMRErrorTag::VORT, field, info));
+    } else if (ppr.countval("adjacent_difference_greater")) {
+      Real value;
+      ppr.get("adjacent_difference_greater", value);
+      std::string field;
+      ppr.get("field_name", field);
+      errtags.push_back(AMRErrorTag(value, AMRErrorTag::GRAD, field, info));
+    } else if (realbox.ok()) {
+      errtags.push_back(AMRErrorTag(info));
+    } else {
+      Abort(std::string("Unrecognised refinement indicator for " +
+                        refinement_indicators[i])
+              .c_str());
+    }
+  }
+}
+
 void CNS::variableSetUp()
 {
   h_prob_parm = new ProbParm{}; // This lives on host
@@ -297,9 +610,6 @@ void CNS::variableSetUp()
                          0, 1, &pc_interp, state_data_extrap, store_in_checkpoint);
   desc_lst.setComponent(Cost_Type, 0, "Cost", bc, bndryfunc2);
 
-  // SNM: commeted
-  // assert(num_state_data_types == desc_lst.size());
-
   Print() << desc_lst.size() << " Data Types:" << std::endl;
   for (int typ = 0; typ < desc_lst.size(); typ++) {
     Print() << typ << " - ";
@@ -423,74 +733,8 @@ void CNS::variableSetUp()
   derive_lst.addComponent("var_T", desc_lst, State_Type, 0, LEN_STATE);
 #endif
 
-  //
   // Dynamically generated error tagging functions
-  //
-  ParmParse pp("cns");
-  Vector<std::string> refinement_indicators;
-  pp.queryarr("refinement_indicators", refinement_indicators);
-
-  for (int i = 0; i < refinement_indicators.size(); ++i) {
-    std::string ref_prefix = "cns." + refinement_indicators[i];
-    ParmParse ppr(ref_prefix);
-
-    RealBox realbox;
-    if (ppr.countval("in_box_lo")) {
-      std::vector<Real> box_lo(amrex::SpaceDim), box_hi(amrex::SpaceDim);
-      ppr.getarr("in_box_lo", box_lo, 0, box_lo.size());
-      ppr.getarr("in_box_hi", box_hi, 0, box_hi.size());
-      realbox = RealBox(&(box_lo[0]), &(box_hi[0]));
-    }
-
-    AMRErrorTagInfo info;
-    if (realbox.ok()) { info.SetRealBox(realbox); }
-    if (ppr.countval("start_time") > 0) {
-      Real min_time;
-      ppr.get("start_time", min_time);
-      info.SetMinTime(min_time);
-    }
-    if (ppr.countval("end_time") > 0) {
-      Real max_time;
-      ppr.get("end_time", max_time);
-      info.SetMaxTime(max_time);
-    }
-    if (ppr.countval("max_level") > 0) {
-      int max_level;
-      ppr.get("max_level", max_level);
-      info.SetMaxLevel(max_level);
-    }
-
-    if (ppr.countval("value_greater")) {
-      Real value;
-      ppr.get("value_greater", value);
-      std::string field;
-      ppr.get("field_name", field);
-      errtags.push_back(AMRErrorTag(value, AMRErrorTag::GREATER, field, info));
-    } else if (ppr.countval("value_less")) {
-      Real value;
-      ppr.get("value_less", value);
-      std::string field;
-      ppr.get("field_name", field);
-      errtags.push_back(AMRErrorTag(value, AMRErrorTag::LESS, field, info));
-    } else if (ppr.countval("vorticity_greater")) {
-      Real value;
-      ppr.get("vorticity_greater", value);
-      const std::string field = "magvort";
-      errtags.push_back(AMRErrorTag(value, AMRErrorTag::VORT, field, info));
-    } else if (ppr.countval("adjacent_difference_greater")) {
-      Real value;
-      ppr.get("adjacent_difference_greater", value);
-      std::string field;
-      ppr.get("field_name", field);
-      errtags.push_back(AMRErrorTag(value, AMRErrorTag::GRAD, field, info));
-    } else if (realbox.ok()) {
-      errtags.push_back(AMRErrorTag(info));
-    } else {
-      Abort(std::string("Unrecognised refinement indicator for " +
-                        refinement_indicators[i])
-              .c_str());
-    }
-  }
+  CNS::read_errtags();
 }
 
 void CNS::variableCleanUp()

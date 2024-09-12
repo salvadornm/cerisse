@@ -272,6 +272,8 @@ protected:
 
   static void read_params();
 
+  static void read_errtags();
+
   void set_typical_values_chem();
 
 #if CNS_USE_EB
@@ -380,6 +382,7 @@ protected:
   static amrex::Real eb_weight;
   static bool eb_no_slip;
   static bool eb_isothermal;
+  static bool eb_wall_model;
   static amrex::Real eb_wall_temp;
   static std::string redistribution_type;
 #endif

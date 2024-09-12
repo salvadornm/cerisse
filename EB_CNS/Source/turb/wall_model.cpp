@@ -52,30 +52,27 @@ AMREX_GPU_DEVICE AMREX_FORCE_INLINE void LawOfTheWall::parallel_wall_stress(
 
 #ifdef WALLMODEL_DEBUG
 namespace {
-void printArray(Real* arr, int n, std::string name) {
+void printArray(Real* arr, int n, std::string name)
+{
   std::cout << name << ": ";
-  for (int i = 0; i < n; ++i) {
-    std::cout << arr[i] << " ";
-  }
+  for (int i = 0; i < n; ++i) { std::cout << arr[i] << " "; }
   std::cout << std::endl;
 }
 
 template <int N>
-void printArray(Array1D<Real, 0, N - 1> arr, std::string name) {
+void printArray(Array1D<Real, 0, N - 1> arr, std::string name)
+{
   std::cout << name << ": ";
-  for (int i = 0; i < N; ++i) {
-    std::cout << arr(i) << " ";
-  }
+  for (int i = 0; i < N; ++i) { std::cout << arr(i) << " "; }
   std::cout << std::endl;
 }
 
 template <int N>
-void printMatrix(Array2D<Real, 0, N - 1, 0, N - 1, Order::C> mat, std::string name) {
+void printMatrix(Array2D<Real, 0, N - 1, 0, N - 1, Order::C> mat, std::string name)
+{
   std::cout << name << ":\n";
   for (int i = 0; i < N; ++i) {
-    for (int j = 0; j < N; ++j) {
-      std::cout << mat(i, j) << " ";
-    }
+    for (int j = 0; j < N; ++j) { std::cout << mat(i, j) << " "; }
     std::cout << std::endl;
   }
 }
@@ -122,23 +119,27 @@ AMREX_GPU_DEVICE AMREX_FORCE_INLINE void EquilibriumODE::parallel_wall_stress(
   // printArray(T, n_grid, "T");
 
   Real res_u = 1e10, res_T = 1e10; // residuals
-  Real rho[n_grid], tmp[n_grid], mu[n_grid], lam[n_grid], cp[n_grid], 
-       tauw, yplus[n_grid], mut[n_grid];                                     // temporary variables
+  Real rho_0, tauw, tmp[n_grid], mu[n_grid], lam[n_grid], cp[n_grid], mut[n_grid]; // temporary variables
   int iter = 0, max_iter = 10;
-  while ((res_u > 0.01 * uwm || res_T > 0.01 * Twm) && (iter < max_iter)) { // until within 1% error
+  LUSolver<n_grid, Real> lusolver;
+  while ((res_u > 0.01 * uwm || res_T > 0.01 * Twm) &&
+         (iter < max_iter)) { // until within 1% error
     // compute coefficients
     for (int i = 0; i < n_grid; ++i) {
-      rho[i] = rhowm * Twm / T[i]; // assume const p
+      Real rho_i = rhowm * Twm / T[i]; // assume const p
       Real get_mu, get_lam, dummy;
-      trans.transport(false, true, true, false, false, T[i], rho[i], Y, nullptr,
+      trans.transport(false, true, true, false, false, T[i], rho_i, Y, nullptr,
                       nullptr, get_mu, dummy, get_lam, ltransparm);
       mu[i] = get_mu;
       lam[i] = get_lam;
-      eos.RTY2Cp(rho[i], T[i], Y, cp[i]);
-      if (i == 0) { tauw = mu[0] * (u[0] - uw) / y[0]; }
-      yplus[i] = y[i] * std::sqrt(tauw / rho[0]) / (mu[0] * rho[0]);
-      mut[i] = kappa * y[i] * std::sqrt(rho[i] * tauw) *
-               std::pow(1.0 - std::exp(-yplus[i] / Aplus), 2);
+      eos.RTY2Cp(rho_i, T[i], Y, cp[i]);
+      if (i == 0) { 
+        tauw = mu[0] * (u[0] - uw) / y[0]; 
+        rho_0 = rho_i;
+      }
+      Real yplus_i = y[i] * std::sqrt(tauw / rho_0) / (mu[0] * rho_0);
+      mut[i] = kappa * y[i] * std::sqrt(rho_i * tauw) *
+               std::pow(1.0 - std::exp(-yplus_i / Aplus), 2);
     }
     // printArray(mu, n_grid, "mu");
     // printArray(yplus, n_grid, "y+");
@@ -148,10 +149,8 @@ AMREX_GPU_DEVICE AMREX_FORCE_INLINE void EquilibriumODE::parallel_wall_stress(
     // solve for u
     Array2D<Real, 0, n_grid - 1, 0, n_grid - 1, Order::C> A;
     Array1D<Real, 0, n_grid - 1> b;
-    for (int i = 0; i < n_grid; ++i) {    
-      for (int j = 0; j < n_grid; ++j) {
-        A(i, j) = 0.0;
-      }
+    for (int i = 0; i < n_grid; ++i) {
+      for (int j = 0; j < n_grid; ++j) { A(i, j) = 0.0; }
       b(i) = 0.0;
     }
     // wall BC
@@ -174,9 +173,9 @@ AMREX_GPU_DEVICE AMREX_FORCE_INLINE void EquilibriumODE::parallel_wall_stress(
     }
     // printMatrix<n_grid>(A, "A");
     // printArray<n_grid>(b, "b");
-    
+
     // solve
-    LUSolver<n_grid, Real> lusolver(A);
+    lusolver.define(A);
     lusolver(tmp, b.arr);
 
     res_u = 0.0;
@@ -187,7 +186,7 @@ AMREX_GPU_DEVICE AMREX_FORCE_INLINE void EquilibriumODE::parallel_wall_stress(
     // printArray(u, n_grid, "u");
 
     // solve for T
-    for (int i = 0; i < n_grid; ++i) {    
+    for (int i = 0; i < n_grid; ++i) {
       for (int j = 0; j < n_grid; ++j) {
         A(i, j) = 0.0;
       }
@@ -239,7 +238,7 @@ AMREX_GPU_DEVICE AMREX_FORCE_INLINE void EquilibriumODE::parallel_wall_stress(
     res_T = 0.0;
     for (int i = 0; i < n_grid; ++i) {
       res_T += std::abs(T[i] - tmp[i]) / Real(n_grid);
-      T[i] = tmp[i];
+      T[i] = std::max(tmp[i], 90.0);
     }
     // printArray(T, n_grid, "T");
 
