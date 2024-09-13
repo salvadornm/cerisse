@@ -4,6 +4,17 @@
 #include <AMReX_FArrayBox.H>
 #include <CNS.h>
 
+//-------------------
+// discontinuity sensor function
+  AMREX_GPU_DEVICE AMREX_FORCE_INLINE Real disconSensor(Real pp, Real pl,
+                                                      Real pr) {
+  Real pjst = pr + 2.0_rt * pp + pl;
+  Real ptvd = std::abs(pr - pp) + std::abs(pp - pl);
+  return std::abs(2.0_rt * (pr - 2.0_rt * pp + pl) /
+                  (pjst + ptvd + Real(1.0e-40)));
+  }
+
+
 template <bool isAD, bool isIB, int order, typename cls_t>
 class skew_t {
   public:
@@ -141,6 +152,14 @@ class skew_t {
       rhs(i, j, k, n)=0.0;
       });
 
+
+    // compute lambda (only if AD)
+    if constexpr (isAD) {
+    ParallelFor(bxgnodal,
+                  [=,*this] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {
+                    this->ComputeLambda(i, j, k, prims, lambda_max,cls);
+                  });                    
+    } 
     // ---------------------------------------------------------------------  //
     // loop over directions
     for (int dir = 0; dir < AMREX_SPACEDIM; dir++) {
@@ -148,18 +167,21 @@ class skew_t {
 
       int Qdir =  cls_t::QRHO + dir + 1; 
 
-      // compute interface fluxes at i-1/2, j-1/2, k-1/2
+      // compute interface fluxes at  flx[i] => f[i-1/2]
       ParallelFor(bxgnodal,
                   [=,*this] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {
                     this->flux_dir(i, j, k,Qdir, vdir, cons, prims, lambda_max, flx, cls);
                   });
 
-      // add dissipative fluxes  ...          
-       // if constexpr (isAD) {
-      //   art_dissipation_flux();
-      // }
-        
-      // add flux derivative to rhs, i.e.  rhs[n] + = (fi[n] - fi+1[n])/dx
+      // dissipative fluxes 
+      if constexpr (isAD) {      
+        ParallelFor(bxgnodal,
+                  [=,*this] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {
+                    this->fluxdissip_dir(i, j, k,Qdir, vdir, cons, prims, lambda_max, flx, cls);
+                  });       
+      }
+
+      // add flux derivative to rhs, i.e.  rhs + = (flx[i] - flx[i+1])/dx
       ParallelFor(bx, cls_t::NCONS,
                   [=] AMREX_GPU_DEVICE(int i, int j, int k, int n) noexcept {
                     rhs(i, j, k, n) +=
@@ -168,7 +190,6 @@ class skew_t {
 
 
     // if constexpr (isIB) {
-    //   sensor =  (idir) 
     //   eflux_ibm();
     // }
 
@@ -192,24 +213,16 @@ class skew_t {
     int il= i-halfsten*vdir[0]; int jl= j-halfsten*vdir[1]; int kl= k-halfsten*vdir[2];   
 
     for (int l = 0; l < order; l++) {  
-      rho =prims(il,jl,kl,cls_t::QRHO);
       V[l] = prims(il,jl,kl,Qdir); 
-      U[l][cls_t::URHO] = rho;
-      U[l][cls_t::UMX] = cons(il,jl,kl,cls_t::UMX);
-      U[l][cls_t::UMY] = cons(il,jl,kl,cls_t::UMY);
-      U[l][cls_t::UMZ] = cons(il,jl,kl,cls_t::UMZ);      
-      kin  = prims(il,jl,kl,cls_t::QU)*prims(il,jl,kl,cls_t::QU);
-      kin += prims(il,jl,kl,cls_t::QV)*prims(il,jl,kl,cls_t::QV);
-      kin += prims(il,jl,kl,cls_t::QW)*prims(il,jl,kl,cls_t::QW);
-      eint = prims(il, jl, kl, cls_t::QEINT) + Real(0.5)*kin;
-      // [snm] can be clean using cons
-
+      U[l][cls_t::URHO] = prims(il,jl,kl,cls_t::QRHO);
+      U[l][cls_t::UMX]  = cons(il,jl,kl,cls_t::UMX);
+      U[l][cls_t::UMY]  = cons(il,jl,kl,cls_t::UMY);
+      U[l][cls_t::UMZ]  = cons(il,jl,kl,cls_t::UMZ);      
       P[l] = prims(il,jl,kl,cls_t::QPRES);
-      U[l][cls_t::UET] = rho*eint  + P[l];
+      U[l][cls_t::UET] = cons(il,jl,kl,cls_t::UET)  + P[l];
 
       il +=  vdir[0];jl +=  vdir[1];kl +=  vdir[2];
     }
-
 
     // compute fluxes
     for (int nvar = 0; nvar < cls_t::NCONS; nvar++) {
@@ -228,58 +241,80 @@ class skew_t {
  
   }
 
-
+  
   AMREX_GPU_DEVICE AMREX_FORCE_INLINE void fluxdissip_dir(
-    int i, int j, int k, int Qdir,const GpuArray<int, 3>& vdir, const Array4<Real>& cons, const Array4<Real>& prims, const Array4<Real>& lambda_max, const Array4<Real>& flx,
+    int i, int j, int k, int Qdir,const GpuArray<int, 3>& vdir, const Array4<Real>& cons, const Array4<Real>& prims, const Array4<Real>& lambda, const Array4<Real>& flx,
     const cls_t* cls) const {
          
-    int il= i-vdir[0]; int jl= j-vdir[1]; int kl= k-vdir[2];   
-    // int idir =
-   
-      // calculate sensor at i-1 and i    
-      // compute sensor at i-1/2  sen =  max( sen(i-1),sen(i) )
-      // Real rr = max(lambda(i-il, j-jl, k - kl, Qdir-1), lambda(i, j, k, Qdir-1));
+    int ir = i+vdir[0];   int jr = j+vdir[1];   int kr = k+vdir[2];   
+    int il = i-vdir[0];   int jl = j-vdir[1];   int kl = k-vdir[2];   
+    int ill= il-vdir[0]; int jll = jl-vdir[1]; int kll= kl-vdir[2];   
 
-      // eps2 = cls::Cshock*rr*sen;
+    // calculate sensor based on P   
+    Real sen_num= Real(0.0),sen_denom=Real(1.0e-16);
+    // do it clever in a loop NVARSEN
+    int nv = cls_t::QPRES;
+    
+    // sensor
+    Real p0 =  prims(ill,jll,kll,nv);
+    Real p1 =  prims(il,jl,kl,nv);
+    Real p2 =  prims(i,j,k,nv);
+    Real p3 =  prims(ir,jr,kr,nv);    
+    Real sen  = std::max(disconSensor(p0,p1,p2), disconSensor(p1,p2,p3) );
+    sen_num += sen*sen;sen_denom +=sen;
+    sen = sen_num/sen_denom;
 
-      // compute damping (2 or 4) per var
-      // fshock = eps2*(cons(i + 1, j, k, n) - 3.0 * cons(i, j, k, n) )
-      // fdamp  = cons(i + 1, j, k, n) - 3.0 * cons(i, j, k, n) +
-        //  3.0 * cons(i - 1, j, k, n) - cons(i - 2, j, k, n);
-      // eps4 =   max(0.0, cls::Cdamp - eps2)
-
+    // spectral radius Jacobian matrix (u + c)
+    Real rr = std::max(lambda(il, jl, kl, Qdir), lambda(i, j, k, Qdir));    
+    rr = std::abs( prims(i,j,k,Qdir) ) + prims(i, j, k, cls_t::QC);           
+    Real eps2 = Cshock*rr*sen;
+    Real eps4 = std::max(0.0, Cdamp*rr - eps2);
+        
     for (int nvar = 0; nvar < cls_t::NCONS; nvar++) {   
-      //fdamp = 
-      flx(i, j, k, nvar) -= 9999;
-      //fshock - max(0.0, cls::Cdamp - sen) * rr *famp;
+      // shock capturing
+      // 2nd order     
+      // flx(i, j, k, nvar) -=  eps2*(cons(i, j, k, nvar) - cons(il, jl, kl, nvar));
+
+      // 4th order
+      flx(i, j, k, nvar) -=  eps2*(-cons(ir, jr, kr, nvar) + 7.0* cons(i, j, k, nvar)
+                               -5.0*cons(il, jl, kl, nvar) - cons(ill, jll, kll, nvar)  );
+
+
+      // high freq damping   
+      flx(i, j, k, nvar) += eps4*(cons(ir, jr, kr, nvar) - 3.0 * cons(i, j, k, nvar) +
+        3.0 * cons(il, jl, kl, nvar) - cons(ill, jll, kll, nvar));
+        
     }
 
   } 
+  
+  // compute lambda = u + c
+  AMREX_GPU_DEVICE AMREX_FORCE_INLINE void ComputeLambda(
+    int i, int j, int k, const auto& prims, const auto& lambda,
+    const cls_t* cls) const {
+ 
+    Real gamma = prims(i, j, k, cls_t::QG); 
+    // speed of sound
+    Real cs    = prims(i, j, k, cls_t::QC); 
+    for (int dir = 0; dir < AMREX_SPACEDIM; dir++) {
+      lambda(i, j, k, dir) = std::abs( prims(i,j,k,dir)) + cs;    
+    }
 
-  // artificial dissipation flux
-  void inline art_dissipation_flux() {
-    amrex::Print() << "AD eflux (skew)" << std::endl;
-  }
+  }    
 
-    // immersed boundary ghost point  NOT READY YET
+  // immersed boundary ghost point  NOT READY YET
   void inline eflux_ibm() { amrex::Print() << "IBM eflux (skew)" << std::endl; }
 
-
+  // coefficents
   typedef Array2D<Real, 0, order, 0, order> arrCoeff_t;
   arrCoeff_t coefskew,coefP;
 
   int halfsten = order / 2;
 
+  // parameters for damping and shock capturing   
+  const Real Cshock = 0.1,Cdamp = 0.00016; //0.016
+
   };
 
-
-  // discontinuity sensor function
-  AMREX_GPU_DEVICE AMREX_FORCE_INLINE Real disconSensor(Real pp, Real pl,
-                                                      Real pr) {
-  Real pjst = pr + 2.0_rt * pp + pl;
-  Real ptvd = std::abs(pr - pp) + std::abs(pp - pl);
-  return std::abs(2.0_rt * (pr - 2.0_rt * pp + pl) /
-                  (pjst + ptvd + Real(1.0e-40)));
-  }
 
 #endif

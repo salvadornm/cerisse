@@ -18,7 +18,12 @@ static constexpr int QRHO=0;
 static constexpr int QU=1;
 static constexpr int QV=2;
 static constexpr int QW=3
-...
+static constexpr int QT=4;
+static constexpr int QPRES=5;
+static constexpr int QC=6;
+static constexpr int QG=7;
+static constexpr int QEINT=8;
+static constexpr int QFS=9;
 ```
 As well as the number of equations to solve and number of halo points
 
@@ -40,8 +45,8 @@ static constexpr int NGHOST=3; // TODO: make it an automatic parameter
 |   `QW`               | 3       | z-velocity    |
 |   `QT`               | 4       | temperature    |
 |   `QPRES`            | 5       | pressure   |
-|   `QC`            | 6          | ?  |
-|   `QG`            | 7          | ?   |
+|   `QC`            | 6          | spounde speed  |
+|   `QG`            | 7          | gamma   |
 |   `QEINT`            | 8       | internal energy  |
 |   `QFS`            | 9         | index first specie   |
 
