@@ -34,7 +34,7 @@ case  $1 in
 	tput setaf 2
 	echo " ...  quick x-momentum 2d plot"
 	tput sgr0
-	python ../../bin/plt2d.py
+	python ../../bin/plot2d.py
 	echo -e "\\033[1;32m  DONE  \\033[0m"
 	;;
 	backup )

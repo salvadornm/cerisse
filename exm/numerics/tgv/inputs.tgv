@@ -1,0 +1,44 @@
+max_step  = 10000
+stop_time =  0.0018336339443081453
+cfl = 0.3
+
+# Geometry 
+geometry.is_periodic = 1 1 1
+geometry.coord_sys   = 0  # 0 => cart, 1 => RZ  2=>spherical
+geometry.prob_lo     = -3.1416 -3.1416 -3.1416
+geometry.prob_hi     =  3.1416  3.1416  3.1416
+
+# -1 = N/A (Incase of periodic)
+# 0 = Interior           3 = Symmetry
+# 1 = Inflow             4 = SlipWall
+# 2 = Outflow            5 = NoSlipWall
+# 6 = user defined
+cns.lo_bc = -1 -1 -1 
+cns.hi_bc = -1 -1 -1
+cns.screen_output = 0 # 0=quiet, 1=verbose
+cns.verbose = 0       # 0=quiet, 1=verbose
+
+# Refinement and regridding 
+amr.n_cell          = 128 128 128
+amr.max_level       = 0     # maximum level number allowed
+amr.ref_ratio       = 2 2 2 # refinement ratio per level
+amr.regrid_int      = 5     # how often to regrid per level
+amr.blocking_factor_x = 8 8 8 # blocking factor in x per level
+amr.blocking_factor_y = 8 8 8 # blocking factor in x per level
+amr.blocking_factor_z = 8 8 8 # blocking factor in x per level
+amr.max_grid_size_x   = 64 64 64 # maximum grid size in x per level
+amr.max_grid_size_y   = 64 64 64 # maximum grid size in y per level
+amr.n_error_buf     = 2 2 2 # number of buffer cells in error est
+amr.grid_eff        = 0.7     # what constitutes an efficient grid
+amr.v               = 1
+
+
+
+# Plot and checkpoint
+amr.checkpoint_files_output = 0
+amr.check_file              = chk    # root name of checkpoint file
+amr.check_int               = 10000    # number of timesteps between checkpoints
+amr.plot_files_output = 1
+amr.plot_file         = ./plot/plt # root name of plotfile
+amr.plot_int          = 200         # number of timesteps between plotfiles
+amr.derive_plot_vars  = pressure x_velocity y_velocity z_velocity temperature
