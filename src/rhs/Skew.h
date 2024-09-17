@@ -14,7 +14,7 @@
                   (pjst + ptvd + Real(1.0e-40)));
   }
 
-
+// int imask
 template <bool isAD, bool isIB, int order, typename cls_t>
 class skew_t {
   public:
@@ -22,24 +22,19 @@ class skew_t {
   AMREX_GPU_HOST_DEVICE
   skew_t() {
     
-    // initialize coefficients for skew-symmetric
+    // init coefficients for skew-symmetric
     for (int l = 0; l < order; l++) {       
       for (int m = 0; m < order; m++) { 
         coefskew(l,m) = Real(0.0); 
       }
     }
-    // interpolation coeffcients      
+    // init interpolation, damping and shock coeffcients      
     for (int l = 0; l < order; l++) {       
-      coefdamp(l) = Real(0.0);
-      coefP(l)    = Real(0.0);
-    }
-    // no masking
-    for (int l = 0; l < AMREX_SPACEDIM; l++) {             
-      mask_sen(l,1) = 0;      // bottom
-      mask_sen(l,2) = 9999; // top              
-    }  
-
-    //
+      coefdamp(l)  = Real(0.0);
+      coefP(l)     = Real(0.0);
+      coefshock(l) = Real(0.0);
+    }    
+    
     switch (order)
     {
     case 2:
@@ -48,12 +43,14 @@ class skew_t {
       coefskew(0,1) =  Real(0.25);
       coefskew(1,1) =  Real(0.25);
       // pressure interpolation
-      coefP(0)    =  Real(0.5);
-      coefP(1)    =  Real(0.5);
+      coefP(0)      =  Real(0.5);
+      coefP(1)      =  Real(0.5);
       // damping coefficients
-      coefdamp(0) = Real(0.0);
-      coefdamp(1) = Real(0.0);
-      
+      coefdamp(0)   = Real(0.0);
+      coefdamp(1)   = Real(0.0);
+      // shock
+      coefshock(0) =  -Real(1.0);
+      coefshock(1) =  +Real(1.0);            
       break;
     case 4:
       coefskew(0,0) =  - Real(1.0/24.0);
@@ -89,10 +86,16 @@ class skew_t {
       coefP(3) = -Real(1.0/12.0);   
 
       // damping coefficients
-      coefdamp(0) = Real(1.0);
-      coefdamp(1) = Real(-3.0);
-      coefdamp(2) = Real(3.0);
-      coefdamp(3) = Real(-1.0);
+      coefdamp(0) = -Real(1.0);
+      coefdamp(1) = +Real(3.0);
+      coefdamp(2) = -Real(3.0);
+      coefdamp(3) = +Real(1.0);
+
+      // shock coefficients
+      coefshock(0) = -Real(1.0/6.0);
+      coefshock(1) = -Real(5.0/6.0);
+      coefshock(2) = +Real(7.0/6.0);
+      coefshock(3) = -Real(1.0/6.0);
 
       break; 
     case 6:                   
@@ -130,14 +133,22 @@ class skew_t {
       coefP(5) = Real(1.0/60.0);
 
       // damping coefficients
-      coefdamp(0) = Real(-1.0/12.0);
-      coefdamp(1) = Real(+17.0/12.0);
-      coefdamp(2) = Real(-46.0/12.0);
-      coefdamp(3) = Real(+46.0/12.0);
-      coefdamp(4) = Real(-17.0/12.0);
-      coefdamp(5) = Real(+1.0/12.0);
-                 
+      coefdamp(0) = +Real(1.0/12.0);
+      coefdamp(1) = -Real(17.0/12.0);
+      coefdamp(2) = +Real(46.0/12.0);
+      coefdamp(3) = -Real(46.0/12.0);
+      coefdamp(4) = +Real(17.0/12.0);
+      coefdamp(5) = -Real(1.0/12.0);
+
+      // shock coefficients
+      coefshock(0) =  Real(0.0);      
+      coefshock(1) = -Real(1.0/6.0);
+      coefshock(2) = -Real(5.0/6.0);
+      coefshock(3) = +Real(7.0/6.0);
+      coefshock(4) = -Real(1.0/6.0);
+      coefshock(5) =  Real(0.0);                             
       break;
+
     default: //second order
       coefskew(0,0) =  Real(0.25);
       coefskew(1,0) =  Real(0.25);
@@ -153,10 +164,10 @@ class skew_t {
     NSEN[0] = cls_t::QRHO;
     NSEN[1] = cls_t::QPRES;
 
-    // masking
+    // no masking
     for (int l = 0; l < AMREX_SPACEDIM; l++) {  
-      mask_sen(l,1) = 3;     
-      mask_sen(l,2) = 9999;     
+      mask_sen(l,1) = -1;     
+      mask_sen(l,2) = 9999999;     
     }  
     
   }
@@ -189,17 +200,21 @@ class skew_t {
       rhs(i, j, k, n)=0.0;
       });
 
-    // masking BC here function of global geometry    
+    int imask = 3; // reduce order 
+    // get global index
+    const int* domlo = geom.Domain().loVect();
+    const int* domhi = geom.Domain().hiVect();
+
+    // masking BC here function of global geometry  (only non-periodic dirs)       
     for (int l = 0; l < AMREX_SPACEDIM; l++) {  
-      mask_sen(l,1) = 3;     
-      mask_sen(l,2) = 510;     
+      if (geom.isPeriodic(l)==0) {
+        mask_sen(l,1) = domlo[l] + imask;     
+        mask_sen(l,2) = domhi[l] - imask;     
+      }
     }  
-
-    
-
     // compute lambda (only if AD)
     if constexpr (isAD) {
-    ParallelFor(bxgnodal,
+      ParallelFor(bxgnodal,
                   [=,*this] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {
                     this->ComputeLambda(i, j, k, prims, lambda_max,cls);
                   });                    
@@ -296,12 +311,10 @@ class skew_t {
  
     const int idir = Qdir -1;
 
-
-    // calculate sensor based on P   
+    // calculate sensor    
     Real p0,p1,p2,p3;
     Real sen_num= Real(0.0),sen_denom=Real(1.0e-16);
-
-    // do it clever in a loop NVARSEN
+    // loop over sensor variables
     int nv = 0;
     Real sen = Real(0.0);
     for (int l=0;l<NVARSEN;l++)
@@ -325,29 +338,16 @@ class skew_t {
     rr = std::abs( prims(i,j,k,Qdir) ) + prims(i, j, k, cls_t::QC);           
     Real eps2 = Cshock*rr*sen;
     Real eps4 = std::max(0.0, Cdamp*rr - eps2);
-        
-    for (int nvar = 0; nvar < cls_t::NCONS; nvar++) {   
-      // shock capturing
-      // 2nd order     
-      //flx(i, j, k, nvar) -=  eps2*(cons(i, j, k, nvar) - cons(il, jl, kl, nvar));
 
-      // 4th order
-      flx(i, j, k, nvar) -=  eps2*(-cons(ir, jr, kr, nvar) + 7.0* cons(i, j, k, nvar)
-                               -5.0*cons(il, jl, kl, nvar) - cons(ill, jll, kll, nvar)  );
-
-      // high freq damping   
-      flx(i, j, k, nvar) += eps4*(cons(ir, jr, kr, nvar) - 3.0 * cons(i, j, k, nvar) +
-        3.0 * cons(il, jl, kl, nvar) - cons(ill, jll, kll, nvar));
-
-      // compact way to write damping
-      // il= i-halfsten*vdir[0]; jl= j-halfsten*vdir[1]; kl= k-halfsten*vdir[2];   
-      // for (int l = 0; l < order; l++) { 
-      //   flx(i, j, k, nvar) +=  eps4*coefdamp(l)*cons(il,jl,kl,nvar);     
-      //   il +=  vdir[0];jl +=  vdir[1];kl +=  vdir[2];
-      // }
-        
-    }
-
+    // shock capturing and damping 
+    int ii= i-halfsten*vdir[0]; int jj= j-halfsten*vdir[1]; int kk= k-halfsten*vdir[2];                    
+    for (int l = 0; l < order; l++) { 
+      for (int nvar = 0; nvar < cls_t::NCONS; nvar++) { 
+        flx(i, j, k, nvar) -=  eps2*coefshock(l)*cons(ii,jj,kk,nvar);
+        flx(i, j, k, nvar) +=   eps4*coefdamp(l)*cons(ii,jj,kk,nvar);     
+      }
+      ii +=  vdir[0];jj +=  vdir[1];kk +=  vdir[2];      
+    }   
   } 
   
   // compute lambda = u + c
@@ -373,7 +373,7 @@ class skew_t {
   int halfsten = order / 2;
 
   // parameters for damping and shock capturing   
-  const Real Cshock = 0.1,Cdamp = 0.0016; //0.016
+  const Real Cshock = 0.1,Cdamp = 0.016; //default 0.1 and 0.016
   // sensor variables
   const int NVARSEN=2;
   int NSEN[2];

@@ -47,20 +47,20 @@ Thre probelm correspinbds to as M=3 shock moving into a field with small density
 The solutyion is compared with a eference solution with a fine mesh.
 
 
-Table cost gcc version 11, 1 core, all CFL fix 0.3, times are in secs approximated, all in CPU
+Table cost gcc version 11, 1 core, all CFL fix 0.3, times are in secs approximated, all in same CPU
 
 | Run                     | Mesh         | Run Time | 
-| ------------------------| -------------|---------| 
+| ------------------------| -------------|----------| 
 | Reference MUSCL         | 8912         |  49.337  | 
-| MUSCL                   | 256          |  0.098  | 
-| Skew 4 Cs=0.1 Cd=0.0016  | 256         |  0.071  | 
+| MUSCL                   | 256          |  0.098   | 
+| Skew 4 *Cs=0.1 Cd=0.016*  | 256          |  0.08    | 
 
 
-**MUSCL** Riemann solver 2th order  N=256
+**MUSCL** Riemann solver 2th order  **N=256**
 ![shunum3](images/num_shu_muscl.png)
 
-**Skew**  solver 4th order  N=256
+**Skew**  solver 4th order  **N=256**, *Cs=0.1* *Cd=0.016*
 ![shunum2](images/num_shu_skew.png)
 
-**Skew**  solver 4th order  N=512
+**Skew**  solver 4th order  **N=512**, *Cs=0.1* *Cd=0.016*
 ![shunum2](images/num_shu_skew2.png)

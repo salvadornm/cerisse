@@ -22,7 +22,7 @@ cns.screen_output = 0 # 0=quiet, 1=verbose
 cns.verbose = 0       # 0=quiet, 1=verbose
 
 # Refinement and regridding 
-amr.n_cell          = 512
+amr.n_cell          = 256
 amr.max_level       = 0     # maximum level number allowed
 amr.ref_ratio       = 2  # refinement ratio per level
 amr.regrid_int      = 2  # how often to regrid per level
