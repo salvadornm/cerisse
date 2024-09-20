@@ -1,1 +1,1 @@
-CEXE_headers += RHS.h CentralKEEP.h Riemann.h react.h Rusanov.h
+CEXE_headers += RHS.h CentralKEEP.h Riemann.h react.h Rusanov.h Diffusion.h

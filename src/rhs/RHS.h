@@ -6,6 +6,7 @@
 #include <CentralKEEP.h>
 #include <Riemann.h>
 #include <Rusanov.h>
+#include <Diffusion.h>
 #ifdef USE_PELEPHYSICS
 #include "react.h"
 #endif
@@ -42,6 +43,5 @@ public:
   template<typename... Args>
   void src(Args&&... args) {}
 };
-
 
 #endif

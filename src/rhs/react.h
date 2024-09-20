@@ -8,7 +8,6 @@
 template <typename cls_t>
 class reactor_t {
  public:
- public:
   bool m_initialized = false;
   std::unique_ptr<pele::physics::reactions::ReactorBase> m_reactor;
 
@@ -165,6 +164,9 @@ class reactor_t {
       }
     });
     // TODO: Record runtime for load balancing
+  
+    // Real sum_fc = tempf.sum<RunOn::Device>(2 * NUM_SPECIES + 3, 1);
+    // amrex::Print() << " # RHS eval = " << sum_fc << "\n";
   }
 };
 
