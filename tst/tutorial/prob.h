@@ -145,8 +145,10 @@ user_tagging(int i, int j, int k, int nt_level, auto &tagfab,
         break;
       case 1:
         tagfab(i,j,k) = (rhot > 1.2 && rhot < 1.8); 
+        break;
       default:
         tagfab(i,j,k) = (rhot > 1.3 && rhot < 1.7); 
+        break;
     }
   }
 } 

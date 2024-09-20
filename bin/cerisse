@@ -30,11 +30,18 @@ case  $1 in
 	ls -1 plot/plt*/Header | tee movie.visit	
 	echo -e "\\033[1;32m  DONE  \\033[0m"
 	;;
-	backup )
-        tput setaf 2
-        echo " backing up.. in $2 "
+	plot )
+	tput setaf 2
+	echo " ...  quick x-momentum 2d plot"
 	tput sgr0
-        mkdir $2
+	python ../../bin/plt2d.py
+	echo -e "\\033[1;32m  DONE  \\033[0m"
+	;;
+	backup )
+    tput setaf 2
+    echo " backing up.. in $2 "
+	tput sgr0
+    mkdir $2
 	cp *.H $2
 	cp *.cpp $2
 	cp inputs $2
@@ -46,7 +53,7 @@ case  $1 in
 	;;
         *)
 	echo "option not recognised.."
-	echo "clean[all]/visit/backup[dirname]"
+	echo "clean[all]/visit/plot/backup[dirname]"
     exit
 esac
 

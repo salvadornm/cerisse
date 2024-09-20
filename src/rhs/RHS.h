@@ -6,6 +6,9 @@
 #include <CentralKEEP.h>
 #include <Riemann.h>
 #include <Rusanov.h>
+#include <Skew.h>
+#include <CentralDif.h>
+
 #include <Diffusion.h>
 #ifdef USE_PELEPHYSICS
 #include "react.h"
