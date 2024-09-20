@@ -41,7 +41,7 @@ ifeq ($(USE_GPIBM),TRUE)
 
   INCLUDE_LOCATIONS += $(AMR_SOLVER)/lib/install/cgal/include
   LIBRARY_LOCATIONS += $(AMR_SOLVER)/lib/install/cgal/lib/cmake/CGAL
-  LIBRARIES += -lgmp
+#  LIBRARIES += -lgmp
 
   include $(AMR_SOLVER)/src/ibm/Make.package
   INCLUDE_LOCATIONS += $(AMR_SOLVER)/src/ibm/
