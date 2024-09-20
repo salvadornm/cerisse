@@ -39,7 +39,7 @@ class IBMultiFab : public FabArray<IBFab<marker_t,gp_t>> {
   // constructor from BoxArray and DistributionMapping
   explicit inline IBMultiFab<marker_t,gp_t>(
       const BoxArray& bxs, const DistributionMapping& dm, const int nvar,
-      const int ngrow, const MFInfo& info = MFInfo(),
+      const int ngrow, const MFInfo& info = MFInfo{true, amrex::The_Managed_Arena()},
       const FabFactory<IBFab<marker_t,gp_t>>& factory = DefaultFabFactory<IBFab<marker_t,gp_t>>()) : FabArray<IBFab<marker_t,gp_t>>(bxs, dm, nvar, ngrow, info, factory) {};
 
   IBMultiFab<marker_t,gp_t>(IBMultiFab<marker_t,gp_t>&& rhs) noexcept 

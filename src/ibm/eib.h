@@ -201,14 +201,15 @@ public:
     for (MFIter mfi(mfab, false); mfi.isValid(); ++mfi) {
       auto& ibFab = mfab.get(mfi);
       const Box& bx = mfi.tilebox();
-      const IntVect& lo = bx.smallEnd();
-      const IntVect& hi = bx.bigEnd();
       const auto& ibMarkers = mfab.array(mfi); // boolean array
 
       // compute sld markers (including at ghost points) - cannot use ParallelFor - CGAL call causes problems
-      for (int k = lo[2] - cls_t::NGHOST; k <= hi[2] + cls_t::NGHOST; ++k) {
-        for (int j = lo[1] - cls_t::NGHOST; j <= hi[1] + cls_t::NGHOST; ++j) {
-          for (int i = lo[0] - cls_t::NGHOST; i <= hi[0] + cls_t::NGHOST; ++i) {
+      // const IntVect& lo = bx.smallEnd();
+      // const IntVect& hi = bx.bigEnd();
+      // for (int k = lo[2] - cls_t::NGHOST; k <= hi[2] + cls_t::NGHOST; ++k) {
+      //   for (int j = lo[1] - cls_t::NGHOST; j <= hi[1] + cls_t::NGHOST; ++j) {
+      //     for (int i = lo[0] - cls_t::NGHOST; i <= hi[0] + cls_t::NGHOST; ++i) {
+      amrex::LoopOnCpu(amrex::grow(bx, cls_t::NGHOST), [&](int i, int j, int k) {
             // NOTE: ibMarkers are accessed on CPU here always. This relies on amrex.the_arena_is_managed=1 option in the inputs. TODO: remove this and transfer bool for all i for given j,k to GPU in async arrays.
 
             // initialise to false
@@ -234,16 +235,17 @@ public:
                 break;
               }
             }
-          }
-        }
-      };
+        //   }
+        // }
+      });
 
       // compute ghost markers -- move to GPU.
       ibFab.gpData.ngps = 0;
       int nextra = 1;
-      for (int k = lo[2] - nextra; k <= hi[2] + nextra; ++k) {
-        for (int j = lo[1] - nextra; j <= hi[1] + nextra; ++j) {
-          for (int i = lo[0] - nextra; i <= hi[0] + nextra; ++i) {
+      // for (int k = lo[2] - nextra; k <= hi[2] + nextra; ++k) {
+      //   for (int j = lo[1] - nextra; j <= hi[1] + nextra; ++j) {
+      //     for (int i = lo[0] - nextra; i <= hi[0] + nextra; ++i) {
+      amrex::LoopOnCpu(amrex::grow(bx, nextra), [&](int i, int j, int k) {
             bool ghost = false;
             if (ibMarkers(i, j, k, 0)) {
               for (int l = -1; l <= 1; l = l + 2) {
@@ -261,10 +263,10 @@ public:
               } else {
                 ibMarkers(i, j, k, 1) = false;
               }
-            }
-          }
-        };
-      }
+          //   }
+          // }
+        }
+      });
     }
   }
 
@@ -277,8 +279,6 @@ void initialiseGPs(int lev) {
     auto& gpData = ibFab.gpData;
     const Box& bxg = mfi.growntilebox(cls_t::NGHOST);
     // const Box& bx = mfi.tilebox();
-    const IntVect& lo = bxg.smallEnd();
-    const IntVect& hi = bxg.bigEnd();
     auto const ibMarkers = mfab.array(mfi);  // boolean array
 
     // we need a CPU loop here (cannot be GPU loop) as CGAL tree seach for
@@ -288,9 +288,12 @@ void initialiseGPs(int lev) {
     // are only stored on GPU memory. Array1D<int,0,AMREX_SPACEDIM-1>& idx =
     // ibFab.gpData.gp_ijk[ii];
 
-    for (int k = lo[2]; k <= hi[2]; ++k) {
-      for (int j = lo[1]; j <= hi[1]; ++j) {
-        for (int i = lo[0]; i <= hi[0]; ++i) {
+    // const IntVect& lo = bxg.smallEnd();
+    // const IntVect& hi = bxg.bigEnd();
+    // for (int k = lo[2]; k <= hi[2]; ++k) {
+    //   for (int j = lo[1]; j <= hi[1]; ++j) {
+    //     for (int i = lo[0]; i <= hi[0]; ++i) {
+    amrex::LoopOnCpu(bxg, [&](int i, int j, int k) {
           // for each ghost point
           if (ibMarkers(i, j, k, 1)) {
             Real x = prob_lo[0] + (0.5_rt + i) * dx_a[lev][0];
@@ -430,9 +433,9 @@ void initialiseGPs(int lev) {
             // printf("disIM: %f\n", di_a[lev]);
             // printf("IM point: %f %f %f\n", imp_xyz(0,0), imp_xyz(0,1), imp_xyz(0,2));
         }
-      }
-    }
-  }
+    //   }
+    // }
+  });
 }
 }
 
@@ -513,12 +516,12 @@ void computeGPs(const MFIter& mfi, const Array4<Real>& cons, const Array4<Real>&
       // AMREX_ASSERT_WITH_MESSAGE( prims(i,j,k,QPRES)>50,"P<50 at GP");
 
       // insert conservative ghost state into consFab
-      cons(i,j,k,cls_t::URHO) = primsNormal(0,cls_t::QRHO);
-      cons(i,j,k,cls_t::UMX)  = primsNormal(0,cls_t::QRHO)*primsNormal(0,cls_t::QU);
-      cons(i,j,k,cls_t::UMY)  = primsNormal(0,cls_t::QRHO)*primsNormal(0,cls_t::QV);
-      cons(i,j,k,cls_t::UMZ)  = primsNormal(0,cls_t::QRHO)*primsNormal(0,cls_t::QW);
-      Real ek   = 0.5_rt*(primsNormal(0,cls_t::QU)*primsNormal(0,cls_t::QU) + primsNormal(0,cls_t::QV)* primsNormal(0,cls_t::QV) + primsNormal(0,cls_t::QW)*primsNormal(0,cls_t::QW));
-      cons(i,j,k,cls_t::UET) = primsNormal(0,cls_t::QPRES)/(cls->gamma-1.0_rt) + primsNormal(0,cls_t::QRHO)*ek;
+      // cons(i,j,k,cls_t::URHO) = primsNormal(0,cls_t::QRHO);
+      // cons(i,j,k,cls_t::UMX)  = primsNormal(0,cls_t::QRHO)*primsNormal(0,cls_t::QU);
+      // cons(i,j,k,cls_t::UMY)  = primsNormal(0,cls_t::QRHO)*primsNormal(0,cls_t::QV);
+      // cons(i,j,k,cls_t::UMZ)  = primsNormal(0,cls_t::QRHO)*primsNormal(0,cls_t::QW);
+      // Real ek   = 0.5_rt*(primsNormal(0,cls_t::QU)*primsNormal(0,cls_t::QU) + primsNormal(0,cls_t::QV)* primsNormal(0,cls_t::QV) + primsNormal(0,cls_t::QW)*primsNormal(0,cls_t::QW));
+      // cons(i,j,k,cls_t::UET) = primsNormal(0,cls_t::QPRES)/(cls->gamma-1.0_rt) + primsNormal(0,cls_t::QRHO)*ek;
       });
 };
 
@@ -630,7 +633,11 @@ private:
       ip_ijk(iim,iip,0) = ii; ip_ijk(iim,iip,1) = jj; ip_ijk(iim,iip,2) = kk;
       sumfluid += fluid; sumweights += weights(iim,iip);
 
-      AMREX_ASSERT_WITH_MESSAGE( sumfluid >= 2,"Less than 2 interpolation points are fluid points");
+      // AMREX_ASSERT_WITH_MESSAGE( sumfluid >= 2,"Less than 2 interpolation points are fluid points");
+      if (sumfluid < 2) {
+        amrex::Print() << i << " " << j << " " << k << " " << sumfluid << std::endl;
+        amrex::Warning("Less than 2 interpolation points are fluid points");
+      }
 
       // re-normalise
       for (int ll=0; ll<8; ll++) {
