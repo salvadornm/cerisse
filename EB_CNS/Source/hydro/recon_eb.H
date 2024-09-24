@@ -18,11 +18,12 @@
  * @param eb_mode  0: fill covered stencil with values of the first cell from wall;
  *                 1: automatically switch to lower order scheme.
  */
+template<int recon_scheme, int eb_mode>
 AMREX_GPU_DEVICE AMREX_FORCE_INLINE void cns_recon_eb(
   int i, int j, int k, int n, int dir, amrex::Array4<const amrex::Real> const& q,
   amrex::Array4<amrex::Real> const& ql, amrex::Array4<amrex::Real> const& qr,
-  int recon_scheme, amrex::Real plm_theta,
-  amrex::Array4<amrex::EBCellFlag const> const& flag, int eb_mode) noexcept
+  amrex::Real plm_theta,
+  amrex::Array4<amrex::EBCellFlag const> const& flag) noexcept
 {
   using amrex::Real;
 
@@ -48,11 +49,19 @@ AMREX_GPU_DEVICE AMREX_FORCE_INLINE void cns_recon_eb(
   ivp2 = cp1 && cp2 ? ivp2 : ivp1;
 
   // Switch to second order scheme near EB
-  if ((eb_mode == 1) && (recon_scheme > 2)) {
-    if ((ivm2 == ivm1) || (ivp2 == ivp1)) { recon_scheme = 2; }
-  }
-
-  if (recon_scheme == 6) {
+  if constexpr ((eb_mode == 1) && (recon_scheme != 1)) {
+    if ((ivm2 == ivm1) || (ivp2 == ivp1)) { 
+      // MUSCL / PLM
+      Real s[3];
+      s[0] = q(ivm1, n);
+      s[1] = q(iv, n);
+      s[2] = q(ivp1, n);
+      muscl(s, qr(iv, n), ql(iv + iv_dir, n), plm_theta);
+      return;
+    }
+  } 
+  
+  if constexpr (recon_scheme == 6) {
     // TENO-5
     Real s[5];
     s[0] = q(ivm2, n);
@@ -61,7 +70,7 @@ AMREX_GPU_DEVICE AMREX_FORCE_INLINE void cns_recon_eb(
     s[3] = q(ivp1, n);
     s[4] = q(ivp2, n);
     teno5(s, qr(iv, n), ql(iv + iv_dir, n));
-  } else if (recon_scheme == 5) {
+  } else if constexpr (recon_scheme == 5) {
     // WENO-Z5
     Real s[5];
     s[0] = q(ivm2, n);
@@ -70,7 +79,7 @@ AMREX_GPU_DEVICE AMREX_FORCE_INLINE void cns_recon_eb(
     s[3] = q(ivp1, n);
     s[4] = q(ivp2, n);
     wenoz5(s, qr(iv, n), ql(iv + iv_dir, n));
-  } else if (recon_scheme == 4) {
+  } else if constexpr (recon_scheme == 4) {
     // WENO-JS5
     Real s[5];
     s[0] = q(ivm2, n);
@@ -79,21 +88,21 @@ AMREX_GPU_DEVICE AMREX_FORCE_INLINE void cns_recon_eb(
     s[3] = q(ivp1, n);
     s[4] = q(ivp2, n);
     wenojs5(s, qr(iv, n), ql(iv + iv_dir, n));
-  } else if (recon_scheme == 3) {
+  } else if constexpr (recon_scheme == 3) {
     // WENO-Z3
     Real s[3];
     s[0] = q(ivm1, n);
     s[1] = q(iv, n);
     s[2] = q(ivp1, n);
     wenoz3(s, qr(iv, n), ql(iv + iv_dir, n));
-  } else if (recon_scheme == 2) {
+  } else if constexpr (recon_scheme == 2) {
     // MUSCL / PLM
     Real s[3];
     s[0] = q(ivm1, n);
     s[1] = q(iv, n);
     s[2] = q(ivp1, n);
     muscl(s, qr(iv, n), ql(iv + iv_dir, n), plm_theta);
-  } else if (recon_scheme == 1) {
+  } else if constexpr (recon_scheme == 1) {
     // Simple Godunov
     qr(iv, n) = q(iv, n);
     ql(iv + iv_dir, n) = q(iv, n);

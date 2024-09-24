@@ -31,7 +31,7 @@ public:
   //    Constructors and destructors                                        //
   ////////////////////////////////////////////////////////////////////////////
 
-  CNS(){}; // Default constructor, builds invalid object
+  CNS() {}; // Default constructor, builds invalid object
 
   CNS(amrex::Amr& papa, int lev, const amrex::Geometry& level_geom,
       const amrex::BoxArray& bl, const amrex::DistributionMapping& dm,

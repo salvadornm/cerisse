@@ -162,10 +162,13 @@ void CNS::compute_dSdt_box(Box const& bx, Array4<const Real>& sarr,
           });
           // 2. FD interpolation to cell face
           const Box& reconbox = amrex::grow(bx, dir, 1);
-          amrex::ParallelFor(
-            reconbox, NCHAR, [=] AMREX_GPU_DEVICE(int i, int j, int k, int n) {
-              cns_recon(i, j, k, n, dir, w, wl, wr, recon_scheme, plm_theta);
-            });
+          amrex::ParallelFor(TypeList<CompileTimeOptions<1, 2, 3, 4, 5, 6>>{},
+                             {recon_scheme}, reconbox, NCHAR,
+                             [=] AMREX_GPU_DEVICE(int i, int j, int k, int n,
+                                                  auto captured_recon_scheme) {
+                               cns_recon<captured_recon_scheme>(i, j, k, n, dir, w,
+                                                                wl, wr, plm_theta);
+                             });
           // 3. Solve Riemann problem for fluxes at cell face
           amrex::ParallelFor(flxbx, [=] AMREX_GPU_DEVICE(int i, int j, int k) {
             cns_riemann(i, j, k, dir, flx, q, wl, wr, char_sys, recon_char_var);
