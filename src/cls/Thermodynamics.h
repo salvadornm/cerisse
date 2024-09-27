@@ -263,7 +263,7 @@ class multispecies_gas_t {
                             vel[0]*vel[0] + vel[1]*vel[1] + vel[2]*vel[2]);
     Real E = (cons(i,j,k,idx_t::UET) - ke)/rho;
     Real e_cgs = E * 1.0e4;
-    Real T, p_cgs, G;
+    Real T=0.0, p_cgs=0.0, G=0.0;
     eos.REY2T(rho_cgs, e_cgs, Y, T);
     eos.RTY2P(rho_cgs, T, Y, p_cgs);
     eos.RTY2G(rho_cgs, T, Y, G);
@@ -272,12 +272,12 @@ class multispecies_gas_t {
     Real cs_cgs = std::sqrt(G * p_cgs / rho_cgs);
     Real cs = cs_cgs * 0.01;
 
-    // 4.directional velocity (u)
+    // 4.directional velocity abs(u)
     Real u = AMREX_D_PICK(
               vel[0]*vdir[0],
               vel[0]*vdir[0] + vel[1]*vdir[1], 
               vel[0]*vdir[0] + vel[1]*vdir[1] + vel[2]*vdir[2]);
-
+    u = std::abs(u);
     // 5. Compute eigenvalues
     GpuArray<Real,idx_t::NWAVES> eigenvals; //{u+cs,u...,u,u-cs};
     eigenvals[0] = u + cs;

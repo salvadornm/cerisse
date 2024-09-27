@@ -13,7 +13,7 @@ USE_CUDA = TRUE
 CUDA_ARCH= 8.0
 
 # Debugging
-DEBUG = TRUE
+DEBUG = FALSE
 
 # PelePhysics
 EOS_MODEL := FUEGO
