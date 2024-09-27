@@ -41,7 +41,7 @@ class calorifically_perfect_gas_t {
     cs = std::sqrt(gamma * Rspec * T);
   }
 
-  AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE GpuArray<Real,idx_t::NWAVES> cons2eigenvals(const int i, const int j, const int k, const Array4<Real>& cons, const GpuArray<int, 3>& vdir) const {
+  AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE GpuArray<Real,idx_t::NWAVES> cons2eigenvals(const int i, const int j, const int k, const Array4<Real>& cons, const GpuArray<int, AMREX_SPACEDIM>& vdir) const {
 
     Real rho = cons(i, j, k, idx_t::URHO);
     Real rhoinv = Real(1.0) / rho;
@@ -235,32 +235,56 @@ class multispecies_gas_t {
 #endif
   }
 
-  AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE GpuArray<Real,idx_t::NWAVES> cons2eigenvals(const int i, const int j, const int k, const int dir,const Array4<Real>& cons) const {
+  AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE GpuArray<Real,idx_t::NWAVES> cons2eigenvals(const int i, const int j, const int k, const Array4<Real>& cons, const GpuArray<int, AMREX_SPACEDIM>& vdir) const {
 
-    Abort("cons2eigenvals not implemented for multispecies_gas_t");
+    auto eos = pele::physics::PhysicsType::eos();
 
-    // GpuArray<int, AMREX_SPACEDIM> vdir = {AMREX_D_DECL(int(dir == 0), int(dir == 1), int(dir == 2))};
+    // 1.Compute density
+    Real rho = 0.0;
+    for (int n = 0; n < NUM_SPECIES; ++n) {
+      rho += cons(i, j, k, idx_t::UFS + n);
+    }
+    Real rho_cgs = rho * 0.001;
 
-    // Real rho = cons(i, j, k, idx.URHO);
-    // Real rhoinv = Real(1.0) / rho;
-    // GpuArray<int, AMREX_SPACEDIM> vel= {AMREX_D_DECL(
-    //                               cons(i, j, k, idx_t::UMX) * rhoinv,
-    //                               cons(i, j, k, idx_t::UMY) * rhoinv,
-    //                               cons(i, j, k, idx_t::UMZ) * rhoinv)};
-    // Real ke = Real(0.5) * rho * AMREX_D_PICK(
-    //                             vel[0]*vel[0],
-    //                             vel[0]*vel[0] + vel[1]*vel[1], 
-    //                             vel[0]*vel[0] + vel[1]*vel[1] + vel[2]*vel[2]);
-    // Real eint = (cons(i,j,k,idx_t::UET) - ke)/rho;
-    // Real T = eint / cv;
+    // 2.Compute pressure(rho_cgs,T(rho_cgs,e_cgs,Y),Y)
+    // Get composition (Y), energy (e_cgs), temperature (T), pressure (p_cgs), gamma (G)
+    Real rhoinv = Real(1.0) / rho;
+    Real Y[NUM_SPECIES];
+    for (int n = 0; n < NUM_SPECIES; ++n) {
+      Y[n] = cons(i, j, k, idx_t::UFS + n) * rhoinv;
+    }
+    GpuArray<Real, AMREX_SPACEDIM> vel= {AMREX_D_DECL(
+                                  cons(i, j, k, idx_t::UMX) * rhoinv,
+                                  cons(i, j, k, idx_t::UMY) * rhoinv,
+                                  cons(i, j, k, idx_t::UMZ) * rhoinv)};
+    Real ke = Real(0.5) * rho * AMREX_D_PICK(
+                            vel[0]*vel[0],
+                            vel[0]*vel[0] + vel[1]*vel[1], 
+                            vel[0]*vel[0] + vel[1]*vel[1] + vel[2]*vel[2]);
+    Real E = (cons(i,j,k,idx_t::UET) - ke)/rho;
+    Real e_cgs = E * 1.0e4;
+    Real T, p_cgs, G;
+    eos.REY2T(rho_cgs, e_cgs, Y, T);
+    eos.RTY2P(rho_cgs, T, Y, p_cgs);
+    eos.RTY2G(rho_cgs, T, Y, G);
 
-    // Real cs = std::sqrt(gamma * Rspec * T);
-    // Real u = AMREX_D_PICK(
-    //           vel[0]*vdir[0],
-    //           vel[0]*vdir[0] + vel[1]*vdir[1], 
-    //           vel[0]*vdir[0] + vel[1]*vdir[1] + vel[2]*vdir[2]);
+    // 3.Compute sound speed
+    Real cs_cgs = std::sqrt(G * p_cgs / rho_cgs);
+    Real cs = cs_cgs * 0.01;
 
-    GpuArray<Real,idx_t::NWAVES> eigenvals; //{u+cs,u,u-cs}
+    // 4.directional velocity (u)
+    Real u = AMREX_D_PICK(
+              vel[0]*vdir[0],
+              vel[0]*vdir[0] + vel[1]*vdir[1], 
+              vel[0]*vdir[0] + vel[1]*vdir[1] + vel[2]*vdir[2]);
+
+    // 5. Compute eigenvalues
+    GpuArray<Real,idx_t::NWAVES> eigenvals; //{u+cs,u...,u,u-cs};
+    eigenvals[0] = u + cs;
+    for (int n = 1; n < idx_t::NWAVES - 1; ++n) {
+      eigenvals[n] = u;
+    }
+    eigenvals[idx_t::NWAVES] = u + cs;
   return eigenvals;
   }
 
@@ -305,11 +329,10 @@ class multispecies_gas_t {
     const Box& bxg = mfi.growntilebox(idx_t::NGHOST);
 
     amrex::ParallelFor(bxg, [=, *this] AMREX_GPU_DEVICE(int i, int j, int k) {
-      Real rho = 0.0;  // cons(i, j, k, idx.URHO);
+      Real rho = 0.0;
       for (int n = 0; n < NUM_SPECIES; ++n) {
         rho += cons(i, j, k, idx.UFS + n);
       }
-      // rho = max(1e-40, rho);
       Real rhoinv = Real(1.0) / rho;
       Real ux = cons(i, j, k, idx.UMX) * rhoinv;
       Real uy = cons(i, j, k, idx.UMY) * rhoinv;

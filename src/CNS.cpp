@@ -360,6 +360,7 @@ void CNS::computeNewDt(int finest_level, int sub_cycle, Vector<int> &n_cycle,
   Array_t* d_max_eigenvals = aa_max_eigenvals.data(); // Get associated device pointer
 
   // Compute max eigenvalues
+  // Can be made more efficient by computing all the eigenvalues in all directions at once. Rather than per direction.
   for (MFIter mfi(consmf, false); mfi.isValid(); ++mfi) {
     const Box &bx = mfi.tilebox();
     const Array4<Real>& cons= consmf.array(mfi);
