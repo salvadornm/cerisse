@@ -259,12 +259,17 @@ void CNS::compute_rhs(MultiFab& statemf, Real dt, FluxRegister* fr_as_crse, Flux
 
 #ifdef AMREX_USE_GPIBM
     IBM::ib.computeGPs(mfi, state, prims, cls_d, level);
+    const auto& ibMarkers = ib_mf.array(mfi);
 #endif
 
     // Fluxes including boundary/discontinuity corrections
     // Note: we are over-writing state (cons) with flux derivative
     // PROB::ProbRHS::eflux(geom, mfi, prims, temp, state, cls_d);
-    prob_rhs.eflux(geom, mfi, prims, temp, state, cls_d);
+#ifdef AMREX_USE_GPIM    
+    prob_rhs.eflux_ibm(geom, mfi, prims, temp, state, cls_d, ibMarkers);
+#else
+    prob_rhs.eflux(geom, mfi, prims, temp, state, cls_d,ibm);
+#endif
 
     prob_rhs.dflux();
 

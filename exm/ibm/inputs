@@ -6,17 +6,17 @@ max_step  = 10000
 stop_time = 10.0
 #time_step = 1.0e-5 # at base level, higher level time step is computed based on the number of subcycles (depending on the subcycling strategy). stop_time = max_step*time_step
 # or
-cfl = 0.5
+cfl = 0.3
 
 # -1 = N/A (Incase of periodic)
 # 0 = Interior           3 = Symmetry
 # 1 = Inflow             4 = SlipWall
 # 2 = Outflow            5 = NoSlipWall
 # 6 = user defined
-cns.lo_bc = 2 -1 -1
+cns.lo_bc = 1 -1 -1
 cns.hi_bc = 2 -1 -1
 cns.nstep_screen_output = 5 # 0=quiet, 1=verbose
-cns.verbose = 1       # 0=quiet, 1=verbose
+cns.verbose = 0       # 0=quiet, 1=verbose
 
 #-------------------------------- IMMERSED BOUNDARY ---------------------------#
 ib.filename = sphere.stl
@@ -26,7 +26,7 @@ geometry.is_periodic = 0 1 1
 geometry.coord_sys   = 0  # 0 => cart, 1 => RZ  2=>spherical
 geometry.prob_lo     =   0.0     0.0     0.0
 geometry.prob_hi     =   4.0     4.0     4.0
-amr.n_cell           =   128     128     128
+amr.n_cell           =   256     256     256
 
 #-------------------------------- REFINEMENT / REGRIDDING ---------------------#
 amr.max_level       = 1       # maximum level number allowed

@@ -17,11 +17,18 @@ struct ProbParm
 { 
   Real p_inf = 1.0e5;
   Real T_inf = 300.0;
-  Real u_inf = 1200.0;
+  Real u_inf = 200.0; // 1200
 
-  Real x0 = 1.0_rt;
+  Real x0 = 2.0_rt;  
   Real y0 = 2.0_rt;
   Real z0 = 2.0_rt;
+
+  // derived values
+  Real gam = 1.4;
+  Real eint    = p_inf/(gam -Real(1.0));
+  Real rho_inf = p_inf*29.0_rt/(T_inf*8.314_rt*1000_rt);
+  Real ekin = rho_inf*u_inf*u_inf;
+
 };
 
 
@@ -29,8 +36,10 @@ typedef closures_dt<indicies_t, visc_suth_t, cond_suth_t,
                     calorifically_perfect_gas_t<indicies_t>>
     ProbClosures;
 
-typedef rhs_dt<rusanov_t<ProbClosures>, no_diffusive_t, no_source_t>
-    ProbRHS;
+typedef rhs_dt<rusanov_t<ProbClosures>, no_diffusive_t, no_source_t>  ProbRHS;
+
+//typedef rhs_dt<skew_t<false,false, 2, ProbClosures>, no_diffusive_t, no_source_t > ProbRHS;
+
 
 typedef std::ratio<5,5> d_image;
 typedef eib_t<1,1,d_image,ProbClosures> ProbIB;
@@ -42,7 +51,7 @@ void inline inputs() {
   pp.add("cns.stages_rk", 3);  // 1, 2 or 3
 
   pp.add   ("ib.move",0); // 0=false, 1=true
-  pp.add   ("ib.plot_surf",0); // 0=false, 1=true
+  pp.add   ("ib.plot_surf",1); // 0=false, 1=true
 }
 
 //////////////////////////// Initial conditions ////////////////////////////////
@@ -63,22 +72,28 @@ void prob_initdata (int i, int j, int k, amrex::Array4<amrex::Real> const& state
   Real xend   = pparm.x0;
   Real dis = xstart - xend;
   Real grad = (pparm.u_inf - u_small)/(dis);
-  if (x < xstart) {
-    ux = pparm.u_inf;
-    T = pparm.T_inf;
-    P = pparm.p_inf;
-  }
-  else if (pow(x-pparm.x0,2) + pow(y-pparm.y0,2) + pow(z-pparm.z0,2) < pow(0.6_rt,2) ) { 
-    Real xx = x - xstart;
-    // ux = pparm.u_inf + grad*xx;
-    ux = u_small;
-    T = pparm.T_inf*3;
-    P = pparm.p_inf;
-  } else {
-    ux = pparm.u_inf;
-    T = pparm.T_inf*3;
-    P = pparm.p_inf;
-  }
+  
+  // if (x < xstart) {
+  //   ux = pparm.u_inf;
+  //   T = pparm.T_inf;
+  //   P = pparm.p_inf;
+  // }
+  // else if (pow(x-pparm.x0,2) + pow(y-pparm.y0,2) + pow(z-pparm.z0,2) < pow(0.6_rt,2) ) { 
+  //   Real xx = x - xstart;
+  //   // ux = pparm.u_inf + grad*xx;
+  //   ux = u_small;
+  //   T = pparm.T_inf*3;
+  //   P = pparm.p_inf;
+  // } else {
+  //   ux = pparm.u_inf;
+  //   T = pparm.T_inf*3;
+  //   P = pparm.p_inf;
+  // }
+
+  ux = Real(0.0);//pparm.u_inf;
+  T = pparm.T_inf;
+  P = pparm.p_inf;
+  //--------------------------------
 
 
   rho = P/(closures.Rspec*T);
@@ -154,31 +169,37 @@ void user_tagging(int i, int j, int k, int nt, auto& tagfab, const auto &sdatafa
 }
 
 //////////////////////////// Boundary conditions ///////////////////////////////
-/**
- * \brief Fill external boundary conditions for ghost cells.
- *
- * @param x         ghost cell cooridinates.
- * @param dr        wall-ghost/wall-first internal distance ratio 
- * @param s_int     flow state inside of the domain.
- * @param s_ext     flow state to be filled.
- * @param idir      direction (0: x, 1: y, 2: z).
- * @param sgn       high or low boundary (1: low, -1: high).
- * @param time      time.
- * @param geomdata  domain geometry data.
- * @param pparm ProbParm data as defined in pparm.H and initialised in
- * amrex_probinit.
- * @sa CnsFillExtDir
- * @sa CnsFillExtDir::operator()
- */
 AMREX_GPU_DEVICE AMREX_FORCE_INLINE void
 bcnormal(const amrex::Real x[AMREX_SPACEDIM], amrex::Real dratio, const amrex::Real s_int[ProbClosures::NCONS],
          const amrex::Real s_refl[ProbClosures::NCONS], amrex::Real s_ext[ProbClosures::NCONS],
          const int idir, const int sgn, const amrex::Real time,
-         amrex::GeometryData const& /*geomdata*/,  ProbClosures const& closures, ProbParm const& pparm)
+         amrex::GeometryData const& /*geomdata*/,  ProbClosures const& closures, ProbParm const& pparm)  
 {
-  // if (idir == 1) { // ylo or yhi
+  const int URHO = ProbClosures::URHO;
+  const int UMX  = ProbClosures::UMX;
+  const int UMY  = ProbClosures::UMY;
+  const int UMZ  = ProbClosures::UMZ;
+  const int UET  = ProbClosures::UET;
+  const int face = (idir+1)*sgn;
 
-    amrex::Abort("bcnormal not coded");
+  switch(face)
+  {
+    case  -1:  // EAST
+      
+      s_ext[URHO] = pparm.rho_inf;
+      s_ext[UMX]  = pparm.rho_inf*pparm.u_inf;
+      s_ext[UMY]  = Real(0.0);    
+      s_ext[UMZ]  = Real(0.0);
+      s_ext[UET]  = pparm.eint + pparm.ekin;
+  
+      break;
+    case   1:  //WEST
+      break;      
+    default:
+
+      break;
+  }
+
 
 }
 
