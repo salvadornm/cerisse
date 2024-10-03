@@ -84,24 +84,24 @@ struct ProbParm {
 that may be useful.
 The names follow in the **cons_var_names** array
 
-```
+```cpp
 inline Vector<std::string> cons_vars_names={"Xmom","Ymom","Zmom","Energy","Energy"};
 ```
 
 The type of variables, keep as it is, scalar ser 0 and vectors are given by their components
 
 
-```
+```cpp
 inline Vector<int> cons_vars_type={1,2,3,0,0};
 ```
 
 The closures and right-hand-side of equations
 
-```
-typedef closures_dt<indicies_t, visc_suth_t, cond_suth_t,
+```cpp
+  typedef closures_dt<indicies_t, visc_suth_t, cond_suth_t,
                     calorifically_perfect_gas_t<indicies_t>>
     ProbClosures;
-typedef rhs_dt<riemann_t<false, ProbClosures>, no_diffusive_t, no_source_t>
+  typedef rhs_dt<riemann_t<false, ProbClosures>, no_diffusive_t,no_source_t>
     ProbRHS;
 ```
 
@@ -117,9 +117,17 @@ typedef rhs_dt<riemann_t<false, ProbClosures>, no_diffusive_t, no_source_t>
 
 ### RHS
 
+This call indicates the different type of numerical scheme for the advection part
+
+```cpp
+  typedef rhs_dt<keep_euler_t<false, false, 4, ProbClosures>,no_diffusive_t,
+               no_source_t> ProbRHS;
+```
+
 | RHS                     | Options          | Use | Description                                                  |
 | --------------------------- | ------------- |:-------:| ------------------------------------------------------------ |
-| ```riemann_t```             |            |   often      | Riemann Solver                 |
+| ```riemann_t```             |            |   often      | Riemann Solver   MUSCL              |
+| ```keep_euler_t```             |  AD,IB, order           |   often      | KEEP Scheme                 |
 | ```centraldif_t```             |  AD,IB, order           |   often      | Central Scheme                 |
 | ```skew_t```             |  AD, IB, order           |   often      | Skew-symmetric Scheme                 |
 | ```no_diffusive_t```        |            |   often      | No diffusive part (Euler)                |

@@ -259,14 +259,18 @@ void CNS::compute_rhs(MultiFab& statemf, Real dt, FluxRegister* fr_as_crse, Flux
 
 #ifdef AMREX_USE_GPIBM
     IBM::ib.computeGPs(mfi, state, prims, cls_d, level);
+    const auto& ibMarkers = ib_mf.array(mfi);
 #endif
 
     // Fluxes including boundary/discontinuity corrections
     // Note: we are over-writing state (cons) with flux derivative
-    // PROB::ProbRHS::eflux(geom, mfi, prims, temp, state, cls_d);
+#ifdef AMREX_USE_GPIBM    
+    prob_rhs.eflux_ibm(geom, mfi, prims, temp, state, cls_d, ibMarkers);
+  //  prob_rhs.dflux_ibm(ibMarkers);
+#else
     prob_rhs.eflux(geom, mfi, prims, temp, state, cls_d);
-
     prob_rhs.dflux();
+#endif
 
     // Source terms, including update mask (e.g inside IB)
     prob_rhs.src(mfi, prims, state, cls_d, dt);
@@ -275,7 +279,6 @@ void CNS::compute_rhs(MultiFab& statemf, Real dt, FluxRegister* fr_as_crse, Flux
     // TODO: IBM::set_solid_state(mfi,state,cls_d)
 #if AMREX_USE_GPIBM
     const Box& bx   = mfi.tilebox();
-    const auto& ibMarkers = ib_mf.array(mfi);
     amrex::ParallelFor(bx, cls_h.NCONS,
     [=] AMREX_GPU_DEVICE (int i, int j, int k, int n) noexcept
     {

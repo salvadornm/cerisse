@@ -16,3 +16,7 @@ These examples are classical tests designed to compare numerical schemes and are
 
 --8<-- "exm/shock_reflect/README.md"
 
+## Numerics Schemes 
+
+--8<-- "exm/numerics/README.md"
+
