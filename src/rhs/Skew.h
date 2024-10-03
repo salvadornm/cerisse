@@ -542,7 +542,7 @@ class skew_t {
   int halfsten = order / 2;
 
   // parameters for damping and shock capturing   
-  const Real Cshock = 1.0,Cdamp = 0.016; //default 0.1 and 0.016
+  const Real Cshock = 0.1,Cdamp = 0.016; //default 0.1 and 0.016
   // sensor variables
   const int NVARSEN=2;
   int NSEN[2];

@@ -45,7 +45,8 @@ class calorifically_perfect_gas_t {
     cs = std::sqrt(gamma * Rspec * T);
   }
 
-  AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE GpuArray<Real,idx_t::NWAVES> cons2eigenvals(const int i, const int j, const int k, const Array4<Real>& cons, const GpuArray<int, AMREX_SPACEDIM>& vdir) const {
+  AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE GpuArray<Real,idx_t::NWAVES> cons2eigenvals(const int i, const int j, const int k, const Array4<Real>& cons, 
+                                                                                       const GpuArray<int, 3>& vdir) const {
 
     Real rho = cons(i, j, k, idx_t::URHO);
     Real rhoinv = Real(1.0) / rho;
@@ -246,7 +247,8 @@ class multispecies_gas_t {
 #endif
   }
 
-  AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE GpuArray<Real,idx_t::NWAVES> cons2eigenvals(const int i, const int j, const int k, const Array4<Real>& cons, const GpuArray<int, AMREX_SPACEDIM>& vdir) const {
+  AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE GpuArray<Real,idx_t::NWAVES> cons2eigenvals(const int i, const int j, const int k,
+                                                                                       const Array4<Real>& cons, const GpuArray<int, 3>& vdir) const {
 
     auto eos = pele::physics::PhysicsType::eos();
 
@@ -255,7 +257,8 @@ class multispecies_gas_t {
     for (int n = 0; n < NUM_SPECIES; ++n) {
       rho += cons(i, j, k, idx_t::UFS + n);
     }
-    Real rho_cgs = rho * 0.001;
+    // CGS-> SI
+    Real rho_cgs = rho * rho_si2cgs;
 
     // 2.Compute pressure(rho_cgs,T(rho_cgs,e_cgs,Y),Y)
     // Get composition (Y), energy (e_cgs), temperature (T), pressure (p_cgs), gamma (G)
@@ -273,7 +276,7 @@ class multispecies_gas_t {
                             vel[0]*vel[0] + vel[1]*vel[1], 
                             vel[0]*vel[0] + vel[1]*vel[1] + vel[2]*vel[2]);
     Real E = (cons(i,j,k,idx_t::UET) - ke)/rho;
-    Real e_cgs = E * 1.0e4;
+    Real e_cgs = E * specenergy_si2cgs;
     Real T=0.0, p_cgs=0.0, G=0.0;
     eos.REY2T(rho_cgs, e_cgs, Y, T);
     eos.RTY2P(rho_cgs, T, Y, p_cgs);
@@ -281,7 +284,8 @@ class multispecies_gas_t {
 
     // 3.Compute sound speed
     Real cs_cgs = std::sqrt(G * p_cgs / rho_cgs);
-    Real cs = cs_cgs * 0.01;
+    // CGS -> SI
+    Real cs = cs_cgs * speed_cgs2si;
 
     // 4.directional velocity abs(u)
     Real u = AMREX_D_PICK(
