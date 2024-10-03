@@ -15,10 +15,18 @@ class rusanov_t {
   AMREX_GPU_HOST_DEVICE
   ~rusanov_t() {}
 
+#ifdef AMREX_USE_GPIBM  
+  void inline eflux_ibm(const Geometry& geom, const MFIter& mfi,
+                    const Array4<Real>& prims, const Array4<Real>& flx,
+                    const Array4<Real>& rhs,
+                    const cls_t* cls, const Array4<bool>& ibMarkers) {
+#else
   void inline eflux(const Geometry& geom, const MFIter& mfi,
                     const Array4<Real>& prims, const Array4<Real>& flx,
                     const Array4<Real>& rhs,
                     const cls_t* cls) {
+#endif
+
     const GpuArray<Real, AMREX_SPACEDIM> dxinv = geom.InvCellSizeArray();
     const Box& bx  = mfi.growntilebox(0);
     const Box& bxg = mfi.growntilebox(cls->NGHOST);
@@ -80,9 +88,6 @@ class rusanov_t {
     for (int n = 0; n < cls_t::NCONS; n++) {
       flx(i, j, k, n) = 0.5_rt*((cell_flux(i,j,k,n) + cell_flux(il,jl,kl,n)) 
                       - lambda*(cons(i,j,k,n) - cons(il,jl,kl,n)));
-      // printf("lambda_max[%d,%d,%d] = %f\n",i,j,k,lambda_max(i,j,k,0));
-      // printf("lambda_max[%d,%d,%d] = %f\n",i+1,j,k,lambda_max(i+1,j,k,0));
-      // printf("flx[%d,%d,%d,%d] = %f\n",i,j,k,n,flx(i,j,k,n));
       };
     }
   };

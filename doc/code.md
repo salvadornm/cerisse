@@ -55,12 +55,12 @@ static constexpr int NGHOST=3; // TODO: make it an automatic parameter
 
 | Index                      |  Default | Description                                                  |
 | --------------------------- | ------------- | ------------------------------------------------------------ |
-|   `UMX`             | 0       | density    |
-|   `UMY`             | 1       | x-velocity    |
-|   `UMZ`             | 2       | y-velocity    |
-|   `UET`             | 3       | z-velocity    |
-|   `URHO`            | 4       | temperature    |
-|   `UFS`             | 4       | last index, replace density when solving species  |
+|   `UMX`             | 0       | x-momentum *rho u*   |
+|   `UMY`             | 1       | y-momentum *rho v*     |
+|   `UMZ`             | 2       | z-momentum *rho w*     |
+|   `UET`             | 3       | total energy *rho e* |
+|   `URHO`            | 4       | density    |
+|   `UFS`             | 4       | first spec index, replace density when solving species  |
 
 
 ### Other

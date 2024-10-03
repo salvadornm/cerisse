@@ -2,7 +2,7 @@
 #                                 INPUT FILE
 #------------------------------------------------------------------------------#
 # start time is assumed to be 0, unless re-starting
-max_step  = 10000
+max_step  = 1000
 stop_time = 10.0
 #time_step = 1.0e-5 # at base level, higher level time step is computed based on the number of subcycles (depending on the subcycling strategy). stop_time = max_step*time_step
 # or
@@ -13,9 +13,9 @@ cfl = 0.3
 # 1 = Inflow             4 = SlipWall
 # 2 = Outflow            5 = NoSlipWall
 # 6 = user defined
-cns.lo_bc = 1 -1 -1
+cns.lo_bc = 2 -1 -1
 cns.hi_bc = 2 -1 -1
-cns.nstep_screen_output = 5 # 0=quiet, 1=verbose
+cns.nstep_screen_output = 5 # 
 cns.verbose = 0       # 0=quiet, 1=verbose
 
 #-------------------------------- IMMERSED BOUNDARY ---------------------------#
@@ -26,12 +26,12 @@ geometry.is_periodic = 0 1 1
 geometry.coord_sys   = 0  # 0 => cart, 1 => RZ  2=>spherical
 geometry.prob_lo     =   0.0     0.0     0.0
 geometry.prob_hi     =   4.0     4.0     4.0
-amr.n_cell           =   256     256     256
+amr.n_cell           =   128     128     128
 
 #-------------------------------- REFINEMENT / REGRIDDING ---------------------#
 amr.max_level       = 1       # maximum level number allowed
 amr.ref_ratio       = 2 2  # refinement ratio
-amr.regrid_int      = 2000000 200  # how often to regrid
+amr.regrid_int      = 50 50  # how often to regrid
 amr.blocking_factor_x = 8 8 # blocking factor in x per level
 amr.blocking_factor_y = 8 8 # blocking factor in x per level
 amr.blocking_factor_z = 8 8 # blocking factor in x per level
@@ -44,7 +44,7 @@ amr.grid_eff        = 0.8     # what constitutes an efficient grid
 #-------------------------------- PLOTFILES -----------------------------------#
 amr.plot_files_output = 1
 amr.plot_file         = ./plot/plt # root name of plotfile
-amr.plot_int          = 500     # number of timesteps between plotfiles
+amr.plot_int          = 10     # number of timesteps between plotfiles
 amr.derive_plot_vars  = x_velocity pressure x_velocity y_velocity z_velocity temperature
 amr.v = 1 # 0=quiet, 1=verbose
 

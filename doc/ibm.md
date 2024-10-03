@@ -62,17 +62,18 @@ For example, a slip wall in y bottom wall woiudl be could be define as
 If the boundary is not defined, the code will use the one specified in the input for that particular face.
 
 
-## Immersed Boundaries
+# Immersed Boundaries
+
+In **Immersed Boundary Methods** (IBM), boundary conditions on the surface are enforced by interpolating the influence of the boundary onto the fluid flow. This is achieved by assigning specific values at *ghost points* (GP). These values are extrapolated from the surrounding fluid points, taking into account the surface normal and the imposed boundary conditions.
+
+<img src="../../images/IB_geom.png">
 
 
-## Theory
+## Set-up 
 
-In *Immersed Boundary Methods * (IBM), boundary conditions are enforced by introducing source terms,  using interpolation  to impose the influence of the boundary on the fluid flow.
+### input
 
-## Set-up input
-
-
-Define STL file with geometry
+To set-up the Define STL file with geometry
 
 ```
 #-------------------------------- IMMERSED BOUNDARY ---------------------------#
@@ -80,7 +81,7 @@ ib.filename = sphere_fine_20k.stl
 ```
 
 
-## Set-up prob.h
+### prob.h
 
 
 ```cpp
@@ -88,7 +89,9 @@ pp.add   ("ib.move",0); // 0=false, 1=true
 pp.add   ("ib.plot_surf",0); // 0=false, 1=true
 ```
 
-## Set-up bcnormal
+### tagging
+
+### bcnormal
 
 
 
@@ -97,3 +100,9 @@ pp.add   ("ib.plot_surf",0); // 0=false, 1=true
 ```eib_t``` is explicit geometry (triangulation based) immersed boundary method
 class. It holds an array of IBMultiFab, one for each AMR level; and it also holds
 the geometry
+
+### Markers
+
+The field variable ibMarkers (is a boolean)  has two values 
+```ibMarkers(i,j,k,0)``` is the **SLD** solid point marker and
+```ibMarkers(i,j,k,1)```  the **GP** ghost  point marker. Both markers indicated if the i,j,k cell in teh domain is a solid or a ghost point.Remember that **GP** cells *are* **SLD** cells.

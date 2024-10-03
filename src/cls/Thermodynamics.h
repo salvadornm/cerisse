@@ -3,6 +3,10 @@
 
 using namespace amrex;
 
+#include <Constants.h>
+
+using namespace universal_constants;
+
 // Philosophy
 // Keep all thermodynamics functions local, acting on a single point
 
@@ -13,7 +17,7 @@ class calorifically_perfect_gas_t {
  public:
   Real gamma = 1.40;   // ratio of specific heats
   Real mw = 28.96e-3;  // mean molecular weight air kg/mol
-  Real Ru = Real(8.31451);
+  Real Ru = gas_constant;
   Real cv = Ru / (mw * (gamma - Real(1.0)));
   Real cp = gamma * Ru / (mw * (gamma - Real(1.0)));
   Real Rspec = Ru / mw;
@@ -159,22 +163,24 @@ class multispecies_gas_t {
   AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE void RYP2E(const Real R,
                                                       const Real Y[NUM_SPECIES],
                                                       const Real P,
-                                                      Real& E) const {
-    Real rho_cgs = R * 0.001;
-    Real p_cgs = P * 10.0;
+                                                      Real& E) const {    
+    // SI -> CGS   
+    Real rho_cgs = R * rho_si2cgs;     
+    Real p_cgs = P * pres_si2cgs;
 
     auto eos = pele::physics::PhysicsType::eos();
     Real e_cgs;
     eos.RYP2E(rho_cgs, Y, p_cgs, e_cgs);
-
-    E = e_cgs * 1.0e-4;
+    // CGS -> SI
+    E = e_cgs*specenergy_cgs2si
   }
 
   AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE void RYE2TP(
       const Real R, const Real Y[NUM_SPECIES], const Real E, Real& T,
-      Real& P) const {
-    Real rho_cgs = R * 0.001;
-    Real e_cgs = E * 1.0e4;
+      Real& P) const {    
+    // SI -> CGS
+    Real rho_cgs = R * rho_si2cgs;     
+    Real e_cgs = E * specenergy_si2cgs;
 
     auto eos = pele::physics::PhysicsType::eos();
     Real p_cgs;
@@ -182,7 +188,9 @@ class multispecies_gas_t {
     eos.REY2T(rho_cgs, e_cgs, Y, T);
     eos.RTY2P(rho_cgs, T, Y, p_cgs);
 
-    P = p_cgs * 0.1;
+    // CGS -> SI
+    P = p_cgs * pres_cgs2si;
+
 #ifdef DEBUG_PP_EOS
     AMREX_ALWAYS_ASSERT(T > 0.0);
     AMREX_ALWAYS_ASSERT(P > 0.0);
@@ -191,8 +199,9 @@ class multispecies_gas_t {
 
   AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE void RYE2Cs(
       const Real R, const Real Y[NUM_SPECIES], const Real E, Real& cs) const {
-    Real rho_cgs = R * 0.001;
-    Real e_cgs = E * 1.0e4;
+    // SI -> CGS
+    Real rho_cgs = R * rho_si2cgs;     
+    Real e_cgs = E * specenergy_si2cgs;
 
     auto eos = pele::physics::PhysicsType::eos();
     Real T = 0.0, p_cgs, G, cs_cgs;
@@ -200,8 +209,8 @@ class multispecies_gas_t {
     eos.RTY2P(rho_cgs, T, Y, p_cgs);
     eos.RTY2G(rho_cgs, T, Y, G);
     cs_cgs = std::sqrt(G * p_cgs / rho_cgs);
-
-    cs = cs_cgs * 0.01;
+    // CGS -> SI
+    cs = cs_cgs * speed_cgs2si;
 #ifdef DEBUG_PP_EOS
     AMREX_ALWAYS_ASSERT(cs > 0.0);
 #endif
@@ -216,8 +225,9 @@ class multispecies_gas_t {
     AMREX_ALWAYS_ASSERT(R > 0.0);
     AMREX_ALWAYS_ASSERT(Y[0] >= 0.0);
 #endif
-    Real rho_cgs = R * 0.001;
-    Real e_cgs = E * 1.0e4;
+    // SI -> CGS
+    Real rho_cgs = R * rho_si2cgs;     
+    Real e_cgs = E * specenergy_si2cgs;
 
     auto eos = pele::physics::PhysicsType::eos();
     Real p_cgs, cs_cgs;
@@ -227,8 +237,9 @@ class multispecies_gas_t {
     eos.RTY2G(rho_cgs, T, Y, G);
     cs_cgs = std::sqrt(G * p_cgs / rho_cgs);
 
-    P = p_cgs * 0.1;
-    cs = cs_cgs * 0.01;
+    // CGS -> SI
+    P = p_cgs * pres_cgs2si;
+    cs = cs_cgs * speed_cgs2si;
 #ifdef DEBUG_PP_EOS
     AMREX_ALWAYS_ASSERT(P > 0.0);
     AMREX_ALWAYS_ASSERT(cs > 0.0);
