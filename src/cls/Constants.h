@@ -33,6 +33,10 @@ namespace universal_constants {
     // Neutron mass (kg)
     constexpr Real neutron_mass = 1.67492749804e-27; // kg
 
+    // Pressure units
+    constexpr Real pres_bar2si = 1.e5;                  // bar->Pa
+    constexpr Real pres_atm2si = 1.01325* pres_bar2si;  // atm->Pa
+
     // CGS <-> SI (mass)
     constexpr Real mass_cgs2si = 0.001;              // g->kg
     constexpr Real mass_si2cgs = 1.0/mass_cgs2si;    // kg->g
