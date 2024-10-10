@@ -224,25 +224,6 @@ class skew_t {
 
       int Qdir =  cls_t::QRHO + dir + 1; 
 
-      // compute maximum eigenvalues (only if AD)     
-      // if constexpr (isAD) {
-      //   ParallelFor(bxg,
-      //             [=] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {
-      //               GpuArray<Real, cls_t::NWAVES> eigenvalues = cls->cons2eigenvals(i, j, k, cons, vdir);
-      //               if (ibMarkers(i,j,k,0))
-      //               {
-      //                 lambda_max(i,j,k,0) = -1e40;
-      //                 for (int n = 0; n < cls_t::NWAVES; n++) {
-      //                   lambda_max(i, j, k, 0) = std::max(lambda_max(i, j, k, 0), std::abs(eigenvalues[n]));
-      //                 }
-      //               }  
-      //               else
-      //               {
-      //                 lambda_max(i,j,k,0) = 0.0;
-      //               }
-      //             });
-      // }
-      // compute interface fluxes at  flx[i] => f[i-1/2] (reducing order close to BC)
 #ifdef AMREX_USE_GPIBM  
       ParallelFor(bxgnodal,
                   [=,*this] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {
@@ -336,11 +317,7 @@ class skew_t {
     const bool intersolid_flx = marker(i,j,k,0) &&  marker(il,jl,kl,0);    // inter-flux
 
     if (intersolid_flx) return;  // flux =0  inside solid 
-    
-
-    // printf("flx[%d,%d,%d,%d] = %f\n",i,j,k,n,flx(i,j,k,n));
-
-  
+      
     // reduce to second order order scheme based on marker
     if (wall_flx)
     {   

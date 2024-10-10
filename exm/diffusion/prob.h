@@ -29,7 +29,7 @@ struct ProbParm {
   Real L = Real(0.016); // domain size
   Real x0 = Real(0.5)*L;
   Real y0 = Real(0.5)*L;
-  Real delta = Real(L/32.0);
+  Real delta = Real(L/32.0); //32
   
 };
 

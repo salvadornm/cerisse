@@ -3,21 +3,24 @@
 
 #include <AMReX_GpuContainers.H>
 
-struct Num_Method_Param {
+// default values 
+struct defaultparm_t {
 
 public:
 
-bool dissipation = false;
+static constexpr bool dissipation = false;
 
 #ifdef AMREX_USE_GPIBM
-bool ibm = true;
+static constexpr bool ibm = true;
 #else
-bool ibm = false;
+static constexpr bool ibm = false;
 #endif
 
-int order = 2;                        // order of scheme
-amrex::Real C2skew=0.1,C4skew=0.0016; // Skew symmetric default
-amrex::Real C1=0.0,C2=0.0;            // dummy paremeters
+static constexpr int order = 2;               // order of scheme
+static constexpr Real C2skew=0.1,C4skew=0.0016;   // Skew symmetric default
+static constexpr Real conductivity = 0.0262;  // conductivity (for constant value)
+static constexpr Real viscosity   = 1.85e-5;  // viscosity    (for constant value)
+  
 
 };
 

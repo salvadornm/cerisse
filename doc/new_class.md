@@ -1,9 +1,35 @@
 # Classes
 
 
-# rhs/
 
-In the prob.h file, there the **rhs_dt** is defined
+
+## closures
+
+In the **prob.h** file, there the **ProbClosures ** is defined, 
+this includes thd index, v
+
+```cpp
+typedef closures_dt<indicies_t, visc_const_t<methodparm_t>, cond_const_t<methodparm_t>,
+                    calorifically_perfect_gas_t<indicies_t>> ProbClosures;
+```
+
+In general
+
+```cpp
+template <typename idx, typename Visc, typename Cond, typename Thermo, typename... others>
+```
+
+| class                      | Type          | Options| Description                                                  |
+| --------------------------- | ------------- |:-------:| ------------------------------------------------------------ |
+|  idx             | Index (common)         |   indicies     | index of vars   |
+|  Visc            | viscosity model         |   visc_suth_t, visc_const     | index of visco models   |
+
+
+
+
+## rhs
+
+In the **prob.h** file, there the **rhs_dt** is defined
 
 ```cpp
 typedef rhs_dt<riemann_t<false, ProbClosures>, no_diffusive_t, no_source_t>
