@@ -6,10 +6,12 @@
 #include <AMReX_ParmParse.H>
 #include <Closures.h>
 #include <RHS.h>
-#include <Constants.H>
+
+#include <Constants.h>
+#include <NumParam.h>
 
 // 2D Thermal diffusion
-// Pure diffusin case taken from HAMISH
+// Pure diffusion case taken from HAMISH
 // https://www.ukctrf.com/index.php/benchmarking-of-the-new-software/
 
 using namespace amrex;
@@ -27,21 +29,29 @@ struct ProbParm {
   Real L = Real(0.016); // domain size
   Real x0 = Real(0.5)*L;
   Real y0 = Real(0.5)*L;
-  Real delta = Real(L/40.0);
+  Real delta = Real(L/32.0);
+  
+};
+
+// numerical method parameters
+struct methodparm_t {
+
+  public:
+
+  static constexpr int  order = 2;              // order numerical scheme viscous
+  static constexpr Real conductivity = 0.0262;  // conductivity (for constant value)
+  static constexpr Real viscosity   = 1.85e-5;  // viscosity    (for constant value)
   
 };
 
 inline Vector<std::string> cons_vars_names={"Xmom","Ymom","Zmom","Energy","Density"};
 inline Vector<int> cons_vars_type={1,2,3,0,0};
 
-typedef closures_dt<indicies_t, visc_suth_t, cond_suth_t,
+typedef closures_dt<indicies_t, visc_const_t<methodparm_t>, cond_const_t<methodparm_t>,
                     calorifically_perfect_gas_t<indicies_t>> ProbClosures;
 
-template <typename cls_t > class user_source_t;
+typedef rhs_dt<no_euler_t, diffusiveheat_t<methodparm_t, ProbClosures>, no_source_t > ProbRHS;
 
-
-typedef rhs_dt<no_euler_t, no_diffusive_t, no_source_t > ProbRHS;
-//typedef rhs_dt<skew_t<true,false, 4, ProbClosures>, no_diffusive_t, no_source_t > ProbRHS;
 
 
 void inline inputs() {
@@ -49,6 +59,10 @@ void inline inputs() {
 
   pp.add("cns.order_rk", 3);   // -2, 1, 2 or 3"
   pp.add("cns.stages_rk", 3);  // 1, 2 or 3
+
+  amrex::Print() << " ****** Starting ... *******" <<  std::endl;
+  amrex::Print() << " Heat Diffusiom  (Oct 2024)" <<  std::endl;
+
 }
 
 // initial condition
@@ -108,32 +122,24 @@ user_tagging(int i, int j, int k, int nt_level, auto &tagfab,
              const ProbParm &prob_parm, int level) {
 
 
-  Real rhot = sdatafab(i,j,k,ProbClosures::URHO);
-
-  Real dengrad_threshold = 0.5;
+//  Real Thres_low[3]= {0.8,0.85,0.9};
+//  Real Thres_high[3]= {1.2,1.1,1.0};
+  Real Threshold[3] = {0.1,0.05,0.02};
+  
+  Real rhop = sdatafab(i,j,k,ProbClosures::URHO);
   Real drhox = Math::abs(sdatafab(i+1,j,k,ProbClosures::URHO) -
-   sdatafab(i,j,k,ProbClosures::URHO))/rhot;
-
+              sdatafab(i-1,j,k,ProbClosures::URHO));
   Real drhoy = Math::abs(sdatafab(i,j+1,k,ProbClosures::URHO) -
-   sdatafab(i,j-1,k,ProbClosures::URHO))/rhot;
+              sdatafab(i,j-1,k,ProbClosures::URHO));
+  Real gradrho= sqrt(drhox*drhox+drhoy*drhoy)/rhop;
 
-  Real gradrho= sqrt(drhox*drhox+drhoy*drhoy);        
+  //Real T = sdatafab(i,j,k,ProbClosures::URHO); //provi
 
-  if (nt_level > 0)
+  if (nt_level> 0)
   {
-    //tag cells based on density gradient
-    switch (level)
-    {
-      case 0:
-        tagfab(i,j,k) = (gradrho > 0.3);        
-        break;
-      case 1:
-        tagfab(i,j,k) = (gradrho > 0.2);        
-        break;
-      default:
-        tagfab(i,j,k) = (gradrho > 0.1);        
-        break;
-    }
+    //tag cells based on density  values       
+    tagfab(i,j,k) = (gradrho > Threshold[level]);        
+      
   }
 }
 ////////////////////////////////////////////////////////////////////////////////

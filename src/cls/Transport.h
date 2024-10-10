@@ -3,10 +3,11 @@
 
 ////////////////////////////////TRANSPORT/////////////////////////////////
 ////// Viscosity
+template <typename param>
 class visc_const_t {
  private:
  public:
-  Real visc_ref = 1.458e-6;  // Viscosity reference value
+  Real visc_ref = param::viscosity;
 
   AMREX_GPU_DEVICE AMREX_FORCE_INLINE Real visc(const Real& T) const {
     return visc_ref;
@@ -26,11 +27,12 @@ class visc_suth_t {
 };
 
 ////// Conductivity
+template <typename param>
 class cond_const_t {
  private:
  public:
-  Real cond_ref = 1.458e-6;
-
+  Real cond_ref = param::conductivity;
+  
   AMREX_GPU_DEVICE AMREX_FORCE_INLINE Real cond(Real& T) const {
     return cond_ref;
   }
@@ -39,16 +41,6 @@ class cond_const_t {
   AMREX_FORCE_INLINE Real cond_cpu(Real& T) const { return cond_ref; }
 #endif
 };
-
-// class cond_const_pr_t private: ThermodynamicsBase {
-//   private:
-//   public:
-//     Real visc_ref = 1.458e-6; // Viscosity reference value
-
-//     AMREX_GPU_DEVICE AMREX_FORCE_INLINE Real cond(Real& T) const {
-//       // cp*;
-//     return visc_ref;}
-// };
 
 class cond_suth_t {
  private:

@@ -20,3 +20,6 @@ These examples are classical tests designed to compare numerical schemes and are
 
 --8<-- "exm/numerics/README.md"
 
+## Thermal Diffusion
+
+--8<-- "exm/diffusion/README.md"

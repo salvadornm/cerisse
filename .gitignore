@@ -13,7 +13,7 @@
 **/.ipynb_checkpoints/
 **/results
 **/*.visit
-
+build/
 # mac files
 .DS_Store
 

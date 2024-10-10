@@ -266,10 +266,10 @@ void CNS::compute_rhs(MultiFab& statemf, Real dt, FluxRegister* fr_as_crse, Flux
     // Note: we are over-writing state (cons) with flux derivative
 #ifdef AMREX_USE_GPIBM    
     prob_rhs.eflux_ibm(geom, mfi, prims, temp, state, cls_d, ibMarkers);
-    prob_rhs.dflux_ibm(ibMarkers);
+    prob_rhs.dflux_ibm(geom, mfi, prims, temp, state, cls_d, ibMarkers);
 #else
     prob_rhs.eflux(geom, mfi, prims, temp, state, cls_d);
-    prob_rhs.dflux();
+    prob_rhs.dflux(geom, mfi, prims, temp, state, cls_d);
 #endif
 
     // Source terms, including update mask (e.g inside IB)

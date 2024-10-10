@@ -149,13 +149,9 @@ class skew_t {
       coefshock(5) =  Real(0.0);                             
       break;
 
-    default: //second order
-      coefskew(0,0) =  Real(0.25);
-      coefskew(1,0) =  Real(0.25);
-      coefskew(0,1) =  Real(0.25);
-      coefskew(1,1) =  Real(0.25);
-      coefP(0)    =  Real(0.5);
-      coefP(1)    =  Real(0.5);
+    default: 
+
+      amrex::Abort("Skew-symmetric order available 2/4/6 MUST specify one of those ");      
 
       break;
     }

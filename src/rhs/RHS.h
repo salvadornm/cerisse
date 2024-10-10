@@ -9,7 +9,9 @@
 #include <Skew.h>
 //#include <CentralDif.h>
 
-#include <Diffusion.h>
+//#include <Diffusion.h>
+#include <DiffusionCD.h>
+
 #ifdef USE_PELEPHYSICS
 #include "react.h"
 #endif

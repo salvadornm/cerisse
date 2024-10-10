@@ -44,12 +44,20 @@ $$
 Newtonian flows, Fourier and Fickian diffusion and also including (optionally) Soret diffusion
 
 
-$$
-q_j = -\lambda  \frac{\partial T }{\partial x_j}
-$$
+
+
+**Shear stress**
 
 $$
-\tau_{ij} = 2 \mu S_{ij}
+\tau_{ij} = 2 \mu S_{ij}  + (\mu_b - \frac{2}{3} \mu)\nabla \cdot \vec{v} \delta_{ij}
+$$
+
+Where $\mu$ and $\mu_b$ are teh viscosity and bulk viscosity respectively
+
+**Heat Flux**
+
+$$
+q_j = -\lambda  \frac{\partial T }{\partial x_j}
 $$
 
 $$

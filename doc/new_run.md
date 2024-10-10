@@ -1,9 +1,70 @@
-# Running
+# CODE DISCUSSION DOCUMENT
 
 
-NEW CODE DISCUSSION DOCUMENT
+The code is based on two premises:
+
+### Physical Problem Closures
+
+creating the "closures" of the problems, that means which model of transport 
+properties is to be used. This depend on the problem and is seletced in `prob.h`
+
+For example:
+
+```cpp
+typedef closures_dt<indicies_t, visc_suth_t, cond_suth_t,
+                    calorifically_perfect_gas_t<indicies_t>> ProbClosures;
+```
+
+This selects a problem that uses the structure `indicies_t`, which tell position
+of the variables and how many variables to solve. The above also selects
+Sutherland viscosity model  ```visc_suth_t```
+All this is wraped in the class ```ProbClosures``
 
 
+### Equations to Solve and how
+
+Define the RHS of the problem, that includes which equation to solve and which nuemrivcal scheme to use. In general 
+
+$$
+\frac{\partial U}{\partial t} = \mbox{RHS}(U)
+$$
+
+where the RHS includes, inviscid (Euler) terms viscous (for Navier-Stokes) and source terms. For example:
+
+```cpp
+typedef rhs_dt<skew_t<true,false, 4, ProbClosures>, no_diffusive_t, no_source_t > ProbRHS;
+```
+This will solve
+$$
+\frac{\partial U}{\partial t} = F(U)
+$$
+corresponding to the Euelr equations, with a 4th order skew-symmetric numerical scheme.
+Template `skew_t`,`diffusive_t` may have  arguments (like the order of the scheme).
+
+**NEW** Parameters can be passed by a small structure `methodparm_t`,
+so all paraeters  can be changed directly in `prob.h`, 
+such as the order of the scheme, disspation parameters, 
+extra damping, sensor variables, etc. The above example would be
+
+```cpp
+struct methodparm_t {
+
+  public:
+
+  static constexpr int  order = 2;              // order numerical scheme viscous
+  static constexpr Real conductivity = 0.0262;  // conductivity (for constant value)
+  static constexpr Real viscosity   = 1.85e-5;  // viscosity    (for constant value)
+  
+};
+typedef closures_dt<indicies_t, visc_const_t<methodparm_t>, cond_const_t<methodparm_t>,
+                    calorifically_perfect_gas_t<indicies_t>> ProbClosures;
+
+typedef rhs_dt<no_euler_t, diffusiveheat_t<methodparm_t, ProbClosures>, no_source_t > ProbRHS;
+
+```
+
+This is used to set manually the conductivity and viscosity to a desired value ensure 
+and accuarcy of derivatives in `diffusiveheat` 
 
 
 Variables
