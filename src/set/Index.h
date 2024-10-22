@@ -25,8 +25,6 @@ static constexpr int URHO=4;
 static constexpr int UFS=URHO;
 
 
-
-
 static amrex::Vector<std::string> get_cons_vars_names() {  
 #ifdef USE_PELEPHYSICS
   amrex::Vector<std::string> spec_names;
@@ -61,6 +59,14 @@ static constexpr int QG=7;
 static constexpr int QEINT=8;
 static constexpr int QFS=9;
 
+
+// Transport coefficients
+static constexpr int CMU=0;   // dynamic viscosity
+static constexpr int CXI=1;   // bulk viscosity
+static constexpr int CLAM=2;  // heat conductivity 
+static constexpr int CRHOD=3; // species diffusivity (rho*D)
+
+
 // Vector<std::string> prim_vars_names={"Pressure","Temperature","Xvel","Yvel","Zvel"};
 // amrex::Gpu::ManagedVector<std::string> cons_vars_names={"Density","Xmom","Ymom","Zmom","Energy"};
 
@@ -74,6 +80,7 @@ static constexpr int QFS=9;
 static constexpr int NCONS=UFS + NUM_SPECIES;
 static constexpr int NPRIM=QFS + NUM_SPECIES;
 static constexpr int NWAVES=2 + NUM_SPECIES;
+static constexpr int NCOEF= 3 + NUM_SPECIES;
 static constexpr int NGHOST=3; // TODO: make it an automatic parameter
 };
 

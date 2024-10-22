@@ -10,6 +10,7 @@
 //#include <CentralDif.h>
 
 #include <DiffusionCD.h>
+#include <viscous.h>
 
 #ifdef USE_PELEPHYSICS
 #include "react.h"

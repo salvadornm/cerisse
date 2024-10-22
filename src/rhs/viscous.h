@@ -1,5 +1,5 @@
-#ifndef CNS_DIFFUSION_K_H_
-#define CNS_DIFFUSION_K_H_
+#ifndef VISCOUS_H_
+#define VISCOUS_H_
 
 #include <AMReX_CONSTANTS.H>
 #include <AMReX_FArrayBox.H>
@@ -13,10 +13,10 @@ class viscous_t {
   public:
   
   AMREX_GPU_HOST_DEVICE
-  diffusiveheat_t() {}
+  viscous_t() {}
 
   AMREX_GPU_HOST_DEVICE
-  ~diffusiveheat_t() {}
+  ~viscous_t() {}
 
   // vars accessed by functions 
   int order_sch=param::order;
@@ -39,23 +39,32 @@ class viscous_t {
     const Box& bxg = mfi.growntilebox(cls->NGHOST);     // to handle high-order 
     const Box& bxgnodal = mfi.grownnodaltilebox(-1, 0); // to handle fluxes
 
-    // allocate arrays for transport properties
-    FArrayBox coeffs(bxg, 2, The_Async_Arena());
-    const auto& mu_arr  = coeffs.array(0);
-    const auto& lam_arr = coeffs.array(1);
-
+    // allocate arrays for transport properties  SNM CHECK HERE....
+    FArrayBox coeffs(bxg, cls_t::NCOEF, The_Async_Arena());
+    const auto& mu_arr   = coeffs.array(cls_t::CMU);
+    const auto& lam_arr  = coeffs.array(cls_t::CLAM);
+    const auto& xi_arr   = coeffs.array(cls_t::CXI);
+    const auto& rhoD_arr = coeffs.array(cls_t::CRHOD);
+    
     // calculate all transport properties and store in array (up to ghost points)
+#ifdef USE_PELEPHYSICS
+
+    // PELEPHYSICS TRANSPORT CALL  
+
+
+#else
     amrex::ParallelFor(
         bxg, [=, *this] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {
           mu_arr(i,j,k)  = cls->visc(prims(i,j,k,cls_t::QT));
-          lam_arr(i,j,k) = cls->cond(prims(i,j,k,cls_t::QT));          
+          lam_arr(i,j,k) = cls->cond(prims(i,j,k,cls_t::QT));            
         });
+#endif        
 
     // loop over directions -----------------------------------------------
     for (int dir = 0; dir < AMREX_SPACEDIM; dir++) {
       GpuArray<int, 3> vdir = {int(dir == 0), int(dir == 1), int(dir == 2)};
 
-      // computr diffusion fluxes
+      // compute diffusion fluxes
 #ifdef AMREX_USE_GPIBM  
       amrex::Abort(" IBM +diffusion only No ready yet")
     
@@ -82,7 +91,7 @@ class viscous_t {
   /**
   * @brief Compute diffusion fluxes.
   *
-  * @param i,j,k  x, y, z index.
+  * @param i,j,k  x, y, z index.cls_t::CLAM
   * @param dir    direction, 0:x, 1:y, 2:z.
   * @param q      primitive variables.
   * @param[out] flx  output diffusion fluxes.
@@ -124,27 +133,25 @@ class viscous_t {
     const Real u13  = tangent_diff<order>(iv, d1, d3, QU1, q, dxinv);
     const Real u33  = tangent_diff<order>(iv, d1, d3, QU3, q, dxinv);
 #endif
-  const Real divu   = AMREX_D_TERM(u11, +u22, +u33);
-
-  // CHECK  ....  need CMU,CXI,CLAM
-  const Real muf    = interp<order>(iv, d1, CMU, coeffs);
-  const Real xif    = interp<order>(iv, d1, CXI, coeffs);
-  //
-
-  AMREX_D_TERM(Real tau11 = muf * (2.0 * u11 - (2.0 / 3.0) * divu) + xif * divu;
+    const Real divu   = AMREX_D_TERM(u11, +u22, +u33);
+    
+    const Real muf    = interp<order>(iv, d1, cls_t::CMU, coeffs);
+    const Real xif    = interp<order>(iv, d1, cls_t::CXI, coeffs);
+    
+    AMREX_D_TERM(Real tau11 = muf * (2.0 * u11 - (2.0 / 3.0) * divu) + xif * divu;
                , Real tau12 = muf * (u12 + u21);, Real tau13 = muf * (u13 + u31);)
 
-  AMREX_D_TERM(flx(iv, UM1) -= tau11;, flx(iv, UM2) -= tau12;, flx(iv, UM3) -= tau13;)
-  flx(iv, cls_t::UET) -= 0.5 * (AMREX_D_TERM((q(iv, QU1) + q(ivm, QU1)) * tau11,
-                                            +(q(iv, QU2) + q(ivm, QU2)) * tau12,
-                                            +(q(iv, QU3) + q(ivm, QU3)) * tau13) +
-                           (coeffs(iv, CLAM) + coeffs(ivm, CLAM)) * dTdn);
+    AMREX_D_TERM(flx(iv, UM1) -= tau11;, flx(iv, UM2) -= tau12;, flx(iv, UM3) -= tau13;)
+    flx(iv, cls_t::UET) -= 0.5 * (AMREX_D_TERM((q(iv, QU1) + q(ivm, QU1)) * tau11,
+                                              +(q(iv, QU2) + q(ivm, QU2)) * tau12,
+                                              +(q(iv, QU3) + q(ivm, QU3)) * tau13) +
+                           (coeffs(iv, cls_t::CLAM) + coeffs(ivm, cls_t::CLAM)) * dTdn);
 
-  // Species transport
-  cns_diff_species(iv, d1, q, coeffs, dxinv, flx);
-}
+    // Species transport  (COMMENTS FOR NOW)
+    //cns_diff_species(iv, d1, q, coeffs, dxinv, flx);
+    }
 
-  
+  }; 
 
 //---------------------------------------------
 #endif
