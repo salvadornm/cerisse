@@ -2,264 +2,289 @@
 #define Weno_H
 
 #include <AMReX_FArrayBox.H>
-// #include <Index.h>
 
-///
-/// \brief Template class for Riemann solvers
-///
-/// \param iSplit Flux vector splitting (0 - Global lax-friedrichs) 
-/// \param isChar Characteristic transform 
-///
-/// ```
-/// {rst}
-///
-/// :math:`f_{i+1/2}= `
-/// ```
-///
-template <int iSplit, bool isChar, typename cls_t>
+#include "Closures.h"
+
+#define POWER2(x) ((x) * (x))
+#define POWER6(x) ((x) * (x) * (x) * (x) * (x) * (x))
+
+// Choices are WenoZ5, Teno5. (Teno6 is slightly unstable)
+namespace ReconScheme {
+struct WenoZ5 {
+  static constexpr int ng = 3;
+
+  /**
+   * @brief From a 2*ng x NCONS array, extract the left stencil.
+   * @param[in] n  Index of the component.
+   * @param[in] fp Flux array.
+   * @param[out] s Stencil array [i+1, i, i-1, i-2, i-3].
+   */
+  template <size_t NCONS>
+  static AMREX_GPU_DEVICE AMREX_FORCE_INLINE void left_stencil(
+      int n, amrex::Real const fp[2 * ng][NCONS], amrex::Real s[5]) noexcept {
+    for (int m = 1; m < 2 * ng; ++m) s[m - 1] = fp[2 * ng - 1 - m][n];
+  }
+
+  /**
+   * @brief From a 2*ng x NCONS array, extract the right stencil.
+   * @param[in] n  Index of the component.
+   * @param[in] fm Flux array.
+   * @param[out] s Stencil array [i-2, i-1, i, i+1, i+2].
+   */
+  template <size_t NCONS>
+  static AMREX_GPU_DEVICE AMREX_FORCE_INLINE void right_stencil(
+      int n, amrex::Real const fm[2 * ng][NCONS], amrex::Real s[5]) noexcept {
+    for (int m = 1; m < 2 * ng; ++m) s[m - 1] = fm[m][n];
+  }
+
+  /**
+   * \brief (FV)WENO-Z5. Ref https://doi.org/10.1016/j.jcp.2010.11.028.
+   * \param[in] s Stencil values at cells [i-2, i-1, i, i+1, i+2].
+   * \return Reconstructed value at i-1/2.
+   */
+  static AMREX_GPU_DEVICE AMREX_FORCE_INLINE amrex::Real recon(
+      const amrex::Real s[5]) noexcept {
+    using amrex::Real;
+    constexpr Real eps = 1e-40;
+    Real vr[3], beta[3], tmp;
+
+    constexpr Real w13o12 = 13.0 / 12.0;
+    constexpr Real w1o4 = 0.25;
+    beta[2] = w13o12 * POWER2(s[4] - 2.0 * s[3] + s[2]) +
+              w1o4 * POWER2(s[4] - 4.0 * s[3] + 3.0 * s[2]);
+    beta[1] =
+        w13o12 * POWER2(s[3] - 2.0 * s[2] + s[1]) + w1o4 * POWER2(s[3] - s[1]);
+    beta[0] = w13o12 * POWER2(s[2] - 2.0 * s[1] + s[0]) +
+              w1o4 * POWER2(3.0 * s[2] - 4.0 * s[1] + s[0]);
+
+    tmp = std::abs(beta[2] - beta[0]);
+    beta[2] = 1.0 + tmp / (eps + beta[2]);
+    beta[1] = (1.0 + tmp / (eps + beta[1])) * 6.0;
+    beta[0] = (1.0 + tmp / (eps + beta[0])) * 3.0;
+    tmp = 1.0 / (beta[2] + beta[1] + beta[0]);
+
+    vr[2] = 11.0 * s[2] - 7.0 * s[3] + 2.0 * s[4];
+    vr[1] = -s[3] + 5.0 * s[2] + 2.0 * s[1];
+    vr[0] = 2.0 * s[2] + 5.0 * s[1] - s[0];
+
+    return tmp / Real(6.0) *
+           (beta[2] * vr[2] + beta[1] * vr[1] + beta[0] * vr[0]);
+  }
+};  // struct WenoZ5
+
+struct Teno5 : public WenoZ5 {
+  /**
+   * \brief (FV)TENO-5. Ref https://doi.org/10.1016/j.jcp.2015.10.037.
+   * \param[in] s Stencil values at cells [i-2, i-1, i, i+1, i+2].
+   * \return Reconstructed value at i-1/2.
+   */
+  static AMREX_GPU_DEVICE AMREX_FORCE_INLINE amrex::Real recon(
+      const amrex::Real s[5]) noexcept {
+    using amrex::Real;
+
+    constexpr Real eps = std::numeric_limits<Real>::epsilon();
+    constexpr Real cutoff = 1e-4;
+    Real vr[3], beta[3], tmp;
+
+    constexpr Real w13o12 = 13.0 / 12.0;
+    constexpr Real w1o4 = 0.25;
+    beta[2] = w13o12 * POWER2(s[4] - 2.0 * s[3] + s[2]) +
+              w1o4 * POWER2(s[4] - 4.0 * s[3] + 3.0 * s[2]);
+    beta[1] =
+        w13o12 * POWER2(s[3] - 2.0 * s[2] + s[1]) + w1o4 * POWER2(s[3] - s[1]);
+    beta[0] = w13o12 * POWER2(s[2] - 2.0 * s[1] + s[0]) +
+              w1o4 * POWER2(3.0 * s[2] - 4.0 * s[1] + s[0]);
+
+    tmp = std::abs(std::abs(beta[2] - beta[0]) -
+                   (beta[2] + 4.0 * beta[1] + beta[0]) / 6.0);
+    beta[2] = POWER6(1.0 + tmp / (eps + beta[2]));
+    beta[1] = POWER6(1.0 + tmp / (eps + beta[1]));
+    beta[0] = POWER6(1.0 + tmp / (eps + beta[0]));
+    tmp = 1.0 / (beta[2] + beta[1] + beta[0]);
+    beta[2] = beta[2] * tmp < cutoff ? 0.0 : 1.0;
+    beta[1] = beta[1] * tmp < cutoff ? 0.0 : 6.0;
+    beta[0] = beta[0] * tmp < cutoff ? 0.0 : 3.0;
+    tmp = 1.0 / (beta[2] + beta[1] + beta[0]);
+
+    vr[2] = 11.0 * s[2] - 7.0 * s[3] + 2.0 * s[4];
+    vr[1] = -s[3] + 5.0 * s[2] + 2.0 * s[1];
+    vr[0] = 2.0 * s[2] + 5.0 * s[1] - s[0];
+
+    return tmp / Real(6.0) *
+           (beta[2] * vr[2] + beta[1] * vr[1] + beta[0] * vr[0]);
+  }
+};  // struct Teno5
+
+struct Teno6 {
+  static constexpr int ng = 3;
+
+  /**
+   * @brief From a 2*ng x NCONS array, extract the left stencil.
+   * @param[in] n  Index of the component.
+   * @param[in] fp Flux array.
+   * @param[out] s Stencil array [i+2, i+1, i, i-1, i-2, i-3].
+   */
+  template <size_t NCONS>
+  static AMREX_GPU_DEVICE AMREX_FORCE_INLINE void left_stencil(
+      int n, amrex::Real const fp[2 * ng][NCONS], amrex::Real s[6]) noexcept {
+    for (int m = 0; m < 2 * ng; ++m) s[m] = fp[2 * ng - 1 - m][n];
+  }
+
+  /**
+   * @brief From a 2*ng x NCONS array, extract the left stencil.
+   * @param[in] n  Index of the component.
+   * @param[in] fm Flux array.
+   * @param[out] s Stencil array [i-3, i-2, i-1, i, i+1, i+2].
+   */
+  template <size_t NCONS>
+  static AMREX_GPU_DEVICE AMREX_FORCE_INLINE void right_stencil(
+      int n, amrex::Real const fm[2 * ng][NCONS], amrex::Real s[6]) noexcept {
+    for (int m = 0; m < 2 * ng; ++m) s[m] = fm[m][n];
+  }
+
+  /**
+   * \brief (FV)TENO-6. Ref https://doi.org/10.1016/j.jcp.2015.10.037.
+   * \param[in] s Stencil values at cells [i-3, i-2, i-1, i, i+1, i+2].
+   * \return Reconstructed value at i-1/2.
+   */
+  static AMREX_GPU_DEVICE AMREX_FORCE_INLINE amrex::Real recon(
+      const amrex::Real s[6]) noexcept {
+    using amrex::Real;
+
+    constexpr Real eps = std::numeric_limits<Real>::epsilon();
+    constexpr Real cutoff = 1e-5;
+    Real vr[4], beta[4], tmp;
+
+    constexpr Real w13o12 = 13.0 / 12.0;
+    constexpr Real w1o4 = 0.25;
+    beta[3] =
+        Real(1. / 36.) *
+            POWER2(-11.0 * s[3] + 18.0 * s[2] - 9.0 * s[1] + 2.0 * s[0]) +
+        w13o12 * POWER2(2.0 * s[3] - 5.0 * s[2] + 4.0 * s[1] - s[0]) +
+        Real(781. / 720.) * POWER2(-s[3] + 3.0 * s[2] - 3.0 * s[1] + s[0]);
+    beta[2] = w13o12 * POWER2(s[4] - 2.0 * s[3] + s[2]) +
+              w1o4 * POWER2(s[4] - 4.0 * s[3] + 3.0 * s[2]);
+    beta[1] =
+        w13o12 * POWER2(s[3] - 2.0 * s[2] + s[1]) + w1o4 * POWER2(s[3] - s[1]);
+    beta[0] = w13o12 * POWER2(s[2] - 2.0 * s[1] + s[0]) +
+              w1o4 * POWER2(3.0 * s[2] - 4.0 * s[1] + s[0]);
+
+    tmp = std::abs(beta[3] - (beta[2] + 4.0 * beta[1] + beta[0]) / 6.0);
+    beta[3] = POWER6(1.0 + tmp / (eps + beta[3]));
+    beta[2] = POWER6(1.0 + tmp / (eps + beta[2]));
+    beta[1] = POWER6(1.0 + tmp / (eps + beta[1]));
+    beta[0] = POWER6(1.0 + tmp / (eps + beta[0]));
+    tmp = 1.0 / (beta[3] + beta[2] + beta[1] + beta[0]);
+    beta[3] = beta[3] * tmp < cutoff ? 0.0 : 4.0;
+    beta[2] = beta[2] * tmp < cutoff ? 0.0 : 1.0;
+    beta[1] = beta[1] * tmp < cutoff ? 0.0 : 9.0;
+    beta[0] = beta[0] * tmp < cutoff ? 0.0 : 6.0;
+    tmp = 1.0 / (beta[3] + beta[2] + beta[1] + beta[0]);
+
+    vr[3] = 0.5 * (s[0] - 5.0 * s[1] + 13.0 * s[2] + 3.0 * s[3]);
+    vr[2] = 11.0 * s[3] - 7.0 * s[4] + 2.0 * s[5];
+    vr[1] = -s[4] + 5.0 * s[3] + 2.0 * s[2];
+    vr[0] = 2.0 * s[3] + 5.0 * s[2] - s[1];
+
+    return tmp / Real(6.0) *
+           (beta[3] * vr[3] + beta[2] * vr[2] + beta[1] * vr[1] +
+            beta[0] * vr[0]);
+  }
+};  // struct Teno6
+};  // namespace ReconScheme
+
+// TODO: this class name is not very accurate. llf? high_order_fd?
+template <typename Scheme, typename cls_t>
 class weno_t {
-  public: 
+  static constexpr int ng = Scheme::ng;  // number of ghost cells on each side
+  static_assert(ng <= cls_t::NGHOST);    // ensure enough ghost cells
+
+ public:
   AMREX_GPU_HOST_DEVICE
   weno_t() {}
+
+  AMREX_GPU_HOST_DEVICE
   ~weno_t() {}
 
-  /// \brief Template class for Riemann solvers
-  ///
-  /// \param ivars interpolation vars
-  ///
-  void inline eflux(const Geometry& geom, const MFIter& mfi,
-                    const Array4<Real>& prims, const Array4<Real>& ivars,
-                    const Array4<Real>& rhs,
-                    const cls_t& cls) {
-    const GpuArray<Real, AMREX_SPACEDIM> dxinv = geom.InvCellSizeArray();
-    const Box& bx = mfi.growntilebox(0);
-    const Box& bxg = mfi.growntilebox(cls_t::NGHOST);
-    const Box& bxn = mfi.grownnodaltilebox(-1, 0);  // 0,N+1 all directions
+#ifdef AMREX_USE_GPIBM
+  // TODO: implement IBM
+  // void inline eflux_ibm(const Geometry& geom, const MFIter& mfi,
+  //                       const Array4<Real>& prims, const Array4<Real>& flx,
+  //                       const Array4<Real>& rhs, const cls_t* cls,
+  //                       const Array4<bool>& ibMarkers)
+#else
+  void inline eflux(const amrex::Geometry& geom, const amrex::MFIter& mfi,
+                    const amrex::Array4<amrex::Real>& prims,
+                    const amrex::Array4<amrex::Real>& flx,
+                    const amrex::Array4<amrex::Real>& rhs, const cls_t* cls)
+#endif
+  {
+    using amrex::Array4, amrex::Box, amrex::IntVect, amrex::Real;
+    const Box& bx = mfi.tilebox();
+    const auto dxinv = geom.InvCellSizeArray();
 
-    FArrayBox varsf(bxg, cls_t::NCONS, The_Async_Arena());
-    FArrayBox lambdaf(bxg, 1, The_Async_Arena());
-    FArrayBox tempf(bxg, cls_t::NCONS, The_Async_Arena());
-
-    Array4<Real> const& vars= varsf.array();
-    Array4<Real> const& lambda= lambdaf.array();
-    Array4<Real> const& temp= tempf.array();
-
-    // zero rhs
-    ParallelFor(bxg, cls_t::NCONS, [=] AMREX_GPU_DEVICE(int i, int j, int k, int
-    n) noexcept {rhs(i, j, k, n)=0.0;});
+    // clear rhs
+    ParallelFor(bx, cls_t::NCONS,
+                [=] AMREX_GPU_DEVICE(int i, int j, int k, int n) noexcept {
+                  rhs(i, j, k, n) = 0.0;
+                });
 
     // for each direction
-    for (int dir = 0; dir < AMREX_SPACEDIM; dir++) {
-      GpuArray<int, 3> vdir = {int(dir == 0), int(dir == 1), int(dir == 2)};
+    for (int dir = 0; dir < amrex::SpaceDim; ++dir) {
+      const Box& flxbx = amrex::surroundingNodes(bx, dir);
 
-      // prims to fluxes
-      // compute eigenvalues
-      ParallelFor(bxg, [=] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {
-        cls.prims2fluxes(i, j, k, prims, ivars, vdir);
-        Real cs = cls.sos(prims(i,j,k,cls.QT));
-        Real udir = prims(i,j,k,cls.QU) * vdir[0] + prims(i,j,k,cls.QV) * vdir[1] + prims(i,j,k,cls.QW) * vdir[2];
-        lambda(i, j, k, 0) = std::abs(max(udir + cs, udir - cs, udir));
+      ParallelFor(flxbx, [=] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {
+        IntVect iv(AMREX_D_DECL(i, j, k));
+        IntVect ivd(IntVect::TheDimensionVector(dir));
+
+        const Real alpha = cls->max_char_speed(iv, dir, ng, prims);
+        const auto roe_avg = cls->roe_avg_state(iv, dir, prims);
+
+        Real cons[cls_t::NCONS], f[cls_t::NCONS], fp[2 * ng][cls_t::NCONS],
+            fm[2 * ng][cls_t::NCONS];
+        for (int m = 0; m < 2 * ng; ++m) {
+          // LLF splitting into left- and right-running fluxes
+          cls->prims2flux(iv + (m - ng) * ivd, dir, prims, f);
+          cls->prims2cons(iv + (m - ng) * ivd, prims, cons);
+
+          for (int n = 0; n < cls_t::NCONS; ++n) {
+            fp[m][n] = 0.5 * (cons[n] + f[n] / alpha);
+            fm[m][n] = 0.5 * (cons[n] - f[n] / alpha);
+          }
+
+          // Convert into characteristic variables
+          cls->cons2char(roe_avg, fp[m]);
+          cls->cons2char(roe_avg, fm[m]);
+        }
+
+        // Reconstruct with upwind stencils
+        Real fpL[cls_t::NCONS], fmR[cls_t::NCONS], s[2 * ng];
+        for (int n = 0; n < cls_t::NCONS; ++n) {
+          Scheme::left_stencil(n, fp, s);
+          fpL[n] = Scheme::recon(s);
+
+          Scheme::right_stencil(n, fm, s);
+          fmR[n] = Scheme::recon(s);
+        }
+
+        // Convert back to conservative variables
+        cls->char2cons(roe_avg, fpL);
+        cls->char2cons(roe_avg, fmR);
+
+        for (int n = 0; n < cls_t::NCONS; ++n) {
+          flx(iv, n) = alpha * (fpL[n] - fmR[n]);
+        }
       });
 
-
-      // split flux
-      for (int is=-1; is<1; is+=2) {
-
-      }
-
-      // compute interpolation vars
-      if constexpr (isChar) {
-        Array2D<Real,0,cls_t::NCONS-1,0,cls_t::NCONS-1> jac;
-        ParallelFor(bxg, [=] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {
-          // R = 
-          // ivars(i,j,k,) = R*var;
-        });
-      }
-
-      // interpolate split-flux at i-1/2, j-1/2, k-1/2
-      ParallelFor(bxn, cls_t::NCONS,
+      // add flux derivative to rhs
+      ParallelFor(bx, cls_t::NCONS,
                   [=] AMREX_GPU_DEVICE(int i, int j, int k, int n) noexcept {
-                    // flux_dir(i, j, k, n, prims, ivars, lambda, temp);
-
-                    // weno5js()
+                    IntVect iv(AMREX_D_DECL(i, j, k));
+                    IntVect ivp = iv + IntVect::TheDimensionVector(dir);
+                    rhs(i, j, k, n) += dxinv[dir] * (flx(iv, n) - flx(ivp, n));
                   });
-
-      // // transform interpolation vars to fluxes at i-1/2, j-1/2 and k-1/2
-      // if constexpr (isChar) {
-      //   printf("WENO characteristic transform to do");
-      //   exit(0);
-      // }
-
-      // // add flux derivative to rhs = -(fi+1 - fi)/dx = (fi - fi+1)/dx
-      // ParallelFor(
-      //     bx, NCONS, [=] AMREX_GPU_DEVICE(int i, int j, int k, int n) noexcept {
-      //       rhs(i, j, k, n) +=
-      //           dxinv[dir] * (temp(i, j, k, n) -
-      //                         temp(i + vdir[0], j + vdir[1], k + vdir[2], n));
-      //     });
-    }
-
+    }  // end of for each direction
   }
-
-  AMREX_GPU_DEVICE AMREX_FORCE_INLINE void flux_dir(int& i, int& j, int& k, int& n, const Array4<Real>& prims, const Array4<Real>& vars, const Array4<Real>& lambda, Array4<Real>& temp) {
-    // Real maxeigen = max(lambda(i - 3, j, k, 0), lambda(i - 2, j, k, 0),
-    //                     lambda(i - 1, j, k, 0), lambda(i, j, k, 0),
-    //                     lambda(i + 1, j, k, 0), lambda(i + 2, j, k, 0));
-
-    // df[0] = maxeigen * cons(i - 3, j, k, n);
-    // df[1] = maxeigen * cons(i - 2, j, k, n);
-    // df[2] = maxeigen * cons(i - 1, j, k, n);
-    // df[3] = maxeigen * cons(i, j, k, n);
-    // df[4] = maxeigen * cons(i + 1, j, k, n);
-    // df[5] = maxeigen * cons(i + 2, j, k, n);
-
-    // // f(i-1/2)^+
-    // sten[0] = Real(0.5) * (pfx(i - 3, j, k, n) + df[0]);
-    // sten[1] = Real(0.5) * (pfx(i - 2, j, k, n) + df[1]);
-    // sten[2] = Real(0.5) * (pfx(i - 1, j, k, n) + df[2]);
-    // sten[3] = Real(0.5) * (pfx(i, j, k, n) + df[3]);
-    // sten[4] = Real(0.5) * (pfx(i + 1, j, k, n) + df[4]);
-    // Real ivar = weno5js(sten);
-
-    // // f(i-1/2)^- (note, we are flipping the stencil)
-    // sten[4] = Real(0.5) * (pfx(i - 2, j, k, n) - df[1]);
-    // sten[3] = Real(0.5) * (pfx(i - 1, j, k, n) - df[2]);
-    // sten[2] = Real(0.5) * (pfx(i, j, k, n) - df[3]);
-    // sten[1] = Real(0.5) * (pfx(i + 1, j, k, n) - df[4]);
-    // sten[0] = Real(0.5) * (pfx(i + 2, j, k, n) - df[5]);
-    // ivar += weno5js(sten);
-
-    // temp(i, j, k, n) = flx;
-  }
-
-
-  AMREX_GPU_DEVICE AMREX_FORCE_INLINE Real weno5js(const GpuArray<Real, 5>& s) {
-    constexpr Real eps = 1e-40;
-    constexpr int q = 2;  // tunable positive integer
-    Real vl[3], beta[3], alpha[3];
-    beta[0] = (13.0_rt / 12.0_rt) * (s[0] - 2.0_rt * s[1] + s[2]) *
-                  (s[0] - 2.0_rt * s[1] + s[2]) +
-              0.25 * (s[0] - 4.0_rt * s[1] + 3.0_rt * s[2]) *
-                  (s[0] - 4.0_rt * s[1] + 3.0_rt * s[2]);
-    beta[1] =
-        (13.0_rt / 12.0_rt) * (s[1] - 2.0_rt * s[2] + s[3]) *
-            (s[1] - 2.0_rt * s[2] + s[3]) +
-        0.25 * (s[1] - s[3]) * (s[1] - s[3]) * (s[1] - s[3]) * (s[1] - s[3]);
-    beta[2] = (13.0_rt / 12.0_rt) * (s[2] - 2.0_rt * s[3] + s[4]) *
-                  (s[2] - 2.0_rt * s[3] + s[4]) +
-              0.25_rt * (3.0_rt * s[2] - 4.0_rt * s[3] + s[4]) *
-                  (3.0_rt * s[2] - 4.0_rt * s[3] + s[4]);
-    alpha[0] = 0.1_rt / pow(eps + beta[0], q);
-    alpha[1] = 0.6_rt / pow(eps + beta[1], q);
-    alpha[2] = 0.3_rt / pow(eps + beta[2], q);
-    Real sum = 1.0_rt / (alpha[0] + alpha[1] + alpha[2]);
-    vl[0] = 2.0_rt * s[0] - 7.0_rt * s[1] + 11.0_rt * s[2];
-    vl[1] = -s[1] + 5.0_rt * s[2] + 2.0_rt * s[3];
-    vl[2] = 2.0_rt * s[2] + 5.0_rt * s[3] - s[4];
-    Real fr = (Real(1.0) / 6.0_rt) * sum *
-              (alpha[0] * vl[0] + alpha[1] * vl[1] + alpha[2] * vl[2]);
-    return fr;
-  };
-
-
 };
-
-
-
-
-// // Computes Euler fluxes with global lax-friedrichs splitting at
-// // i-1/2,j-1/2,k-1/2
-// AMREX_GPU_DEVICE AMREX_FORCE_INLINE void numericalflux_globallaxsplit(
-//     int i, int j, int k, int n, const auto& cons, const auto& pfx,
-//     const auto& pfy, const auto& pfz, const auto& lambda, const auto& nfx,
-//     const auto& nfy, const auto& nfz) {
-//   GpuArray<Real, 5> sten;
-//   GpuArray<Real, 6> df = {0};
-
-//   // x direction /////////////////////////////////////////////////////////
-//   Real maxeigen = max(lambda(i - 3, j, k, 0), lambda(i - 2, j, k, 0),
-//                       lambda(i - 1, j, k, 0), lambda(i, j, k, 0),
-//                       lambda(i + 1, j, k, 0), lambda(i + 2, j, k, 0));
-
-//   df[0] = maxeigen * cons(i - 3, j, k, n);
-//   df[1] = maxeigen * cons(i - 2, j, k, n);
-//   df[2] = maxeigen * cons(i - 1, j, k, n);
-//   df[3] = maxeigen * cons(i, j, k, n);
-//   df[4] = maxeigen * cons(i + 1, j, k, n);
-//   df[5] = maxeigen * cons(i + 2, j, k, n);
-
-//   // f(i-1/2)^+
-//   sten[0] = Real(0.5) * (pfx(i - 3, j, k, n) + df[0]);
-//   sten[1] = Real(0.5) * (pfx(i - 2, j, k, n) + df[1]);
-//   sten[2] = Real(0.5) * (pfx(i - 1, j, k, n) + df[2]);
-//   sten[3] = Real(0.5) * (pfx(i, j, k, n) + df[3]);
-//   sten[4] = Real(0.5) * (pfx(i + 1, j, k, n) + df[4]);
-//   Real flx = weno5js(sten);
-
-//   // f(i-1/2)^- (note, we are flipping the stencil)
-//   sten[4] = Real(0.5) * (pfx(i - 2, j, k, n) - df[1]);
-//   sten[3] = Real(0.5) * (pfx(i - 1, j, k, n) - df[2]);
-//   sten[2] = Real(0.5) * (pfx(i, j, k, n) - df[3]);
-//   sten[1] = Real(0.5) * (pfx(i + 1, j, k, n) - df[4]);
-//   sten[0] = Real(0.5) * (pfx(i + 2, j, k, n) - df[5]);
-//   flx += weno5js(sten);
-//   nfx(i, j, k, n) = flx;
-
-//   // y direction /////////////////////////////////////////////////////////
-//   maxeigen = max(lambda(i, j - 3, k, 1), lambda(i, j - 2, k, 1),
-//                  lambda(i, j - 1, k, 1), lambda(i, j, k, 1),
-//                  lambda(i, j + 1, k, 1), lambda(i, j + 2, k, 1));
-//   df[0] = maxeigen * cons(i, j - 3, k, n);
-//   df[1] = maxeigen * cons(i, j - 2, k, n);
-//   df[2] = maxeigen * cons(i, j - 1, k, n);
-//   df[3] = maxeigen * cons(i, j, k, n);
-//   df[4] = maxeigen * cons(i, j + 1, k, n);
-//   df[5] = maxeigen * cons(i, j + 2, k, n);
-
-//   // f(j-1/2)^+
-//   sten[0] = Real(0.5) * (pfy(i, j - 3, k, n) + df[0]);
-//   sten[1] = Real(0.5) * (pfy(i, j - 2, k, n) + df[1]);
-//   sten[2] = Real(0.5) * (pfy(i, j - 1, k, n) + df[2]);
-//   sten[3] = Real(0.5) * (pfy(i, j, k, n) + df[3]);
-//   sten[4] = Real(0.5) * (pfy(i, j + 1, k, n) + df[4]);
-//   flx = weno5js(sten);
-
-//   // f(j-1/2)^- (note, we are flipping the stencil)
-//   sten[4] = Real(0.5) * (pfy(i, j - 2, k, n) - df[1]);
-//   sten[3] = Real(0.5) * (pfy(i, j - 1, k, n) - df[2]);
-//   sten[2] = Real(0.5) * (pfy(i, j, k, n) - df[3]);
-//   sten[1] = Real(0.5) * (pfy(i, j + 1, k, n) - df[4]);
-//   sten[0] = Real(0.5) * (pfy(i, j + 2, k, n) - df[5]);
-//   flx += weno5js(sten);
-//   nfy(i, j, k, n) = flx;
-
-//   // z direction /////////////////////////////////////////////////////////
-//   maxeigen = max(lambda(i, j, k - 3, 2), lambda(i, j, k - 2, 2),
-//                  lambda(i, j, k - 1, 2), lambda(i, j, k, 2),
-//                  lambda(i, j, k + 1, 2), lambda(i, j, k + 2, 2));
-//   df[0] = maxeigen * cons(i, j, k - 3, n);
-//   df[1] = maxeigen * cons(i, j, k - 2, n);
-//   df[2] = maxeigen * cons(i, j, k - 1, n);
-//   df[3] = maxeigen * cons(i, j, k, n);
-//   df[4] = maxeigen * cons(i, j, k + 1, n);
-//   df[5] = maxeigen * cons(i, j, k + 2, n);
-
-//   // f(k-1/2)^+
-//   sten[0] = Real(0.5) * (pfz(i, j, k - 3, n) + df[0]);
-//   sten[1] = Real(0.5) * (pfz(i, j, k - 2, n) + df[1]);
-//   sten[2] = Real(0.5) * (pfz(i, j, k - 1, n) + df[2]);
-//   sten[3] = Real(0.5) * (pfz(i, j, k, n) + df[3]);
-//   sten[4] = Real(0.5) * (pfz(i, j, k + 1, n) + df[4]);
-//   flx = weno5js(sten);
-
-//   // f(k-1/2)^- (note, we are flipping the stencil)
-//   sten[4] = Real(0.5) * (pfz(i, j, k - 2, n) - df[1]);
-//   sten[3] = Real(0.5) * (pfz(i, j, k - 1, n) - df[2]);
-//   sten[2] = Real(0.5) * (pfz(i, j, k, n) - df[3]);
-//   sten[1] = Real(0.5) * (pfz(i, j, k + 1, n) - df[4]);
-//   sten[0] = Real(0.5) * (pfz(i, j, k + 2, n) - df[5]);
-//   flx += weno5js(sten);
-//   nfz(i, j, k, n) = flx;
-// }
 
 #endif
