@@ -45,6 +45,9 @@ class viscous_t {
     const auto& lam_arr  = coeffs.array(cls_t::CLAM);
     const auto& xi_arr   = coeffs.array(cls_t::CXI);
     const auto& rhoD_arr = coeffs.array(cls_t::CRHOD);
+
+    //const auto& coeftrans = coeffs.array;
+    const amrex::Array4<const amrex::Real>& coeftrans = coeffs.array();
     
     // calculate all transport properties and store in array (up to ghost points)
 #ifdef USE_PELEPHYSICS
@@ -58,7 +61,31 @@ class viscous_t {
           mu_arr(i,j,k)  = cls->visc(prims(i,j,k,cls_t::QT));
           lam_arr(i,j,k) = cls->cond(prims(i,j,k,cls_t::QT));            
         });
-#endif        
+#endif     
+
+
+    // 
+    int CMU  = cls_t::CMU;
+    int CLAM = cls_t::CLAM;
+
+    int is,js,ks;
+    is = 0;js=0;ks=0;
+    
+    amrex::Print()  << " Entering Viscous " << std::endl;
+    
+    printf(" visc = %f ",mu_arr(is,js,ks));
+    printf(" lam  = %f \n",lam_arr(is,js,ks));
+    printf(" COEF visc = %f "  ,coeftrans(is,js,ks,CMU));
+    printf(" COEF lam  = %f \n",coeftrans(is,js,ks,CLAM));
+    
+    // the above is correct
+
+
+
+
+    //
+
+
 
     // loop over directions -----------------------------------------------
     for (int dir = 0; dir < AMREX_SPACEDIM; dir++) {
@@ -72,7 +99,7 @@ class viscous_t {
       amrex::ParallelFor(bxgnodal,
                   [=,*this] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {
                     for (int n = 0; n < cls_t::NCONS; n++) flx(i, j, k, n) = 0.0;
-                    this->cns_diff(i, j, k,dir, prims,flx,coeffs, dxinv, cls);
+                    this->cns_diff(i, j, k,dir, prims,flx,coeftrans, dxinv, cls);
                   });                  
 #endif
   
@@ -99,14 +126,14 @@ class viscous_t {
   * @param dxinv  1/dx
   * @param cls_t  ProbClosures 
   */
-  AMREX_GPU_DEVICE AMREX_FORCE_INLINE void
-  cns_diff(const int i, const int j, const int k, const int d1,
-        amrex::Array4<const amrex::Real> const& q,
-        amrex::Array4<amrex::Real> const& flx,
-        amrex::Array4<const amrex::Real> const& coeffs,
-        amrex::GpuArray<amrex::Real, AMREX_SPACEDIM> const& dxinv,
-        const cls_t* cls) noexcept
-    {
+  AMREX_GPU_DEVICE AMREX_FORCE_INLINE void cns_diff(
+      const int i, const int j, const int k, const int d1,
+      amrex::Array4<const amrex::Real> const& q,
+      amrex::Array4<amrex::Real> const& flx,
+      amrex::Array4<const amrex::Real> const& coeffs,
+      amrex::GpuArray<amrex::Real, AMREX_SPACEDIM> const& dxinv,
+      const cls_t* cls) const {
+    
     using amrex::Real;
     const amrex::IntVect iv{AMREX_D_DECL(i, j, k)};
     const amrex::IntVect ivm = iv - amrex::IntVect::TheDimensionVector(d1);

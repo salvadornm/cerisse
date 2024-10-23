@@ -1,13 +1,13 @@
 # Simulation time
-max_step  =  200
+max_step  =  5
 stop_time =  0.02
-time_step = 1.0e-4 
+time_step = 5.0e-3 
 
 # Geometry 
 geometry.is_periodic = 1 0
 geometry.coord_sys   = 0  
 geometry.prob_lo     = 0.0   0.0
-geometry.prob_hi     = 0.016   0.016
+geometry.prob_hi     = 0.25 1.0
 
 # BC
 cns.lo_bc = -1 1
@@ -42,5 +42,5 @@ amr.check_file              = chk     # root name of checkpoint file
 amr.check_int               = 10000   # number of timesteps between checkpoints
 amr.plot_files_output = 1
 amr.plot_file         = ./plot/plt    # root name of plotfile
-amr.plot_int          = 50           # number of timesteps between plotfiles
+amr.plot_int          = 1           # number of timesteps between plotfiles
 amr.derive_plot_vars  = pressure x_velocity y_velocity temperature
