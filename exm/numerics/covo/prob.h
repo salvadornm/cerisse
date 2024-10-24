@@ -23,18 +23,28 @@ struct ProbParm {
   Real L = 0.3112;  // size of domain
 };
 
+// numerical method parameters
+struct methodparm_t {
+
+  public:
+
+  static constexpr bool dissipation = false;         // no dissipation
+  static constexpr int  order = 4;                  // order numerical scheme   
+  static constexpr Real C2skew=0.1,C4skew=0.0016;   // Skew symmetric default
+
+};
+
 inline Vector<std::string> cons_vars_names={"Xmom","Ymom","Zmom","Energy","Density"};
 inline Vector<int> cons_vars_type={1,2,3,0,0};
 
 typedef closures_dt<indicies_t, visc_suth_t, cond_suth_t,
-                    calorifically_perfect_gas_t<indicies_t>>
-    ProbClosures;
+                    calorifically_perfect_gas_t<indicies_t> > ProbClosures;
 
 template <typename cls_t > class user_source_t;
 
 
 //typedef rhs_dt<riemann_t<false, ProbClosures>, no_diffusive_t, no_source_t > ProbRHS;
-typedef rhs_dt<skew_t<false,false, 4, ProbClosures>, no_diffusive_t, no_source_t > ProbRHS;
+typedef rhs_dt<skew_t<methodparm_t, ProbClosures>, no_diffusive_t, no_source_t > ProbRHS;
 
 
 void inline inputs() {

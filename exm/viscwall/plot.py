@@ -71,8 +71,8 @@ for (ys, vs) in zip(y, v):
 
   # cerisse
   plt.plot(vs, ys, label='cerisse')
-  plt.ylabel(' v ')
-  plt.xlabel(' y/H ', horizontalalignment='center')
+  plt.ylabel(' y/H ')
+  plt.xlabel(' v ', horizontalalignment='center')
 
   plt.legend()
   plt.show()

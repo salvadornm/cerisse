@@ -10,6 +10,7 @@ nav:
   - BC: ibm.md
   - Tutorial: tutorial.md
   - Equations: equations.md
+  - Chemistry: chemistry.md
   - tips: tips.md  
   - errors: errors.md
   - Solver: new_rhs.md
