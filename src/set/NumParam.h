@@ -20,7 +20,9 @@ static constexpr int order = 2;               // order of scheme
 static constexpr Real C2skew=0.1,C4skew=0.0016;   // Skew symmetric default
 static constexpr Real conductivity = 0.0262;  // conductivity (for constant value)
 static constexpr Real viscosity   = 1.85e-5;  // viscosity    (for constant value)
-  
+
+static constexpr bool solve_viscterms_only = false;
+
 
 };
 

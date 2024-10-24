@@ -1,6 +1,6 @@
 TINY_PROFILE = FALSE
 
-DEBUG   = TRUE
+DEBUG   = FALSE
 DIM     = 2
 COMP     = gcc
 

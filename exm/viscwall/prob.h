@@ -16,17 +16,22 @@
 
 using namespace amrex;
 
+
 namespace PROB {
+
+
+static constexpr Real Reynolds = 50.0;  // Reynolds number
+
 
 // problem parameters 
 struct ProbParm {
-  Real Re   = 50.0;          // Reynodls number
   Real L    =   1.0;         // channel height    
+  Real u    = 1.0;           // bulk velocity
+  Real rho  = 1.0;           // bulk density
+  Real Q    =   u*L;         // volumetric flow rate (per width unit)
   Real p    =  pres_atm2si; 
-  Real rho  = 1.0;
-  Real u    = 1.0;
-  Real visc = rho*u*L/Re;    // default  0.02
-  Real dpdx = 5e-5;          // forcing term
+  Real visc = rho*u*L/Reynolds;     // viscosity ~ 1/Reynolds          
+  Real dpdx = 12.0*Q*Q/(Reynolds*L*L*L);    // forcing term (pressure gradient)
 };
 
 // numerical method parameters
@@ -34,9 +39,11 @@ struct methodparm_t {
 
   public:
 
-  static constexpr int  order = 2;              // order numerical scheme viscous
-  static constexpr Real conductivity = 0.0262;  // conductivity (for constant value)
-  static constexpr Real viscosity    = 0.02;  // viscosity    (for constant value)
+  static constexpr int  order = 2;                  // order numerical scheme viscous
+  static constexpr Real conductivity = 0.0262;      // conductivity (for constant value)
+  static constexpr Real viscosity    = 1.0/Reynolds;// viscosity    (for constant value)
+
+  static constexpr bool solve_viscterms_only = true;
   
 };
 
@@ -88,7 +95,7 @@ prob_initdata(int i, int j, int k, Array4<Real> const &state,
 
   // printf(" DIFF number = %f \n", dt*prob_parm.visc/(dx[0]*dx[0]) );
   // printf(" CFL  number = %f \n", dt*prob_parm.u/dx[0] );
-  
+  // printf(" pressure gradient = %f \n", prob_parm.dpdx );
   // exit(0);
 
   //
@@ -96,9 +103,9 @@ prob_initdata(int i, int j, int k, Array4<Real> const &state,
   
   // initial conditioms  
   P    = prob_parm.p; rho = prob_parm.rho;
-  //u[0] = prob_parm.u; 
+  u[0] = prob_parm.u; 
   u[1] = Real(0.0);
-  u[0] = prob_parm.u*(1 - yoh)*yoh;
+  //u[0] = prob_parm.u*(1 - yoh)*yoh;
 
   // T and E from P and T
   T =   P/(cls.Rspec*rho);
@@ -166,7 +173,8 @@ class user_source_t {
 
       //  Pressure Source           
       //Real rho = prims(i, j, k, cls.QRHO);
-      rhs(i,j,k,cls.UMX) += prob_parm.dpdx;      
+      rhs(i,j,k,cls.UMX) += prob_parm.dpdx;  
+
       });
 
   };

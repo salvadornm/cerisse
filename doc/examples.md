@@ -23,3 +23,7 @@ These examples are classical tests designed to compare numerical schemes and are
 ## Thermal Diffusion
 
 --8<-- "exm/diffusion/README.md"
+
+## Laminar Channel Flow
+
+--8<-- "exm/viscwall/README.md"

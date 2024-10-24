@@ -39,14 +39,26 @@ class viscous_t {
     const Box& bxg = mfi.growntilebox(cls->NGHOST);     // to handle high-order 
     const Box& bxgnodal = mfi.grownnodaltilebox(-1, 0); // to handle fluxes
 
+    // clear rhs 
+    if (param::solve_viscterms_only)
+    {      
+      ParallelFor(bxg, cls_t::NCONS, [=] AMREX_GPU_DEVICE(int i, int j, int k, int n) noexcept {
+      rhs(i, j, k, n) = 0.0;
+      });
+    }
+
+
     // allocate arrays for transport properties  SNM CHECK HERE....
     FArrayBox coeffs(bxg, cls_t::NCOEF, The_Async_Arena());
+    const int CMU  = cls_t::CMU;
+    const int CLAM = cls_t::CLAM;
+    const int CXI  = cls_t::CXI;
     const auto& mu_arr   = coeffs.array(cls_t::CMU);
     const auto& lam_arr  = coeffs.array(cls_t::CLAM);
     const auto& xi_arr   = coeffs.array(cls_t::CXI);
-    const auto& rhoD_arr = coeffs.array(cls_t::CRHOD);
 
-    //const auto& coeftrans = coeffs.array;
+
+    // pointer to array of transport coefficients    
     const amrex::Array4<const amrex::Real>& coeftrans = coeffs.array();
     
     // calculate all transport properties and store in array (up to ghost points)
@@ -57,36 +69,14 @@ class viscous_t {
 
 #else
     amrex::ParallelFor(
-        bxg, [=, *this] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {
-          mu_arr(i,j,k)  = cls->visc(prims(i,j,k,cls_t::QT));
-          lam_arr(i,j,k) = cls->cond(prims(i,j,k,cls_t::QT));            
+        bxg, [=, *this] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {        
+        mu_arr(i,j,k)  = cls->visc(prims(i,j,k,cls_t::QT));
+        lam_arr(i,j,k) = cls->cond(prims(i,j,k,cls_t::QT));       
+        xi_arr(i,j,k)  = 0.0;
         });
 #endif     
 
-
-    // 
-    int CMU  = cls_t::CMU;
-    int CLAM = cls_t::CLAM;
-
-    int is,js,ks;
-    is = 0;js=0;ks=0;
     
-    amrex::Print()  << " Entering Viscous " << std::endl;
-    
-    printf(" visc = %f ",mu_arr(is,js,ks));
-    printf(" lam  = %f \n",lam_arr(is,js,ks));
-    printf(" COEF visc = %f "  ,coeftrans(is,js,ks,CMU));
-    printf(" COEF lam  = %f \n",coeftrans(is,js,ks,CLAM));
-    
-    // the above is correct
-
-
-
-
-    //
-
-
-
     // loop over directions -----------------------------------------------
     for (int dir = 0; dir < AMREX_SPACEDIM; dir++) {
       GpuArray<int, 3> vdir = {int(dir == 0), int(dir == 1), int(dir == 2)};
@@ -145,7 +135,7 @@ class viscous_t {
     AMREX_D_TERM(const int UM1 = cls_t::UMX + d1;, const int UM2 = cls_t::UMX + d2;
                , const int UM3 = cls_t::UMX + d3;)
 
-    constexpr int order = 4;
+    constexpr int order = 2;
 
     // Aij = dA_i/dx_j
     const Real dTdn = normal_diff<order>(iv, d1, cls_t::QT, q, dxinv);
@@ -168,11 +158,15 @@ class viscous_t {
     AMREX_D_TERM(Real tau11 = muf * (2.0 * u11 - (2.0 / 3.0) * divu) + xif * divu;
                , Real tau12 = muf * (u12 + u21);, Real tau13 = muf * (u13 + u31);)
 
+    // momentum
     AMREX_D_TERM(flx(iv, UM1) -= tau11;, flx(iv, UM2) -= tau12;, flx(iv, UM3) -= tau13;)
+   
+    // energy
+    const Real lamf = interp<order>(iv, d1, cls_t::CLAM, coeffs);
     flx(iv, cls_t::UET) -= 0.5 * (AMREX_D_TERM((q(iv, QU1) + q(ivm, QU1)) * tau11,
                                               +(q(iv, QU2) + q(ivm, QU2)) * tau12,
-                                              +(q(iv, QU3) + q(ivm, QU3)) * tau13) +
-                           (coeffs(iv, cls_t::CLAM) + coeffs(ivm, cls_t::CLAM)) * dTdn);
+                                              +(q(iv, QU3) + q(ivm, QU3)) * tau13)) +
+                                              + lamf* dTdn;
 
     // Species transport  (COMMENTS FOR NOW)
     //cns_diff_species(iv, d1, q, coeffs, dxinv, flx);

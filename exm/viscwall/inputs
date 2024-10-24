@@ -1,6 +1,6 @@
 # Simulation time
-max_step  =  5
-stop_time =  0.02
+max_step  =  5000
+stop_time =  100.0
 time_step = 5.0e-3 
 
 # Geometry 
@@ -30,17 +30,11 @@ amr.max_grid_size_y   = 64  # maximum grid size in y per level
 amr.n_error_buf       = 2 2    # number of buffer cells in error est
 amr.grid_eff          = 0.9    # what constitutes an efficient grid
 
-# refiment conditions
-cns.refine_dengrad = 0.01
-cns.refine_dengrad_max_lev = 10
-
-#fabarray.mfiter_tile_size = 8 8
-
 # Plot and checkpoint
 amr.checkpoint_files_output = 0
 amr.check_file              = chk     # root name of checkpoint file
 amr.check_int               = 10000   # number of timesteps between checkpoints
 amr.plot_files_output = 1
 amr.plot_file         = ./plot/plt    # root name of plotfile
-amr.plot_int          = 1           # number of timesteps between plotfiles
+amr.plot_int          = 500           # number of timesteps between plotfiles
 amr.derive_plot_vars  = pressure x_velocity y_velocity temperature

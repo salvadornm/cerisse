@@ -4,54 +4,51 @@ import matplotlib.pyplot as plt
 import glob
 import os
 
-L = 0.016
-beta = 0.04  # vortex strength
+L = 1.0
 
-xc = 0.5*L
+xc = 0.25*L/2
 yc = 0.5*L
-T0 = 300.0
-T1 = 100.0
-delta = L/32.0
-lam = 0.0262
-Cp = 1000
-rho = 1.17 
-D= lam/(rho*Cp)
+dpdx = 0.24
+rho = 1.0 
+Re  = 50
+h  = 0.5*L
+visc = 1/Re
+Vbulk = h**2*dpdx/(3*visc)
 
-print(" Heat Diffusion  ..")
+print(" Vbulk= ",Vbulk," [m/s]") 
+print(" visc= ",visc," [Pa s]") 
 
 
 #####################
-def InitSolution(x):
-  y=yc
-  T = T0 + T1*np.exp(-0.25*((x-xc)**2+ (y- yc)**2)/delta**2)
-  return T
+def ExactSolution(y):
+  yoh = y/L
+  u = 1.5*Vbulk*(4*(1 - yoh)*yoh)  
+  return u
 ##################
-#####################
-def ExactSolution(x,t):
-  y=yc
-  Tt = T1*np.exp(-D*t)
-  T = T0 + T1*np.exp(-0.25*((x-xc)**2+ (y- yc)**2)/delta**2)
-  return T
-##################
-def VortexLineoutX(datasets, xc, yc):
-  x_out = []
+def ExtractLineoutY(datasets, xc):
+  y_out = []
   v_out = []
-  T_out = []
-
+  
   for d in range(len(datasets)):
     ds = yt.load(datasets[d])
 
     xaxis = 0  # take a line cut along x axis
-    lineout = ds.ortho_ray(xaxis, (yc, 0))
-    srt = np.argsort(lineout["x"])
-    x = np.array(lineout["x"][srt])
-    v = np.array(lineout["Ymom"][srt])
-    x_out.append(x)
-    v_out.append(v)
-    T = np.array(lineout["temperature"][srt])
-    T_out.append(T)
+    #lineout = ds.ortho_ray(xaxis, (yc, 0))
 
-  return x_out, v_out, T_out
+    yaxis = 1 # take a line cut along y axis
+    lineout = ds.ortho_ray(yaxis,(xc, 0))
+    
+
+    srt = np.argsort(lineout["y"])
+    y = np.array(lineout["y"][srt])
+    rhov = np.array(lineout["Xmom"][srt])
+    rho  =  np.array(lineout["Density"][srt])
+    v = rhov/rho 
+
+    y_out.append(y)
+    v_out.append(v)
+
+  return y_out, v_out
 ################################################
 
 print('opening data')
@@ -62,23 +59,22 @@ latest_file = max(list_of_files, key=os.path.getctime)
 print(" LAST FILE=",latest_file)
 datasets = [latest_file]
 
-#print("extracting lines at xc,yc=",xc,yc)
 
-x, v, T  = VortexLineoutX(datasets, xc, yc)
+y, v  = ExtractLineoutY(datasets, xc)
 
-for (xs, vs, Ts) in zip(x, v, T): 
+for (ys, vs) in zip(y, v): 
 
-  Te  = InitSolution(xs)
+  ve  = ExactSolution(ys)
   
-  # Initial  solution
-  plt.plot(xs,Te,'o',label='t=0',mfc='none',markersize=3)
-  plt.legend()
+  # Exact  solution
+  plt.plot(ve,ys,'o',label='Analytical',mfc='none',markersize=3)
 
   # cerisse
-  plt.plot(xs, Ts, label='cerisse')
-  plt.ylabel("T")
-  plt.xlabel(' x ', horizontalalignment='center')
+  plt.plot(vs, ys, label='cerisse')
+  plt.ylabel(' v ')
+  plt.xlabel(' y/H ', horizontalalignment='center')
 
+  plt.legend()
   plt.show()
 
 # Save the line plot into a file
