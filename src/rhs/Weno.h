@@ -82,7 +82,7 @@ struct Teno5 : public WenoZ5 {
       const amrex::Real s[5]) noexcept {
     using amrex::Real;
 
-    constexpr Real eps = std::numeric_limits<Real>::epsilon();
+    constexpr Real eps = 1e-40;
     constexpr Real cutoff = 1e-4;
     Real vr[3], beta[3], tmp;
 
@@ -207,19 +207,19 @@ class weno_t {
   ~weno_t() {}
 
 #ifdef AMREX_USE_GPIBM
-  // TODO: implement IBM
-  // void inline eflux_ibm(const Geometry& geom, const MFIter& mfi,
-  //                       const Array4<Real>& prims, const Array4<Real>& flx,
-  //                       const Array4<Real>& rhs, const cls_t* cls,
-  //                       const Array4<bool>& ibMarkers)
+  void inline eflux_ibm(const amrex::Geometry& geom, const amrex::MFIter& mfi,
+                        const amrex::Array4<const amrex::Real>& prims_in,
+                        const amrex::Array4<amrex::Real>& flx,
+                        const amrex::Array4<amrex::Real>& rhs, const cls_t* cls,
+                        const amrex::Array4<const bool>& ibMarkers)
 #else
   void inline eflux(const amrex::Geometry& geom, const amrex::MFIter& mfi,
-                    const amrex::Array4<amrex::Real>& prims,
+                    const amrex::Array4<const amrex::Real>& prims,
                     const amrex::Array4<amrex::Real>& flx,
                     const amrex::Array4<amrex::Real>& rhs, const cls_t* cls)
 #endif
   {
-    using amrex::Array4, amrex::Box, amrex::IntVect, amrex::Real;
+    using amrex::Array4, amrex::Box, amrex::Dim3, amrex::IntVect, amrex::Real;
     const Box& bx = mfi.tilebox();
     const auto dxinv = geom.InvCellSizeArray();
 
@@ -236,6 +236,16 @@ class weno_t {
       ParallelFor(flxbx, [=] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {
         IntVect iv(AMREX_D_DECL(i, j, k));
         IntVect ivd(IntVect::TheDimensionVector(dir));
+
+#if AMREX_USE_GPIBM
+        Real prims_ptr[2 * ng * cls_t::NPRIM];
+        Dim3 prims_begin = (iv - ng * ivd).dim3();
+        Dim3 prims_end = (iv + (ng - 1) * ivd + amrex::IntVect(1)).dim3();
+        Array4<Real> prims(prims_ptr, prims_begin, prims_end, cls_t::NPRIM);
+        if (!fill_solid_prims(iv, ivd, dir, prims_in, prims, ibMarkers)) {
+          return;  // skip solid cells
+        }
+#endif
 
         const Real alpha = cls->max_char_speed(iv, dir, ng, prims);
         const auto roe_avg = cls->roe_avg_state(iv, dir, prims);
@@ -285,6 +295,99 @@ class weno_t {
                   });
     }  // end of for each direction
   }
+
+#ifdef AMREX_USE_GPIBM
+  AMREX_GPU_DEVICE AMREX_FORCE_INLINE bool fill_solid_prims(
+      amrex::IntVect iv, amrex::IntVect ivd, int cdir,
+      amrex::Array4<const amrex::Real> const &prims_in,
+      amrex::Array4<amrex::Real> const &prims,
+      amrex::Array4<const bool> const &ib_mask) {
+    // Find the first solid point, which will be the ghost point
+    int gl = ng, gr = ng;  // ghost point position on left and right
+    for (int m = 0; m < ng; ++m) {
+      if (ib_mask(iv + m * ivd)) {
+        gr = std::min(gr, m);
+      }
+      if (ib_mask(iv - (m + 1) * ivd)) {
+        gl = std::min(gl, m);
+      }
+    }
+    if (gl == 0 && gr == 0) return false;  // skip solid cells
+
+    // // Option1: use first order recon up to ng cells away from GP
+    // int glr = std::min(gl, gr);
+    // if (glr < ng) {
+    //   glr = 0;
+    // }
+    // for (int m = 0; m < ng; ++m) {
+    //   if (m <= glr) {
+    //     for (int n = 0; n < cls_t::NPRIM; ++n) {
+    //       prims(iv + m * ivd, n) = prims_in(iv + m * ivd, n);
+    //       prims(iv - (m + 1) * ivd, n) = prims_in(iv - (m + 1) * ivd, n);
+    //     }
+    //   } else {
+    //     for (int n = 0; n < cls_t::NPRIM; ++n) {
+    //       prims(iv + m * ivd, n) = prims_in(iv + glr * ivd, n);
+    //       prims(iv - (m + 1) * ivd, n) = prims_in(iv - (glr + 1) * ivd, n);
+    //     }
+    //   }
+    // }
+
+    // 2. fill the other solid points with the ghost point values
+    // if (gl == 0 || gr == 0) {
+    //   gl = 0;
+    //   gr = 0; // use 1st order if next to GP
+    // }
+    // for (int m = 0; m < ng; ++m) {
+    //   if (m <= gr) {
+    //     for (int n = 0; n < cls_t::NPRIM; ++n) {
+    //       prims(iv + m * ivd, n) = prims_in(iv + m * ivd, n);
+    //     }
+    //   } else {
+    //     for (int n = 0; n < cls_t::NPRIM; ++n) {
+    //       prims(iv + m * ivd, n) = prims_in(iv + gr * ivd, n);
+    //     }
+    //   }
+    // }
+    // for (int m = 0; m < ng; ++m) {
+    //   if (m <= gl) {
+    //     for (int n = 0; n < cls_t::NPRIM; ++n) {
+    //       prims(iv - (m + 1) * ivd, n) = prims_in(iv - (m + 1) * ivd, n);
+    //     }
+    //   } else {
+    //     for (int n = 0; n < cls_t::NPRIM; ++n) {
+    //       prims(iv - (m + 1) * ivd, n) = prims_in(iv - (gl + 1) * ivd, n);
+    //     }
+    //   }
+    // }
+
+    // 3. fill using 1st order BC (adiabatic no-slip)
+    for (int m = 0; m < 2 * ng; ++m) {
+      for (int n = 0; n < cls_t::NPRIM; ++n) {
+        prims(iv + (m - ng) * ivd, n) = prims_in(iv + (m - ng) * ivd, n);
+      }
+    }
+
+    for (int m = 0; m < ng; ++m) {
+      if (m >= gl) {
+        for (int n = 0; n < cls_t::NPRIM; ++n) {
+          prims(iv - (m + 1) * ivd, n) = prims(iv - (2 * gl - m) * ivd, n);
+        }
+        prims(iv - (m + 1) * ivd, cls_t::QU + cdir) =
+            -prims(iv - (2 * gl - m) * ivd, cls_t::QU + cdir);
+      }
+      if (m >= gr) {
+        for (int n = 0; n < cls_t::NPRIM; ++n) {
+          prims(iv + m * ivd, n) = prims(iv + (2 * gr - m - 1) * ivd, n);
+        }
+        prims(iv + m * ivd, cls_t::QU + cdir) =
+            -prims(iv + (2 * gr - m - 1) * ivd, cls_t::QU + cdir);
+      }
+    }
+
+    return true;
+  }
+#endif
 };
 
 #endif

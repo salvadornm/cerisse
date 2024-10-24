@@ -472,8 +472,14 @@ void CNS::errorEst(TagBoxArray &tags, int /*clearval*/, int /*tagval*/,
   }
 }
 
-// TODO: Add restarts
-// -----------------------------------------------------------------------------
+void CNS::post_restart() {
+#ifdef AMREX_USE_GPIBM
+  IBM::ib.destroy_mf(level);
+  IBM::ib.build_mf(grids, dmap, level);
+  IBM::ib.computeMarkers(level);
+  IBM::ib.initialiseGPs(level);
+#endif
+}
 
 void CNS::avgDown() {
   BL_PROFILE("CNS::avgDown()");

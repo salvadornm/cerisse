@@ -30,7 +30,8 @@ class no_euler_t
 public:
   template<typename... Args>
   void eflux(Args&&... args){}
- // void eflux_ibm(Args&&... args){}
+  template<typename... Args>
+  void eflux_ibm(Args&&... args){}
 };
 
 // no diffusive flux
@@ -39,7 +40,8 @@ class no_diffusive_t
 public:
   template<typename... Args>
   void dflux(Args&&... args) {}
-  //void dflux_ibm(Args&&... args) {}
+  template<typename... Args>
+  void dflux_ibm(Args&&... args) {}
 };
 
 // no source

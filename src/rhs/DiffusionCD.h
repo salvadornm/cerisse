@@ -111,7 +111,7 @@ class diffusiveheat_t {
 
       // computr diffusion fluxes
 #ifdef AMREX_USE_GPIBM  
-      amrex::Abort(" IBM +diffusion only No ready yet")
+      amrex::Abort(" IBM +diffusion only No ready yet");
       amrex::ParallelFor(bxgnodal,
                   [=,*this] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {
                     for (int n = 0; n < cls_t::NCONS; n++) flx(i, j, k, n) = 0.0;

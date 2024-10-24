@@ -77,6 +77,8 @@ class CNS : public amrex::AmrLevel {
 
   virtual void postCoarseTimeStep(Real time) override;
 
+  virtual void post_restart() override;
+
   // -------------------------------------------------------------------------
 
   // Gridding ----------------------------------------------------------------
