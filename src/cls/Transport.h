@@ -37,7 +37,7 @@ class cond_const_t {
     return cond_ref;
   }
 
-#ifdef AMREX_USE_GPU
+#ifdef AMREX_USE_GPU  // TODO: can't we use AMREX_HOST_DEVICE?
   AMREX_FORCE_INLINE Real cond_cpu(Real& T) const { return cond_ref; }
 #endif
 };
@@ -53,7 +53,7 @@ class cond_suth_t {
     return cond_ref * T * sqrt(T) / (Tcond_ref + T);
   }
 
-#ifdef AMREX_USE_GPU
+#ifdef AMREX_USE_GPU // TODO: can't we use AMREX_HOST_DEVICE?
   AMREX_FORCE_INLINE Real cond_cpu(Real& T) const {
     return cond_ref * T * sqrt(T) / (Tcond_ref + T);
   }

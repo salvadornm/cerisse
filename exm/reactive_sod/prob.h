@@ -10,7 +10,7 @@
 #include "Closures.h"
 #include "RHS.h"
 
-using namespace amrex;
+// using namespace amrex;
 
 namespace PROB {
 
@@ -21,23 +21,21 @@ struct ProbParm {
   Real p_l = 7173.0;   // pressure [Pa]
   GpuArray<Real, NUM_SPECIES> Y_l = {
       0., 0.01277243, 0.,         0., 0., 0.10136214, 0.,
-      0., 0.,         0.88586543, 0., 0., 0.};  // mass fractions [-] (molefrac 2:1:7)
+      0., 0.,         0.88586543, 0., 0., 0.};  // mass fractions [-] (molefrac
+                                                // 2:1:7)
 
   Real rho_r = 0.18075;
   Real u_r = -487.34;
   Real p_r = 35594.0;
-  GpuArray<Real, NUM_SPECIES> Y_r = {
-      0., 0.01277243, 0.,         0., 0., 0.10136214, 0.,
-      0., 0.,         0.88586543, 0., 0., 0.};
+  GpuArray<Real, NUM_SPECIES> Y_r = {0.,         0.01277243, 0., 0., 0.,
+                                     0.10136214, 0.,         0., 0., 0.88586543,
+                                     0.,         0.,         0.};
 };
 
-
-typedef closures_dt<indicies_t, visc_suth_t, cond_suth_t,
-                    multispecies_gas_t<indicies_t>> ProbClosures;
-// typedef rhs_dt<riemann_t<false, ProbClosures>, no_diffusive_t,
-//                reactor_t<1,ProbClosures>> ProbRHS;
-typedef rhs_dt<riemann_t<false, ProbClosures>, no_diffusive_t,
-               reactor_t<ProbClosures>> ProbRHS;
+using ProbClosures = closures_dt<indicies_t, visc_suth_t, cond_suth_t,
+                                 multispecies_perfect_gas_t<indicies_t>>;
+using ProbRHS =
+    rhs_dt<weno_t<ReconScheme::Teno5, ProbClosures>, no_diffusive_t, reactor_t<ProbClosures>>;
 
 void inline inputs() {
   // ParmParse pp;
@@ -56,7 +54,7 @@ AMREX_GPU_DEVICE AMREX_FORCE_INLINE void prob_initdata(
 
   Real x = prob_lo[0] + (i + Real(0.5)) * dx[0];
   Real Pt, rhot, uxt;
-  const Real* Yt;
+  const Real *Yt;
   if (x < prob_hi[0] / 2) {
     Pt = prob_parm.p_l;
     rhot = prob_parm.rho_l;
