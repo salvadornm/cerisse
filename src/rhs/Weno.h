@@ -37,6 +37,32 @@ struct WenoZ5 {
     for (int m = 1; m < 2 * ng; ++m) s[m - 1] = fm[m][n];
   }
 
+  static AMREX_GPU_DEVICE AMREX_FORCE_INLINE void smoothness_indicator(
+      const amrex::Real s[5], amrex::Real beta[3]) noexcept {
+    // constexpr Real w13o12 = 13.0 / 12.0;
+    // constexpr Real w1o4 = 0.25;
+    // beta[2] = w13o12 * POWER2(s[4] - 2.0 * s[3] + s[2]) +
+    //           w1o4 * POWER2(s[4] - 4.0 * s[3] + 3.0 * s[2]);
+    // beta[1] =
+    //     w13o12 * POWER2(s[3] - 2.0 * s[2] + s[1]) + w1o4 * POWER2(s[3] - s[1]);
+    // beta[0] = w13o12 * POWER2(s[2] - 2.0 * s[1] + s[0]) +
+    //           w1o4 * POWER2(3.0 * s[2] - 4.0 * s[1] + s[0]);
+
+    beta[2] = Real(13. / 12.) * POWER2(s[4] - 2.0 * s[3] + s[2]) +
+              Real(0.25) * POWER2(s[4] - 4.0 * s[3] + 3.0 * s[2]);
+    beta[1] = Real(13. / 12.) * POWER2(s[3] - 2.0 * s[2] + s[1]) +
+              Real(0.25) * POWER2(s[3] - s[1]);
+    beta[0] = Real(13. / 12.) * POWER2(s[2] - 2.0 * s[1] + s[0]) +
+              Real(0.25) * POWER2(3.0 * s[2] - 4.0 * s[1] + s[0]);
+  }
+
+  static AMREX_GPU_DEVICE AMREX_FORCE_INLINE void linear_polynomial_recon(
+      const amrex::Real s[5], amrex::Real vr[3]) noexcept {
+    vr[2] = 11.0 * s[2] - 7.0 * s[3] + 2.0 * s[4];
+    vr[1] = -s[3] + 5.0 * s[2] + 2.0 * s[1];
+    vr[0] = 2.0 * s[2] + 5.0 * s[1] - s[0];
+  }
+
   /**
    * \brief (FV)WENO-Z5. Ref https://doi.org/10.1016/j.jcp.2010.11.028.
    * \param[in] s Stencil values at cells [i-2, i-1, i, i+1, i+2].
@@ -48,24 +74,14 @@ struct WenoZ5 {
     constexpr Real eps = 1e-40;
     Real vr[3], beta[3], tmp;
 
-    constexpr Real w13o12 = 13.0 / 12.0;
-    constexpr Real w1o4 = 0.25;
-    beta[2] = w13o12 * POWER2(s[4] - 2.0 * s[3] + s[2]) +
-              w1o4 * POWER2(s[4] - 4.0 * s[3] + 3.0 * s[2]);
-    beta[1] =
-        w13o12 * POWER2(s[3] - 2.0 * s[2] + s[1]) + w1o4 * POWER2(s[3] - s[1]);
-    beta[0] = w13o12 * POWER2(s[2] - 2.0 * s[1] + s[0]) +
-              w1o4 * POWER2(3.0 * s[2] - 4.0 * s[1] + s[0]);
-
+    smoothness_indicator(s, beta);
     tmp = std::abs(beta[2] - beta[0]);
     beta[2] = 1.0 + tmp / (eps + beta[2]);
     beta[1] = (1.0 + tmp / (eps + beta[1])) * 6.0;
     beta[0] = (1.0 + tmp / (eps + beta[0])) * 3.0;
     tmp = 1.0 / (beta[2] + beta[1] + beta[0]);
 
-    vr[2] = 11.0 * s[2] - 7.0 * s[3] + 2.0 * s[4];
-    vr[1] = -s[3] + 5.0 * s[2] + 2.0 * s[1];
-    vr[0] = 2.0 * s[2] + 5.0 * s[1] - s[0];
+    linear_polynomial_recon(s, vr);
 
     return tmp / Real(6.0) *
            (beta[2] * vr[2] + beta[1] * vr[1] + beta[0] * vr[0]);
@@ -82,19 +98,11 @@ struct Teno5 : public WenoZ5 {
       const amrex::Real s[5]) noexcept {
     using amrex::Real;
 
-    constexpr Real eps = 1e-40;
+    constexpr Real eps = std::numeric_limits<Real>::epsilon();
     constexpr Real cutoff = 1e-4;
     Real vr[3], beta[3], tmp;
-
-    constexpr Real w13o12 = 13.0 / 12.0;
-    constexpr Real w1o4 = 0.25;
-    beta[2] = w13o12 * POWER2(s[4] - 2.0 * s[3] + s[2]) +
-              w1o4 * POWER2(s[4] - 4.0 * s[3] + 3.0 * s[2]);
-    beta[1] =
-        w13o12 * POWER2(s[3] - 2.0 * s[2] + s[1]) + w1o4 * POWER2(s[3] - s[1]);
-    beta[0] = w13o12 * POWER2(s[2] - 2.0 * s[1] + s[0]) +
-              w1o4 * POWER2(3.0 * s[2] - 4.0 * s[1] + s[0]);
-
+    
+    smoothness_indicator(s, beta);
     tmp = std::abs(std::abs(beta[2] - beta[0]) -
                    (beta[2] + 4.0 * beta[1] + beta[0]) / 6.0);
     beta[2] = POWER6(1.0 + tmp / (eps + beta[2]));
@@ -106,9 +114,7 @@ struct Teno5 : public WenoZ5 {
     beta[0] = beta[0] * tmp < cutoff ? 0.0 : 3.0;
     tmp = 1.0 / (beta[2] + beta[1] + beta[0]);
 
-    vr[2] = 11.0 * s[2] - 7.0 * s[3] + 2.0 * s[4];
-    vr[1] = -s[3] + 5.0 * s[2] + 2.0 * s[1];
-    vr[0] = 2.0 * s[2] + 5.0 * s[1] - s[0];
+    linear_polynomial_recon(s, vr);
 
     return tmp / Real(6.0) *
            (beta[2] * vr[2] + beta[1] * vr[1] + beta[0] * vr[0]);

@@ -62,6 +62,16 @@ static constexpr int NGHOST=3; // TODO: make it an automatic parameter
 |   `URHO`            | 4       | density    |
 |   `UFS`             | 4       | first spec index, replace density when solving species  |
 
+### Transport Properties
+
+
+| Index                      |  Default | Description                                                  |
+| --------------------------- | ------------- | ------------------------------------------------------------ |
+|   `CMU`             | 0       | dynamic viscosity  |
+|   `CXI`             | 1       | bulk viscosity     |
+|   `CLAM`            | 2       | heat conductivity      |
+|   `CRHOD`           | 3       | first species diffusivity  *rho D* |
+
 
 ### Other
 | Index                      |  Default | Description                                                  |

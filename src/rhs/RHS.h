@@ -2,14 +2,17 @@
 #define RHS_H_
 
 #include <Index.h>
+
+// numerical methods
 #include <Weno.h>
 #include <CentralKEEP.h>
 #include <Riemann.h>
 #include <Rusanov.h>
 #include <Skew.h>
-//#include <CentralDif.h>
 
+// viscous templates
 #include <DiffusionCD.h>
+#include <viscous.h>
 
 #ifdef USE_PELEPHYSICS
 #include "react.h"

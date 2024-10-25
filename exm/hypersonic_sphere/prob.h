@@ -29,7 +29,9 @@ typedef closures_dt<indicies_t, visc_suth_t, cond_suth_t,
                     calorifically_perfect_gas_t<indicies_t>>
     ProbClosures;
 // typedef rhs_dt<riemann_t<false, ProbClosures>, no_diffusive_t, no_source_t>
-typedef rhs_dt<rusanov_t<ProbClosures>, no_diffusive_t, no_source_t>
+// typedef rhs_dt<rusanov_t<ProbClosures>, no_diffusive_t, no_source_t>
+//     ProbRHS;
+typedef rhs_dt<weno_t<ReconScheme::WenoZ5, ProbClosures>, no_diffusive_t, no_source_t>
     ProbRHS;
 
 typedef std::ratio<5,5> d_image;
@@ -125,6 +127,10 @@ void user_tagging(int i, int j, int k, int nt, auto& tagfab, const auto &sdatafa
     if (drhox > dengrad_threshold) {
       tagfab(i,j,k) = true;
     }
+    // amrex::Real mag_mom = std::hypot(sdatafab(i,j,k,ProbClosures::UMX),sdatafab(i,j,k,ProbClosures::UMY),sdatafab(i,j,k,ProbClosures::UMZ));
+    // if (mag_mom < 100) {
+    //   tagfab(i,j,k) = true;
+    // }
     if (ibfab(i,j,k,1)) {
       for (int ii = -1; ii <= 1; ii++) {
         for (int jj = -1; jj <= 1; jj++) {

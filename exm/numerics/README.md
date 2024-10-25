@@ -27,12 +27,15 @@ Table with speed
 
 ### Riemann Problem
 
+The skew-symmetric scheme will not work without shock capturing (setting 
+dissipation to true `dissipation = true;` in the **prob.h** file)
 
-**Skew-symmetric** 4th order,Shock Capturing and high freq damping with constants **C=0.5** and **C=0.0016**  N=96
+
+**Skew-symmetric** 4th order, Shock Capturing and damping with constants **C2=0.1** and **C4=0.016**  N=96
 ![rienum1](images/num_rie_skew_damp.png)
 
 
-**Skew-symmetric** 4th order,Shock Capturing and high freq damping with constants **C=0.1** and **C=0.00016**  N=96
+**Skew-symmetric** 4th order,Shock Capturing and damping with constants **C2=0.5** and **C4=0.016**  N=96
 ![rienum2](images/num_rie_skew_damp2.png)
 
 
@@ -60,6 +63,9 @@ Table cost gcc version 11, 1 core, all CFL fix 0.3, times are in secs approximat
 ![shunum3](images/num_shu_muscl.png)
 
 **Skew**  solver 4th order  **N=256**, *Cs=0.1* *Cd=0.016*
+The artidcat at x0 is due to the zero-gradient BC  and it dissapears if the
+grid is refined or a fix BC is imposed
+
 ![shunum2](images/num_shu_skew.png)
 
 **Skew**  solver 4th order  **N=512**, *Cs=0.1* *Cd=0.016*

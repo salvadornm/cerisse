@@ -15,7 +15,7 @@
   }
 
 // int imask
-template <bool isAD, bool isIB, int order, typename cls_t>
+template <typename param, typename cls_t>
 class skew_t {
   public:
 
@@ -106,6 +106,7 @@ class skew_t {
       coefskew(1,3) = -Real(9.0/120.0);    
       coefskew(1,4) = Real(1.0/120.0);    
       
+      coefskew(2,2) = Real(37.0/120.0);
       coefskew(2,3) = Real(45.0/120.0);
       coefskew(2,4) = -Real(9.0/120.0);    
       coefskew(2,5) = Real(1.0/120.0);    
@@ -170,6 +171,13 @@ class skew_t {
 
   AMREX_GPU_HOST_DEVICE
   ~skew_t() {}
+
+  // parameters for damping and shock capturing   
+  static const int order = param::order;
+  // default values Cshock = 0.1 Cdamp = 0.016; 
+  Real Cshock = param::C2skew;
+  Real Cdamp  = param::C4skew; 
+
 
 #ifdef AMREX_USE_GPIBM  
   void inline eflux_ibm(const Geometry& geom, const MFIter& mfi,
@@ -236,7 +244,7 @@ class skew_t {
                   });                  
 #endif
       // dissipative fluxes 
-      if constexpr (isAD) {
+      if constexpr (param::dissipation) {
 #ifdef AMREX_USE_GPIBM               
         ParallelFor(bxgnodal,
                   [=,*this] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {
@@ -505,8 +513,10 @@ class skew_t {
     }   
   }
   // .............................................................  
-   
+
+  
   // coefficents
+  //static const int ordermax = 6;
   typedef Array2D<Real, 0, order, 0, order> arrCoeff_t;
   arrCoeff_t coefskew;
   typedef Array1D<Real, 0, order> arrayNumCoef;
@@ -514,8 +524,6 @@ class skew_t {
 
   int halfsten = order / 2;
 
-  // parameters for damping and shock capturing   
-  const Real Cshock = 0.1,Cdamp = 0.016; //default 0.1 and 0.016
   // sensor variables
   const int NVARSEN=2;
   int NSEN[2];

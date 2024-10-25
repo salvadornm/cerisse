@@ -1,5 +1,5 @@
 # AMReX
-DIM = 3
+DIM = 1
 COMP = gnu
 PRECISION = DOUBLE
 
@@ -9,8 +9,8 @@ TINY_PROFILE = FALSE
 # Performance
 USE_MPI = TRUE
 USE_OMP = FALSE
-USE_CUDA = TRUE
-CUDA_ARCH= 8.0
+# USE_CUDA = TRUE
+# CUDA_ARCH= 8.0
 
 # Debugging
 DEBUG = FALSE

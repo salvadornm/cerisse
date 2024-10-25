@@ -21,6 +21,17 @@ struct ProbParm {
   // Real u_r = 0.0;
 };
 
+// numerical method parameters
+struct methodparm_t {
+
+  public:
+
+  static constexpr bool dissipation = true;         // no dissipation
+  static constexpr int  order = 4;                  // order numerical scheme
+  static constexpr Real C2skew=0.1,C4skew=0.016;   // Skew symmetric default
+
+};
+
 inline Vector<std::string> cons_vars_names={"Xmom","Ymom","Zmom","Energy","Density"};
 inline Vector<int> cons_vars_type={1,2,3,0,0};
 
@@ -29,7 +40,7 @@ typedef closures_dt<indicies_t, visc_suth_t, cond_suth_t,
     ProbClosures;
 
 //typedef rhs_dt<riemann_t<false, ProbClosures>, no_diffusive_t, no_source_t    > ProbRHS;
-typedef rhs_dt<skew_t<true,false, 4, ProbClosures>, no_diffusive_t, no_source_t > ProbRHS;
+typedef rhs_dt<skew_t<methodparm_t, ProbClosures>, no_diffusive_t, no_source_t > ProbRHS;
 // typedef rhs_dt<weno_t<ReconScheme::Teno5, ProbClosures>, no_diffusive_t, no_source_t > ProbRHS;
 
 void inline inputs() {

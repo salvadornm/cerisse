@@ -131,6 +131,13 @@ class reactor_t {
 #endif
     amrex::Gpu::Device::streamSynchronize();  // Important
 
+
+    /// Compet LES properties
+    // if (LES)
+    // {
+    //   // do stuff compute taus sgs, Efficiency ...
+    // }
+
     //////////////////////// Unpack data ////////////////////////
     amrex::ParallelFor(bx, [=] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {
       const auto& cls = *cls_d;
@@ -143,6 +150,9 @@ class reactor_t {
               (rY(i, j, k, ns) < -1e-5 || rY(i, j, k, ns) > 1.0 + 1e-5 ||
                std::isnan(rY(i, j, k, ns)));
         }
+
+
+            
 
         if (any_rY_unbounded || temp_leq_zero) {
           // printf("Post-reaction rY=[ ");
@@ -163,6 +173,11 @@ class reactor_t {
         }
       }
     });
+
+     
+     // if LES multiply by something
+
+
     // TODO: Record runtime for load balancing
   
     // Real sum_fc = tempf.sum<RunOn::Device>(2 * NUM_SPECIES + 3, 1);

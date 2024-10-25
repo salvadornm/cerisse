@@ -10,6 +10,7 @@
 **/*.ex
 **/Backtrace*
 **/plt*
+**/chk*
 **/.ipynb_checkpoints/
 **/results
 **/*.visit
