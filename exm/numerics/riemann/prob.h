@@ -31,7 +31,8 @@ typedef closures_dt<indicies_t, visc_suth_t, cond_suth_t,
 //typedef rhs_dt<riemann_t<false, ProbClosures>, no_diffusive_t, no_source_t    > ProbRHS;
 
 typedef rhs_dt<skew_t<true,false, 4, ProbClosures>, no_diffusive_t, no_source_t > ProbRHS;
-    
+// typedef rhs_dt<weno_t<ReconScheme::Teno5, ProbClosures>, no_diffusive_t, no_source_t> ProbRHS;
+
 
 void inline inputs() {
   ParmParse pp;

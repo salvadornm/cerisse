@@ -44,7 +44,7 @@ amr.check_int               = 100    # number of timesteps between checkpoints
 amr.plot_files_output = 1
 amr.plot_file         = ./plot/plt # root name of plotfile
 amr.plot_int          = 100         # number of timesteps between plotfiles
-amr.derive_plot_vars  = pressure x_velocity y_velocity z_velocity temperature
+amr.derive_plot_vars  = pressure velocity temperature
 
 # Debugging 
 # amrex.fpe_trap_invalid=1
