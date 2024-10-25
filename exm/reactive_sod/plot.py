@@ -3,7 +3,10 @@ import matplotlib.pyplot as plt
 import yt
 import glob
 
-folders = ["muscl", "weno", "teno"]
+#folders = ["muscl", "weno", "teno"]
+
+folders = ["plot"]
+
 
 # Plot the results
 time_int = [16, 23]
@@ -53,5 +56,6 @@ plt.legend()
 plt.xlabel("x [m]")
 plt.tight_layout()
 
-plt.savefig("compare_ref.png", facecolor="white")
-print("Saved plot to compare_ref.png!")
+plt.show()
+#plt.savefig("compare_ref.png", facecolor="white")
+#print("Saved plot to compare_ref.png!")

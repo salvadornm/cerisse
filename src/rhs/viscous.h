@@ -76,6 +76,12 @@ class viscous_t {
         });
 #endif     
 
+    // if (LES)   Pseudo-code for LES
+    // {
+    //  cls->compute_sgsterms(prims(UX-UZ)) 
+    //  muarr+= cls->musgs()
+    //  lamarr+=  ls->lamsgs()
+    // }
     
     // loop over directions -----------------------------------------------
     for (int dir = 0; dir < AMREX_SPACEDIM; dir++) {

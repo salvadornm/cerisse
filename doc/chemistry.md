@@ -24,6 +24,15 @@ PELE_PHYSICS_HOME = $(abspath ../../lib/PelePhysics)
 ```
 
 
+Important do this before running with PelePhysics chemistry (do it only once)
+
+```bash
+make TPL
+```
+
+If you do make directly
+
+
 ### Available Mechanisms
 
 
