@@ -198,10 +198,11 @@ void CNS::compute_dSdt(const MultiFab& S, MultiFab& dSdt, Real dt,
         }
 
         // shock sensor always needed in cns_riemann
+        if (use_hybrid_scheme)
         {
           Real time = state[State_Type].curTime();
           int* bcrec_dummy;
-          cns_dershocksensor(amrex::grow(bx, 2), shock_sensor_mf[mfi], 0, 1, S[mfi],
+          cns_dershocksensor(amrex::grow(bx, 3), shock_sensor_mf[mfi], 0, 1, S[mfi],
                              geom, time, bcrec_dummy, level);
         }
 
@@ -388,7 +389,8 @@ void CNS::enforce_consistent_state(MultiFab& S)
                     for (int iz = -1; iz <= 1; ++iz) {
                       Real T_neighbour = s_arr(i + ix, j + iy, k + iz, UTEMP);
                       if (std::isgreater(T_neighbour, clip_temp) &&
-                          std::isless(T_neighbour, 10000)
+                          std::isless(T_neighbour, 4000.0) &&
+                          bx.contains(i + ix, j + iy, k + iz)
 #if CNS_USE_EB
                           && flag_arr(i + ix, j + iy, k + iz).isRegular()
 #endif
@@ -455,8 +457,8 @@ void CNS::enforce_consistent_state(MultiFab& S)
 #endif
               } // if T < clip_temp
 
-              if (s_arr(iv, UTEMP) > 5000.0) {
-                Real target_temp = 5000.0;
+              if (s_arr(iv, UTEMP) > 4000.0) {
+                Real target_temp = 4000.0;
 
                 // Calculate new temperature
                 const Real rhoNew = s_arr(iv, URHO);

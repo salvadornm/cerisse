@@ -14,7 +14,7 @@ cns_diff_species_eb(amrex::IntVect const& iv, const int idir,
                     amrex::Array4<amrex::Real const> const& q,
                     amrex::Array4<amrex::Real const> const& coeffs,
                     amrex::GpuArray<amrex::Real, AMREX_SPACEDIM> const& dxinv,
-                    amrex::Array4<amrex::Real> const& flx)
+                    amrex::Real flx[NVAR])
 {
 #if (NUM_SPECIES > 1) // no point doing diffusion for single species
   using amrex::Real;
@@ -51,15 +51,15 @@ cns_diff_species_eb(amrex::IntVect const& iv, const int idir,
     const amrex::Real Vd = -0.5 * (coeffs(iv, CRHOD + n) + coeffs(ivm, CRHOD + n)) *
                            (dXdx + (Xface - Yface) * dlnp);
     Vc += Vd;
-    flx(iv, UFS + n) += Vd;
-    flx(iv, UEDEN) += Vd * hface;
+    flx[UFS + n] += Vd;
+    flx[UEDEN] += Vd * hface;
   }
   // Add correction velocity to fluxes so sum(Vd) = 0
   for (int ns = 0; ns < NUM_SPECIES; ++ns) {
     const amrex::Real Yface = 0.5 * (mass1[ns] + mass2[ns]);
     const amrex::Real hface = 0.5 * (hi1[ns] + hi2[ns]);
-    flx(iv, UFS + ns) -= Yface * Vc;
-    flx(iv, UEDEN) -= Yface * hface * Vc;
+    flx[UFS + ns] -= Yface * Vc;
+    flx[UEDEN] -= Yface * hface * Vc;
   }
 #endif
 }
@@ -76,15 +76,14 @@ cns_diff_species_eb(amrex::IntVect const& iv, const int idir,
  * @param[out] flx_arr  output diffusion fluxes.
  */
 AMREX_GPU_DEVICE AMREX_FORCE_INLINE void
-cns_diff_eb(const int i, const int j, const int k, const int d1,
+cns_diff_eb(const amrex::IntVect& iv, const int d1,
             amrex::Array4<const amrex::Real> const& q,
             amrex::Array4<const amrex::Real> const& coeffs,
             amrex::Array4<const amrex::EBCellFlag> const& flag,
             amrex::GpuArray<amrex::Real, AMREX_SPACEDIM> const& dxinv,
-            amrex::Array4<amrex::Real> const& flx) noexcept
+            amrex::Real flx[NVAR]) noexcept
 {
   using amrex::Real;
-  const amrex::IntVect iv{AMREX_D_DECL(i, j, k)};
   const amrex::IntVect ivm(iv - amrex::IntVect::TheDimensionVector(d1));
   if (flag(iv).isCovered() || flag(ivm).isCovered()) { return; }
 
@@ -115,6 +114,16 @@ cns_diff_eb(const int i, const int j, const int k, const int d1,
   const Real u22 = (0.5 * dxinv[d2]) *
                    ((q(iv + hip * ivd2, QU2) - q(iv + him * ivd2, QU2)) * whi +
                     (q(ivm + lop * ivd2, QU2) - q(ivm + lom * ivd2, QU2)) * wlo);
+  // Real whip = hip == 1 ? 1 : -1;
+  // Real whim = him == -1 ? 1 : -1;
+  // Real wlop = lop == 1 ? 1 : -1;
+  // Real wlom = lom == -1 ? 1 : -1;
+  // const Real u12 = (0.25 * dxinv[d2]) *
+  //                  (q(iv + hip * ivd2, QU1) * whip - q(iv + him * ivd2, QU1) * whim +
+  //                   q(ivm + lop * ivd2, QU1) * wlop - q(ivm + lom * ivd2, QU1) * wlom);
+  // const Real u22 = (0.25 * dxinv[d2]) *
+  //                  (q(iv + hip * ivd2, QU2) * whip - q(iv + him * ivd2, QU2) * whim +
+  //                   q(ivm + lop * ivd2, QU2) * wlop - q(ivm + lom * ivd2, QU2) * wlom);
 #if (AMREX_SPACEDIM == 3)
   const Real u31 = (q(iv, QU3) - q(ivm, QU3)) * dxinv[d1];
   const amrex::IntVect ivd3(amrex::IntVect::TheDimensionVector(d3));
@@ -130,6 +139,17 @@ cns_diff_eb(const int i, const int j, const int k, const int d1,
   const Real u33 = (0.5 * dxinv[d3]) *
                    ((q(iv + hip * ivd3, QU3) - q(iv + him * ivd3, QU3)) * whi +
                     (q(ivm + lop * ivd3, QU3) - q(ivm + lom * ivd3, QU3)) * wlo);
+  // whip = hip == 1 ? 1 : -1;
+  // whim = him == -1 ? 1 : -1;
+  // wlop = lop == 1 ? 1 : -1;
+  // wlom = lom == -1 ? 1 : -1;
+  // const Real u13 = (0.25 * dxinv[d3]) *
+  //                  (q(iv + hip * ivd3, QU1) * whip - q(iv + him * ivd3, QU1) * whim +
+  //                   q(ivm + lop * ivd3, QU1) * wlop - q(ivm + lom * ivd3, QU1) * wlom);
+  // const Real u33 = (0.25 * dxinv[d3]) *
+  //                  (q(iv + hip * ivd3, QU3) * whip - q(iv + him * ivd3, QU3) * whim +
+  //                   q(ivm + lop * ivd3, QU3) * wlop - q(ivm + lom * ivd3, QU3) * wlom);
+
 #endif
   const Real divu = AMREX_D_TERM(u11, +u22, +u33);
   const Real muf = 0.5 * (coeffs(iv, CMU) + coeffs(ivm, CMU));
@@ -137,9 +157,8 @@ cns_diff_eb(const int i, const int j, const int k, const int d1,
   AMREX_D_TERM(Real tau11 = muf * (2.0 * u11 - (2.0 / 3.0) * divu) + xif * divu;
                , Real tau12 = muf * (u12 + u21);, Real tau13 = muf * (u13 + u31);)
 
-  AMREX_D_TERM(flx(iv, UM1) -= tau11;, flx(iv, UM2) -= tau12;
-               , flx(iv, UM3) -= tau13;)
-  flx(iv, UEDEN) -= 0.5 * (AMREX_D_TERM((q(iv, QU1) + q(ivm, QU1)) * tau11,
+  AMREX_D_TERM(flx[UM1] -= tau11;, flx[UM2] -= tau12;, flx[UM3] -= tau13;)
+  flx[UEDEN] -= 0.5 * (AMREX_D_TERM((q(iv, QU1) + q(ivm, QU1)) * tau11,
                                         +(q(iv, QU2) + q(ivm, QU2)) * tau12,
                                         +(q(iv, QU3) + q(ivm, QU3)) * tau13) +
                            (coeffs(iv, CLAM) + coeffs(ivm, CLAM)) * dTdn);
@@ -746,17 +765,18 @@ AMREX_GPU_DEVICE AMREX_FORCE_INLINE void compute_diff_wallflux(
   Real rho, mu, xi, lam;
   Real p = q(i, j, k, QPRES), Y[NUM_SPECIES]; // assume dp/dn, dY/dn ~ 0
   for (int n = 0; n < NUM_SPECIES; ++n) { Y[n] = q(i, j, k, QFS + n); }
-  if (eb_isothermal) {
-    auto trans = pele::physics::PhysicsType::transport();
-    auto const* ltransparm = CNS::trans_parms.device_trans_parm();
-    Real dummy2;
+  // if (eb_isothermal) {
+  //   auto trans = pele::physics::PhysicsType::transport();
+  //   auto const* ltransparm = CNS::trans_parms.device_trans_parm();
+  //   Real dummy2;
 
-    auto eos = pele::physics::PhysicsType::eos();
-    eos.PYT2R(p, Y, eb_wall_temp, rho); // assume dp/dn ~ 0
+  //   auto eos = pele::physics::PhysicsType::eos();
+  //   eos.PYT2R(p, Y, eb_wall_temp, rho); // assume dp/dn ~ 0
 
-    trans.transport(true, true, true, false, false, eb_wall_temp, rho, Y, nullptr,
-                    nullptr, mu, xi, lam, ltransparm);
-  } else {
+  //   trans.transport(true, true, true, false, false, eb_wall_temp, rho, Y, nullptr,
+  //                   nullptr, mu, xi, lam, ltransparm);
+  // } else 
+  {
     // Adiabatic wall dT/dn ~ 0
     rho = q(i, j, k, QRHO);
     mu = coefs(i, j, k, CMU);
@@ -852,10 +872,10 @@ AMREX_GPU_DEVICE AMREX_FORCE_INLINE void compute_diff_wallflux(
       EquilibriumODE wm;
       // Tangent vectors (t1.n = 0, t2.t1 = 0, u.t2 = 0)
       Real t1[3];
-      Real udotn = u2 * anrmx + v2 * anrmy + w2 * anrmz;
-      t1[0] = u2 - udotn * anrmx;
-      t1[1] = v2 - udotn * anrmy;
-      t1[2] = w2 - udotn * anrmz;
+      Real udotn = u1 * anrmx + v1 * anrmy + w1 * anrmz;
+      t1[0] = u1 - udotn * anrmx;
+      t1[1] = v1 - udotn * anrmy;
+      t1[2] = w1 - udotn * anrmz;
       Real tnorm = std::sqrt(t1[0] * t1[0] + t1[1] * t1[1] + t1[2] * t1[2]);
       t1[0] /= tnorm;
       t1[1] /= tnorm;
@@ -868,18 +888,19 @@ AMREX_GPU_DEVICE AMREX_FORCE_INLINE void compute_diff_wallflux(
       //             << std::endl;
       //   amrex::Abort("Tangent vector is not orthogonal to the normal vector");
       // }
-      Real u_parallel = u2 * t1[0] + v2 * t1[1] + w2 * t1[2]; // u dot tangent
+      Real u_parallel = u1 * t1[0] + v1 * t1[1] + w1 * t1[2]; // u dot tangent
       Real ts = (u_parallel > 0.0) ? 1.0 : -1.0;
       u_parallel *= ts; // abs(u)
-      if (u_parallel > 1e-3 && T2 > 90.0 && T2 < 5000.0 && rho > 0.0) {
+      if (u_parallel > 100.0 && T1 > 90.0 && T1 < 3000.0 && rho > 0.0) {
         Real T_wall = eb_isothermal ? eb_wall_temp : -1.0;
-        Real h = d2 * dx;
+        Real h = d1 * dx;
         Real tauw, qw;
-        wm.parallel_wall_stress(u_parallel, T2, rho, Y, h, mu, lam, T_wall, tauw, qw);
+        wm.parallel_wall_stress(u_parallel, T1, rho, Y, h, mu, lam, T_wall, tauw, qw);
         // std::cout << "y+: " << yplus << " -> "
         //           << rho * std::sqrt(tauw / rho) / mu * dx;
         // std::cout << "  viscous wall stress: " << tau * cfarea << " (" << viscw[UMX]
         //           << ", " << viscw[UMY] << ", " << viscw[UMY] << ") -> ";
+        if (!isnan(tauw) && !isnan(qw)) {
         viscw[UMX] = cfarea * ts * t1[0] * tauw;
         viscw[UMY] = cfarea * ts * t1[1] * tauw;
         viscw[UMZ] = cfarea * ts * t1[2] * tauw;
@@ -888,6 +909,12 @@ AMREX_GPU_DEVICE AMREX_FORCE_INLINE void compute_diff_wallflux(
         viscw[UEDEN] = cfarea * qw;
         // std::cout << "  " << apnorm << " (" << anrmx << ", " << anrmy << ", "
         //           << anrmz << ")\n";
+        
+        // if ((i == 100 && j == 16 && k == 23))
+        //   std::cout << "(" << i <<","<<j<<","<<k<<")" << ": tauw=" << tauw << ", qw=" << qw 
+        //             << ", t=" << ts*t1[0] <<"," << ts*t1[1] <<","<< ts*t1[2] << ", cfarea=" << cfarea 
+        //             << ", guess y+=" << yplus << std::endl;
+        }
       }
     }
   }

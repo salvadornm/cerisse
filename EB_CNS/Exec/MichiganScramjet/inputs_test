@@ -1,9 +1,10 @@
 # ====================================================== #
 #                  CERISSE INPUT SCRIPT                  #
 # ====================================================== #
-max_step = 15000
+max_step = 100
 stop_time = 0.1
 amrex.fpe_trap_invalid = 0
+fab.init_snan = 0
 
 # ================ COMPUTATIONAL DOMAIN ================ #
 geometry.is_periodic = 0 0 0
@@ -30,9 +31,9 @@ cns.hi_bc = 2 5 5
 # ==================== WHAT PHYSICS ==================== #
 cns.do_hydro = 1
 cns.do_visc  = 1
-cns.do_react = 1
-#cns.do_vpdf = 1
-#cns.do_spdf = 1
+cns.do_react = 0
+cns.do_vpdf = 1
+cns.do_spdf = 1
 
 # ==================== WHAT NUMERICS =================== #
 cns.cfl = 0.3
@@ -62,7 +63,7 @@ ode.verbose = 0
 amr.loadbalance_with_workestimates = 1 # loadbalance_int = regrid_int
 
 # =============== REFINEMENT / REGRIDDING ============== #
-amr.max_level       = 1     # maximum level number allowed
+amr.max_level       = 0     # maximum level number allowed
 amr.ref_ratio       = 2 2 2 # refinement ratio
 amr.regrid_int      = 20    # how often to regrid
 amr.blocking_factor = 8
@@ -92,7 +93,7 @@ cns.refine_cutcells = 1
 cns.refine_cutcells_max_lev = 2
 
 # ==================== OUTPUT FILES ==================== #
-amr.checkpoint_files_output = 1
+amr.checkpoint_files_output = 0
 amr.check_file      = chk    # root name of checkpoint file
 amr.check_int       = 100    # number of timesteps between checkpoints
 #amr.check_per # interval physical time between checkpoints
@@ -101,7 +102,7 @@ amr.plot_files_output = 1
 amr.plot_file         = plt  # root name of plotfile
 amr.plot_int          = 100  # number of timesteps between plotfiles
 #amr.plot_per # interval physical time between plotfiles
-amr.derive_plot_vars  = pressure velocity MachNumber magvort shock_sensor
+amr.derive_plot_vars  = pressure velocity MachNumber magvort shock_sensor reynolds_stress
 cns.plot_rhoy = 0
 cns.plot_molefrac = 0
 cns.plot_massfrac = 1
@@ -112,6 +113,6 @@ prob.T0 = 1400 # total temperature [K]
 prob.spark = 0
 prob.micka_fuel_cond = 1
 prob.do_bl = 0
-prob.make_bl_on_restart = 0
+prob.make_bl_on_restart = 1
 prob.record_statistics = 0
 prob.clean_aux_on_restart = 0

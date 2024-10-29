@@ -736,10 +736,9 @@ void CNS::avgDown()
   MultiFab& S_crse = get_new_data(State_Type);
   const MultiFab& S_fine = fine_lev.get_new_data(State_Type);
 
+#if CNS_USE_EB
   MultiFab volume(S_fine.boxArray(), S_fine.DistributionMap(), 1, 0);
   geom.GetVolume(volume);
-
-#if CNS_USE_EB
   amrex::EB_average_down(S_fine, S_crse, volume, fine_lev.volFrac(), 0,
                          S_fine.nComp(), fine_ratio);
 #else

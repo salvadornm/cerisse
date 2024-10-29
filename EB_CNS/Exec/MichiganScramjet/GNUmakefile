@@ -26,13 +26,12 @@ THREAD_SANITIZER = FALSE
 # PelePhysics
 Eos_Model := Fuego
 Transport_Model := Simple
-#Chemistry_Model := LiDryer
-Custom_Chemistry_Model = ../../Source/chem/Zettervall-9-22
+Chemistry_Model := LiDryer
 
 # CNS
 USE_EB = TRUE
 NUM_AUX = 12
-#NUM_FIELD = 8
+NUM_FIELD = 8
 
 # GNU Make
 include ./Make.package

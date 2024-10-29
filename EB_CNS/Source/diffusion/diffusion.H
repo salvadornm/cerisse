@@ -15,7 +15,7 @@ cns_diff_species(amrex::IntVect const& iv, const int idir,
                  amrex::Array4<amrex::Real const> const& q,
                  amrex::Array4<amrex::Real const> const& coeffs,
                  amrex::GpuArray<amrex::Real, AMREX_SPACEDIM> const& dxinv,
-                 amrex::Array4<amrex::Real> const& flx)
+                 amrex::Real flx[NVAR])
 {
 #if (NUM_SPECIES > 1) // no point doing diffusion for single species
   using amrex::Real;
@@ -23,24 +23,22 @@ cns_diff_species(amrex::IntVect const& iv, const int idir,
   const amrex::IntVect ivm(iv - amrex::IntVect::TheDimensionVector(idir));
 
   // Get massfrac, molefrac, enthalpy
-  Real mass1[NUM_SPECIES], mass2[NUM_SPECIES], mass3[NUM_SPECIES],
-    mass4[NUM_SPECIES];
-  Real mole1[NUM_SPECIES], mole2[NUM_SPECIES], mole3[NUM_SPECIES],
-    mole4[NUM_SPECIES];
+  Real mass1[NUM_SPECIES], mass2[NUM_SPECIES], mole1[NUM_SPECIES], mole2[NUM_SPECIES];
+  // Real mass3[NUM_SPECIES], mass4[NUM_SPECIES], mole3[NUM_SPECIES], mole4[NUM_SPECIES];
   Real hi1[NUM_SPECIES], hi2[NUM_SPECIES];
   for (int n = 0; n < NUM_SPECIES; ++n) {
-    // mass1[n] = q(iv, QFS + n);
-    // mass2[n] = q(ivm, QFS + n);
-    mass1[n] = q(2 * iv - ivm, QFS + n);
-    mass2[n] = q(iv, QFS + n);
-    mass3[n] = q(ivm, QFS + n);
-    mass4[n] = q(2 * ivm - iv, QFS + n);
+    mass1[n] = q(iv, QFS + n);
+    mass2[n] = q(ivm, QFS + n);
+    // mass1[n] = q(2 * iv - ivm, QFS + n);
+    // mass2[n] = q(iv, QFS + n);
+    // mass3[n] = q(ivm, QFS + n);
+    // mass4[n] = q(2 * ivm - iv, QFS + n);
   }
   auto eos = pele::physics::PhysicsType::eos();
   eos.Y2X(mass1, mole1);
   eos.Y2X(mass2, mole2);
-  eos.Y2X(mass3, mole3);
-  eos.Y2X(mass4, mole4);
+  // eos.Y2X(mass3, mole3);
+  // eos.Y2X(mass4, mole4);
 
   // Compute species and enthalpy fluxes for ideal EOS
   // Get species/enthalpy diffusion, compute correction vel
@@ -49,38 +47,41 @@ cns_diff_species(amrex::IntVect const& iv, const int idir,
   T = q(ivm, QTEMP);
   eos.RTY2Hi(q(ivm, QRHO), T, mass2, hi2);
 
-  constexpr int order = 4;
-  const Real w1 = -1.0 / 24.0;
-  const Real w2 = 27.0 / 24.0;
-  const Real w3 = -27.0 / 24.0;
-  const Real w4 = 1.0 / 24.0;
+  // constexpr int order = 4;
+  // const Real w1 = -1.0 / 24.0;
+  // const Real w2 = 27.0 / 24.0;
+  // const Real w3 = -27.0 / 24.0;
+  // const Real w4 = 1.0 / 24.0;
 
   Real Vc = 0.0;
-  const Real dpdx = normal_diff<order>(iv, idir, QPRES, q, dxinv);
+  const Real dpdx = dxinv[idir] * (q(iv, QPRES) - q(ivm, QPRES));
+  // const Real dpdx = normal_diff<order>(iv, idir, QPRES, q, dxinv);
   const Real dlnp = dpdx / (0.5 * (q(iv, QPRES) + q(ivm, QPRES)));
   for (int n = 0; n < NUM_SPECIES; ++n) {
-    // const Real Xface = 0.5 * (mole1[n] + mole2[n]);
-    // const Real Yface = 0.5 * (mass1[n] + mass2[n]);
-    const Real Xface = (-mole1[n] + 9 * mole2[n] + 9 * mole3[n] - mole4[n]) / 16.0;
-    const Real Yface = (-mass1[n] + 9 * mass2[n] + 9 * mass3[n] - mass4[n]) / 16.0;
+    const Real Xface = 0.5 * (mole1[n] + mole2[n]);
+    const Real Yface = 0.5 * (mass1[n] + mass2[n]);
+    // const Real Xface = (-mole1[n] + 9 * mole2[n] + 9 * mole3[n] - mole4[n]) / 16.0;
+    // const Real Yface = (-mass1[n] + 9 * mass2[n] + 9 * mass3[n] - mass4[n]) / 16.0;
     const Real hface = 0.5 * (hi1[n] + hi2[n]);
-    // const Real dXdx = (mole1[n] - mole2[n]) * dxinv[idir]; // 2nd order
-    const Real dXdx =
-      (w1 * mole1[n] + w2 * mole2[n] + w3 * mole3[n] + w4 * mole4[n]) *
-      dxinv[idir]; // 4th order
-    const Real Vd =
-      -(interp<order>(iv, 0, CRHOD + n, coeffs)) * (dXdx + (Xface - Yface) * dlnp);
+    const Real dXdx = (mole1[n] - mole2[n]) * dxinv[idir]; // 2nd order
+    // const Real dXdx =
+    //   (w1 * mole1[n] + w2 * mole2[n] + w3 * mole3[n] + w4 * mole4[n]) *
+    //   dxinv[idir]; // 4th order
+    const Real rhoD_n = 0.5 * (coeffs(iv, CRHOD + n) + coeffs(ivm, CRHOD + n));
+    const Real Vd = -rhoD_n * (dXdx + (Xface - Yface) * dlnp);
+    // const Real Vd =
+    //   -(interp<order>(iv, 0, CRHOD + n, coeffs)) * (dXdx + (Xface - Yface) * dlnp);
     Vc += Vd;
-    flx(iv, UFS + n) += Vd;
-    flx(iv, UEDEN) += Vd * hface;
+    flx[UFS + n] += Vd;
+    flx[UEDEN] += Vd * hface;
   }
   // Add correction velocity to fluxes so sum(Vd) = 0
   for (int n = 0; n < NUM_SPECIES; ++n) {
-    // const Real Yface = 0.5 * (mass1[n] + mass2[n]);
-    const Real Yface = (-mass1[n] + 9 * mass2[n] + 9 * mass3[n] - mass4[n]) / 16.0;
+    const Real Yface = 0.5 * (mass1[n] + mass2[n]);
+    // const Real Yface = (-mass1[n] + 9 * mass2[n] + 9 * mass3[n] - mass4[n]) / 16.0;
     const Real hface = 0.5 * (hi1[n] + hi2[n]);
-    flx(iv, UFS + n) -= Yface * Vc;
-    flx(iv, UEDEN) -= Yface * hface * Vc;
+    flx[UFS + n] -= Yface * Vc;
+    flx[UEDEN] -= Yface * hface * Vc;
   }
 #endif
 }
@@ -96,14 +97,13 @@ cns_diff_species(amrex::IntVect const& iv, const int idir,
  * @param[out] flx  output diffusion fluxes.
  */
 AMREX_GPU_DEVICE AMREX_FORCE_INLINE void
-cns_diff(const int i, const int j, const int k, const int d1,
+cns_diff(const amrex::IntVect& iv, const int d1,
          amrex::Array4<const amrex::Real> const& q,
          amrex::Array4<const amrex::Real> const& coeffs,
          amrex::GpuArray<amrex::Real, AMREX_SPACEDIM> const& dxinv,
-         amrex::Array4<amrex::Real> const& flx) noexcept
+         amrex::Real flx[NVAR]) noexcept
 {
   using amrex::Real;
-  const amrex::IntVect iv{AMREX_D_DECL(i, j, k)};
   const amrex::IntVect ivm = iv - amrex::IntVect::TheDimensionVector(d1);
 
   const int d2 = d1 == 0 ? 1 : 0;
@@ -113,7 +113,7 @@ cns_diff(const int i, const int j, const int k, const int d1,
   AMREX_D_TERM(const int UM1 = UMX + d1;, const int UM2 = UMX + d2;
                , const int UM3 = UMX + d3;)
 
-  constexpr int order = 4;
+  constexpr int order = 2;
 
   // Aij = dA_i/dx_j
   const Real dTdn = normal_diff<order>(iv, d1, QTEMP, q, dxinv);
@@ -134,9 +134,8 @@ cns_diff(const int i, const int j, const int k, const int d1,
   AMREX_D_TERM(Real tau11 = muf * (2.0 * u11 - (2.0 / 3.0) * divu) + xif * divu;
                , Real tau12 = muf * (u12 + u21);, Real tau13 = muf * (u13 + u31);)
 
-  AMREX_D_TERM(flx(iv, UM1) -= tau11;, flx(iv, UM2) -= tau12;
-               , flx(iv, UM3) -= tau13;)
-  flx(iv, UEDEN) -= 0.5 * (AMREX_D_TERM((q(iv, QU1) + q(ivm, QU1)) * tau11,
+  AMREX_D_TERM(flx[UM1] -= tau11;, flx[UM2] -= tau12;, flx[UM3] -= tau13;)
+  flx[UEDEN] -= 0.5 * (AMREX_D_TERM((q(iv, QU1) + q(ivm, QU1)) * tau11,
                                         +(q(iv, QU2) + q(ivm, QU2)) * tau12,
                                         +(q(iv, QU3) + q(ivm, QU3)) * tau13) +
                            (coeffs(iv, CLAM) + coeffs(ivm, CLAM)) * dTdn);

@@ -118,7 +118,7 @@ AMREX_GPU_DEVICE AMREX_FORCE_INLINE void EquilibriumODE::parallel_wall_stress(
   // printArray(u, n_grid, "u");
   // printArray(T, n_grid, "T");
 
-  Real res_u = 1e10, res_T = 1e10; // residuals
+  Real res_u = 1e10, res_T = 0; // residuals
   Real rho_0, tauw, tmp[n_grid], mu[n_grid], lam[n_grid], cp[n_grid], mut[n_grid]; // temporary variables
   int iter = 0, max_iter = 10;
   LUSolver<n_grid, Real> lusolver;
@@ -185,62 +185,62 @@ AMREX_GPU_DEVICE AMREX_FORCE_INLINE void EquilibriumODE::parallel_wall_stress(
     }
     // printArray(u, n_grid, "u");
 
-    // solve for T
-    for (int i = 0; i < n_grid; ++i) {
-      for (int j = 0; j < n_grid; ++j) {
-        A(i, j) = 0.0;
-      }
-      b(i) = 0.0;
-    }
-    // wall BC
-    mu_lo = mu[0] + mut[0];
-    mu_hi = 0.5 * (mu[0] + mut[0] + mu[1] + mut[1]);
-    Real lam_lo = (lam[0] + cp[0] * mut[0] / Prt);
-    Real lam_hi =
-      0.5 * (lam[0] + cp[0] * mut[0] / Prt + lam[1] + cp[1] * mut[1] / Prt);
-    if (T_wall > 0.0) {
-      // Isothermal wall
-      A(0, 0) = lam_lo * (-1. / y[0]) - lam_hi * (1. / (y[1] - y[0]));
-      A(0, 1) = lam_hi * (1. / (y[1] - y[0]));
-      b(0) = -lam_lo * T_wall / y[0] + mu_lo * (uw * u[0] / y[0]) -
-             mu_hi * ((u[0] + u[1]) / 2 * (u[1] - u[0]) / (y[1] - y[0]));
-    } else {
-      // adiabatic wall
-      A(0, 0) = -lam_hi * (1.0 / (y[1] - y[0]));
-      A(0, 1) = lam_hi * (1. / (y[1] - y[0]));
-      b(0) = mu_lo * (uw * u[0] / y[0]) -
-             mu_hi * ((u[0] + u[1]) / 2 * (u[1] - u[0]) / (y[1] - y[0]));
-    }
-    // freestream BC
-    A(n_grid - 1, n_grid - 1) = 1.0;
-    b(n_grid - 1) = Twm;
-    // interior points
-    for (int i = 1; i < n_grid - 1; ++i) {
-      mu_lo = 0.5 * (mu[i - 1] + mut[i - 1] + mu[i] + mut[i]);
-      mu_hi = 0.5 * (mu[i] + mut[i] + mu[i + 1] + mut[i + 1]);
-      lam_lo = 0.5 * (lam[i - 1] + cp[i - 1] * mut[i - 1] / Prt + lam[i] +
-                      cp[i] * mut[i] / Prt);
-      lam_hi = 0.5 * (lam[i] + cp[i] * mut[i] / Prt + lam[i + 1] +
-                      cp[i + 1] * mut[i + 1] / Prt);
-      A(i, i - 1) = lam_lo / (y[i] - y[i - 1]);
-      A(i, i) = -lam_lo / (y[i] - y[i - 1]) - lam_hi / (y[i + 1] - y[i]);
-      A(i, i + 1) = lam_hi / (y[i + 1] - y[i]);
-      b(i) =
-        mu_lo * ((u[i - 1] + u[i]) / 2 * (u[i] - u[i - 1]) / (y[i] - y[i - 1])) -
-        mu_hi * ((u[i] + u[i + 1]) / 2 * (u[i + 1] - u[i]) / (y[i + 1] - y[i]));
-    }
-    // printMatrix<n_grid>(A, "C");
-    // printArray<n_grid>(b, "d");
+    // // solve for T
+    // for (int i = 0; i < n_grid; ++i) {
+    //   for (int j = 0; j < n_grid; ++j) {
+    //     A(i, j) = 0.0;
+    //   }
+    //   b(i) = 0.0;
+    // }
+    // // wall BC
+    // mu_lo = mu[0] + mut[0];
+    // mu_hi = 0.5 * (mu[0] + mut[0] + mu[1] + mut[1]);
+    // Real lam_lo = (lam[0] + cp[0] * mut[0] / Prt);
+    // Real lam_hi =
+    //   0.5 * (lam[0] + cp[0] * mut[0] / Prt + lam[1] + cp[1] * mut[1] / Prt);
+    // if (T_wall > 0.0) {
+    //   // Isothermal wall
+    //   A(0, 0) = lam_lo * (-1. / y[0]) - lam_hi * (1. / (y[1] - y[0]));
+    //   A(0, 1) = lam_hi * (1. / (y[1] - y[0]));
+    //   b(0) = -lam_lo * T_wall / y[0] + mu_lo * (uw * u[0] / y[0]) -
+    //          mu_hi * ((u[0] + u[1]) / 2 * (u[1] - u[0]) / (y[1] - y[0]));
+    // } else {
+    //   // adiabatic wall
+    //   A(0, 0) = -lam_hi * (1.0 / (y[1] - y[0]));
+    //   A(0, 1) = lam_hi * (1. / (y[1] - y[0]));
+    //   b(0) = mu_lo * (uw * u[0] / y[0]) -
+    //          mu_hi * ((u[0] + u[1]) / 2 * (u[1] - u[0]) / (y[1] - y[0]));
+    // }
+    // // freestream BC
+    // A(n_grid - 1, n_grid - 1) = 1.0;
+    // b(n_grid - 1) = Twm;
+    // // interior points
+    // for (int i = 1; i < n_grid - 1; ++i) {
+    //   mu_lo = 0.5 * (mu[i - 1] + mut[i - 1] + mu[i] + mut[i]);
+    //   mu_hi = 0.5 * (mu[i] + mut[i] + mu[i + 1] + mut[i + 1]);
+    //   lam_lo = 0.5 * (lam[i - 1] + cp[i - 1] * mut[i - 1] / Prt + lam[i] +
+    //                   cp[i] * mut[i] / Prt);
+    //   lam_hi = 0.5 * (lam[i] + cp[i] * mut[i] / Prt + lam[i + 1] +
+    //                   cp[i + 1] * mut[i + 1] / Prt);
+    //   A(i, i - 1) = lam_lo / (y[i] - y[i - 1]);
+    //   A(i, i) = -lam_lo / (y[i] - y[i - 1]) - lam_hi / (y[i + 1] - y[i]);
+    //   A(i, i + 1) = lam_hi / (y[i + 1] - y[i]);
+    //   b(i) =
+    //     mu_lo * ((u[i - 1] + u[i]) / 2 * (u[i] - u[i - 1]) / (y[i] - y[i - 1])) -
+    //     mu_hi * ((u[i] + u[i + 1]) / 2 * (u[i + 1] - u[i]) / (y[i + 1] - y[i]));
+    // }
+    // // printMatrix<n_grid>(A, "C");
+    // // printArray<n_grid>(b, "d");
 
-    // solve
-    lusolver.define(A);
-    lusolver(tmp, b.arr);
-    res_T = 0.0;
-    for (int i = 0; i < n_grid; ++i) {
-      res_T += std::abs(T[i] - tmp[i]) / Real(n_grid);
-      T[i] = std::max(tmp[i], 90.0);
-    }
-    // printArray(T, n_grid, "T");
+    // // solve
+    // lusolver.define(A);
+    // lusolver(tmp, b.arr);
+    // res_T = 0.0;
+    // for (int i = 0; i < n_grid; ++i) {
+    //   res_T += std::abs(T[i] - tmp[i]) / Real(n_grid);
+    //   T[i] = std::max(tmp[i], 90.0);
+    // }
+    // // printArray(T, n_grid, "T");
 
     // std::cout << iter << " res_u = " << res_u << ", res_T = " << res_T << std::endl;
     iter++;

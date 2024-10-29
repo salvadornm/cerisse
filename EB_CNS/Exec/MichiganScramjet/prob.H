@@ -30,17 +30,14 @@ AMREX_GPU_DEVICE AMREX_FORCE_INLINE void bl_profile(const amrex::Real y,
                                                     amrex::Real& ei)
 {
   // Make boundary layer
-  amrex::Real d_wall = amrex::min(y, 2.54 - y); // dist from upper and lower walls
-  d_wall = amrex::min(d_wall, 1.905 - amrex::Math::abs(z)); // dist from left and right walls
+  amrex::Real d_wall = std::min(y, 2.54 - y); // dist from upper and lower walls
+  d_wall = std::min(d_wall, 1.905 - std::abs(z)); // dist from left and right walls
   d_wall /= (0.1245 * 2.0); // d_wall/D
-  amrex::Real u_profile = (d_wall > 0.0) ? tanh(5.0 * d_wall) : 0.0; // u/u_inf
-  // amrex::Real u_profile = (d_wall > 0.68) ? 1.0 : 1.0085656 - exp(-7.0 * d_wall); // u/u_inf
+  const amrex::Real u_profile = (d_wall > 0.0) ? std::tanh(5.0 * d_wall) : 0.0; // u/u_inf
   u = pp.u * u_profile;
-  // assert((u_profile => 0.0) && (u_profile <= 1.0));
 
   amrex::Real T_inf, p_inf;
-  amrex::Real Y[NUM_SPECIES];
-  for (int n = 0; n < NUM_SPECIES; ++n) { Y[n] = pp.Y[n]; }
+  const amrex::Real* Y = pp.Y.begin();
   auto eos = pele::physics::PhysicsType::eos();
   ei = pp.ei;
   eos.RYET2P(pp.rho, Y, ei, T_inf, p_inf); // get T, p_inf
@@ -50,11 +47,9 @@ AMREX_GPU_DEVICE AMREX_FORCE_INLINE void bl_profile(const amrex::Real y,
   amrex::Real cv, cv_inf = pp.cv_Tinf / T_inf;
   eos.TY2Cv(T_inf * T_profile, Y, cv);
   T_profile *= cv_inf / cv;
-  // assert((T_profile => 0.0) && (T_profile <= 1.0));
 
   rho = pp.rho / T_profile;
   eos.RYP2E(rho, Y, p_inf, ei); // rho, p_inf -> ei
-  // assert(!isnan(ei));
 }
 
 /**
@@ -85,7 +80,7 @@ prob_initdata(int i, int j, int k, amrex::Array4<amrex::Real> const& state,
   amrex::Real rho = pp.rho;
   amrex::Real u = pp.u;
   amrex::Real ei = pp.ei;
-  if (pp.do_bl && pp.make_bl_on_restart) { bl_profile(y, z, pp, rho, u, ei); }
+  if ((pp.do_bl || pp.make_bl_on_restart) && x > -5.0) { bl_profile(y, z, pp, rho, u, ei); }
 
   // Ventilated air
   for (int nf = 0; nf <= NUM_FIELD; ++nf) {
