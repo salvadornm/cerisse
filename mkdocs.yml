@@ -3,7 +3,6 @@ docs_dir: doc
 nav:
   - Home: index.md
   - Quick: quickrun.md
-  - input: input-options.md
   - Run: new_run.md
   - Tests: new_test.md
   - Examples: examples.md  
