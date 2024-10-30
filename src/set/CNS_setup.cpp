@@ -177,4 +177,19 @@ void CNS::variableSetUp() {
   derive_lst.add("density", IndexType::TheCellType(), 1, derdensity,
                  the_same_box);
   derive_lst.addComponent("density", desc_lst, State_Type, 0, h_prob_closures->NCONS);
+
+  // Kinetic energy
+  derive_lst.add("kinetic_energy", IndexType::TheCellType(), 1, derkineticenergy,
+                 the_same_box);
+  derive_lst.addComponent("kinetic_energy", desc_lst, State_Type, 0, h_prob_closures->NCONS);
+
+  // Vorticity magnitude
+  derive_lst.add("magvort", IndexType::TheCellType(), 1, dermagvort,
+                 DeriveRec::GrowBoxByOne);
+  derive_lst.addComponent("magvort", desc_lst, State_Type, 0, h_prob_closures->NCONS);
+
+  // Enstrophy
+  derive_lst.add("enstrophy", IndexType::TheCellType(), 1, derenstrophy,
+                 DeriveRec::GrowBoxByOne);
+  derive_lst.addComponent("enstrophy", desc_lst, State_Type, 0, h_prob_closures->NCONS);
 }

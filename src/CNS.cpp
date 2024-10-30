@@ -173,6 +173,9 @@ void CNS::post_init(Real stop_time) {
   if (verbose) {
     printTotal();
   }
+  
+  // Set up diagnostics
+  setupTimeProbe();
 }
 // -----------------------------------------------------------------------------
 
@@ -401,6 +404,10 @@ void CNS::post_timestep(int /* iteration*/) {
   if (level < parent->finestLevel()) {
     avgDown();
   }
+
+  // Record time statistics
+  recordTimeProbe();
+  // recordLine();
 }
 
 void CNS::postCoarseTimeStep(Real time) {
