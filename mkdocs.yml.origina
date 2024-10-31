@@ -1,0 +1,28 @@
+site_name: cerisse++
+docs_dir: doc
+nav:
+  - Home: index.md
+  - Quick: quickrun.md
+  - Run: new_run.md
+  - Tests: new_test.md
+  - Examples: examples.md  
+  - BC: ibm.md
+  - Tutorial: tutorial.md
+  - Equations: equations.md
+  - Chemistry: chemistry.md
+  - tips: tips.md  
+  - errors: errors.md
+  - Solver: new_rhs.md
+  - Code:  code.md
+  - Class: new_class.md
+  - Develop: doc.md
+extra_javascript:
+  - https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.4/MathJax.js?config=TeX-AMS-MML_HTMLorMML
+markdown_extensions:
+  - mdx_math
+  - callouts
+  - footnotes
+  - pymdownx.magiclink
+  - pymdownx.snippets:
+      check_paths: true
+
