@@ -1,34 +1,30 @@
+---
+icon: person-carry-box
+---
+
 # Tutorial
 
-This  page will explain the set-up, run and visualization of a typical case.
-For a quick overview of running the code, see [Quickrun](quickstart.md).
-At a glance, domain dimension and control parameters are handled in file `inputs` (or similar name)  while problem description is in * `prob.h`
+This page will explain the set-up, run and visualization of a typical case. For a quick overview of running the code, see [Quickrun](quickstart.md). At a glance, domain dimension and control parameters are handled in file `inputs` (or similar name) while problem description is in \* `prob.h`
 
-NOTE: It is recommended to cp the tutorial into a `wrk` or `exm/tmp` directory. Is not neccesary, but if the code is cloned, changes in mian files will register as to commit.
-The previous directories will always be ignored by **git**.
+
+
+{% hint style="warning" %}
+It is recommended to cp the tutorial into a `wrk` or `exm/tmp` directory. Is not neccesary, but if the code is cloned, changes in mian files will register as to commit. The previous directories will always be ignored by **git**.
+{% endhint %}
+
 
 
 ## Problem Set-up
 
-The problem involves a heavy fluid descending into a lighter fluid, creating conditions for a Rayleigh-Taylor instability. The upper half of the domain contains a fluid with a density of 2, while the lower half is filled with a fluid of density 1. The initial pressure distribution is hydrostatic, and a velocity perturbation is introduced to trigger the instability
-The initial conditions can be summarised as
+The problem involves a heavy fluid descending into a lighter fluid, creating conditions for a Rayleigh-Taylor instability. The upper half of the domain contains a fluid with a density of 2, while the lower half is filled with a fluid of density 1. The initial pressure distribution is hydrostatic, and a velocity perturbation is introduced to trigger the instability The initial conditions can be summarised as
 
 $$
- (\rho, v_x, v_y, P) =\left \{
-  \begin{array}[cr]  
-  ( 2, 0, -\epsilon c \cos(8 \pi x),P_0 + \rho g y )   && \mbox{ at }  y > y_0  \\
-  ( 1, 0, -\epsilon c \cos(8 \pi x),P_0 + \rho g y )   && \mbox{ otherwise }   \\
-  \end{array}
-\right.
+(\rho, v_x, v_y, P) =\left \{ \begin{array}[cr] ( 2, 0, -\epsilon c \cos(8 \pi x),P_0 + \rho g y ) && \mbox{ at } y > y_0 \\ ( 1, 0, -\epsilon c \cos(8 \pi x),P_0 + \rho g y ) && \mbox{ otherwise } \\ \end{array} \right.
 $$
 
-where Inline equation: *y0* is the middle of the domain, *P0=2* gravity is taken as 1 pointing downwards and the perturbation is 0.025.
-The initial conditions followed the paper by Shi et al [^1].
-Both fluids are miscible and follow the ideal gas law with adiabatic coefficient of 5/3.
-
+where Inline equation:  $$y_0$$ is the middle of the domain, $$P_0=2$$  is the pressure and  gravity is taken as 1 pointing downwards and the perturbation is $$\epsilon=0.025$$. The initial conditions followed the paper by Shi et al . Both fluids are miscible and follow the ideal gas law with adiabatic coefficient of 5/3.
 
 ## prob.h
-
 
 ### Set-up of Problem Parameters
 
@@ -45,9 +41,9 @@ struct ProbParm {
 };
 ```
 
-### Set-up of  initial conditions
+### Set-up of initial conditions
 
-This is done in the function **prob_initdata**
+This is done in the function **prob\_initdata**
 
 ```cpp
 AMREX_GPU_DEVICE AMREX_FORCE_INLINE void
@@ -61,6 +57,7 @@ prob_initdata(int i, int j, int k, Array4<Real> const &state,
   Real x = prob_lo[0] + (i + Real(0.5)) * dx[0];
   Real y = prob_lo[1] + (j + Real(0.5)) * dx[1];
 ```
+
 where the spatial coordinates **x** and **y** of the cells are determined from the mesh sizes and problem dimensions (which are defined in **inputs**).
 
 The initial conditions are defined as
@@ -89,11 +86,10 @@ The initial conditions are defined as
   state(i, j, k, cls.UET) = et + Real(0.5) * rhot * (uxt * uxt + uyt * uyt); 
 ```
 
-
 The array **state** holds all the information required in conserved variables
 
 $$
-\mbox{state} = \left( \rho, \rho v_x, \rho v_y, \rho e_T  \right)
+\mbox{state} = \left( \rho, \rho v_x, \rho v_y, \rho e_T \right)
 $$
 
 to initialise the problem.
@@ -106,8 +102,8 @@ The solvers is selected in the line
 typedef rhs_dt<riemann_t<false, ProbClosures>, no_diffusive_t, user_source_t<ProbClosures>>
     ProbRHS;
 ```
-which defines which problem to solve
 
+which defines which problem to solve
 
 ### Source Term
 
@@ -123,9 +119,7 @@ class user_source_t {
                   amrex::Real dt){
 ```
 
-The lines below loop over the cells and gravity is added to the momentum 
-and energy equation. The `prob_parm.grav` reads the gravity value defined
-in `ProbParm` structure. 
+The lines below loop over the cells and gravity is added to the momentum and energy equation. The `prob_parm.grav` reads the gravity value defined in `ProbParm` structure.
 
 ```cpp
 amrex::ParallelFor(bx,
@@ -138,11 +132,9 @@ amrex::ParallelFor(bx,
     });
 ```
 
-
 ### AMR
 
-This function defines which points need to be "tagged" to be refined.
-AMReX will then create patches around that cell to create the refined regions.
+This function defines which points need to be "tagged" to be refined. AMReX will then create patches around that cell to create the refined regions.
 
 ```cpp
 AMREX_GPU_DEVICE AMREX_FORCE_INLINE void
@@ -150,9 +142,8 @@ user_tagging(int i, int j, int k, int nt_level, auto &tagfab,
              const auto &sdatafab, const auto &geomdata,
              const ProbParm &prob_parm, int level) {
 ```
-The actual tagging is produced in the follwoing lines, where the
-array `tagfab(i,j,k)` is set ot true or false based on the 
-value of density.
+
+The actual tagging is produced in the follwoing lines, where the array `tagfab(i,j,k)` is set ot true or false based on the value of density.
 
 ```cpp
   Real rhot = sdatafab(i,j,k,ProbClosures::URHO);
@@ -176,8 +167,8 @@ value of density.
 
 ## Input file
 
-
 ### Time steps
+
 ```
 max_step  = 20000
 stop_time = 2.0
@@ -186,8 +177,7 @@ cfl = 0.3
 
 ### Boundary conditions
 
-The boudantry conditions are defined
-More complex boudnarty conditions can be defined 
+The boudantry conditions are defined More complex boudnarty conditions can be defined
 
 ```
 cns.lo_bc = -1 5
@@ -201,9 +191,8 @@ amr.n_cell          = 128 512
 amr.max_level       = 1     # maximum level number allowed
 amr.regrid_int      = 2 2 # how often to regrid per level
 ```
+
 These lines will select size of the mesh and how often to regrid
-
-
 
 ## Compile and Running
 
@@ -240,102 +229,88 @@ plt01100	plt02400	plt03700	plt05000	plt06300
 plt01200	plt02500	plt03800	plt05100	plt06390
 ```
 
-In the following sectionsm we will show how to visualize the results using Python,
-Visit and Paraview.
+In the following sectionsm we will show how to visualize the results using Python, Visit and Paraview.
 
 ### Python
 
-The following assumes that **yt** is installed. Check [Tips](tips.md) for installation.
-A Python script for easy of use,by invoking 
+The following assumes that **yt** is installed. Check [Tips](tips.md) for installation. A Python script for easy of use,by invoking
 
 ```bash
 $ python plot.py
 ```
 
-The last density snaphot at *t=2* will be saved into a png file, which looks like
-(with default color scheme in **yt**).
+The last density snaphot at _t=2_ will be saved into a png file, which looks like (with default color scheme in **yt**).
 
-<img src="../../images/tutorial_yt1.png" width=50%>
-
+<figure><img src=".gitbook/assets/tutorial_yt1.png" alt="" width="242"><figcaption><p>Results of <code>python plot.py</code></p></figcaption></figure>
 
 ### Visit
 
-To see the results with [VisIt](https://visit-dav.github.io/visit-website/),  you can use the script **cerisse**, to open all directories at the same time (to make an animation for example). See  [Tips](tips.md) to set-up the script.
+To see the results with [VisIt](https://visit-dav.github.io/visit-website/), you can use the script **cerisse**, to open all directories at the same time (to make an animation for example). See [Tips](tips.md) to set-up the script.
 
 ```bash
 $ cerisse visit
 ```
-This will create a file `movie.visit` in the tutorial directory.
-To open Visit, type `visit` (or use the appropiate icon).
 
-Once opened, use **File/Open** to load the  `movie.visit file.
-If it loads corerctly, it should look something like:
+This will create a file `movie.visit` in the tutorial directory. To open Visit, type `visit` (or use the appropiate icon).
 
-<img src="../../images/tutorial_Visit1.png" width=100%>
+<figure><img src=".gitbook/assets/tutorial_Visit1.png" alt=""><figcaption></figcaption></figure>
+
+Once opened, use **File/Open** to load the `movie.visit` file. If it loads correctly, it should look something like:&#x20;
 
 
-Adding a plot is easy by just  **Add/Pseudocolor/Density**
 
-<img src="../../images/tutorial_Visit2.png" width=100%>
+Adding a plot is easy by just **Add/Pseudocolor/Density**
 
-The results shows the pseudocolor for density with default visualization options
-(see Visit manual and webpage for details on costumization).
-By clicking the arrow in the panel
-<img src="../../images/tutorial_Visit3.png" width=50%>
+<figure><img src=".gitbook/assets/tutorial_Visit2.png" alt=""><figcaption></figcaption></figure>
 
-we obtain  a quick animation of the results. The final snapshot
-should be
 
-<img src="../../images/tutorial_Visit4.png" width=100%>
 
-By **Add/Subset/Levels** we can get an idea of the refinement 
+The results shows the pseudocolor for density with default visualization options (see Visit manual and webpage for details on costumization). By clicking the arrow in the panel&#x20;
 
-<img src="../../images/tutorial_Visit5.png" width=50%>
+<figure><img src=".gitbook/assets/tutorial_Visit3.png" alt="" width="375"><figcaption></figcaption></figure>
 
-Double-cliking on the **Subset/Levels**  we can edit the attributes of the plot
+we obtain a quick animation of the results. The final snapshot should be
 
-<img src="../../images/tutorial_Visit6.png" width=50%>
 
-And the final plot  should look like, where the solid lines are the limits of refinmement
 
-<img src="../../images/tutorial_Visit7.png" width=100%>
+<figure><img src=".gitbook/assets/tutorial_Visit4.png" alt=""><figcaption></figcaption></figure>
 
-There is no need to open the complete database and tiem steps can be opened individually by open the individual header files (for example opening directly `plot/plt02600/Header`)
-VisIt is good for exploring the data interactively, Visit can also be scripted with Python.
-For a VisIt tutorial check (http://visitusers.org/index.php?title=VisIt_Tutorial)
 
+
+By **Add/Subset/Levels** we can get an idea of the refinement
+
+<figure><img src=".gitbook/assets/tutorial_Visit5.png" alt="" width="375"><figcaption></figcaption></figure>
+
+Double-cliking on the **Subset/Levels** we can edit the attributes of the plot
+
+<figure><img src=".gitbook/assets/tutorial_Visit6.png" alt="" width="375"><figcaption></figcaption></figure>
+
+And the final plot should look like, where the solid lines are the limits of refinmement
+
+<figure><img src=".gitbook/assets/tutorial_Visit7.png" alt=""><figcaption></figcaption></figure>
+
+There is no need to open the complete database and tiem steps can be opened individually by open the individual header files (for example opening directly `plot/plt02600/Header`) VisIt is good for exploring the data interactively, Visit can also be scripted with Python. For a VisIt tutorial check (http://visitusers.org/index.php?title=VisIt\_Tutorial)
 
 ### Paraview
 
 To use [Paraview](https://www.paraview.org), start Paraview in the usual way and open the `plot\plt...` folder
 
+<figure><img src=".gitbook/assets/tutorial_Paraview1.png" alt=""><figcaption></figcaption></figure>
 
-<img src="../../images/tutorial_Paraview1.png" width=100%>
+Select the AMReX/Boxlib Grid Reader
 
-Select the AMReX/Boxlib Grid Reader 
-
-<img src="../../images/tutorial_Paraview2.png" width=50%>
+<figure><img src=".gitbook/assets/tutorial_Paraview2.png" alt="" width="375"><figcaption></figcaption></figure>
 
 Tick the density box and click **Apply**, it would look something like
 
-<img src="../../images/tutorial_Paraview4.png" width=100%>
+<figure><img src=".gitbook/assets/tutorial_Paraview3.png" alt=""><figcaption></figcaption></figure>
 
 Select Density and Surface
 
-<img src="../../images/tutorial_Paraview3.png" width=100%>
+<figure><img src=".gitbook/assets/tutorial_Paraview4.png" alt=""><figcaption></figcaption></figure>
 
+And then use the final time to show the final plot (with default options)
 
-And then use the  final time to show the final plot (with default options)
+<figure><img src=".gitbook/assets/tutorial_Paraview5.png" alt=""><figcaption></figcaption></figure>
 
-<img src="../../images/tutorial_Paraview5.png" width=100%>
-
-Similar to Visit, Paraview is good for exploring the data interactively.
-can also be scripted with Python. Both softwares are similar and can 
-use HPC, remote visualization and support large number of points (billions)
-A Paraview Tutorial manual can be found in [Paraview Manual](https://www.paraview.org/Wiki/images/5/5d/ParaViewTutorial41.pdf)
-
-
-
-
-[^1]:  J Shi et al, *Resolution of high order WENO schemes for complicated flow structures*, J Computational Physics, (2003), 186, pp 690-696.
-https://www.sciencedirect.com/science/article/pii/S0021999103000949
+Similar to Visit, Paraview is good for exploring the data interactively. can also be scripted with Python. Both softwares are similar and can use HPC, remote visualization and support large number of points (billions) A Paraview Tutorial manual can be found in [Paraview Manual](https://www.paraview.org/Wiki/images/5/5d/ParaViewTutorial41.pdf)

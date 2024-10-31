@@ -1,14 +1,13 @@
-‌# Summary​
+# Table of contents
 
 ## GETTING STARTED
 
-* [Welcome](README.md)
-    * [QuickStart](quickstart.md)
-    * [Tutorial](tutorial.md)
-    
+* [🍒 Welcome](README.md)
+  * [⚡ QuickStart](quickstart.md)
+  * [Tutorial](tutorial.md)
+
 ## EXAMPLES
 
-* [Examples](another-page.md)
+* [Examples](examples/examples.md)
 
 ## THEORY
-

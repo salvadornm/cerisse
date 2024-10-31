@@ -1,26 +1,28 @@
+# 🍒 Welcome
 
-<p align="center">
-<img src="images/intro.png" width=100%>
-</p>
+<div align="center">
 
-[![License](https://img.shields.io/badge/License-BSD_3--Clause-blue.svg)](https://opensource.org/licenses/BSD-3-Clause)
+<img src="images/intro.png" alt="" width="100%">
 
+</div>
 
+[![License](https://img.shields.io/badge/License-BSD\_3--Clause-blue.svg)](https://opensource.org/licenses/BSD-3-Clause)
 
 **A research computational solver for Large Eddy Simulation (LES) and Direct Numerical Simulation (DNS) of high-speed compressible turbulent reactive flows.**
 
 The solver employs high-order finite volume methods with adaptive mesh refinement (AMR) and embedded/immersed boundary techniques to capture complex geometries.
 
-WARNING: DOCUMENTATION is not complete yet. Work in progress.
 
 
-### Applications
+{% hint style="danger" %}
+DOCUMENTATION is not complete yet. Work in progress !!
+{% endhint %}
 
-The solver is designed for studying high-speed, turbulent reactive flows in a range of advanced engineering and scientific applications. Examples include supersonic and hypersonic combustion in scramjets, rocket engine combustion chambers, detonation and deflagration-to-detonation transition phenomena, gaseous explosion scenarios, gas turbine combustion, thermoacustics, and shock tube experiments. Additionally, it can model external aerothermodynamics in hypersonic vehicles, spacecraft re-entry, and planetary atmospheric entry.
-The implementation of non-ideal equations of state further extends its applicability to systems involving cryogenic flows, such as liquid-propellant rocket engines, liquid hydrogen pipelines, and rapid cryogenic cooling processes.
+#### Applications
 
+The solver is designed for studying high-speed, turbulent reactive flows in a range of advanced engineering and scientific applications. Examples include supersonic and hypersonic combustion in scramjets, rocket engine combustion chambers, detonation and deflagration-to-detonation transition phenomena, gaseous explosion scenarios, gas turbine combustion, thermoacustics, and shock tube experiments. Additionally, it can model external aerothermodynamics in hypersonic vehicles, spacecraft re-entry, and planetary atmospheric entry. The implementation of non-ideal equations of state further extends its applicability to systems involving cryogenic flows, such as liquid-propellant rocket engines, liquid hydrogen pipelines, and rapid cryogenic cooling processes.
 
-### Philosophy
+#### Philosophy
 
 Cerisse is a research-oriented code, distinct from commercial software like Star-CCM, Fluent, or Converge. Unlike general-purpose solvers such as OpenFOAM, which provide broad support for a wide range of equations, Cerisse is specifically tailored to high-speed turbulent reactive flows. Although it is efficient and fast, it is not exclusively designed for DNS, as a code like PeleC would be for similar applications. However, Cerisse can still be effectively used as a highly scalable DNS/LES production code
 
@@ -30,35 +32,23 @@ Cerisse does not rely on a single numerical scheme; instead, users can select fr
 
 Additionally, Cerisse includes advanced LES and combustion models—such as Eulerian Stochastic Fields, PaSR, and Artificial Thickening Flame—representing the latest in turbulence and combustion modeling advancements.
 
+#### Implementation
 
+Cerisse is writte in C++, relying heavily use of templates. The problem definition and solver selction are perfomed by a C++ file. This ensures a relatively efficient code (at the expense of compilation time) with few dependencies. The code only uses what it needs. The code runs on Linux and MacOS.
 
-### Implementation
+Cerisse uses AMREX libraries [AMREX](https://amrex-codes.github.io/amrex/), which ensures efefctive parallelization in GPU and CPU, as well as [PelePhysics](https://pelephysics.readthedocs.io/en/latest/) repository for chemistry and transport models. However, simpler (or more complex) Thermodynamics and Transport models can be used and integrated. Cerisse does not use a _mesh_ and complex geometries are represented by incorporating directly the geometry. Results can be visualised by common open post-processing tools or load into python for further analysis.
 
-Cerisse is writte in C++, relying heavily use of templates.  The problem definition and solver selction are perfomed by a C++ file. 
-This ensures a relatively efficient code (at the expense of compilation time)
-with few dependencies. The code only uses what it needs. 
-The code runs on Linux and MacOS.
+#### Download and Install
 
-Cerisse uses AMREX libraries [AMREX](https://amrex-codes.github.io/amrex/),
-which ensures efefctive parallelization in GPU and CPU,
-as well as  [PelePhysics](https://pelephysics.readthedocs.io/en/latest/)
-repository for chemistry and transport models. However, simpler (or more complex) Thermodynamics and Transport models can be used and integrated.
-Cerisse does not use a *mesh* and complex geometries are represented by incorporating directly the geometry. Results can be visualised by common open post-processing tools or load into python for further analysis.
+The code source code is [GitHub](https://github.com/salvadornm/cerisse) Check the [QuickStart](quickstart.md) on how to download, installing the and run a simple example case.
 
-### Download and Install
-
-The code source code is [GitHub](https://github.com/salvadornm/cerisse)
-Check the [QuickStart](quickstart.md) on how to download, installing the and run a simple example case.
-
-### Citation
+#### Citation
 
 This open-source software is distributed under the BSD3 license. If you use it in your work, please cite it as
 
-Monal Patel, Enson Un, Navarro-Martinez 'Cerisse', Zenodo 99999 (2024)
-[![Static Badge](https://zenodo.org/badge/DOI/10.5281/zenodo.13793622.svg)](https://zenodo.org/records/9999999)
+Monal Patel, Enson Un, Navarro-Martinez 'Cerisse', Zenodo 99999 (2024) [![Static Badge](https://zenodo.org/badge/DOI/10.5281/zenodo.13793622.svg)](https://zenodo.org/records/9999999)
 
-Cite as well the **AMReX**
-[![Citing](http://joss.theoj.org/papers/10.21105/joss.01370/status.svg)](https://doi.org/10.21105/joss.01370)
+Cite as well the **AMReX** [![Citing](http://joss.theoj.org/papers/10.21105/joss.01370/status.svg)](https://doi.org/10.21105/joss.01370)
 
 ```
 @article{AMReX_JOSS,
@@ -76,7 +66,7 @@ Cite as well the **AMReX**
 }
 ```
 
-And if  **PelePhysics** is used, please cite
+And if **PelePhysics** is used, please cite
 
 ```
 @article{PeleSoftware,
@@ -105,5 +95,4 @@ And if  **PelePhysics** is used, please cite
   url = {https://www.sciencedirect.com/science/article/pii/S0010218024004498},
 }
 ```
-
 
