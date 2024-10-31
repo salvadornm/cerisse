@@ -1,5 +1,6 @@
 # Tips
 
+Small tips on intallationo f auxiliary files and scripts
 
 ### Install yt
 

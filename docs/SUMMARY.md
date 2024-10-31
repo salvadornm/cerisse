@@ -1,11 +1,14 @@
 ‌# Summary​
 
-## Use headings to create page groups like this one​
+## GETTING STARTED
 
 * [Welcome](README.md)
     * [QuickStart](quickstart.md)
+    * [Tutorial](tutorial.md)
     
-## A second-page group​
+## EXAMPLES
 
-* [Yet another page](another-page.md)
+* [Examples](another-page.md)
+
+## THEORY
 
