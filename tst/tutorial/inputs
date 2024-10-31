@@ -2,7 +2,6 @@
 # start time is assumed to be 0, unless re-starting
 max_step  = 20000
 stop_time = 2.0
-#time_step = 0.00001
 cfl = 0.3
 
 # Geometry 
@@ -43,4 +42,4 @@ amr.check_int               = 10000    # number of timesteps between checkpoints
 amr.plot_files_output = 1
 amr.plot_file         = ./plot/plt # root name of plotfile
 amr.plot_int          = 100         # number of timesteps between plotfiles
-amr.derive_plot_vars  = pressure x_velocity y_velocity temperature
+amr.derive_plot_vars  = pressure temperature

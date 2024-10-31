@@ -1,12 +1,17 @@
 
-<img src="images/intro.png" width=800 height=200>
-
+<p align="center">
+<img src="images/intro.png" width=100%>
+</p>
 
 [![License](https://img.shields.io/badge/License-BSD_3--Clause-blue.svg)](https://opensource.org/licenses/BSD-3-Clause)
+
+
 
 **A research computational solver for Large Eddy Simulation (LES) and Direct Numerical Simulation (DNS) of high-speed compressible turbulent reactive flows.**
 
 The solver employs high-order finite volume methods with adaptive mesh refinement (AMR) and embedded/immersed boundary techniques to capture complex geometries.
+
+WARNING: DOCUMENTATION is not complete yet. Work in progress.
 
 
 ### Applications
@@ -31,7 +36,8 @@ Additionally, Cerisse includes advanced LES and combustion models—such as Eule
 
 Cerisse is writte in C++, relying heavily use of templates.  The problem definition and solver selction are perfomed by a C++ file. 
 This ensures a relatively efficient code (at the expense of compilation time)
-with few dependencies. The code only uses what it needs.
+with few dependencies. The code only uses what it needs. 
+The code runs on Linux and MacOS.
 
 Cerisse uses AMREX libraries [AMREX](https://amrex-codes.github.io/amrex/),
 which ensures efefctive parallelization in GPU and CPU,
@@ -42,7 +48,7 @@ Cerisse does not use a *mesh* and complex geometries are represented by incorpor
 ### Download and Install
 
 The code source code is [GitHub](https://github.com/salvadornm/cerisse)
-Check the [QuickStart](quickstart.md)on how to download, installing it and run a simple example case.
+Check the [QuickStart](quickstart.md) on how to download, installing the and run a simple example case.
 
 ### Citation
 
@@ -51,7 +57,7 @@ This open-source software is distributed under the BSD3 license. If you use it i
 Monal Patel, Enson Un, Navarro-Martinez 'Cerisse', Zenodo 99999 (2024)
 [![Static Badge](https://zenodo.org/badge/DOI/10.5281/zenodo.13793622.svg)](https://zenodo.org/records/9999999)
 
-Cite as well 
+Cite as well the **AMReX**
 [![Citing](http://joss.theoj.org/papers/10.21105/joss.01370/status.svg)](https://doi.org/10.21105/joss.01370)
 
 ```
@@ -70,7 +76,7 @@ Cite as well
 }
 ```
 
-And if  PelePhysics is used, please cite
+And if  **PelePhysics** is used, please cite
 
 ```
 @article{PeleSoftware,

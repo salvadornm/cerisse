@@ -3,6 +3,9 @@ docs_dir: docs
 nav:
   - Home: README.md
   - Quick: quickstart.md
+  - Tutorial: tutorial.md
+extra_javascript:
+  - https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.4/MathJax.js?config=TeX-AMS-MML_HTMLorMML
 markdown_extensions:
   - mdx_math
   - callouts
