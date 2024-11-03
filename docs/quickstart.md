@@ -1,3 +1,8 @@
+---
+cover: .gitbook/assets/cover2.png
+coverY: 0
+---
+
 # ⚡ QuickStart
 
 ## Installation
@@ -43,7 +48,7 @@ $ cd cerisse/lib/
 $ ./install_script safe
 ```
 
-It will connect to Github and download the required packages. `$ ./install git`, will install latest release commit in the **development** branch of AMReX The install safe option will install version **23.11** of **AMReX** and **23.03** of **PelePhysics**. Downloads are fast with 27 and 30 M respectively. All installation files will live udner `./lib`
+It will connect to Github and download the required packages. `$ ./install git`, will install latest release commit in the **development** branch of AMReX. The install **safe** option will install version **23.11** of **AMReX** and **23.03** of **PelePhysics**. Downloads are fast with 27 and 30 M respectively. All installation files will live under `./lib`
 
 #### Installation CGAL
 
@@ -59,20 +64,20 @@ This will install **5.6.1** CGAL version as well as **boost** folder. All instal
 
 #### Installation SUNDIALS
 
-This is a libary of differential and algebraic equation solvers used by PelePhysics for CVODE to integrate the chemistry. To install go to an example involving chemistry (`tst/test2`) and execute
+SUNDIALS is a libary of differential and algebraic equation solvers used by PelePhysics for CVODE to integrate the chemistry. To install go to an example involving chemistry (`tst/test2`) and execute
 
 ```bash
 $ cd tst/test2
 $ make TPL
 ```
 
-This will download and install version **6.5** if not present. Sundials cannot be installed before compiling as some options (such as GPU) require re-compiling. All sundials files will live udner `./lib`.
+This will download and install version **6.5** if not present. Sundials cannot be installed before compiling as some options (such as GPU) require re-compiling. All sundials files will live under `./lib`.
 
 ## Quick Example
 
 This quick example shows the workflow of Cerisse in a simple example
 
-#### 1) Go to Problem Folder
+#### 1) Go to problem folder
 
 In this example, Cerisse will solve a very coarse classic one-dimensional Sod Test.
 
@@ -88,19 +93,21 @@ GNUmakefile	    README.md	inputs		prob.h
 Make.package	exact.dat	plot.py
 ```
 
-A detailed explanation of the files is in tutorial [Tutorial](tutorial.md), but basically `inputs` is your simulation control file (mesh size, number of steps, etc...), while `prob.h` determines the problem to solve.
+A detailed explanation of the files is in tutorial [Tutorial](tutorial.md), but basically `inputs` is the simulation control file (mesh size, number of steps, etc...), while `prob.h` determines the problem to solve.
 
 #### 2) Compile code
 
-The compiling stage will create the executable, to compile use
+The compiling stage will create the executable, to compile use:
 
 ```bash
 $ make
 ```
 
-NOTE: use `$make -j4` if possible, it will compile faster. This step can be very slow, especially the first time, depending on your computer and options, but most of the time it has to be done only once.
+{% hint style="info" %}
+Utilize `$make -j4` if feasible, as it will expedite the compilation process. This step may be time-consuming, especially during the initial execution, depending on your system and configuration options. However, in most cases, this step needs to be done only once .
+{% endhint %}
 
-Once finished it will create a temporary folder `tmp_build_dir` and, if succesful, an executable named `main1d.gnu.MPI.ex` The executable name will change depending on the compiler, parallelization and dimension of the problem.
+After compilation, the code will create a temporary folder `tmp_build_dir` and, if succesful, an executable named `main1d.gnu.MPI.ex` The executable name will change depending on the compiler, parallelization and dimension of the problem.
 
 #### 4) Run
 

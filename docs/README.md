@@ -1,8 +1,14 @@
+---
+cover: >-
+  https://images.unsplash.com/photo-1484589065579-248aad0d8b13?crop=entropy&cs=srgb&fm=jpg&ixid=M3wxOTcwMjR8MHwxfHNlYXJjaHwxfHxzcGFjZXxlbnwwfHx8fDE3MzA2NjQxNTd8MA&ixlib=rb-4.0.3&q=85
+coverY: 0
+---
+
 # 🍒 Welcome
 
 <div align="center">
 
-<img src="images/intro.png" alt="" width="100%">
+<img src=".gitbook/assets/Intro.png" alt="">
 
 </div>
 
