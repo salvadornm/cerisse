@@ -1,13 +1,11 @@
 
 This is test is a turbulent channel flow.
-The set-up is inspired on HAMISH validation case
 
-https://www.ukctrf.com/index.php/benchmarking-of-the-new-software/
 
 
 Tested       |          grid | comment
 :----------- |:-------------:| -----------:
-gcc 14.2     | **384x64x128**    | (2 levels)        | 
+gcc 14.2     | **384x64x128**    | (1 levels)        | 
 
 
 h=6.845 mm
@@ -19,15 +17,10 @@ Lz = 4  h
 
 Reb = 3000
 
-Mb = 1.5
+Mb = 0.3 and Mb=1.5
 
 Tw=500
 
-utau = 35
-
-$$
-\frac{dp}{dx} = \frac{\tau}{2 h \rho_b}
-$$
 
 
 

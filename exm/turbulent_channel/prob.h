@@ -10,9 +10,9 @@
 #include <Constants.h>
 #include <NumParam.h>
 
-// 2D periodic channel laminar flow
-// Pure diffusion case taken from HAMISH
-// https://www.ukctrf.com/index.php/benchmarking-of-the-new-software/
+#include <random>
+
+// Periodic Turbulent channel
 
 using namespace amrex;
 
@@ -21,19 +21,28 @@ namespace PROB {
 
 
 static constexpr Real Reynolds = 3000.0;  // bulk Reynolds number
-static constexpr Real Mach     = 1.5;     // bulk Mach number
+static constexpr Real Mach     = 0.3;     // bulk Mach number
+static constexpr Real Rgas     = gas_constant*1000.0/28.96;  // bulk Mach number
+static constexpr Real Ggas     = 1.4;      // gamma
+static constexpr Real viscos   = 1.0/Reynolds;    // viscos temp
+static constexpr Real Retau    = 100;      // Retau
+
 
 
 // problem parameters 
 struct ProbParm {
   Real Tw   =   500;	
-  Real utau =   35
-  Real h    =   0.006845;    // channel height    
-  Real ubulk    = Mach*sqrt(gamma*R*Tw);        // bulk velocity
-  Real rhob  = 1.0;           // bulk density
-  Real Q    =   u*L;         // volumetric flow rate (per width unit)
-  Real p    =  pres_atm2si; 
-  Real visc = rho*u*L/Reynolds;     // viscosity ~ 1/Reynolds          
+  Real h    =   0.006845;     // channel height 2 h
+  Real ubulk    = Mach*sqrt(Ggas*Rgas*Tw); // bulk velocity
+  //Real mass     = Reynolds*viscos/h;       // mass flow rate
+  Real rhob     = 1.0;      
+  Real Q        = ubulk*8*h*h;
+  Real mass     = rhob*ubulk;
+  Real utau     = ubulk*Retau/Reynolds;
+  Real tau      = rhob*utau*utau;          // tau wall
+  Real p        = rhob*Rgas*Tw;            // pressure        
+  Real L        = 2*h;
+  // Real dpdx     = 0.5*tau/(rhob*h);       // forcing term (pressure gradient)
   Real dpdx = 12.0*Q*Q/(Reynolds*L*L*L);    // forcing term (pressure gradient)
 };
 
@@ -42,11 +51,11 @@ struct methodparm_t {
 
   public:
 
-  static constexpr int  order = 2;                  // order numerical scheme viscous
-  static constexpr Real conductivity = 0.0262;      // conductivity (for constant value)
-  static constexpr Real viscosity    = 1.0/Reynolds;// viscosity    (for constant value)
+  static constexpr int  order = 2;                   // order numerical scheme viscous
+  static constexpr Real conductivity = 0.0262;       // conductivity (for constant value)
+  static constexpr Real viscosity    = viscos;        // viscosity    (for constant value)
 
-  static constexpr bool solve_viscterms_only = true;
+  static constexpr bool solve_viscterms_only = false;
   
 };
 
@@ -75,6 +84,8 @@ void inline inputs() {
   amrex::Print() << " ****** Starting ... *******" <<  std::endl;
   amrex::Print() << " 3D Turbulent Channel Flow  (Oct 2024)" <<  std::endl;
 
+ // std::mt19937 generator(rd());
+
 }
 
 // initial condition
@@ -86,53 +97,70 @@ prob_initdata(int i, int j, int k, Array4<Real> const &state,
   const Real *prob_hi = geomdata.ProbHi();
   const Real *dx = geomdata.CellSize();
 
-  //Real x = prob_lo[0] + (i + Real(0.5)) * dx[0];
+  Real x = prob_lo[0] + (i + Real(0.5)) * dx[0];
   Real y = prob_lo[1] + (j + Real(0.5)) * dx[1];
+  Real z = prob_lo[2] + (k + Real(0.5)) * dx[2];
 
-  Real yoh = y/prob_parm.h;
+  const Real yoh = y/prob_parm.L;
+  const Real Lx  = 12.0*prob_parm.h;  
+  const Real Lz  = 4.0*prob_parm.h;
+
   
   // local vars
-  Real rho,eint, T, P,u[3],ufluc[3]; 
-
-
-  // debugging
-  //  Real const dt = 5e-3;
-
-  // std::cout << " Info " << std::endl;
-
-  // printf(" DIFF number = %f \n", dt*prob_parm.visc/(dx[0]*dx[0]) );
-  // printf(" CFL  number = %f \n", dt*prob_parm.u/dx[0] );
-  // printf(" pressure gradient = %f \n", prob_parm.dpdx );
-  // exit(0);
-
-  //
-  // with Tw, R, gamma --> ub
-  // with Tw ---> muw 
-  // with  Retau,utau,h,muw---> rhow
-  // with utau,rhow ---> tauw
-  // with Reb ub,muw---> rhob
-  // with tauw , rhob,h ----> pressgrad 
- 
+  Real rho,eint, T, P,u[3],ufluc[3]={0.0, 0.0, 0.0};  
+  
+  std::random_device rd;
+  std::mt19937 generator(rd());
+  std::uniform_real_distribution<double> distribution(-1.0,1.0);
+  std::uniform_real_distribution<double> distribution2(-0.01,0.01);
+  double rn = distribution(generator);
 
   // fluctuations
   
   // initial conditioms  
-  P    = prob_parm.p; rho = prob_parm.rho;
-  u[0] = prob_parm.u; 
-  u[1] = Real(0.0);
-  //u[0] = prob_parm.u*(1 - yoh)*yoh;
+  P    = prob_parm.p; rho = prob_parm.rhob;
+  Real Ub = prob_parm.ubulk; 
+  u[1] = Real(0.0); u[2] = Real(0.0);
+  u[0] = 12.0*Ub*(1.0 - yoh)*yoh;
   
+  // fluctuations
+  const int NFREQ=6;
+  Real freqz[NFREQ],Amp[NFREQ],freqx[NFREQ];
+  for (int l=0;l<NFREQ;l++) 
+  {
+    double r1 = distribution2(generator);
+    double r2 = distribution2(generator);
+    //r1= 0.0; r2=0.0;
+    Amp[l]   = 0.05/(l+1);
+    freqx[l] = l*2.0*M_PI*x/Lx + r1*M_PI;
+    freqz[l] = l*2.0*M_PI*z/Lz + r2*M_PI;
+  }
+
+  // fluctuations
+  ufluc[0]+= 0.4*Ub*rn;
+  for (int l=0;l<NFREQ;l++)
+  {
+    ufluc[1]+= Amp[l]*Ub*sin(freqx[l])*cos(freqz[l] );
+    ufluc[2]+= Amp[l]*Ub*cos(freqx[l])*sin(freqz[l] );
+  }
+
+
+  //printf(" z=%f vf=%f wf=%f \n ",z, ufluc[1],ufluc[2]);
+  
+  Real kin =0.0;
+  for (int dim=0;dim<3;dim++)
+  {u[dim]+=ufluc[dim]; kin+= Real(0.5)*u[dim]*u[dim];}
 
 
   // T and E from P and T
   T =   P/(cls.Rspec*rho);
-  eint =  P / (cls.gamma - Real(1.0));
+  eint =  cls.cv*T;
 
   state(i, j, k, cls.URHO) = rho;
   state(i, j, k, cls.UMX)  = rho * u[0];
   state(i, j, k, cls.UMY)  = rho * u[1];
   state(i, j, k, cls.UMZ)  = rho * u[2];  
-  state(i, j, k, cls.UET)  = eint + Real(0.5) * rho * (u[0]*u[0] + u[1]*u[1]+ u[2]*u[2]);    
+  state(i, j, k, cls.UET)  = rho*eint + kin;    
 }
 
 /////////////////////////////// BC /////////////////////////////////////////////
@@ -149,17 +177,32 @@ bcnormal(const Real x[AMREX_SPACEDIM], Real dratio, const Real s_int[ProbClosure
   const int UET  = ProbClosures::UET;
   const int face = (idir+1)*sgn;
 
+  // rho, e ---> P
+  Real rho  = s_int[URHO];
+  Real rhoinv = Real(1.0) / rho;
+  Real ux = s_int[UMX] * rhoinv;
+  Real uy = s_int[UMY] * rhoinv;
+  Real uz = s_int[UMZ] * rhoinv;
+  Real rhoke = Real(0.5) * rho * (ux * ux + uy * uy + uz * uz);
+  Real rhoei = (s_int[UET] - rhoke);
+  Real p = (Ggas - Real(1.0)) * rhoei;
+  // comoute rhow
+  Real rhow = p/(Rgas*prob_parm.Tw);
+  Real rho1 = 2.0*rhow-rho;
+
+  
+
   switch(face)
   {
     case 2: // SOUTH adiabatic wall
-      s_ext[URHO] = s_int[URHO];
+      s_ext[URHO] = rho1;
       s_ext[UMX]  = -s_int[UMX];
       s_ext[UMY]  = -s_int[UMY];
       s_ext[UMZ]  = -s_int[UMZ];
       s_ext[UET]  = s_int[UET];
       break;
     case -2: // NORTH adiabatic wall
-      s_ext[URHO] = s_int[URHO];
+      s_ext[URHO] = rho1;
       s_ext[UMX]  = -s_int[UMX];
       s_ext[UMY]  = -s_int[UMY];
       s_ext[UMZ]  = -s_int[UMZ];
