@@ -89,7 +89,7 @@ class viscous_t {
 
       // compute diffusion fluxes
 #ifdef AMREX_USE_GPIBM  
-      amrex::Abort(" IBM +diffusion only No ready yet")
+      amrex::Abort(" IBM +diffusion only No ready yet");
     
 #else    
       amrex::ParallelFor(bxgnodal,

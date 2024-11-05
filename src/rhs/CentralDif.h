@@ -81,8 +81,6 @@ class centraldif_t {
                     this->flux_dir(i, j, k,Qdir, vdir, cons, prims, lambda_max, flx, cls);
                   });
 
-      // add dissipative fluxes            
-
       // add flux derivative to rhs, i.e.  rhs[n] += (fi[n] - fi+1[n])/dx
       ParallelFor(bx, cls_t::NCONS,
                   [=] AMREX_GPU_DEVICE(int i, int j, int k, int n) noexcept {
@@ -124,27 +122,11 @@ class centraldif_t {
     }
 
     // compute fluxes
-    for (int nvar = 0; nvar < cls_t::NCONS; nvar++) {
-      flx(i, j, k, nvar) =  0.0_rt;     
-      for (int l = 0; l < order; l++) { 
-        flx(i, j, k, nvar) +=  flux[l][nvar]*coefdif(l,0);     
-      }
-    }  
-
     // adding high freq damping?
 
     // for (int nvar = 0; nvar < cls_t::NCONS; nvar++) {
     //   flx(i, j, k, nvar) += 
-    // }  
-
-    
-  }
-
-  // immersed boundary ghost point  NOT READY YET
-  void inline eflux_ibm() { amrex::Print() << "IBM eflux (central dif)" << std::endl; }
-
-  // artificial dissipation flux NOT READY YET
-  void inline art_dissipation_flux() {
+    // }  ation_flux() {
     amrex::Print() << "AD eflux (central dif)" << std::endl;
   }
 

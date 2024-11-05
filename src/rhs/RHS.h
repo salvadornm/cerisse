@@ -3,7 +3,7 @@
 
 #include <Index.h>
 
-// numerical methods
+// Euler numerical methods
 #include <Weno.h>
 #include <CentralKEEP.h>
 #include <Riemann.h>
@@ -19,7 +19,6 @@
 #endif
 
 // _dt stands for derived type
-// later on change this from rhs_dt to cns_dt.
 template <typename euler, typename diffusive, typename source>
 class rhs_dt : public euler, public diffusive, public source
 {
@@ -32,8 +31,11 @@ class no_euler_t
 {
 public:
   template<typename... Args>
+#ifdef AMREX_USE_GPIBM  
+  void eflux_ibm(Args&&... args){}
+#else  
   void eflux(Args&&... args){}
- // void eflux_ibm(Args&&... args){}
+#endif  
 };
 
 // no diffusive flux
@@ -41,8 +43,11 @@ class no_diffusive_t
 {
 public:
   template<typename... Args>
-  void dflux(Args&&... args) {}
-  //void dflux_ibm(Args&&... args) {}
+#ifdef AMREX_USE_GPIBM  
+  void dflux_ibm(Args&&... args) {}
+#else
+  void dflux(Args&&... args) {}  
+#endif  
 };
 
 // no source

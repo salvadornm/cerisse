@@ -21,7 +21,7 @@ namespace PROB {
 
 
 static constexpr Real Reynolds = 3000.0;  // bulk Reynolds number
-static constexpr Real Mach     = 0.3;     // bulk Mach number
+static constexpr Real Mach     = 1.5;     // bulk Mach number
 static constexpr Real Rgas     = gas_constant*1000.0/28.96;  // bulk Mach number
 static constexpr Real Ggas     = 1.4;      // gamma
 static constexpr Real viscos   = 1.0/Reynolds;    // viscos temp
@@ -59,6 +59,18 @@ struct methodparm_t {
   
 };
 
+struct skewparm_t {
+
+  public:
+
+  static constexpr int  order = 4;                 
+  static constexpr bool dissipation = true;  
+  static constexpr bool ibm = false;
+  static constexpr Real C2skew=0.1,C4skew=0.0016; 
+  
+};
+
+
 inline Vector<std::string> cons_vars_names={"Xmom","Ymom","Zmom","Energy","Density"};
 inline Vector<int> cons_vars_type={1,2,3,0,0};
 
@@ -71,7 +83,7 @@ typedef closures_dt<indicies_t, transport_const_t<methodparm_t>,
 
 template <typename cls_t > class user_source_t;
 
-typedef rhs_dt<skew_t<defaultparm_t,ProbClosures>, viscous_t<methodparm_t, ProbClosures>, user_source_t<ProbClosures> > ProbRHS;
+typedef rhs_dt<skew_t<skewparm_t,ProbClosures>, viscous_t<methodparm_t, ProbClosures>, user_source_t<ProbClosures> > ProbRHS;
 
 
 

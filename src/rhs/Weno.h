@@ -207,11 +207,10 @@ class weno_t {
   ~weno_t() {}
 
 #ifdef AMREX_USE_GPIBM
-  // TODO: implement IBM
-  // void inline eflux_ibm(const Geometry& geom, const MFIter& mfi,
-  //                       const Array4<Real>& prims, const Array4<Real>& flx,
-  //                       const Array4<Real>& rhs, const cls_t* cls,
-  //                       const Array4<bool>& ibMarkers)
+  void inline eflux_ibm(const Geometry& geom, const MFIter& mfi,
+                        const Array4<Real>& prims, const Array4<Real>& flx,
+                        const Array4<Real>& rhs, const cls_t* cls,
+                        const Array4<bool>& ibMarkers)
 #else
   void inline eflux(const amrex::Geometry& geom, const amrex::MFIter& mfi,
                     const amrex::Array4<amrex::Real>& prims,

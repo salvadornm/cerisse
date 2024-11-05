@@ -109,9 +109,9 @@ class diffusiveheat_t {
     for (int dir = 0; dir < AMREX_SPACEDIM; dir++) {
       GpuArray<int, 3> vdir = {int(dir == 0), int(dir == 1), int(dir == 2)};
 
-      // computr diffusion fluxes
+      // compute diffusion fluxes
 #ifdef AMREX_USE_GPIBM  
-      amrex::Abort(" IBM +diffusion only No ready yet")
+      amrex::Abort(" IBM +diffusion only No ready yet");
       amrex::ParallelFor(bxgnodal,
                   [=,*this] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {
                     for (int n = 0; n < cls_t::NCONS; n++) flx(i, j, k, n) = 0.0;
