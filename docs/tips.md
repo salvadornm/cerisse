@@ -1,30 +1,32 @@
 # Tips
 
-Small tips on intallationo f auxiliary files and scripts
+Small tips on installation of auxiliary files and scripts
 
-### Install yt
+## yt
 
-To load data into python for plotting, etc
+[yt](https://yt-project.org) is an open-source python package for analyzing and visualizing volumetric data.
+It us highly recomended if Python is used for postprocessing and analysis of simulations data. To install
 
-```
+```bash
 $ python -m pip install --user yt
 ```
 or using conda environments
 
-```
+```bash
 $ conda install --channel conda-forge yt
 ```
 
-Beware of the combination  Python **3.9** and **yt**. It is recommended to use newer or older Python, **>3.11** recommended.
-Check [yt Website](https://yt-project.org) for details and tutorials.
+Beware of the combination  Python **3.9** and **yt**. It is recommended to use newer  Python, **>3.11** recommended.
+Check [yt Website](https://yt-project.org) for details and tutorials. Most of the examples
+in the manual use it for quick analysis and plotting in a `plot.py` script.
 
-### Use cerisse script
+## Cerisse script
 
 The **cerisse** script can help to clean directories, create backups, create visit files for movies quickly. It is useful for day to day running and avoid file creep-up.
 The script is installed in `bin` and can be used by  
 
-```
-$ /bin/cerisse [options]
+```bash
+$ ../bin/cerisse [options]
 ```
 
 or by setting the path in `.bashrc` or `.profile` by adding the line at the end
@@ -34,6 +36,7 @@ PATH="/home/snm/work/cerisse/bin:$PATH"
 ```
 
 where  `/home/snm/work/cerisse` corresponds to the installation directory.
+Current options are **clean** (*all*) to remove old results and temporary directories. **visit** to prepare data for input into Visit, **plot**, which will crete a snaphsot of the density, **backup** (*dirname*) will save simualytion data and main files into a backup directory
 
 
 ### Running on Imperial's HPC

@@ -23,7 +23,7 @@ All this is wraped in the class ```ProbClosures``
 
 ### Equations to Solve and how
 
-Define the RHS of the problem, that includes which equation to solve and which nuemrivcal scheme to use. In general 
+Define the RHS of the problem, that includes which equation to solve and which numerivcal scheme to use. In general 
 
 $$
 \frac{\partial U}{\partial t} = \mbox{RHS}(U)
