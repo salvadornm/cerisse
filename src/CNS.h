@@ -77,6 +77,8 @@ class CNS : public amrex::AmrLevel {
 
   virtual void postCoarseTimeStep(Real time) override;
 
+  virtual void post_restart() override;
+
   // -------------------------------------------------------------------------
 
   // Gridding ----------------------------------------------------------------
@@ -108,6 +110,15 @@ class CNS : public amrex::AmrLevel {
 
   virtual void writePlotFilePost(const std::string& dir,
                                  std::ostream& os) override;
+
+  // diagnostics
+  void setupTimeProbe();
+  void recordTimeProbe();
+  static int time_probe_lev;
+  static int time_probe_int;
+  static amrex::Vector<std::string> time_probe_names;
+  static amrex::Vector<amrex::Box> time_probe_boxes;
+
   // Parameters
   static int num_state_data_types;
   std::unique_ptr<amrex::FluxRegister> flux_reg;

@@ -62,7 +62,7 @@ Real CNS::advance(Real time, Real dt, int /*iteration*/, int /*ncycle*/) {
     FillPatch(*this, Stemp, nghost, time + dt, State_Type, 0, ncons);
     compute_rhs(Stemp, Real(0.5) * dt, fr_as_crse, fr_as_fine);
     // S_new = 0.5*(Sborder+S_old) = U^n + 0.5*dt*dUdt^n
-    MultiFab::LinComb(S2, Real(0.5), S1, 0, Real(0.5), S1, 0, 0, ncons, 0);
+    MultiFab::LinComb(S2, Real(0.5), S1, 0, Real(0.5), S2, 0, 0, ncons, 0);
     // S_new += 0.5*dt*dSdt
     MultiFab::Saxpy(S2, Real(0.5) * dt, Stemp, 0, 0, ncons, 0);
     // We now have S_new = U^{n+1} = (U^n+0.5*dt*dUdt^n) + 0.5*dt*dUdt^*
@@ -202,6 +202,39 @@ Real CNS::advance(Real time, Real dt, int /*iteration*/, int /*ncycle*/) {
 
   }
 
+#ifdef AMREX_USE_GPIBM
+  const PROB::ProbClosures& cls_h = *CNS::h_prob_closures;
+  const PROB::ProbClosures* cls_d = CNS::d_prob_closures;
+  auto& ib_mf = *IBM::ib.bmf_a[level];
+  FillPatch(*this, Stemp, cls_h.NGHOST, time + dt, State_Type, 0, ncons);
+
+  for (MFIter mfi(S2, false); mfi.isValid(); ++mfi) {
+    const Box& bx = mfi.tilebox();
+    const Box& bxg = mfi.growntilebox(cls_h.NGHOST);
+    FArrayBox primf(bxg, cls_h.NPRIM, The_Async_Arena());
+    Array4<Real> const& state_temp = Stemp.array(mfi);
+    Array4<Real> const& state = S2.array(mfi);
+    const auto& ibMarkers = ib_mf.array(mfi);
+    Array4<Real> const& prims = primf.array();
+
+    cls_h.cons2prims(mfi, state_temp, prims);
+    IBM::ib.computeGPs(mfi, state_temp, prims, cls_d, level);
+
+    ParallelFor(bx, [=] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {
+      if (ibMarkers(i, j, k, 1)) {
+        state(i, j, k, cls_d->UMX) = prims(i, j, k, cls_d->QRHO) * prims(i, j, k, cls_d->QU);
+        state(i, j, k, cls_d->UMY) = prims(i, j, k, cls_d->QRHO) * prims(i, j, k, cls_d->QV);
+        state(i, j, k, cls_d->UMZ) = prims(i, j, k, cls_d->QRHO) * prims(i, j, k, cls_d->QW);
+        state(i, j, k, cls_d->UET) = prims(i, j, k, cls_d->QPRES) / (cls_d->gamma - 1.0) +
+            0.5 * (prims(i, j, k, cls_d->QU) * prims(i, j, k, cls_d->QU) +
+                   prims(i, j, k, cls_d->QV) * prims(i, j, k, cls_d->QV) +
+                   prims(i, j, k, cls_d->QW) * prims(i, j, k, cls_d->QW));
+        state(i, j, k, cls_d->URHO) = prims(i, j, k, cls_d->QRHO);
+      }
+    });
+  }
+#endif
+
   // else if (order_rk == 4) {
   //   Print() << "SSPRK4 not implemented yet" << std::endl;
   //   exit(0);
@@ -285,5 +318,20 @@ void CNS::compute_rhs(MultiFab& statemf, Real dt, FluxRegister* fr_as_crse, Flux
     state(i,j,k,n) = state(i,j,k,n)*(1 - int(ibMarkers(i,j,k,0)));
     });
 #endif
+
+    // // Flux register
+    // if (do_reflux) {
+    //   const auto dx = geom.CellSizeArray();
+    //   if (fr_as_fine) {
+    //     fr_as_fine->FineAdd(mfi,
+    //                         {AMREX_D_DECL(&fluxes[0], &fluxes[1], &fluxes[2])},
+    //                         dx.data(), dtsub, RunOn::Device);
+    //   }
+    //   if (fr_as_crse) {
+    //     fr_as_crse->CrseAdd(mfi,
+    //                         {AMREX_D_DECL(&fluxes[0], &fluxes[1], &fluxes[2])},
+    //                         dx.data(), dtsub, RunOn::Device);
+    //   }
+    // }
   }
 }

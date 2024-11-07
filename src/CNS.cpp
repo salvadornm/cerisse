@@ -173,6 +173,9 @@ void CNS::post_init(Real stop_time) {
   if (verbose) {
     printTotal();
   }
+  
+  // Set up diagnostics
+  setupTimeProbe();
 }
 // -----------------------------------------------------------------------------
 
@@ -401,6 +404,10 @@ void CNS::post_timestep(int /* iteration*/) {
   if (level < parent->finestLevel()) {
     avgDown();
   }
+
+  // Record time statistics
+  recordTimeProbe();
+  // recordLine();
 }
 
 void CNS::postCoarseTimeStep(Real time) {
@@ -472,8 +479,14 @@ void CNS::errorEst(TagBoxArray &tags, int /*clearval*/, int /*tagval*/,
   }
 }
 
-// TODO: Add restarts
-// -----------------------------------------------------------------------------
+void CNS::post_restart() {
+#ifdef AMREX_USE_GPIBM
+  IBM::ib.destroy_mf(level);
+  IBM::ib.build_mf(grids, dmap, level);
+  IBM::ib.computeMarkers(level);
+  IBM::ib.initialiseGPs(level);
+#endif
+}
 
 void CNS::avgDown() {
   BL_PROFILE("CNS::avgDown()");

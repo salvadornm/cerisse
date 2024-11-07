@@ -12,19 +12,18 @@ using namespace amrex;
 namespace PROB {
 
 //////////////////////////////DISCRETISATION////////////////////////////////////
-typedef closures_dt<indicies_t, visc_suth_t, cond_suth_t,
-                    calorifically_perfect_gas_t<indicies_t>>
-    ProbClosures;
-typedef rhs_dt<keep_euler_t<false, false, 4, ProbClosures>, no_diffusive_t,
-               no_source_t>
-    ProbRHS;
+using ProbClosures = closures_dt<indicies_t, visc_suth_t, cond_suth_t,
+                                 calorifically_perfect_gas_t<indicies_t>>;
+using ProbRHS =
+    // rhs_dt<skew_t<defaultparm_t, ProbClosures>, no_diffusive_t, no_source_t>;
+    rhs_dt<riemann_t<false, ProbClosures>, no_diffusive_t, no_source_t>;
 
 // Numerical operators
 void inline inputs() {
   ParmParse pp;
 
-  pp.add("cns.order_rk", 3);  // -2, 1, 2 or 3"
-  pp.add("cns.stages_rk", 4); // 1, 2 or 3
+  pp.add("cns.order_rk", -2);  // -2, 1, 2 or 3"
+  pp.add("cns.stages_rk", 2); // 1, 2 or 3
 }
 ////////////////////////////////////////////////////////////////////////////////
 
