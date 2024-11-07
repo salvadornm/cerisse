@@ -1,7 +1,15 @@
 ---
-cover: >-
-  https://images.unsplash.com/photo-1484589065579-248aad0d8b13?crop=entropy&cs=srgb&fm=jpg&ixid=M3wxOTcwMjR8MHwxfHNlYXJjaHwxfHxzcGFjZXxlbnwwfHx8fDE3MzA2NjQxNTd8MA&ixlib=rb-4.0.3&q=85
-coverY: 0
+layout:
+  title:
+    visible: true
+  description:
+    visible: true
+  tableOfContents:
+    visible: true
+  outline:
+    visible: true
+  pagination:
+    visible: true
 ---
 
 # 🍒 Welcome

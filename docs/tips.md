@@ -1,29 +1,30 @@
+---
+icon: info
+---
+
 # Tips
 
 Small tips on installation of auxiliary files and scripts
 
 ## yt
 
-[yt](https://yt-project.org) is an open-source python package for analyzing and visualizing volumetric data.
-It us highly recomended if Python is used for postprocessing and analysis of simulations data. To install
+[yt](https://yt-project.org) is an open-source python package for analyzing and visualizing volumetric data. It us highly recomended if Python is used for postprocessing and analysis of simulations data. To install
 
 ```bash
 $ python -m pip install --user yt
 ```
+
 or using conda environments
 
 ```bash
 $ conda install --channel conda-forge yt
 ```
 
-Beware of the combination  Python **3.9** and **yt**. It is recommended to use newer  Python, **>3.11** recommended.
-Check [yt Website](https://yt-project.org) for details and tutorials. Most of the examples
-in the manual use it for quick analysis and plotting in a `plot.py` script.
+Beware of the combination Python **3.9** and **yt**. It is recommended to use newer Python, **>3.11** recommended. Check [yt Website](https://yt-project.org) for details and tutorials. Most of the examples in the manual use it for quick analysis and plotting in a `plot.py` script.
 
 ## Cerisse script
 
-The **cerisse** script can help to clean directories, create backups, create visit files for movies quickly. It is useful for day to day running and avoid file creep-up.
-The script is installed in `bin` and can be used by  
+The **cerisse** script can help to clean directories, create backups, create visit files for movies quickly. It is useful for day to day running and avoid file creep-up. The script is installed in `bin` and can be used by
 
 ```bash
 $ ../bin/cerisse [options]
@@ -35,21 +36,13 @@ or by setting the path in `.bashrc` or `.profile` by adding the line at the end
 PATH="/home/snm/work/cerisse/bin:$PATH"
 ```
 
-where  `/home/snm/work/cerisse` corresponds to the installation directory.
-Current options are **clean** (*all*) to remove old results and temporary directories. **visit** to prepare data for input into Visit, **plot**, which will crete a snaphsot of the density, **backup** (*dirname*) will save simualytion data and main files into a backup directory
-
+where `/home/snm/work/cerisse` corresponds to the installation directory. Current options are **clean** (_all_) to remove old results and temporary directories. **visit** to prepare data for input into Visit, **plot**, which will crete a snaphsot of the density, **backup** (_dirname_) will save simualytion data and main files into a backup directory
 
 ## Documentation Editing
 
+Althoigh the main docuementation is onine in Gitbooks. It is possible to generate this doumentation by locally typng in the parent directory: `mkdocs serve` and the point the browser to [127.0.0.1.8000](http://127.0.0.1:8000)
 
-Althoigh the main docuementation is onine in Gitbooks.
-It is possible to generate this doumentation  by locally typng in the parent directory: `mkdocs serve`
-and the point the browser to [127.0.0.1.8000](http://127.0.0.1:8000)
-
-You may need to install the `python-markdown-math` extension for rendering equations and the `markdown-callouts` extension for correctly displaying the warning and note blocks. For help editing the documentation visit [mkdocs.org](https://www.mkdocs.org). 
-
-
-
+You may need to install the `python-markdown-math` extension for rendering equations and the `markdown-callouts` extension for correctly displaying the warning and note blocks. For help editing the documentation visit [mkdocs.org](https://www.mkdocs.org).
 
 ### Running on Imperial's HPC
 
@@ -93,4 +86,3 @@ If you see an error relating to `icpc: command not found`, that is because the `
 ```bash
 $ I_MPI_CXX=g++ make
 ```
-
