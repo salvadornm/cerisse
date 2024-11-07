@@ -8,7 +8,7 @@
   * [Tips](tips.md)
 
 ## SET-UP
-* [Welcome](setup.md)
+* [Overview](setup.md)
   * [PROB](prob.md)
   * [Input](input.md)
   * [Makefile](makefile.md)
@@ -19,3 +19,4 @@
 * [Examples](examples/examples.md)
 
 ## THEORY
+* [Equation](equations.md)
