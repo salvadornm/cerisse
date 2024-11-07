@@ -3,6 +3,7 @@
 #include <AMReX_ParmParse.H>
 
 #include "CNS.h"
+#include <cassert>
 
 using namespace amrex;
 
@@ -28,8 +29,8 @@ Box realbox_to_box(std::vector<Real> const &rbox_lo,
 }
 
 void CNS::setupTimeProbe() {
-  assert(parent->NumDataLogs() > 0 &&
-         "No data logs file available for time probes!");
+//  assert(parent->NumDataLogs() > 0 &&
+//         "No data logs file available for time probes!");
 
   ParmParse pp("cns");
   Vector<std::string> time_probes;
