@@ -24,9 +24,12 @@ static constexpr Real Reynolds = 3000.0;  // bulk Reynolds number
 static constexpr Real Mach     = 1.5;     // bulk Mach number
 static constexpr Real Rgas     = gas_constant*1000.0/28.96;  // bulk Mach number
 static constexpr Real Ggas     = 1.4;      // gamma
+static constexpr Real Cv       = Rgas/(Ggas - 1.0);
+static constexpr Real Cp       = Ggas*Cv;
 static constexpr Real viscos   = 1.0/Reynolds;    // viscos temp
-static constexpr Real Retau    = 100;      // Retau
-
+static constexpr Real Pr       = 0.7;    // Prandtl
+static constexpr Real lambda   = viscos*Cp/Pr;    // Prandtl
+static constexpr Real Retau    = 220;    // Retau
 
 
 // problem parameters 
@@ -38,13 +41,14 @@ struct ProbParm {
   Real rhob     = 1.0;      
   Real Q        = ubulk*8*h*h;
   Real mass     = rhob*ubulk;
-  Real utau     = ubulk*Retau/Reynolds;
-  Real tau      = rhob*utau*utau;          // tau wall
   Real p        = rhob*Rgas*Tw;            // pressure        
-  Real L        = 2*h;
-  // Real dpdx     = 0.5*tau/(rhob*h);       // forcing term (pressure gradient)
+  Real L        = 2*h;  
   Real dpdx = 12.0*Q*Q/(Reynolds*L*L*L);    // forcing term (pressure gradient)
-};
+  // fixing utau
+  Real utau = 35.0;
+  Real rhow = Retau*viscos/(utau*L);
+  Real fx   = rhow*utau*utau/(L*rhob);       // forcing term (P)
+ };
 
 // numerical method parameters
 struct methodparm_t {
@@ -52,8 +56,8 @@ struct methodparm_t {
   public:
 
   static constexpr int  order = 2;                   // order numerical scheme viscous
-  static constexpr Real conductivity = 0.0262;       // conductivity (for constant value)
-  static constexpr Real viscosity    = viscos;        // viscosity    (for constant value)
+  static constexpr Real conductivity = lambda;       // conductivity (for constant value)
+  static constexpr Real viscosity    = viscos;       // viscosity    (for constant value)
 
   static constexpr bool solve_viscterms_only = false;
   
@@ -74,9 +78,6 @@ struct skewparm_t {
 inline Vector<std::string> cons_vars_names={"Xmom","Ymom","Zmom","Energy","Density"};
 inline Vector<int> cons_vars_type={1,2,3,0,0};
 
-//typedef closures_dt<indicies_t, visc_const_t<methodparm_t>, cond_const_t<methodparm_t>,
-//                    calorifically_perfect_gas_t<indicies_t>> ProbClosures;
-
 typedef closures_dt<indicies_t, transport_const_t<methodparm_t>,
                     calorifically_perfect_gas_t<indicies_t>> ProbClosures;
 
@@ -95,8 +96,6 @@ void inline inputs() {
 
   amrex::Print() << " ****** Starting ... *******" <<  std::endl;
   amrex::Print() << " 3D Turbulent Channel Flow  (Oct 2024)" <<  std::endl;
-
- // std::mt19937 generator(rd());
 
 }
 
@@ -155,9 +154,6 @@ prob_initdata(int i, int j, int k, Array4<Real> const &state,
     ufluc[1]+= Amp[l]*Ub*sin(freqx[l])*cos(freqz[l] );
     ufluc[2]+= Amp[l]*Ub*cos(freqx[l])*sin(freqz[l] );
   }
-
-
-  //printf(" z=%f vf=%f wf=%f \n ",z, ufluc[1],ufluc[2]);
   
   Real kin =0.0;
   for (int dim=0;dim<3;dim++)
@@ -243,9 +239,11 @@ class user_source_t {
       {
       const auto& cls = *cls_d;
 
-      //  Pressure Source           
-      //Real rho = prims(i, j, k, cls.QRHO);
-      rhs(i,j,k,cls.UMX) += prob_parm.dpdx;  
+      Real rho = prims(i, j, k, cls.QRHO);
+      rhs(i,j,k,cls.UMX) += rho*prob_parm.fx;  
+      rhs(i,j,k,cls.UET) += rho*prob_parm.fx*prims(i,j,k,cls.QU);     
+
+      //   rhs(i,j,k,cls.UMX) += prob_parm.dpdx;  
 
       });
 

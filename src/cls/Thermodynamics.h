@@ -19,7 +19,7 @@ class calorifically_perfect_gas_t {
   Real mw = 28.96e-3;  // mean molecular weight air kg/mol
   Real Ru = gas_constant;
   Real cv = Ru / (mw * (gamma - Real(1.0)));
-  Real cp = gamma * Ru / (mw * (gamma - Real(1.0)));
+  Real cp = gamma * cv;
   Real Rspec = Ru / mw;
 
   AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE void RYP2E(const Real R,
