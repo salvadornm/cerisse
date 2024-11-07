@@ -1,13 +1,14 @@
 # PROB
 
 
-The file is structured in several parts, not all of them are necessary.
-Use ```prob.h``` form one of the examples.
-
-
+The ```prob.h``` file creates the namespace **PROB**, that defines th eprobelm to be solved and the methods to do it.
+file form one of the examples as a starting point
 
 
 ## Problem parameters
+
+The code requires a **ProbParm** structure, which is passed to user deifned functions and allows to centralised
+one place where varibles are stored.
 
 ```cpp
 struct ProbParm {
@@ -20,23 +21,29 @@ struct ProbParm {
 };
 ```
 
-### Global Cosntants
+NOTE: The file uses thet AMReX type Real for floats, which can be single or double precision. Check ```GNU_Makefile```
 
-Similarly,  global constants can be defined
+
+### Global Constants
+
+In some cases in convenient to defined a a few global constants , such as
 
 ```cpp
 static constexpr Real Reynolds = 3000.0;  
 ```
 
-Define them as ```static constexpr```, so 
+These arte defined as ```static constexpr```, so 
 they are evaluated at compile time, making it efficient for use in other compile-time expressions.
-For example, they may be used to set-up a constant viscosity
+Global constant can be used in the method and the ProbParm strcuture and also in the parmeters to methods (see below),
+unlike the ProbParm strycture which is used in user functions.
 
+NOTE: By default Cerisse uses SI units (unlike PeleC) or no-units, include the file "Constants.h" to acesse conversion factors (CGS to SI and viceversa) as well as universal constants with appropiate precision.
 
 ## Themodynamic and Transport Closures
 
-creating the "closures" of the problems, that means which model of transport 
-properties is to be used. 
+The namespace PROB needs to define the **closures_dt** template, which
+creates the physical "closures" of the problems, that means which themrodynamics model is used as well as transport 
+properties 
 
 For example:
 
@@ -45,82 +52,118 @@ typedef closures_dt<indicies_t, visc_suth_t, cond_suth_t,
                     calorifically_perfect_gas_t<indicies_t>> ProbClosures;
 ```
 
-This selects a problem that uses the structure `indicies_t`, which tell position
-of the variables and how many variables to solve. The above also selects
-Sutherland viscosity model  ```visc_suth_t```
-All this is wraped in the class ```ProbClosures``
+The line above selects a problem that uses the structure `indicies_t`, which variables to solve(and how  are they stored)
+how many  to solve. The above also selects the  Sutherland viscosity model  ```visc_suth_t``` and condictivity model ```cond_suth_t```.
+As well as use a perdect ideal gas as thermodynamics model.
+All this is wrapped in the class ```ProbClosures``, which will then pass to the equations.
+Some of the tranpsort model required input from the user, which can use default values (or probelem specific)
 
 
-Options in  ***closures_dt***
+Options in  ***closures_dt***, all units in SI  (October 2024)
 
 
-| Closure                      | Type          | Use | Description                                                  |
-| --------------------------- | ------------- |:-------:| ------------------------------------------------------------ |
-| ```visc_suth```             |            |   often      | Sutherland Viscosity                           |
-| ```cond_suth```             |            |   often      | Sutherland Conductivty                         |
-| ```calorifically_perfect_gas_t```             |            |   often      | perfect gas                      |
+| Closure                          | Options       | defaults                            |       Description                    |
+| ---------------------------------| ------------- |:-----------------------------------:| -----------------------------------  |
+| ```visc_suth_t```                |    no         |   viscosity= 1.458e-6  at T=110.4   | Sutherland Viscosity                 |
+| ```cond_suth_t```                |    no         |   conductivity= 2.495e-3 at T=194.0    | Sutherland Conductivity              |
+| ```visc_const_t```               |    yes        |   viscosity= 1.85e-5     | Constant Viscosity                 |
+| ```cond_const_t```               |    yes        |   conductivity= 0.0262    | Constant Conductivity              |
+| ```transport_const_t```          |    yes        |   viscosity= 1.85e-5 and conductivity= 0.0262    | Constant Viscosity and Conductivity [^1]| 
+| ```calorifically_perfect_gas_t```  |    no        |   $g=1.4$   mol weight=28.96e-3  | perfect gas [^2]                     |
+| ```multispecies_perfect_gas_t```  |    no        |   PelePhysics  |  Use for PelePhsics options (no necesary mixture perfect gas)   |
+
+
+[^1]: 'You can use `transport_cons_t` instead of both `visc_cons_t` and `cond_const`'
+[^2]: 'This can be also reproduced by using PelePhysics options in GNUMakefile'
 
 
 ### Passing Arguments
 
-Parameters can be passed by a small structure `methodparm_t`,
-so all paraeters  can be changed directly in `prob.h`, 
-such as the order of the scheme, disspation parameters, 
-extra damping, sensor variables, etc. The above example would be
+Oprions and parameters can be passed to the closures  by creating a small structure `methodparm_t`
+before the assembly of **closures_dt**,
+so all parameters  are changed directly in `prob.h`.
+For example:
 
 ```cpp
 struct methodparm_t {
 
   public:
 
-  static constexpr int  order = 2;              // order numerical scheme viscous
-  static constexpr Real conductivity = 0.0262;  // conductivity (for constant value)
-  static constexpr Real viscosity   = 1.85e-5;  // viscosity    (for constant value)
+  static constexpr Real viscosity   = 2.85e-5; 
   
 };
-typedef closures_dt<indicies_t, visc_const_t<methodparm_t>, cond_const_t<methodparm_t>,
+typedef closures_dt<indicies_t, visc_const_t<methodparm_t>, cond_const_t<defaultparm_t>,
                     calorifically_perfect_gas_t<indicies_t>> ProbClosures;
 ```
 
+The problem will use a vicosity of 2.85e-5 and a conductivity of 0.0262 (default values using the structure **defaultparm_t** ).
 
-## Equations
+NOTE: To use the default values, the line ```#include <NumParam.h>``` has to be included in the headers
 
-Define the RHS of the problem, that includes which equation to solve and which numerivcal scheme to use. In general 
+
+
+## Numerical Method and Equations
+
+The namespace PROB needs to define as well the **rhs_dt** template, which
+defines which tre,s in the equatison to solve and how. In general 
 
 $$
-\frac{\partial U}{\partial t} = \mbox{RHS}(U)
+\frac{\partial U}{\partial t} = \mbox{RHS}(U) = \mbox{Euler} + \mbox{Diffusive} + \mbox{Source}
 $$
 
-where the RHS includes, inviscid (Euler) terms viscous (for Navier-Stokes) and source terms. For example:
+where the RHS includes the inviscid (Euler) terms viscous (for Navier-Stokes) and source terms. 
+The C++ templete follows:
 
 ```cpp
-typedef rhs_dt<skew_t<true,false, 4, ProbClosures>, no_diffusive_t, no_source_t > ProbRHS;
+template <typename euler, typename diffusive, typename source>
 ```
-This will solve
+Splitting the RHS into Euler terms, diffusive (or viscous) terms and source terms, which need to be defined
+For example, the line below
+
+```cpp
+typedef rhs_dt<skew_t<methodparm_t, ProbClosures>, no_diffusive_t, no_source_t > ProbRHS;
+```
+ will solve
 $$
 \frac{\partial U}{\partial t} = F(U)
 $$
-corresponding to the Euelr equations, with a 4th order skew-symmetric numerical scheme.
-Template `skew_t`,`diffusive_t` may have  arguments (like the order of the scheme).
+corresponding to the Euler equations, with skew-symmetric numerical scheme (with order defined in `methodparm_t`, similar
+ to **closures_dt** .
+
+**euler** options in  ***rhs_dt***  (October 2024)
+
+
+| euler                            | Options          |  IBM   | defaults                  |       Description                    |
+| ---------------------------------| ---------------- |:------:|:-------------------------:| -----------------------------------  |
+| ```riemann_t```                  |    yes(not used) | no     |   -                       | Second TVD - HLLC Riemann solver     |
+| ```skew_t```                     |    yes           | yes    | 4th order, no dissipation | 2/4/6 order Skew-symmetric Scheme    |
+| ```keep_euler_t```               |    yes           | no     | no default                | 2/4/6 order KEEP    Scheme           |
+| ```weno_t```                     |    yes           | no     | no default                | WENO or TENO 5th order  Scheme       |
+| ```rusanov_t```                  |    no            | yes    | -                         | Rusanov 2nd order  Scheme            |
+| ```no_euler_t```                 |    no            | yes    | -                         | 0 (not solving Euler)                |
+
+
+Not all optios are available yet
+
+
+**diffusive**  options in  ***rhs_dt***  (October 2024)
+
+| diffusive                            | Options          |  IBM   | defaults              |       Description                |
+| ---------------------------------| ---------------- |:------:|:-------------------------:| -----------------------------------  |
+| ```diffusiveheat_t```            |    yes           | no     | 4th order                 | 2/4/6  central scheme only heat  |
+| ```skew_t```                     |    yes           | yes    | 4th order                 | 2/4/6  central scheme           |
+| ```no_diffusive_t```             |     no           | yes    | 0                         | 0 (not diffusive part)              |
 
 
 
+**source**  options in  ***rhs_dt***  (October 2024)
 
-This call indicates the different type of numerical scheme for the advection part, default
+| diffusive                            | Options          |  IBM   | defaults              |       Description                   |
+| ---------------------------------| ---------------- |:------:|:-------------------------:| ----------------------------------- |
+| ```reactor_t```                  |    yes           | yes    |   -                       | PelePhysics chemcail raection       |
+| ```user_source_t```              |     no           | yes    | -                         | user-given source term              |
+| ```no_source_t```                |     no           | yes    | 0                         | 0 (no source term part)             |
 
-```cpp
-  typedef rhs_dt<keep_euler_t<false, false, 4, ProbClosures>,no_diffusive_t,
-               no_source_t> ProbRHS;
-```
-
-| RHS                     | Options          | Use | Description                                                  |
-| --------------------------- | ------------- |:-------:| ------------------------------------------------------------ |
-| ```riemann_t```             |            |   often      | Riemann Solver   MUSCL              |
-| ```keep_euler_t```             |  AD,IB, order           |   often      | KEEP Scheme                 |
-| ```centraldif_t```             |  AD,IB, order           |   often      | Central Scheme                 |
-| ```skew_t```             |  AD, IB, order           |   often      | Skew-symmetric Scheme                 |
-| ```no_diffusive_t```        |            |   often      | No diffusive part (Euler)                |
-| ```no_source_t```           |            |   often      | No source term    |
 
 
 
@@ -147,7 +190,6 @@ and allow to define the spatial coordinate *x* (and *y* and *z*) of the cell
   Real x = prob_lo[0] + (i + Real(0.5)) * dx[0];
 ```
 
-NOTE: Real for variable precision (check ```GNU_Makefile```)
 
 
 This allow to define, for example, different condtion depending on the  *x* coordinate.

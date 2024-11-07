@@ -1,17 +1,27 @@
 # CONFIGURATION
 
-Cerisse integrates a collection of C++ source code and libraries (such as AMREX, PelePhysics, etc.) along with the configuration of the problem setup. These pages explain how a case is initialised, detailing what problem will be solved and how.
-The configuration of the problem is divided into three files.
+Cerisse integrates a collection of C++ source code and libraries (such as AMReX, PelePhysics, etc.) along with the configuration of the problem setup. These pages explain how a case is initialised, detailing what problem will be solved and how.
+
+When creating a new problem, it's best to set up a new directory (e.g., ```wrk```) with three files within it.
+
+```bash
+$ls wrk
+GNUmakefile	inputs		prob.h
+```
+
+NOTE: is best to copy them from a similar example and then edit the file, this will ensure consistencty with examples. Nonetheless, the names of the ```input``` and ```prob.h``` files can change (but not the ```GNUmakefile```).
+The configuration of the problem is splitted into three files.
 
 ## Problem definition
 
-The definition of the problem to be solved is specified in the C++ header file ```prob.h```. This file establishes the thermodynamic and turbulence closures, as well as the numerical methods used for solving the problem. In general, it defines the equations to be solved, expressed in the form:
+The definition of the problem to be solved is specified in the C++ header file ```prob.h``` (or similar), where a namespace **PROB** is created. This file establishes the thermodynamic and turbulence closures, as well as the numerical methods used for solving the problem. In general, it defines the equations to be solved, expressed in the form:
 
 $$
 \frac{\partial U}{\partial t} = \mbox{RHS}(U)
 $$
 
 Here, $$ U $$ represents a vector of conserved variables, while $$ \mbox{RHS}(U) $$ is a general term that includes contributions from Euler terms, viscous terms, and source terms. Any changes to this file require the code to be recompiled (by running ```make```).
+The tab [PROB](prob.md) explaisn in detail the confiuguration of this file.
 
 
 ## Compiler options

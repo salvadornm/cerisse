@@ -39,6 +39,18 @@ where  `/home/snm/work/cerisse` corresponds to the installation directory.
 Current options are **clean** (*all*) to remove old results and temporary directories. **visit** to prepare data for input into Visit, **plot**, which will crete a snaphsot of the density, **backup** (*dirname*) will save simualytion data and main files into a backup directory
 
 
+## Documentation Editing
+
+
+Althoigh the main docuementation is onine in Gitbooks.
+It is possible to generate this doumentation  by locally typng in the parent directory: `mkdocs serve`
+and the point the browser to [127.0.0.1.8000](http://127.0.0.1:8000)
+
+You may need to install the `python-markdown-math` extension for rendering equations and the `markdown-callouts` extension for correctly displaying the warning and note blocks. For help editing the documentation visit [mkdocs.org](https://www.mkdocs.org). 
+
+
+
+
 ### Running on Imperial's HPC
 
 To run on Imperial's CX2/3, you need to load the following modules

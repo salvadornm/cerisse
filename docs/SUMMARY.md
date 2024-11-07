@@ -10,6 +10,9 @@
 ## SET-UP
 * [Welcome](setup.md)
   * [PROB](prob.md)
+  * [Input](input.md)
+  * [Makefile](makefile.md)
+  
 
 ## EXAMPLES
 
