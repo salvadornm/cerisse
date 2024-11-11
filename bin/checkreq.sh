@@ -124,7 +124,7 @@ MPI_INS_COMPILERS=(0,0,0,0,0)
 MPI_VER_COMPILERS=(0,0,0,0,0)
 MPI_TYPE_COMPILER=(0,0,0,0,0)
 MPI_SANE_COMPILER=(0,0,0,0,0)
-SOURCE_FILE="com20mpi.cpp"
+SOURCEMPI_FILE="auxcpp/com20mpi.cpp"
 
 mpi_compiler=0
 mpi_installed_compiler=0
@@ -149,7 +149,7 @@ for COMP in "${MPI_REQ_COMPILERS[@]}"; do
 		fi
        
         #check if compiler is sane	
-		$COMP -std=$STANDARD "$SOURCE_FILE"  &> /dev/null
+		$COMP -std=$STANDARD "$SOURCEMPI_FILE"  &> /dev/null
 		compile_status=$?
 		if [ $compile_status -eq 0 ]; then
 			MPI_SANE_COMPILER[mpi_installed_compiler]="OK"
