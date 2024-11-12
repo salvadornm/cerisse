@@ -381,11 +381,11 @@ protected:
   static int eb_recon_mode;
   static amrex::Real eb_weight;
   static bool eb_no_slip;
+  static std::string redistribution_type;
+#endif
   static bool eb_isothermal;
   static bool eb_wall_model;
   static amrex::Real eb_wall_temp;
-  static std::string redistribution_type;
-#endif
 
   // Buffer layer
 

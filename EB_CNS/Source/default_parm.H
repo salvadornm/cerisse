@@ -33,11 +33,11 @@ BCRec CNS::phys_bc; // Holds BC info
 int  CNS::eb_recon_mode = 0;     // 0: fill covered stencil with first cell values; 1: switch to 2nd order scheme close to EB
 Real CNS::eb_weight     = 0.5;   // Weight for FluxRedist
 bool CNS::eb_no_slip    = true;  // No-slip EB walls?
+std::string CNS::redistribution_type = "StateRedist"; // StateRedist / FluxRedist / NoRedist
+#endif
 bool CNS::eb_isothermal = false; // Isothermal EB walls?
 bool CNS::eb_wall_model = false; // Use wall model for EB walls? (TODO: now only support ODE wall model)
 Real CNS::eb_wall_temp;          // EB wall temperature (if eb_isothermal = true)
-std::string CNS::redistribution_type = "StateRedist"; // StateRedist / FluxRedist / NoRedist
-#endif
 
 // Numerics controls
 

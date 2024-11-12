@@ -150,10 +150,11 @@ void CNS::fill_ext_src(int i, int j, int k, Real time, GeometryData const& geomd
 {
 }
 
+#if CNS_USE_EB
 void Scramjet::build(const Geometry& geom, const int max_coarsening_level)
 {
   auto box = EB2::BoxIF({AMREX_D_DECL(-50., -10., -10.)}, {AMREX_D_DECL(4.45, 0.0, 10.)}, false);
-  auto injector = EB2::CylinderIF(0.1245, 2.0, 1, {AMREX_D_DECL(0.0, -0.635, 0.0)}, false);
+  auto injector = EB2::CylinderIF(0.1190625, 2.0, 1, {AMREX_D_DECL(0.0, -0.635, 0.0)}, false);
   auto box_with_inj = EB2::DifferenceIF<EB2::BoxIF, EB2::CylinderIF>(box, injector);
 
   auto rear_wall = EB2::PlaneIF({AMREX_D_DECL(9.525, 0.0, 0.0)}, {AMREX_D_DECL(1.0, 0.0, 0.0)});
@@ -171,3 +172,4 @@ void Scramjet::build(const Geometry& geom, const int max_coarsening_level)
   auto gshop = EB2::makeShop(all_objs);
   EB2::Build(gshop, geom, max_coarsening_level, max_coarsening_level, 6, true);
 }
+#endif

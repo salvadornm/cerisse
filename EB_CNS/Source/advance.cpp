@@ -444,8 +444,8 @@ void CNS::enforce_consistent_state(MultiFab& S)
                 Real ei_new;
                 eos.RTY2E(rhoNew, target_temp, Y, ei_new);
                 Real diff_ei = ei_new - ei;
-                Real ctrl_parm = 1.0; // control param in [0,1] how much KE can be
-                                      // used to heat the cell
+                Real ctrl_parm = 0.9999; // control param in [0,1] how much KE can be
+                                         // used to heat the cell
                 Real fac = std::sqrt(1.0 - amrex::min(diff_ei, ctrl_parm * ke) / ke);
                 AMREX_D_TERM(s_arr(iv, UMX) *= fac;, s_arr(iv, UMY) *= fac;
                              , s_arr(iv, UMZ) *= fac;)

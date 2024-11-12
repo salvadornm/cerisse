@@ -216,8 +216,8 @@ void CNS::compute_dSdt_box_eb(
           const int domlo = geom.Domain().smallEnd(dir);
           const int domhi = geom.Domain().bigEnd(dir);
           const auto problo = geom.ProbLo();
-          const Real x = (i + 0.5) * dx[0] + problo[0];
-          if (eb_wall_model && x < -1.0) { // in line with advance_box_eb   
+          // const Real x = (i + 0.5) * dx[0] + problo[0];
+          if (eb_wall_model /*&& x < -1.0*/) { // in line with advance_box_eb   
             if ((iv[dir] == domhi + 1 && hi_is_wall) ||
                 (iv[dir] == domlo && lo_is_wall)) {
               const auto iv1 = iv[dir] == domlo ? iv : iv - IntVect::TheDimensionVector(dir);
@@ -279,7 +279,7 @@ void CNS::compute_dSdt_box_eb(
                   flx_tmp[UMX] = ts * t1[0] * tauw * lohi;
                   flx_tmp[UMY] = ts * t1[1] * tauw * lohi;
                   flx_tmp[UMZ] = ts * t1[2] * tauw * lohi;
-                  flx_tmp[UEDEN] = qw * lohi;
+                  // flx_tmp[UEDEN] = qw * lohi; // TODO: no wall model heat flux for now
                 }
               }
             }

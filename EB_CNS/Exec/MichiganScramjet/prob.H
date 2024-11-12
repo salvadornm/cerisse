@@ -14,6 +14,7 @@
 #include "prob_parm.H"
 
 // Declare your own geometry here and define the build method in prob.cpp
+#if CNS_USE_EB
 #include "custom_geometry.H"
 class Scramjet : public CustomGeometry::Register<Scramjet>
 {
@@ -22,6 +23,7 @@ public:
 
   void build(const Geometry& geom, const int max_coarsening_level) override;
 };
+#endif
 
 AMREX_GPU_DEVICE AMREX_FORCE_INLINE void bl_profile(const amrex::Real y,
                                                     const amrex::Real z,
@@ -33,23 +35,23 @@ AMREX_GPU_DEVICE AMREX_FORCE_INLINE void bl_profile(const amrex::Real y,
   amrex::Real d_wall = std::min(y, 2.54 - y); // dist from upper and lower walls
   d_wall = std::min(d_wall, 1.905 - std::abs(z)); // dist from left and right walls
   d_wall /= (0.1245 * 2.0); // d_wall/D
-  const amrex::Real u_profile = (d_wall > 0.0) ? std::tanh(5.0 * d_wall) : 0.0; // u/u_inf
+  const amrex::Real u_profile = (d_wall > 0.0) ? std::tanh(10.0 * d_wall) : 0.0; // u/u_inf
   u = pp.u * u_profile;
 
-  amrex::Real T_inf, p_inf;
-  const amrex::Real* Y = pp.Y.begin();
-  auto eos = pele::physics::PhysicsType::eos();
-  ei = pp.ei;
-  eos.RYET2P(pp.rho, Y, ei, T_inf, p_inf); // get T, p_inf
+  // amrex::Real T_inf, p_inf;
+  // const amrex::Real* Y = pp.Y.begin();
+  // auto eos = pele::physics::PhysicsType::eos();
+  // ei = pp.ei;
+  // eos.RYET2P(pp.rho, Y, ei, T_inf, p_inf); // get T, p_inf
 
-  amrex::Real T_profile = 1.0 + (0.5 * pp.u * pp.u) / pp.cv_Tinf *
-                                  (1.0 - u_profile * u_profile); // T/T_inf
-  amrex::Real cv, cv_inf = pp.cv_Tinf / T_inf;
-  eos.TY2Cv(T_inf * T_profile, Y, cv);
-  T_profile *= cv_inf / cv;
+  // amrex::Real T_profile = 1.0 + (0.5 * pp.u * pp.u) / pp.cv_Tinf *
+  //                                 (1.0 - u_profile * u_profile); // T/T_inf
+  // amrex::Real cv, cv_inf = pp.cv_Tinf / T_inf;
+  // eos.TY2Cv(T_inf * T_profile, Y, cv);
+  // T_profile *= cv_inf / cv;
 
-  rho = pp.rho / T_profile;
-  eos.RYP2E(rho, Y, p_inf, ei); // rho, p_inf -> ei
+  // rho = pp.rho / T_profile;
+  // eos.RYP2E(rho, Y, p_inf, ei); // rho, p_inf -> ei
 }
 
 /**
@@ -309,12 +311,16 @@ prob_tag_error(int i, int j, int k, amrex::Array4<char> const& tagarr,
                char tagval, const amrex::Real time,
                amrex::GeometryData const& geomdata, ProbParm const& /*pp*/)
 {
-  // // Geometry
-  // const amrex::Real* prob_lo = geomdata.ProbLo();
-  // const amrex::Real* dx = geomdata.CellSize();
-  // const amrex::Real x = prob_lo[0] + (i + 0.5) * dx[0];
+  // Geometry
+  const amrex::Real* prob_lo = geomdata.ProbLo();
+  const amrex::Real* dx = geomdata.CellSize();
+  const amrex::Real x = prob_lo[0] + (i + 0.5) * dx[0];
+  const amrex::Real y = prob_lo[1] + (j + 0.5) * dx[1];
+  const amrex::Real z = prob_lo[2] + (k + 0.5) * dx[2];
 
-  // if (x < -2.0 || x > 12.0) { tagarr(i, j, k) = TagBox::CLEAR; }
+  amrex::Real d_wall = std::min(y, 2.54 - y); // dist from upper and lower walls
+  d_wall = std::min(d_wall, 1.905 - std::abs(z)); // dist from left and right walls
+  if (d_wall > 0 && d_wall < 0.1245 && x < 0.5) { tagarr(i, j, k) = tagval; }
 }
 
 #endif

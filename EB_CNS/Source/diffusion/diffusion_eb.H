@@ -429,7 +429,7 @@ AMREX_GPU_DEVICE AMREX_FORCE_INLINE void compute_diff_wallflux(
         viscw[UMX] = cfarea * ts * anrmy * tauw;
         viscw[UMY] = -cfarea * ts * anrmx * tauw;
         // std::cout << tauw * cfarea << " (" << viscw[UMX] << ", " << viscw[UMY] << ")";
-        viscw[UEDEN] = cfarea * qw;
+        // viscw[UEDEN] = cfarea * qw; // TODO: no wall model heat flux for now
         // std::cout << "  " << apnorm << " (" << anrmx << ", " << anrmy << ")\n";
       }
     } 

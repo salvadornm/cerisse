@@ -262,8 +262,8 @@ AMREX_FORCE_INLINE AMREX_GPU_DEVICE void vpdf_langevin_model(
     auto eos = pele::physics::PhysicsType::eos();
     eos.RTY2Cs(mean_rho, mean_T, mean_Y, mean_cs);
     amrex::Real M_turb2 = 2.0 * tke / mean_cs / mean_cs; // turbulent Mach number
-    eps *= (1.0 + M_turb2);
-    eps = amrex::max(eps, std::numeric_limits<amrex::Real>::epsilon()); // prevent divide by 0
+    eps *= (1.0 + std::min(M_turb2, 1.0));
+    eps = std::max(eps, std::numeric_limits<amrex::Real>::epsilon()); // prevent divide by 0
 
     amrex::Real u_sgs;
     for (int nf = 1; nf <= NUM_FIELD; ++nf) {
@@ -278,7 +278,7 @@ AMREX_FORCE_INLINE AMREX_GPU_DEVICE void vpdf_langevin_model(
         //   u_sgs = (0.5 + 0.75 * C0) / (tke / eps + dt) * (mean_u - u) * dt;
         // } else {
           u_sgs = (0.5 + 0.75 * C0) / (tke / eps + dt) * (mean_u - u) * dt +
-                  sqrt(C0 * eps) * dW[dir][nf - 1];
+                  std::sqrt(C0 * eps) * dW[dir][nf - 1];
         // }
 
         s(i, j, k, nf * NVAR + UMX + dir) += s(i, j, k, nf * NVAR + URHO) * u_sgs;
@@ -317,7 +317,18 @@ AMREX_FORCE_INLINE AMREX_GPU_DEVICE void spdf_iem_model(
     amrex::Real delta = std::pow(AMREX_D_TERM(dx[0], *dx[1], *dx[2]),
                                  1.0 / amrex::Real(AMREX_SPACEDIM));
     amrex::Real eps = C_e * std::pow(tke, 1.5) / delta;
-    eps = amrex::max(eps, std::numeric_limits<amrex::Real>::epsilon()); // prevent divide by 0
+    // Mach number correction for dissipation
+    amrex::Real mean_rho = s(i, j, k, URHO);
+    amrex::Real rhoinv = 1.0 / mean_rho;
+    amrex::Real mean_T = s(i, j, k, UTEMP);
+    amrex::Real mean_Y[NUM_SPECIES];
+    for (int n = 0; n < NUM_SPECIES; ++n) mean_Y[n] = s(i, j, k, UFS + n) * rhoinv;
+    amrex::Real mean_cs;
+    auto eos = pele::physics::PhysicsType::eos();
+    eos.RTY2Cs(mean_rho, mean_T, mean_Y, mean_cs);
+    amrex::Real M_turb2 = 2.0 * tke / mean_cs / mean_cs; // turbulent Mach number
+    eps *= (1.0 + std::min(M_turb2, 1.0));
+    eps = std::max(eps, std::numeric_limits<amrex::Real>::epsilon()); // prevent divide by 0
 
     // rhoQ_i = rhoQ_i + rho_i*0.5*C_Q*eps/k*(mean_y - y)*dt
     amrex::Real mean_Q, Q, Q_sgs;
