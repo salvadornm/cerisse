@@ -9,8 +9,10 @@ amrex.fpe_trap_invalid = 0
 geometry.is_periodic = 0 0 0
 geometry.coord_sys   = 0
 geometry.prob_lo     = -35.56  -1.27  -1.905
-geometry.prob_hi     =  15.24   2.54   1.905
-amr.n_cell           =  640    48     48
+#geometry.prob_hi     =  15.24   2.54   1.905
+#amr.n_cell           =  640    48     48
+geometry.prob_hi     =  21.59   2.54   1.905
+amr.n_cell           =  720     48     48
 
 eb2.geom_type = Scramjet
 cns.eb_no_slip = 1
@@ -75,21 +77,21 @@ cns.refinement_indicators = refinebox gradp magvort #gradrYH2
 # For shocks
 cns.gradp.field_name = pressure
 cns.gradp.adjacent_difference_greater = 1.7e5
-cns.gradp.max_level = 3
+cns.gradp.max_level = 1
 # For fuel
 #cns.gradrYH2.field_name = rho_H2
 #cns.gradrYH2.adjacent_difference_greater = 2e-5
 #cns.gradrYH2.max_level = 2
 # For boundary layer
 cns.magvort.vorticity_greater = 1e6
-cns.magvort.max_level = 2
+cns.magvort.max_level = 1
 # Near injector
 cns.refinebox.in_box_lo = -0.4 0.0 -0.25
 cns.refinebox.in_box_hi =  0.5 0.5  0.25
-cns.refinebox.max_level = 3
+cns.refinebox.max_level = 2
 
 cns.refine_cutcells = 1
-cns.refine_cutcells_max_lev = 2
+cns.refine_cutcells_max_lev = 1
 
 # ==================== OUTPUT FILES ==================== #
 amr.checkpoint_files_output = 1
