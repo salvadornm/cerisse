@@ -2,7 +2,7 @@
 case  $1 in
     clean )
 	tput setaf 2
-	echo " ... removing plt* *.tmp  files"
+	echo " ... removing plt*, *.tmp  files"
 	tput sgr0
     	rm -rf ./plot/plt*
 	rm -f *.tmp
@@ -12,12 +12,13 @@ case  $1 in
 	case $2 in
 		all )
 		tput setaf 2
-        	echo " ... removing building dirs, checkpoints and *.ex " 
+        	echo " ... removing building dirs, *.log, checkpoints and *.ex " 
 		tput sgr0
 		rm -rf tmp_build_dir
 		rm -rf *.ex
 		rm -rf chk*
 		rm -rf plot
+		rm -rf *.log
 		echo -e "\\033[1;32m  and ready to compile\\033[0m"
 		;;
 		*)

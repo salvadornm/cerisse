@@ -2,6 +2,7 @@
 DIM = 1
 COMP = gnu
 PRECISION = DOUBLE
+CXXSTD    = c++20
 
 # Profiling
 TINY_PROFILE = FALSE

@@ -51,6 +51,7 @@ cns.screen_output     = 1000
 
 # DIAGNOSTICS
 amr.data_log = time_probe.log
+cns.record_probe = 1
 cns.time_probe_lev = 0
 cns.time_probe_int = 1
 cns.time_probes = KineticEnergy Enstrophy Density PressurePoint

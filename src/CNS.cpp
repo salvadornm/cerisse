@@ -7,6 +7,7 @@
 using namespace amrex;
 
 bool CNS::verbose = true;
+bool CNS::record_probe = false;
 bool CNS::dt_dynamic = false;
 bool CNS::ib_move = false;
 bool CNS::plot_surf = false;
@@ -59,6 +60,9 @@ void CNS::read_params() {
 
   pp.query("nstep_screen_output", nstep_screen_output);
   pp.query("verbose", verbose);
+
+  pp.query("record_probe", record_probe);
+  
 
   Vector<int> lo_bc(AMREX_SPACEDIM), hi_bc(AMREX_SPACEDIM);
   pp.getarr("lo_bc", lo_bc, 0, AMREX_SPACEDIM);
@@ -175,8 +179,7 @@ void CNS::post_init(Real stop_time) {
   }
   
   // Set up diagnostics
-  bool probe=false; 
-  if (probe) {
+  if (record_probe) {
     setupTimeProbe();
   }
 }
@@ -420,8 +423,7 @@ void CNS::post_timestep(int /* iteration*/) {
   }
 
   // Record time statistics
-  bool probe=false; 
-  if (probe) {
+  if (record_probe) {
     recordTimeProbe();
   }
   // recordLine();

@@ -112,6 +112,7 @@ class CNS : public amrex::AmrLevel {
                                  std::ostream& os) override;
 
   // diagnostics
+  static bool record_probe;
   void setupTimeProbe();
   void recordTimeProbe();
   static int time_probe_lev;
