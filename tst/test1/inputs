@@ -36,7 +36,6 @@ amr.max_grid_size_x   = 64 64 64 # maximum grid size in z per level
 amr.n_error_buf     = 0 0 0 # number of buffer cells in error est
 amr.grid_eff        = 0.7     # what constitutes an efficient grid
 amr.v               = 1
-# amr.subcycling_mode = # None, Manual, Optimal (n_cycle[lev] is set dynamically), Auto (n_cycle[lev]=ref_ratio[lev])
 fabarray.mfiter_tile_size = 8 8 8
 
 # Plot and checkpoint
@@ -48,11 +47,16 @@ amr.plot_file         = ./plot/plt # root name of plotfile
 amr.plot_int          = 100         # number of timesteps between plotfiles
 amr.derive_plot_vars  = pressure x_velocity y_velocity z_velocity temperature
 
-# Debugging 
-# amrex.fpe_trap_invalid=1
-# amrex.use_gpu_aware_mpi = 1
-# amrex.fpe_trap_zero = 1
-# amrex.fpe_trap_overflow = 1
 
-# fab.do_initval = true;
-# fab.init_snan = true;
+# DIAGNOSTICS
+amr.data_log = time.log
+cns.record_probe = 1
+cns.time_probe_lev = 0
+cns.time_probe_int = 1
+cns.time_probes = KineticEnergy Density
+KineticEnergy.field_name = kinetic_energy
+KineticEnergy.box_lo = 0.0 
+KineticEnergy.box_hi = 1.0 
+Density.field_name = Density
+Density.box_lo = 0.0
+Density.box_hi = 1.0 

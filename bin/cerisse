@@ -38,6 +38,14 @@ case  $1 in
 	python ../../bin/plot2d.py
 	echo -e "\\033[1;32m  DONE  \\033[0m"
 	;;
+	check )
+	tput setaf 2
+	echo " checking if cerisse is broken "
+	tput sgr0
+	bash checktest.sh
+	tput sgr0
+	echo -e "\\033[1;32m  DONE  \\033[0m"
+	;;
 	backup )
     tput setaf 2
     echo " backing up.. in $2 "
@@ -52,9 +60,9 @@ case  $1 in
 	mv plt* $2
 	echo -e "\\033[1;32m  DONE  \\033[0m"
 	;;
-        *)
+    *)
 	echo "option not recognised.."
-	echo "clean[all]/visit/plot/backup[dirname]"
+	echo "clean[all]/visit/plot/backup[dirname]/check"
     exit
 esac
 
