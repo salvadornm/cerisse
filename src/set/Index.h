@@ -59,29 +59,23 @@ static constexpr int QG=7;
 static constexpr int QEINT=8;
 static constexpr int QFS=9;
 
-
 // Transport coefficients
 static constexpr int CMU=0;   // dynamic viscosity
 static constexpr int CXI=1;   // bulk viscosity
 static constexpr int CLAM=2;  // heat conductivity 
 static constexpr int CRHOD=3; // species diffusivity (rho*D)
 
-
-// Vector<std::string> prim_vars_names={"Pressure","Temperature","Xvel","Yvel","Zvel"};
-// amrex::Gpu::ManagedVector<std::string> cons_vars_names={"Density","Xmom","Ymom","Zmom","Energy"};
-
-// amrex::Gpu::ManagedVector<char[2]> cons_vars_names;
-// ={"Density","Xmom","Ymom","Zmom","Energy"};
-      // pr        ux      uy     uz      et
-// amrex::Gpu::ManagedVector<int> cons_vars_type;
-//  ={0,1,2,3,0};
-// amrex::ManagedVector<std::string> prim_vars_names={"Pressure","Temperature"};
-
 static constexpr int NCONS=UFS + NUM_SPECIES;
 static constexpr int NPRIM=QFS + NUM_SPECIES;
 static constexpr int NWAVES=2 + NUM_SPECIES;
 static constexpr int NCOEF= 3 + NUM_SPECIES;
 static constexpr int NGHOST=3; // TODO: make it an automatic parameter
+
+static constexpr int NSTAT=2;              // NSTATS
+static constexpr int LEN_STAT=NCONS+NSTAT; //LENGTH ARRAY
+
+
+
 };
 
 #endif

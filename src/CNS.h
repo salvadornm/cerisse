@@ -97,7 +97,12 @@ class CNS : public amrex::AmrLevel {
   //     Density = 0, Xmom, Ymom, Zmom, Etot
   // };
 
-  enum StateDataType { State_Type = 0, Cost_Type };
+  //enum StateDataType { State_Type = 0, Cost_Type };
+
+  //SNM
+  enum StateDataType { State_Type = 0, Stats_Type, Cost_Type };
+
+
 
   void buildMetrics();
 
@@ -131,6 +136,10 @@ class CNS : public amrex::AmrLevel {
 
   static int refine_max_dengrad_lev;
   static amrex::Real refine_dengrad;
+
+  // Stats
+  static amrex::Real time_stats;
+  static bool compute_stats;
 
   static amrex::Real gravity;
 

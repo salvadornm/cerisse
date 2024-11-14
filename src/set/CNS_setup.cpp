@@ -116,6 +116,17 @@ void CNS::variableSetUp() {
                          state_data_extrap, store_in_checkpoint);
   // https://github.com/AMReX-Codes/amrex/issues/396
 
+  // Setup Stats_Type
+
+  // SNM  (Can I put 0?) Statistics  (from input only if compute_stats)
+
+  if (h_prob_closures->NSTAT > 0 ) {compute_stats=true;}
+  desc_lst.addDescriptor(Stats_Type, IndexType::TheCellType(),
+                          StateDescriptor::Point, 0, h_prob_closures->NSTAT, &lincc_interp,
+                          state_data_extrap, store_in_checkpoint);
+  
+
+
   // Physical boundary conditions ////////////////////////////////////////////
   Vector<BCRec> bcs(PROB::ProbClosures::NCONS);
   Vector<int> cons_vars_type = indicies_t::get_cons_vars_type();
@@ -151,8 +162,37 @@ void CNS::variableSetUp() {
   desc_lst.setComponent(State_Type, 0, PROB::ProbClosures::get_cons_vars_names(), bcs, bndryfunc);
 
   num_state_data_types = desc_lst.size();
-  // printf("num_state_data_types %d \n",num_state_data_types);
+
+  //printf("num_state_data_types (1) %d \n",num_state_data_types);
   // exit(0);
+
+  // SNM ---------
+  int NSTAT = h_prob_closures->NSTAT;
+
+  amrex::Print( ) << "-------- Allocating NSTAT -------" << std::endl;
+  amrex::Print( ) << "NSTAT = " << NSTAT << std::endl;
+  Vector<BCRec> stats_bcs(NSTAT);
+  Vector<std::string>  stats_name(NSTAT);
+  
+  // names
+  int statv = 0;
+  stats_name[statv] = "ux_mean";  statv++;
+  stats_name[statv] = "uy_mean";
+  // bc
+  for (statv=0;statv<h_prob_closures->NSTAT;statv++) {
+    set_scalar_bc(stats_bcs[statv], h_phys_bc);
+  }
+
+  StateDescriptor::BndryFunc bndryfuncstats( cns_bcfill);
+  bndryfuncstats.setRunOnGPU(true);
+  desc_lst.setComponent(Stats_Type, 0, stats_name, stats_bcs, bndryfuncstats);
+
+
+  printf("num_state_data_types(2) %d \n",num_state_data_types);
+
+  // SNM ----
+ 
+
   ////////////////////////////////////////////////////////////////////////////
 
   // Define derived quantities ///////////////////////////////////////////////

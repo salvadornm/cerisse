@@ -19,6 +19,8 @@ int CNS::refine_max_dengrad_lev = -1;
 Real CNS::cfl = 0.0_rt;
 Real CNS::dt_constant = 0.0_rt;
 Real CNS::refine_dengrad = 1.0e10;
+bool CNS::compute_stats = false;
+Real CNS::time_stats = 0.0;
 
 PROB::ProbClosures *CNS::h_prob_closures = nullptr;
 PROB::ProbClosures *CNS::d_prob_closures = nullptr;
@@ -150,12 +152,36 @@ void CNS::initData() {
   PROB::ProbParm const *lprobparm = d_prob_parm;
 
   auto const &sma = S_new.arrays();
+
+
+  amrex::Print( ) << " Initialise Data " << std::endl;  
+
   amrex::ParallelFor(
       S_new, [=] AMREX_GPU_DEVICE(int box_no, int i, int j, int k) noexcept {
         prob_initdata(i, j, k, sma[box_no], geomdata, *lclosures, *lprobparm);
       });
 
   // TODO: Could compute primitive variables here
+
+  // Initialise stats to 0
+  if (compute_stats) {
+
+    amrex::Print( ) << " Initialise STATS " << std::endl; 
+    amrex::Print( ) << " NSTATS = " << PROB::ProbClosures::NSTAT << std::endl; 
+    
+
+    MultiFab &S_stats = get_new_data(Stats_Type);
+    auto const &sma_stats = S_stats.arrays();
+    amrex::ParallelFor(
+      S_stats, [=] AMREX_GPU_DEVICE(int box_no, int i, int j, int k) noexcept {
+            for (int n=0; n < PROB::ProbClosures::NSTAT; n++)  {
+              sma_stats[box_no](i, j, k, n) =  0.0;
+            }                 
+      });
+
+  }
+
+
 }
 
 void CNS::buildMetrics() {
