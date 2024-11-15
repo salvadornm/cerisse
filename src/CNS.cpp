@@ -453,6 +453,49 @@ void CNS::post_timestep(int /* iteration*/) {
     recordTimeProbe();
   }
   // recordLine();
+
+  // Record stats SNM
+  if (compute_stats){
+    MultiFab &S_stats = get_new_data(Stats_Type);
+    auto const &data_stats = S_stats.arrays();
+    MultiFab &S = get_new_data(State_Type);
+    auto const &data = S.arrays();
+    Real dt = parent->dtLevel(level);
+    time_stats += dt;
+
+    amrex::Print( ) << " Compute STATS  "  << std::endl; 
+    amrex::Print( ) << " dt= " << dt << std::endl; 
+    amrex::Print( ) << " timestat= " << time_stats << std::endl;     
+            
+    // storing velocity 
+    amrex::ParallelFor(
+      S_stats, [=] AMREX_GPU_DEVICE(int box_no, int i, int j, int k) noexcept {       
+        amrex::Real o_rho = 1.0/data[box_no](i,j,k,PROB::ProbClosures::URHO);
+        amrex::Real vel[3]={0,0,0};
+        vel[0] = data[box_no](i,j,k,PROB::ProbClosures::UMX)*o_rho;
+        vel[1] = data[box_no](i,j,k,PROB::ProbClosures::UMY)*o_rho;
+        vel[2] = data[box_no](i,j,k,PROB::ProbClosures::UMZ)*o_rho;
+          
+        // U,V,W 
+        for (int n=0; n< AMREX_SPACEDIM; n++){
+          data_stats[box_no](i, j, k, n) += vel[n]*dt;            
+        }                
+        // UU,VV,WW        
+        for (int n=0; n< AMREX_SPACEDIM ; n++) {
+          data_stats[box_no](i, j, k, AMREX_SPACEDIM+n) += vel[n]*vel[n]*dt;            
+        }       
+        // UV,UW,VW        
+#if (AMREX_SPACEDIM >= 2)          
+        data_stats[box_no](i, j, k, 2*AMREX_SPACEDIM) += vel[0]*vel[1]*dt;
+#endif
+#if (AMREX_SPACEDIM == 3)
+        data_stats[box_no](i, j, k, 2*AMREX_SPACEDIM+1) += vel[0]*vel[2]*dt;
+        data_stats[box_no](i, j, k, 2*AMREX_SPACEDIM+2) += vel[1]*vel[2]*dt;
+#endif
+      });
+
+  }  
+
 }
 
 void CNS::postCoarseTimeStep(Real time) {

@@ -24,7 +24,6 @@ static constexpr int UET=3;
 static constexpr int URHO=4;
 static constexpr int UFS=URHO;
 
-
 static amrex::Vector<std::string> get_cons_vars_names() {  
 #ifdef USE_PELEPHYSICS
   amrex::Vector<std::string> spec_names;
@@ -71,8 +70,10 @@ static constexpr int NWAVES=2 + NUM_SPECIES;
 static constexpr int NCOEF= 3 + NUM_SPECIES;
 static constexpr int NGHOST=3; // TODO: make it an automatic parameter
 
-static constexpr int NSTAT=2;              // NSTATS
-static constexpr int LEN_STAT=NCONS+NSTAT; //LENGTH ARRAY
+// Statistic space empty  
+static constexpr int NSTAT = 0;    
+static constexpr int NSTAT_VEL = 0;    
+static constexpr int NSTAT_THERM = 0;    
 
 
 

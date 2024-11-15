@@ -2,6 +2,7 @@
 #define CLOSURES_H_
 
 #include <Index.h>
+#include <Index_stat.h>
 
 #include <NumParam.h>
 #include <Thermodynamics.h>

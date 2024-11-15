@@ -1,7 +1,7 @@
 #ifndef RHS_H_
 #define RHS_H_
 
-#include <Index.h>
+//#include <Index.h>
 
 // Euler numerical methods
 #include <Weno.h>

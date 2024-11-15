@@ -1,8 +1,6 @@
 #ifndef CentralKEEP_H_
 #define CentralKEEP_H_
 
-#include <Index.h>
-
 ///
 /// \brief Template class for Central Kinetic Energy and Entropy Preserving
 /// scheme
