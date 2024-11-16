@@ -103,13 +103,13 @@ prob_initdata(int i, int j, int k, Array4<Real> const &state,
   
   // local vars  
   Real Pt, rhot, uxt, et;
-  const Real Yt[cls.NUM_SPECIES];
+  Real Yt[NUM_SPECIES];
   
   // assign rho,P,Y based on y
   Pt = prob_parm.p;
   uxt  = prob_parm.u1*smooth   + (1.0 - smooth)*prob_parm.u2;
   rhot = prob_parm.rho1*smooth + (1.0 - smooth)*prob_parm.rho2;
-  for (int n = 0; n < cls.NUM_SPECIES; n++){
+  for (int n = 0; n < NUM_SPECIES; n++){
     Yt[n]   = prob_parm.Y1[n]*smooth + (1.0 - smooth)*prob_parm.Y2[n];
   }
   
@@ -119,7 +119,7 @@ prob_initdata(int i, int j, int k, Array4<Real> const &state,
   state(i, j, k, cls.UMY) = Real(0.0);
   state(i, j, k, cls.UMZ) = Real(0.0);
   state(i, j, k, cls.UET) = rhot * et + Real(0.5) * rhot * uxt * uxt;
-  for (int n = 0; n < cls.NUM_SPECIES; n++) {
+  for (int n = 0; n < NUM_SPECIES; n++) {
     state(i, j, k, cls.UFS + n) = rhot * Yt[n];
   }
 
@@ -140,11 +140,10 @@ bcnormal(const Real x[AMREX_SPACEDIM], Real dratio, const Real s_int[ProbClosure
   const int UMZ  = ProbClosures::UMZ;
   const int UET  = ProbClosures::UET;
   const int UFS  = ProbClosures::UFS;  
-  const int NSPECIES =  ProbClosures::NUM_SPECIES;
   const int face = (idir+1)*sgn;
    
   Real Pt, rhot, uxt, et;
-  Real Yt[NSPECIES];
+  Real Yt[NUM_SPECIES];
   Real smooth= 0.5  + 0.5 * tanh(2 * x[1] / prob_parm.theta_w);
 
   switch(face)
@@ -154,16 +153,16 @@ bcnormal(const Real x[AMREX_SPACEDIM], Real dratio, const Real s_int[ProbClosure
       Pt = prob_parm.p;
       uxt  = prob_parm.u1*smooth   + (1.0 - smooth)*prob_parm.u2;
       rhot = prob_parm.rho1*smooth + (1.0 - smooth)*prob_parm.rho2;
-      for (int n = 0; n < NSPECIES; n++){
+      for (int n = 0; n < NUM_SPECIES; n++){
         Yt[n]   = prob_parm.Y1[n]*smooth + (1.0 - smooth)*prob_parm.Y2[n];
       }
-      ProbClosures::RYP2E(rhot, Yt, Pt, et);
+     closures.RYP2E(rhot, Yt, Pt, et);
         
       s_ext[UMX]  = rhot*uxt;
       s_ext[UMY]  = 0.0;
       s_ext[UMZ]  = 0.0;
       s_ext[UET]  = rhot * et + Real(0.5) * rhot * uxt * uxt;
-      for (int n = 0; n < NSPECIES; n++) {
+      for (int n = 0; n < NUM_SPECIES; n++) {
         s_ext[UFS + n] = rhot * Yt[n];        
       }
               
