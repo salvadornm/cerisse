@@ -1,0 +1,45 @@
+# ====================================================== #
+# Mixing layet 2D
+# ====================================================== #
+
+# Simulation time
+max_step  =  20
+stop_time =  0.1
+#time_step = 5.0e-3 
+cfl  = 0.3
+
+# Geometry 
+geometry.is_periodic = 1 0
+geometry.coord_sys   = 0  
+geometry.prob_lo     = 0.   -1.2 
+geometry.prob_hi     = 6.4   1.2
+
+# BC
+cns.lo_bc = 1 2
+cns.hi_bc = 2 2
+
+# output screen
+cns.screen_output = 0 # 0=quiet, 1=verbose
+cns.verbose = 0       # 0=quiet, 1=verbose
+amr.v               = 1
+
+# Refinement and regridding 
+amr.n_cell            = 128 48
+amr.max_level         = 0       # maximum level number allowed
+amr.ref_ratio         = 2 2    # refinement ratio per level
+amr.regrid_int        = 50    # how often to regrid per level
+amr.blocking_factor_x = 8    # blocking factor in x per level
+amr.blocking_factor_y = 8    # blocking factor in y per level
+amr.max_grid_size_x   = 64  # maximum grid size in x per level
+amr.max_grid_size_y   = 64  # maximum grid size in y per level
+amr.n_error_buf       = 2 2    # number of buffer cells in error est
+amr.grid_eff          = 0.7    # what constitutes an efficient grid
+
+# Plot and checkpoint
+amr.checkpoint_files_output = 0
+amr.check_file              = chk     # root name of checkpoint file
+amr.check_int               = 1000000   # number of timesteps between checkpoints
+amr.plot_files_output = 1
+amr.plot_file         = ./plot/plt    # root name of plotfile
+amr.plot_int          = 10           # number of timesteps between plotfiles
+amr.derive_plot_vars  = pressure velocity velocity temperature
