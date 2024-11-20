@@ -90,7 +90,7 @@ static void set_z_vel_bc(BCRec& bc, const BCRec* phys_bc) {
 
 void CNS::variableSetUp() {
 
-  amrex::Print( ) << " oo CNS::variableSetUp " << std::endl; 
+  //amrex::Print( ) << " oo CNS::variableSetUp " << std::endl; 
 
   // Closures and Problem structures (available on both CPU and GPU)
   CNS::h_prob_closures = new PROB::ProbClosures{};
@@ -119,7 +119,7 @@ void CNS::variableSetUp() {
                          state_data_extrap, store_in_checkpoint);
   // https://github.com/AMReX-Codes/amrex/issues/396
 
-  // Setup Stats_Type
+  // Statistical variables
   if (h_prob_closures->NSTAT > 0 ) {
     compute_stats=true;
     desc_lst.addDescriptor(Stats_Type, IndexType::TheCellType(),
@@ -170,16 +170,16 @@ void CNS::variableSetUp() {
   ////////////////////////////////////////////////////////////////////////////
   if (h_prob_closures->NSTAT > 0) { 
 
-    int NSTAT     = h_prob_closures->NSTAT; 
-    int NSTAT_VEL = h_prob_closures->NSTAT_VEL;
-    
+    printf(" NSTAT==%d record_stats=%d \n",h_prob_closures->NSTAT,record_stats);
+
+    int NSTAT        = h_prob_closures->NSTAT;     
     Vector<BCRec> stats_bcs(NSTAT);
     Vector<std::string>  stats_name(NSTAT);
-  
+
+    int statv = -1;
     // names velocity
-    if (NSTAT_VEL > 0) {
-      int statv = 0;
-      stats_name[statv] = "x_velocityMEAN";
+    if (h_prob_closures->record_velocity > 0) {      
+      statv++; stats_name[statv] = "x_velocityMEAN";
 #if AMREX_SPACEDIM >1    
       statv++; stats_name[statv] = "y_velocityMEAN";
 #endif
@@ -199,12 +199,21 @@ void CNS::variableSetUp() {
 #if AMREX_SPACEDIM == 3    
       statv++; stats_name[statv] = "xz_velocityMEAN";
       statv++; stats_name[statv] = "yz_velocityMEAN";    
-#endif  
-    
+#endif    
     }
-
+    // names P,T,rho
+    if (h_prob_closures->record_PTrho > 0) {
+      statv++; stats_name[statv] = "pressureMEAN"; INDEX_THERM=statv;
+      statv++; stats_name[statv] = "temperatureMEAN";
+      statv++; stats_name[statv] = "DensityMEAN";
+      statv++; stats_name[statv] = "pressureSQR";
+      statv++; stats_name[statv] = "temperatureSQR";
+      statv++; stats_name[statv] = "DensitySQR";            
+    }
+    // names species (TODO)
+  
     // bc
-    for (int statv=0;statv<h_prob_closures->NSTAT;statv++) {
+    for (statv=0;statv<h_prob_closures->NSTAT;statv++) {
       set_scalar_bc(stats_bcs[statv], h_phys_bc);
     }
     StateDescriptor::BndryFunc bndryfuncstats( cns_bcfill);

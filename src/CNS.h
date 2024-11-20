@@ -136,7 +136,8 @@ class CNS : public amrex::AmrLevel {
   // Statistics
   static amrex::Real time_stats;
   static amrex::Real time_stat_level[10];
-  static bool compute_stats;
+  static bool compute_stats, record_stats;
+  static int INDEX_THERM;
   void setupStats();
   void computeStats();
   void debugStats(int is, int js, int ks);

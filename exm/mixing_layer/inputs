@@ -48,3 +48,7 @@ amr.derive_plot_vars  = pressure velocity velocity temperature
 cns.order_rk = 3
 cns.stages_rk = 3
 
+# Stats
+cns.record_stats = 1
+
+

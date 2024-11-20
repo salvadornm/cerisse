@@ -19,7 +19,9 @@ int CNS::refine_max_dengrad_lev = -1;
 Real CNS::cfl = 0.0_rt;
 Real CNS::dt_constant = 0.0_rt;
 Real CNS::refine_dengrad = 1.0e10;
+int  CNS::INDEX_THERM = 0;
 bool CNS::compute_stats = false;
+bool CNS::record_stats = false;
 Real CNS::time_stats = 0.0;
 Real CNS::time_stat_level[10] = {0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0};
 
@@ -65,7 +67,7 @@ void CNS::read_params() {
   pp.query("verbose", verbose);
 
   pp.query("record_probe", record_probe);
-  
+  pp.query("record_stats", record_stats);
 
   Vector<int> lo_bc(AMREX_SPACEDIM), hi_bc(AMREX_SPACEDIM);
   pp.getarr("lo_bc", lo_bc, 0, AMREX_SPACEDIM);
@@ -465,7 +467,7 @@ void CNS::post_timestep(int /* iteration*/) {
   }
 
   // Record statistics
-  if (compute_stats) {
+  if (record_stats) {
     time_stat_level[level] += parent->dtLevel(level);
     computeStats();
   }

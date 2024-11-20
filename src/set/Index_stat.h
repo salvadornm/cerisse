@@ -24,7 +24,7 @@ static constexpr int NSTAT_VEL=0;
 #endif
 
 // P,T,rho
-static constexpr int NSTAT_THERM=0; //6              
+static constexpr int NSTAT_THERM=6;              
 
 static constexpr int NSTAT = NSTAT_VEL*record_velocity + NSTAT_THERM*record_PTrho;              
 
