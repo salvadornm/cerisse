@@ -2,5 +2,6 @@ CEXE_sources += CNSBld.cpp
 CEXE_sources += CNS_setup.cpp
 CEXE_sources += bcs.cpp
 CEXE_sources += Diagnosis.cpp
+CEXE_sources += Statistics.cpp
 
 CEXE_headers += Index.h

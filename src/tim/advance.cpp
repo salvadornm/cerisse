@@ -2,10 +2,7 @@
 #include <CNS.h>
 #include <CNS_hydro_K.h>
 #include <prob.h>
-// #include <CentralKEEP.h>
-// #include <Riemann.h>
-// #include <High_resolution.h>
-// #include <NLDE.h>
+
 #ifdef AMREX_USE_GPIBM
 #include <eib.h>
 #endif
@@ -14,16 +11,23 @@ using namespace amrex;
 Real CNS::advance(Real time, Real dt, int /*iteration*/, int /*ncycle*/) {
   BL_PROFILE("CNS::advance()");
 
-  // Print() << "-------- advance start -------" << std::endl;
+  // Print() << " oo CNS::advance " << std::endl;
   // Print() << "time = " << time << std::endl;
   // Print() << "dt = " << dt << std::endl;
+  // Print() << "stages_rk = " << stages_rk << std::endl;
+  // Print() << "order_rk = " << order_rk << std::endl;
+  // Print() << " num_state_data_types= " << num_state_data_types << std::endl;
+  
   // state[0].printTimeInterval(std::cout);
-  // Print() << "---------------------------------" << std::endl;
 
-  for (int i = 0; i < num_state_data_types; ++i) {
-    state[i].allocOldData();
-    state[i].swapTimeLevels(dt);
-  }
+  // for (int i = 0; i < num_state_data_types; ++i) {
+  //   state[i].allocOldData();
+  //   state[i].swapTimeLevels(dt);
+  // }
+
+  state[0].allocOldData();
+  state[0].swapTimeLevels(dt);
+  
 
   MultiFab& S1 = get_old_data(State_Type);
   MultiFab& S2 = get_new_data(State_Type);

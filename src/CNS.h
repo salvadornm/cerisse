@@ -96,12 +96,8 @@ class CNS : public amrex::AmrLevel {
   //     Density = 0, Xmom, Ymom, Zmom, Etot
   // };
 
-  //enum StateDataType { State_Type = 0, Cost_Type };
 
-  //SNM
   enum StateDataType { State_Type = 0, Stats_Type, Cost_Type };
-
-
 
   void buildMetrics();
 
@@ -124,6 +120,7 @@ class CNS : public amrex::AmrLevel {
   static amrex::Vector<std::string> time_probe_names;
   static amrex::Vector<amrex::Box> time_probe_boxes;
 
+
   // Parameters
   static int num_state_data_types;
   std::unique_ptr<amrex::FluxRegister> flux_reg;
@@ -136,9 +133,13 @@ class CNS : public amrex::AmrLevel {
   static int refine_max_dengrad_lev;
   static amrex::Real refine_dengrad;
 
-  // Stats
+  // Statistics
   static amrex::Real time_stats;
+  static amrex::Real time_stat_level[10];
   static bool compute_stats;
+  void setupStats();
+  void computeStats();
+  void debugStats(int is, int js, int ks);
 
   static amrex::Real gravity;
 

@@ -21,6 +21,7 @@ Real CNS::dt_constant = 0.0_rt;
 Real CNS::refine_dengrad = 1.0e10;
 bool CNS::compute_stats = false;
 Real CNS::time_stats = 0.0;
+Real CNS::time_stat_level[10] = {0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0};
 
 PROB::ProbClosures *CNS::h_prob_closures = nullptr;
 PROB::ProbClosures *CNS::d_prob_closures = nullptr;
@@ -120,6 +121,8 @@ void CNS::read_params() {
 void CNS::init(AmrLevel &old) {
   auto &oldlev = dynamic_cast<CNS &>(old);
 
+  // amrex::Print( ) << " oo CNS::init (AMR recast) -----  " << std::endl;  
+
   Real dt_new = parent->dtLevel(level);
   Real cur_time = oldlev.state[State_Type].curTime();
   Real prev_time = oldlev.state[State_Type].prevTime();
@@ -128,9 +131,19 @@ void CNS::init(AmrLevel &old) {
 
   MultiFab &S_new = get_new_data(State_Type);
   FillPatch(old, S_new, 0, cur_time, State_Type, 0,PROB::ProbClosures::NCONS);
+
+  // SNM
+  if (compute_stats){
+  MultiFab &Sstat_new = get_new_data(Stats_Type);
+  FillPatch(old, Sstat_new, 0, cur_time, Stats_Type, 0,PROB::ProbClosures::NSTAT);
+  }
+
 }
 
 void CNS::init() {
+
+  // amrex::Print( ) << " oo CNS::init -----  " << std::endl;  
+
   Real dt = parent->dtLevel(level);
   Real cur_time = getLevel(level - 1).state[State_Type].curTime();
   Real prev_time = getLevel(level - 1).state[State_Type].prevTime();
@@ -142,20 +155,20 @@ void CNS::init() {
   FillCoarsePatch(S_new, 0, cur_time, State_Type, 0,PROB::ProbClosures::NCONS);
 };
 
+//-----
 void CNS::initData() {
   BL_PROFILE("CNS::initData()");
 
   const auto geomdata = geom.data();
   MultiFab &S_new = get_new_data(State_Type);
+  auto const &sma = S_new.arrays();
 
   PROB::ProbClosures const *lclosures = d_prob_closures;
   PROB::ProbParm const *lprobparm = d_prob_parm;
 
-  auto const &sma = S_new.arrays();
-
-
-  amrex::Print( ) << " Initialise Data " << std::endl;  
-
+  //amrex::Print( ) << " oo CNS::initData  " << std::endl; 
+  //amrex::Print( ) << "  calling  prob_init in prob.h ...  " << std::endl; 
+   
   amrex::ParallelFor(
       S_new, [=] AMREX_GPU_DEVICE(int box_no, int i, int j, int k) noexcept {
         prob_initdata(i, j, k, sma[box_no], geomdata, *lclosures, *lprobparm);
@@ -163,28 +176,17 @@ void CNS::initData() {
 
   // TODO: Could compute primitive variables here
 
-  // Initialise stats to 0
+  // Initialise stats 
   if (compute_stats) {
-
-    amrex::Print( ) << " Initialise STATS " << std::endl; 
-    amrex::Print( ) << " NSTATS = " << PROB::ProbClosures::NSTAT << std::endl; 
-    
-
-    MultiFab &S_stats = get_new_data(Stats_Type);
-    auto const &sma_stats = S_stats.arrays();
-    amrex::ParallelFor(
-      S_stats, [=] AMREX_GPU_DEVICE(int box_no, int i, int j, int k) noexcept {
-            for (int n=0; n < PROB::ProbClosures::NSTAT; n++)  {
-              sma_stats[box_no](i, j, k, n) =  0.0;
-            }                 
-      });
-
+    setupStats();
   }
-
 
 }
 
 void CNS::buildMetrics() {
+
+  // amrex::Print() << " oo CNS::buildMetrics  " << std::endl;
+
   // print mesh sizes
   const Real *dx = geom.CellSize();
   amrex::Print() << "Mesh size (dx,dy,dz) = ";
@@ -192,6 +194,9 @@ void CNS::buildMetrics() {
 }
 
 void CNS::post_init(Real stop_time) {
+
+  //amrex::Print() << " oo CNS::post_init level= "  << level << std::endl;
+
   if (level > 0) {
     return;
   };
@@ -208,6 +213,7 @@ void CNS::post_init(Real stop_time) {
   if (record_probe) {
     setupTimeProbe();
   }
+  
 }
 // -----------------------------------------------------------------------------
 
@@ -217,6 +223,8 @@ void CNS::computeInitialDt(int finest_level, int sub_cycle,
                            const Vector<IntVect> &ref_ratio,
                            Vector<Real> &dt_level, Real stop_time) {
   BL_PROFILE("CNS::computeInitialDt()");
+  //amrex::Print() << " oo CNS::computeInitialDt  " << std::endl;
+
   Real dt0 = std::numeric_limits<Real>::max();
   Vector<GpuArray<Real,AMREX_SPACEDIM>> eigenvals_level;
   Vector<Real> CFL_level;
@@ -295,6 +303,8 @@ void CNS::computeNewDt(int finest_level, int sub_cycle, Vector<int> &n_cycle,
                        Vector<Real> &dt_level, Real stop_time,
                        int post_regrid_flag) {
   BL_PROFILE("CNS::computeNewDt()");
+
+  //amrex::Print() << " oo CNS::computeNewDt " << std::endl;
 
   Real dt0 = std::numeric_limits<Real>::max();
   Vector<GpuArray<Real,AMREX_SPACEDIM>> eigenvals_level;
@@ -437,6 +447,7 @@ void CNS::computeNewDt(int finest_level, int sub_cycle, Vector<int> &n_cycle,
 
 void CNS::post_timestep(int /* iteration*/) {
   BL_PROFILE("post_timestep");
+  //amrex::Print() << " oo CNS::post_timestep " << std::endl;
 
   if (do_reflux && level < parent->finestLevel()) {
     MultiFab &S = get_new_data(State_Type);
@@ -450,55 +461,21 @@ void CNS::post_timestep(int /* iteration*/) {
 
   // Record time statistics
   if (record_probe) {
-    recordTimeProbe();
+    recordTimeProbe();    
   }
-  // recordLine();
 
-  // Record stats SNM
-  if (compute_stats){
-    MultiFab &S_stats = get_new_data(Stats_Type);
-    auto const &data_stats = S_stats.arrays();
-    MultiFab &S = get_new_data(State_Type);
-    auto const &data = S.arrays();
-    Real dt = parent->dtLevel(level);
-    time_stats += dt;
-
-    amrex::Print( ) << " Compute STATS  "  << std::endl; 
-    amrex::Print( ) << " dt= " << dt << std::endl; 
-    amrex::Print( ) << " timestat= " << time_stats << std::endl;     
-            
-    // storing velocity 
-    amrex::ParallelFor(
-      S_stats, [=] AMREX_GPU_DEVICE(int box_no, int i, int j, int k) noexcept {       
-        amrex::Real o_rho = 1.0/data[box_no](i,j,k,PROB::ProbClosures::URHO);
-        amrex::Real vel[3]={0,0,0};
-        vel[0] = data[box_no](i,j,k,PROB::ProbClosures::UMX)*o_rho;
-        vel[1] = data[box_no](i,j,k,PROB::ProbClosures::UMY)*o_rho;
-        vel[2] = data[box_no](i,j,k,PROB::ProbClosures::UMZ)*o_rho;
-          
-        // U,V,W 
-        for (int n=0; n< AMREX_SPACEDIM; n++){
-          data_stats[box_no](i, j, k, n) += vel[n]*dt;            
-        }                
-        // UU,VV,WW        
-        for (int n=0; n< AMREX_SPACEDIM ; n++) {
-          data_stats[box_no](i, j, k, AMREX_SPACEDIM+n) += vel[n]*vel[n]*dt;            
-        }       
-        // UV,UW,VW        
-#if (AMREX_SPACEDIM >= 2)          
-        data_stats[box_no](i, j, k, 2*AMREX_SPACEDIM) += vel[0]*vel[1]*dt;
-#endif
-#if (AMREX_SPACEDIM == 3)
-        data_stats[box_no](i, j, k, 2*AMREX_SPACEDIM+1) += vel[0]*vel[2]*dt;
-        data_stats[box_no](i, j, k, 2*AMREX_SPACEDIM+2) += vel[1]*vel[2]*dt;
-#endif
-      });
-
-  }  
-
+  // Record statistics
+  if (compute_stats) {
+    time_stat_level[level] += parent->dtLevel(level);
+    computeStats();
+  }
+    
 }
 
 void CNS::postCoarseTimeStep(Real time) {
+
+  // amrex::Print() << " oo CNS::postCoarseTimeStep " << std::endl;
+
 #if AMREX_USE_GPIBM
   // if (ib_move) {
   //   IBM::ib.moveGeom();
@@ -514,12 +491,17 @@ void CNS::postCoarseTimeStep(Real time) {
   if (verbose && ((this->nStep() % nstep_screen_output) == 0)) {
     printTotal();
   }
+
 }
 // -----------------------------------------------------------------------------
 
 // Gridding -------------------------------------------------------------------
 // Called for each level from 0,1...nlevs-1
 void CNS::post_regrid(int lbase, int new_finest) {
+
+  // amrex::Print() << " oo CNS::post_regrid " << std::endl;
+  
+
 #ifdef AMREX_USE_GPIBM
   IBM::ib.destroy_mf(level);
   IBM::ib.build_mf(grids, dmap, level);
@@ -530,6 +512,9 @@ void CNS::post_regrid(int lbase, int new_finest) {
 
 void CNS::errorEst(TagBoxArray &tags, int /*clearval*/, int /*tagval*/,
                    Real time, int /*n_error_buf*/, int /*ngrow*/) {
+
+ // amrex::Print() << " oo CNS::errorEst " << std::endl;
+
   // MF without ghost points filled (why?)
   MultiFab sdata(get_new_data(State_Type).boxArray(),
                  get_new_data(State_Type).DistributionMap(), PROB::ProbClosures::NCONS, PROB::ProbClosures::NGHOST,
@@ -539,6 +524,16 @@ void CNS::errorEst(TagBoxArray &tags, int /*clearval*/, int /*tagval*/,
   const Real cur_time = state[State_Type].curTime();
   FillPatch(*this, sdata, PROB::ProbClosures::NGHOST, cur_time, State_Type, 0, PROB::ProbClosures::NCONS);
   const auto geomdata = geom.data();
+
+  
+  // fill ghost points of stats (SNM needed? )
+  // if (compute_stats) {
+  //   MultiFab sdata_stat(get_new_data(Stats_Type).boxArray(),
+  //                get_new_data(Stats_Type).DistributionMap(), PROB::ProbClosures::NSTAT, PROB::ProbClosures::NGHOST,
+  //                MFInfo(), Factory());
+  //   FillPatch(*this, sdata_stat, PROB::ProbClosures::NGHOST, cur_time, Stats_Type, 0, PROB::ProbClosures::NSTAT);
+  
+  // }
 
 #ifdef AMREX_USE_GPIBM
   // call function from cns_prob
@@ -576,6 +571,7 @@ void CNS::post_restart() {
 #endif
 }
 
+// 
 void CNS::avgDown() {
   BL_PROFILE("CNS::avgDown()");
 
@@ -588,6 +584,14 @@ void CNS::avgDown() {
 
   amrex::average_down(S_fine, S_crse, fine_lev.geom, geom, 0, S_fine.nComp(),
                       parent->refRatio(level));
+
+  if (compute_stats) {
+    MultiFab &Sstat_crse = get_new_data(Stats_Type);
+    MultiFab &Sstat_fine = fine_lev.get_new_data(Stats_Type);
+    amrex::average_down(Sstat_fine, Sstat_crse, fine_lev.geom, geom, 0, Sstat_fine.nComp(),
+                      parent->refRatio(level));
+  }  
+
 }
 
 void CNS::printTotal() const {
@@ -843,4 +847,5 @@ void CNS::writePlotFilePost(const std::string &dir, std::ostream &os) {
   // if (ioproc=0) ib.writeSurf()
   // }
 #endif
+
 }

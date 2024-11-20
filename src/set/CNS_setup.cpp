@@ -89,6 +89,9 @@ static void set_z_vel_bc(BCRec& bc, const BCRec* phys_bc) {
 }
 
 void CNS::variableSetUp() {
+
+  amrex::Print( ) << " oo CNS::variableSetUp " << std::endl; 
+
   // Closures and Problem structures (available on both CPU and GPU)
   CNS::h_prob_closures = new PROB::ProbClosures{};
   CNS::h_prob_parm = new PROB::ProbParm{};
@@ -169,10 +172,6 @@ void CNS::variableSetUp() {
 
     int NSTAT     = h_prob_closures->NSTAT; 
     int NSTAT_VEL = h_prob_closures->NSTAT_VEL;
-
-    amrex::Print( ) << "-------- Allocating NSTAT -------" << std::endl;
-    amrex::Print( ) << "NSTAT     = " << NSTAT << std::endl;
-    amrex::Print( ) << "NSTAT_VEL = " << NSTAT_VEL << std::endl;
     
     Vector<BCRec> stats_bcs(NSTAT);
     Vector<std::string>  stats_name(NSTAT);
@@ -187,19 +186,19 @@ void CNS::variableSetUp() {
 #if AMREX_SPACEDIM == 3    
       statv++; stats_name[statv] = "z_velocityMEAN";
 #endif
-      statv++; stats_name[statv] = "x_velocityRMS";
+      statv++; stats_name[statv] = "x_velocitySQR";
 #if AMREX_SPACEDIM >1    
-      statv++; stats_name[statv] = "y_velocityRMS";
+      statv++; stats_name[statv] = "y_velocitySQR";
 #endif
 #if AMREX_SPACEDIM == 3    
-      statv++; stats_name[statv] = "z_velocityRMS";
+      statv++; stats_name[statv] = "z_velocitySQR";
 #endif
 #if AMREX_SPACEDIM >1    
-      statv++; stats_name[statv] = "xy_velocityRMS";
+      statv++; stats_name[statv] = "xy_velocityMEAN";
 #endif
 #if AMREX_SPACEDIM == 3    
-      statv++; stats_name[statv] = "xz_velocityRMS";
-      statv++; stats_name[statv] = "yz_velocityRMS";    
+      statv++; stats_name[statv] = "xz_velocityMEAN";
+      statv++; stats_name[statv] = "yz_velocityMEAN";    
 #endif  
     
     }
