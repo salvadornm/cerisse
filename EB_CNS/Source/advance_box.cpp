@@ -267,7 +267,7 @@ void CNS::compute_dSdt_box(Box const& bx, Array4<const Real>& sarr,
                   flx_tmp[UMX] = ts * t1[0] * tauw * lohi;
                   flx_tmp[UMY] = ts * t1[1] * tauw * lohi;
                   flx_tmp[UMZ] = ts * t1[2] * tauw * lohi;
-                  // flx_tmp[UEDEN] = qw * lohi; // TODO: no wall model heat flux for now
+                  flx_tmp[UEDEN] = qw * lohi; // TODO: no wall model heat flux for now
                 }
               }
             }

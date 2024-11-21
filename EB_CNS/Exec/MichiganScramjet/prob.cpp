@@ -27,6 +27,10 @@ void amrex_probinit(const int* /*init*/, const int* /*name*/, const int* /*namel
     if (CNS::h_prob_parm->make_init_on_restart)
       pp.get("x_reset", CNS::h_prob_parm->x_reset);
   }
+  if constexpr (NUM_AUX <= 0) {
+    if (CNS::h_prob_parm->record_statistics)
+      amrex::Abort("Please compile with NUM_AUX to record statistics");
+  }
   if (CNS::h_prob_parm->make_bl_on_restart && CNS::h_prob_parm->do_bl) {
     amrex::Print() << "Restarting with BL...\n";
   }

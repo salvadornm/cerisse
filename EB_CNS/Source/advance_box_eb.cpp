@@ -352,7 +352,7 @@ void CNS::compute_dSdt_box_eb(
                      AMREX_D_DECL(fx_out, fy_out, fz_out), flag, vfrac, bcent, coefs,
                      AMREX_D_DECL(apx, apy, apz), AMREX_D_DECL(fcx, fcy, fcz), dxinv,
                      do_hydro, do_visc, eb_no_slip, eb_isothermal, eb_wall_temp,
-                     eb_wall_model && (x < -1.0));
+                     eb_wall_model && (x < -1.0 || x > 9.6));
     });
   } // for fields
 

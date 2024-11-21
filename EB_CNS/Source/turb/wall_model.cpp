@@ -137,7 +137,7 @@ AMREX_GPU_DEVICE AMREX_FORCE_INLINE void EquilibriumODE::parallel_wall_stress(
         tauw = mu[0] * (u[0] - uw) / y[0]; 
         rho_0 = rho_i;
       }
-      Real yplus_i = y[i] * std::sqrt(tauw / rho_0) / (mu[0] * rho_0);
+      Real yplus_i = y[i] * std::sqrt(tauw / rho_0) / (mu[0] / rho_0);
       mut[i] = kappa * y[i] * std::sqrt(rho_i * tauw) *
                std::pow(1.0 - std::exp(-yplus_i / Aplus), 2);
     }
