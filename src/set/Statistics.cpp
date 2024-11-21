@@ -26,12 +26,11 @@ void CNS::setupStats() {
 //----------------------------------------------------------------------------------
 // functon to compute and store mean values <U> and mean square <UU>, called per level
 void CNS::computeStats(){
-  // get arrays
-  MultiFab &S_stats = get_new_data(Stats_Type);
-  auto const &data_stats = S_stats.arrays();
-  MultiFab &S = get_new_data(State_Type);
-  auto const &data = S.arrays();
 
+  // create multifabs
+  MultiFab &S_stats = get_new_data(Stats_Type);
+  MultiFab &S       = get_new_data(State_Type);
+  
   Real dt = parent->dtLevel(level);
   
   // time_stats += dt; // obsolete
@@ -40,82 +39,75 @@ void CNS::computeStats(){
   // amrex::Print( ) << " Compute  STATS " << std::endl; 
   // amrex:: Print( ) << " level = " << level << std::endl;
   // amrex::Print( ) << " dt= " << dt <<  std::endl; 
-  // amrex::Print( ) << " time_stat= " << time_stats <<  std::endl; 
+  // amrex::Print( ) << " time_stat= " << time_stat_level[level] <<  std::endl; 
   // amrex::Print( ) << " time_aux= " << time_aux <<  std::endl; 
-  // amrex::Print( ) << " time_old= "  << time_stats-dt <<  std::endl; 
-  // amrex::Print( ) << " counter_stat= " << counter_stats <<  std::endl; 
+  // amrex::Print( ) << " time_old= "  << time_stat_level[level]-dt <<  std::endl; 
   
-
-  // compute primitives ??? (need mfi)
+  // closures
   const PROB::ProbClosures& cls_h = *CNS::h_prob_closures;
-  Array4<Real> const& state = statemf.array(mfi);
-  const Box& bxg = mfi.growntilebox(cls_h.NGHOST);
-  FArrayBox primf(bxg, cls_h.NPRIM, The_Async_Arena());
-  Array4<Real> const& prims= primf.array();
-  cls_h.cons2prims(mfi, state, prims); 
-  ////
-
                         
-  // storing stats
-  amrex::ParallelFor(
-    S_stats, [=] AMREX_GPU_DEVICE(int box_no, int i, int j, int k) noexcept {       
-    
-    amrex::Real rho = data[box_no](i,j,k,PROB::ProbClosures::URHO);
-    amrex::Real o_rho = 1.0/rho;
-
-    // reset array  (so is sum (u*dt)
-    for (int n=0; n< PROB::ProbClosures::NSTAT; n++){
-      data_stats[box_no](i, j, k, n) *= (time_aux - dt);            
-    }                
-
-    if (PROB::ProbClosures::record_velocity > 0) { 
-      amrex::Real vel[3]={0,0,0};         
-      vel[0] = data[box_no](i,j,k,PROB::ProbClosures::UMX)*o_rho;
-      vel[1] = data[box_no](i,j,k,PROB::ProbClosures::UMY)*o_rho;
-      vel[2] = data[box_no](i,j,k,PROB::ProbClosures::UMZ)*o_rho;
-       
-      // U,V,W 
-      for (int n=0; n< AMREX_SPACEDIM; n++){
-        data_stats[box_no](i, j, k, n) += vel[n]*dt;            
+  // storing stats 
+  for (MFIter mfi(S, false); mfi.isValid(); ++mfi) {
+    // create box
+    const Box& bx = mfi.tilebox();
+    const Box& bxg = mfi.growntilebox(cls_h.NGHOST);
+    // extract arrays
+    Array4<Real> const& state       = S.array(mfi);   
+    Array4<Real> const& data_stats  = S_stats.array(mfi);   
+    // create primitive array (including ghost)
+    FArrayBox primf(bxg, cls_h.NPRIM, The_Async_Arena());
+    Array4<Real> const& prims= primf.array();
+    // from state variable to primitives (Thermodynamic closure) also update ghost
+    cls_h.cons2prims(mfi, state, prims); 
+    amrex::ParallelFor(bx, [=](int i, int j, int k) {       
+      Real rho = prims(i,j,k,cls_h.QRHO);
+      //Real o_rho = 1.0/rho;
+      // reset array  (so is sum (u*dt)
+      for (int n=0; n< cls_h.NSTAT; n++){
+        data_stats(i, j, k, n) *= (time_aux - dt);    
       }                
-      // UU,VV,WW        
-      for (int n=0; n< AMREX_SPACEDIM ; n++) {
-        data_stats[box_no](i, j, k, AMREX_SPACEDIM+n) += vel[n]*vel[n]*dt;            
-      }       
-      // UV,UW,VW        
+
+      // store velocity mean and square  correlations
+      if (cls_h.record_velocity > 0) { 
+        Real vel[3]={0,0,0};         
+        vel[0] = prims(i,j,k,cls_h.QU);vel[1] = prims(i,j,k,cls_h.QV);vel[2] = prims(i,j,k,cls_h.QW);
+      
+        for (int n=0; n< AMREX_SPACEDIM; n++){
+          data_stats(i, j, k, n) += vel[n]*dt;            
+        }                
+        for (int n=0; n< AMREX_SPACEDIM ; n++) {
+          data_stats(i, j, k, AMREX_SPACEDIM+n) += vel[n]*vel[n]*dt;            
+        }       
 #if (AMREX_SPACEDIM >= 2)          
-      data_stats[box_no](i, j, k, 2*AMREX_SPACEDIM) += vel[0]*vel[1]*dt;
+        data_stats(i, j, k, 2*AMREX_SPACEDIM) += vel[0]*vel[1]*dt;
 #endif
 #if (AMREX_SPACEDIM == 3)
-      data_stats[box_no](i, j, k, 2*AMREX_SPACEDIM+1) += vel[0]*vel[2]*dt;
-      data_stats[box_no](i, j, k, 2*AMREX_SPACEDIM+2) += vel[1]*vel[2]*dt;
+        data_stats(i, j, k, 2*AMREX_SPACEDIM+1) += vel[0]*vel[2]*dt;
+        data_stats(i, j, k, 2*AMREX_SPACEDIM+2) += vel[1]*vel[2]*dt;
 #endif
-    }
+      }
     
-    if (PROB::ProbClosures::record_PTrho > 0 ){
+      // store P,T,rho mean and square
+      if (cls_h.record_PTrho > 0 ){
+                       
+        Real P = prims(i, j, k, cls_h.QPRES);
+        Real T = prims(i, j, k, cls_h.QT);            
+        data_stats(i, j, k, INDEX_THERM)   += P*dt;
+        data_stats(i, j, k, INDEX_THERM+1) += T*dt;
+        data_stats(i, j, k, INDEX_THERM+2) += rho*dt;
+        data_stats(i, j, k, INDEX_THERM+3) += P*P*dt;
+        data_stats(i, j, k, INDEX_THERM+4) += T*T*dt;
+        data_stats(i, j, k, INDEX_THERM+5) += rho*rho*dt;    
+      }
+    
+      // store mean values  
+      for (int n=0; n< cls_h.NSTAT; n++){
+        data_stats(i, j, k, n) /= time_aux;            
+      }           
+    }); 
 
-      //            
-      Real P = prims(i, j, k, PROB::ProbClosures::QPRES);
-      Real T = prims(i, j, k, PROB::ProbClosures::QT);
-            
-      // store P,T,rho
-      data_stats[box_no](i, j, k, INDEX_THERM) += P*dt;
-      data_stats[box_no](i, j, k, INDEX_THERM+1) += T*dt;
-      data_stats[box_no](i, j, k, INDEX_THERM+2) += rho*dt;
-      data_stats[box_no](i, j, k, INDEX_THERM+3) += P*P*dt;
-      data_stats[box_no](i, j, k, INDEX_THERM+4) += T*T*dt;
-      data_stats[box_no](i, j, k, INDEX_THERM+5) += rho*rho*dt;    
-    }
-    
-    // store mean values  
-    for (int n=0; n< PROB::ProbClosures::NSTAT; n++){
-      data_stats[box_no](i, j, k, n) /= time_aux;            
-    }           
-    
-  });
+  } 
   
-  // debugStats(10,96, 0);
-
 }
 
 //----------------------------------------------------------------------------------

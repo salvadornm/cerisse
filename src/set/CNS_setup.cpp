@@ -170,7 +170,7 @@ void CNS::variableSetUp() {
   ////////////////////////////////////////////////////////////////////////////
   if (h_prob_closures->NSTAT > 0) { 
 
-    printf(" NSTAT==%d record_stats=%d \n",h_prob_closures->NSTAT,record_stats);
+    printf(" NSTAT=%d record_stats=%d \n",h_prob_closures->NSTAT,record_stats);
 
     int NSTAT        = h_prob_closures->NSTAT;     
     Vector<BCRec> stats_bcs(NSTAT);

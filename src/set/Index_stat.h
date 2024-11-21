@@ -10,7 +10,7 @@ struct indicies_stat_t : indicies_t {
 // Statistic space
 
 static constexpr int record_velocity   = 1;
-static constexpr int record_PTrho      = 0;
+static constexpr int record_PTrho      = 1;
 
 // velocity
 #if (AMREX_SPACEDIM == 1)

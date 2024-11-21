@@ -3,7 +3,7 @@
 # ====================================================== #
 
 # Simulation time
-max_step  =  50
+max_step  =  1000
 stop_time =  0.5
 #time_step = 5.0e-3 
 cfl  = 0.3
@@ -27,7 +27,7 @@ amr.v               = 1
 amr.n_cell            = 256 96
 amr.max_level         = 1       # maximum level number allowed
 amr.ref_ratio         = 2 2    # refinement ratio per level
-amr.regrid_int        = 10    # how often to regrid per level
+amr.regrid_int        = 5    # how often to regrid per level
 amr.blocking_factor_x = 8    # blocking factor in x per level
 amr.blocking_factor_y = 8    # blocking factor in y per level
 amr.max_grid_size_x   = 64  # maximum grid size in x per level
@@ -41,7 +41,7 @@ amr.check_file              = chk     # root name of checkpoint file
 amr.check_int               = 1000000   # number of timesteps between checkpoints
 amr.plot_files_output = 1
 amr.plot_file         = ./plot/plt    # root name of plotfile
-amr.plot_int          = 20           # number of timesteps between plotfiles
+amr.plot_int          = 50           # number of timesteps between plotfiles
 amr.derive_plot_vars  = pressure velocity velocity temperature
 
 #
