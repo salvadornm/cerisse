@@ -1,15 +1,22 @@
 site_name: cerisse++
 docs_dir: docs
 nav:
-  - Home: README.md
-  - Quick: quickstart.md
-  - Tutorial: tutorial.md
-  - Tips: tips.md
-  - Setup: setup.md
-  - Prob: prob.md
-  - Input: input.md
-  - Make: makefile.md
-  - Theory: equations.md
+   - Home: README.md
+   - Getting Started:
+      - QuickStart: quickstart.md
+      - Tutorial: tutorial.md
+      - Tips: tips.md
+   - SETUP:
+      - Overview: setup.md
+      - PROB: prob.md
+      - Input: input.md
+      - Make: makefile.md
+   - EXAMPLES:
+      - Examples: examples.md
+      - OneDim: onedim.md
+   - THEORY:
+      - DNS: equations.md
+      - LES: les.md
 extra_javascript:
   - https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.4/MathJax.js?config=TeX-AMS-MML_HTMLorMML
 markdown_extensions:
