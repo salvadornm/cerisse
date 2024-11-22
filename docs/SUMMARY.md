@@ -17,10 +17,10 @@
 ## EXAMPLES
 
 * [Examples](examples.md)
-  * [onedim](onedim.md)
-
+  * [one dimension](onedim.md)
 
 ## THEORY
 
 * [Equations](equations.md)
   * [LES](les.md)
+  * [Numerical Methods](theory/equations/numerical-methods.md)

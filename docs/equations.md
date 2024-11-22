@@ -5,7 +5,7 @@ cover: >-
 coverY: 0
 ---
 
-# Navier-Stokes Equations
+# Equations
 
 ### Continuity
 
@@ -19,7 +19,7 @@ $$
 \frac{\partial \rho u_i }{\partial t} + \frac{\partial \rho u_i u_j}{\partial x_j} = -\frac{\partial p}{\partial x_i} + \frac{\partial \tau_{ij}}{\partial x_j}
 $$
 
-### Chemical species transport 
+### Chemical species transport
 
 $$
 \frac{\partial \rho Y_k }{\partial t} + \frac{\partial \rho u_j Y_k}{\partial x_j} = \frac{\partial J_j^k}{\partial x_j} + \rho \dot{\omega}_k
@@ -55,9 +55,7 @@ $$
 q_j = -\lambda \frac{\partial T }{\partial x_j}
 $$
 
-where $$\lambda$$ is the conductivity. 
-The **diffusion flux** follows Fickian transport,
-which based in mole fraction is:
+where $$\lambda$$ is the conductivity. The **diffusion flux** follows Fickian transport, which based in mole fraction is:
 
 $$
 \overline{J}_j^k = - D_k \frac{\partial X_k }{\partial x_j}
@@ -78,7 +76,6 @@ $$
 
 based on binary diffusion coefficients $$\mathcal{D}_{ij}$$
 
-
 ## Equations of state
 
 The equations of state are of the form
@@ -93,4 +90,4 @@ $$
 e_i = f(\rho,T,Y_k)
 $$
 
-The current implementations include perfect gas, ideal gas and Soave-Redlich-Kwong (through PelePhysics).
+The current implementations include perfect gas, ideal gas and Soave-Redlich-Kwong (through PelePhysics), including mixtures.

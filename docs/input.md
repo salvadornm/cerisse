@@ -19,7 +19,7 @@ The AMReX options covers control of
 * output files
 * checkpoint and restarting
 
-The reference is available on [AMReX's documentation](https://amrex-codes.github.io/amrex/docs\_html/Inputs\_Chapter.html).
+The reference is available on [AMReX's documentation](https://amrex-codes.github.io/amrex/docs_html/Inputs_Chapter.html).
 
 
 
@@ -59,7 +59,7 @@ cns.lo_bc = 1 5.0
 cns.hi_bc = 2 5 0
 ```
 
-In the above example, the bc in x would be inflow (at lower boundary) and outflow (at upper boundary) while no specific boudnary will be defiend in z
+In the above example, the bc in _x_ would be inflow (at lower boundary) and outflow (at upper boundary) while no specific boudnary will be defined in _z_
 
 | Option         | Type       | Default | Description                           |
 | -------------- | ---------- | ------- | ------------------------------------- |
