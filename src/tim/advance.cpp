@@ -323,6 +323,9 @@ void CNS::compute_rhs(MultiFab& statemf, Real dt, FluxRegister* fr_as_crse, Flux
     });
 #endif
 
+    // Redistribution ************
+
+
     // // Flux register
     // if (do_reflux) {
     //   const auto dx = geom.CellSizeArray();

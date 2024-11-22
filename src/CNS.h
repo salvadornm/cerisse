@@ -175,4 +175,12 @@ namespace IBM{
 }
 #endif
 
+#ifdef CNS_USE_EB
+  // declare main EB class instance
+namespace EBM{
+  inline PROB::ProbEB eb;
+}
+#endif
+
+
 #endif

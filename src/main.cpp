@@ -5,6 +5,10 @@
 #include <CNS.h>
 #include <prob.h>
 
+#if CNS_USE_EB
+#include <AMReX_EB2.H>
+#endif
+
 using namespace amrex;
 
 amrex::LevelBld* getLevelBld();
@@ -55,6 +59,16 @@ int main(int argc, char* argv[])
     // This needs to happen after amr instance and before amr.init
     IBM::ib.init(&amr);
 #endif
+
+#if CNS_USE_EB
+    amrex::Print() << "  Using EB .. " << std::endl;
+    AmrLevel::SetEBSupportLevel(EBSupport::full); // need all
+    AmrLevel::SetEBMaxGrowCells(6, 6, 6); // for ebcellflags, vfrac, area fraction,
+                                          // boundary centroids and face centroids
+    EBM::eb.init(amr.Geom(amr.maxLevel()), amr.maxLevel(), amr.maxLevel());
+#endif
+
+
     amr.init(start_time, stop_time);
 
     timer_init = amrex::second() - timer_init;

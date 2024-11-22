@@ -19,7 +19,7 @@ using namespace amrex;
 namespace PROB {
 
 static constexpr Real Mw  = 28.96e-3;  // Molecular weight
-static constexpr Real gam = 1.4;  // Molecular weight
+static constexpr Real gam = 1.4;       // Adiabatic coefficient
 
 
 // problem parameters 
