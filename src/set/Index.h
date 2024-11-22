@@ -73,8 +73,9 @@ static constexpr int NGHOST=3; // TODO: make it an automatic parameter
 // Statistic space empty  
 static constexpr int NSTAT = 0;    
 static constexpr int NSTAT_VEL = 0;    
-static constexpr int NSTAT_THERM = 0;    
-
+static constexpr int NSTAT_THERM = 0;  
+static constexpr int record_velocity   = 0;
+static constexpr int record_PTrho      = 0; 
 
 
 };
