@@ -312,7 +312,7 @@ void CNS::compute_rhs(MultiFab& statemf, Real dt, FluxRegister* fr_as_crse, Flux
     // Source terms, including update mask (e.g inside IB)
     prob_rhs.src(mfi, prims, state, cls_d, dt);
 
-    // Set solid point RHS to 0
+    // Set solid point RHS to 0  (state hold RHS at this point)
     // TODO: IBM::set_solid_state(mfi,state,cls_d)
 #if AMREX_USE_GPIBM
     const Box& bx   = mfi.tilebox();
@@ -321,6 +321,17 @@ void CNS::compute_rhs(MultiFab& statemf, Real dt, FluxRegister* fr_as_crse, Flux
     {
     state(i,j,k,n) = state(i,j,k,n)*(1 - int(ibMarkers(i,j,k,0)));
     });
+#endif
+
+#if CNS_USE_EB
+    const Box& bx   = mfi.tilebox();
+    Array4<const Real> vf = (*EBM::eb.volfrac).const_array(mfi); 
+    amrex::ParallelFor(bx, cls_h.NCONS,
+    [=] AMREX_GPU_DEVICE (int i, int j, int k, int n) noexcept
+    {
+    state(i,j,k,n) *= vf(i,j,k);
+    });
+    
 #endif
 
     // Redistribution ************

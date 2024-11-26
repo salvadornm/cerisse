@@ -193,6 +193,40 @@ void CNS::buildMetrics() {
   const Real *dx = geom.CellSize();
   amrex::Print() << "Mesh size (dx,dy,dz) = ";
   amrex::Print() << AMREX_D_TERM(dx[0], << "  " << dx[1], << "  " << dx[2]) << "  \n";
+
+#if CNS_USE_EB
+  static_assert(AMREX_SPACEDIM > 1, "EB only supports 2D and 3D");
+
+  ParmParse ppeb2("eb2");
+  std::string geom_type = "all_regular";
+  ppeb2.query("geom_type", geom_type);
+
+  if (geom_type != "all_regular") {
+    // make sure dx == dy == dz if use EB
+    const Real* dx = geom.CellSize();
+    if (AMREX_D_TERM(,  std::abs(dx[0] - dx[1]) > 1.e-12 * dx[0],
+                     || std::abs(dx[0] - dx[2]) > 1.e-12 * dx[0])) {
+      amrex::Abort("EB must have dx == dy == dz (for cut surface fluxes)\n");
+    }
+  }
+
+  //  fill EB related arrays (directly from cerisse0)
+  const auto& ebfactory = dynamic_cast<EBFArrayBoxFactory const&>(Factory());
+  EBM::eb.volfrac   = &(ebfactory.getVolFrac());
+  // EBM::eb.bndrycent = &(ebfactory.getBndryCent());
+  // EBM::eb.areafrac  = ebfactory.getAreaFrac();
+  // EBM::eb.facecent  = ebfactory.getFaceCent();
+
+  // // Level mask for redistribution
+  // EBM::eb.level_mask.clear();
+  // EBM::eb.level_mask.define(grids, dmap, 1, 3);
+  // EBM::eb.level_mask.BuildMask( geom.Domain(), geom.periodicity(), CNSConstants::level_mask_covered,
+  //   CNSConstants::level_mask_notcovered, CNSConstants::level_mask_physbnd,
+  //   CNSConstants::level_mask_interior);
+#endif
+
+
+
 }
 
 void CNS::post_init(Real stop_time) {
@@ -664,6 +698,11 @@ void CNS::writePlotFile(const std::string &dir, std::ostream &os,
 #ifdef AMREX_USE_GPIBM
   n_data_items += 2;
 #endif
+#ifdef CNS_USE_EB
+  n_data_items += 1;
+#endif
+
+
   //------------------------------------------------------------------------------
 
   // get the time from the first State_Type
@@ -703,6 +742,10 @@ void CNS::writePlotFile(const std::string &dir, std::ostream &os,
     os << "sld\n";
     os << "ghs\n";
 #endif
+#ifdef CNS_USE_EB
+    os << "vfrac\n";
+#endif
+
     //------------------------------------------------------------------------------
 
     os << AMREX_SPACEDIM << '\n';
@@ -811,14 +854,24 @@ void CNS::writePlotFile(const std::string &dir, std::ostream &os,
     for (auto const &dname : derive_names) {
       derive(dname, cur_time, plotMF, cnt);
       cnt += derive_lst.get(dname)->numDerive();
-    }
+    }  //exit(1);
   }
 
-//----------------------------------------------------------------------modified
+  //------------------------------------------------------------------------------
+  // additional plotting ...
+  //------------------------------------------------------------------------------
+  
 #ifdef AMREX_USE_GPIBM
   plotMF.setVal(0.0_rt, cnt, 2, nGrow);
   IBM::ib.bmf_a[level]->copytoRealMF(plotMF, 0, cnt);
 #endif
+
+#ifdef CNS_USE_EB
+  //printf(" cnt= %d level=%d n_data_items=%d   \n",cnt,level,n_data_items);
+  plotMF.setVal(0.0_rt, cnt, 0, nGrow);  
+  EBM::eb.copytoRealMF(plotMF, 0, cnt);
+#endif
+
   //------------------------------------------------------------------------------
 
   //

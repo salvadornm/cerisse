@@ -4,6 +4,7 @@
 #include <AMReX_AmrLevel.H>
 #include <AMReX_FluxRegister.H>
 #include <prob.h>
+#include <CNSconstants.h>
 
 using namespace amrex;
 
@@ -180,6 +181,7 @@ namespace IBM{
 namespace EBM{
   inline PROB::ProbEB eb;
 }
+
 #endif
 
 
