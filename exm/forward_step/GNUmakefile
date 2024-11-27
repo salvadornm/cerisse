@@ -1,5 +1,5 @@
 
-DEBUG   = TRUE
+DEBUG   = FALSE
 DIM     = 2
 COMP     = gcc
 CXXSTD    = c++20

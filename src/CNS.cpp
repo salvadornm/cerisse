@@ -50,6 +50,10 @@ CNS::CNS(Amr &papa, int lev, const Geometry &level_geom, const BoxArray &bl,
   IBM::ib.build_mf(grids, dmap, level);
 #endif
 
+#ifdef CNS_USE_EB
+  EBM::eb.build_mf(grids, dmap, level);
+#endif
+
   buildMetrics();
 
   // prob_rhs.init();
@@ -187,7 +191,7 @@ void CNS::initData() {
 
 void CNS::buildMetrics() {
 
-  // amrex::Print() << " oo CNS::buildMetrics  " << std::endl;
+  //amrex::Print() << " oo CNS::buildMetrics  " << std::endl;
 
   // print mesh sizes
   const Real *dx = geom.CellSize();
@@ -213,9 +217,9 @@ void CNS::buildMetrics() {
   //  fill EB related arrays (directly from cerisse0)
   const auto& ebfactory = dynamic_cast<EBFArrayBoxFactory const&>(Factory());
   EBM::eb.volfrac   = &(ebfactory.getVolFrac());
-  // EBM::eb.bndrycent = &(ebfactory.getBndryCent());
-  // EBM::eb.areafrac  = ebfactory.getAreaFrac();
-  // EBM::eb.facecent  = ebfactory.getFaceCent();
+  EBM::eb.bndrycent = &(ebfactory.getBndryCent());
+  EBM::eb.areafrac  = ebfactory.getAreaFrac();
+  EBM::eb.facecent  = ebfactory.getFaceCent();
 
   // // Level mask for redistribution
   // EBM::eb.level_mask.clear();
@@ -535,7 +539,7 @@ void CNS::postCoarseTimeStep(Real time) {
 // Called for each level from 0,1...nlevs-1
 void CNS::post_regrid(int lbase, int new_finest) {
 
-  // amrex::Print() << " oo CNS::post_regrid " << std::endl;
+  //amrex::Print() << " oo CNS::post_regrid " << std::endl;
   
 
 #ifdef AMREX_USE_GPIBM
@@ -544,6 +548,18 @@ void CNS::post_regrid(int lbase, int new_finest) {
   IBM::ib.computeMarkers(level);
   IBM::ib.initialiseGPs(level);
 #endif
+
+#ifdef CNS_USE_EB
+  EBM::eb.destroy_mf(level);
+  
+  // update volfrac
+  const auto& ebfactory = dynamic_cast<EBFArrayBoxFactory const&>(Factory());
+  EBM::eb.volfrac   = &(ebfactory.getVolFrac());
+  
+  EBM::eb.build_mf(grids, dmap, level);
+  EBM::eb.computeMarkers(level);
+#endif
+
 }
 
 void CNS::errorEst(TagBoxArray &tags, int /*clearval*/, int /*tagval*/,
@@ -599,12 +615,18 @@ void CNS::errorEst(TagBoxArray &tags, int /*clearval*/, int /*tagval*/,
 }
 
 void CNS::post_restart() {
+
+// recreate markers
+
 #ifdef AMREX_USE_GPIBM
   IBM::ib.destroy_mf(level);
   IBM::ib.build_mf(grids, dmap, level);
   IBM::ib.computeMarkers(level);
   IBM::ib.initialiseGPs(level);
 #endif
+
+
+
 }
 
 // 
@@ -868,8 +890,10 @@ void CNS::writePlotFile(const std::string &dir, std::ostream &os,
 
 #ifdef CNS_USE_EB
   //printf(" cnt= %d level=%d n_data_items=%d   \n",cnt,level,n_data_items);
-  plotMF.setVal(0.0_rt, cnt, 0, nGrow);  
-  EBM::eb.copytoRealMF(plotMF, 0, cnt);
+  plotMF.setVal(0.0_rt, cnt, 0, nGrow); 
+  EBM::eb.bmf_a[level]->copytoRealMF(plotMF, 0, cnt);
+
+ // EBM::eb.copytoRealMF(plotMF, 0, cnt);   // CHECK NEED TO PASS LEVEL
 #endif
 
   //------------------------------------------------------------------------------

@@ -274,9 +274,6 @@ void CNS::compute_rhs(MultiFab& statemf, Real dt, FluxRegister* fr_as_crse, Flux
   const PROB::ProbClosures* cls_d = CNS::d_prob_closures;
   const PROB::ProbClosures& cls_h = *CNS::h_prob_closures;
   // const PROB::ProbParm& parms = *d_prob_parm;
-#ifdef AMREX_USE_GPIBM
-  auto& ib_mf = *IBM::ib.bmf_a[level];
-#endif
 
   for (MFIter mfi(statemf, false); mfi.isValid(); ++mfi) {
     Array4<Real> const& state = statemf.array(mfi);
@@ -293,17 +290,52 @@ void CNS::compute_rhs(MultiFab& statemf, Real dt, FluxRegister* fr_as_crse, Flux
     // source term evaluations once per fab from CPU, to be run on GPU.
     cls_h.cons2prims(mfi, state, prims);
 
-
+    // combine arrays if IBM & EBM are used together 
+#if (AMREX_USE_GPIBM || CNS_USE_EB )   
+    //create auxiliary aray
+    BaseFab<bool> fab(bxg,2);
+    Array4<bool> const& geoMarkers = fab.array();    
+#endif
+    // extract markers
 #ifdef AMREX_USE_GPIBM
+    auto& ib_mf = *IBM::ib.bmf_a[level];
     IBM::ib.computeGPs(mfi, state, prims, cls_d, level);
     const auto& ibMarkers = ib_mf.array(mfi);
 #endif
+#ifdef CNS_USE_EB   
+    // no need to update markers here
+    auto& eb_mf = *EBM::eb.bmf_a[level];
+    const auto& ebMarkers = eb_mf.array(mfi);
+#endif
 
+    // combine markers into one  (CAN BE DONE BETTER)
+#if (AMREX_USE_GPIBM && CNS_USE_EB)    
+    amrex::ParallelFor(bxg, 2,
+    [=] AMREX_GPU_DEVICE (int i, int j, int k, int n) noexcept
+    {
+    geoMarkers(i,j,k,n) = ebMarkers(i,j,k,n) && ibMarkers(i,j,k,n);
+    });
+#endif    
+#if (AMREX_USE_GPIBM && !CNS_USE_EB)
+    amrex::ParallelFor(bxg, 2,
+    [=] AMREX_GPU_DEVICE (int i, int j, int k, int n) noexcept
+    {
+    geoMarkers(i,j,k,n) = ibMarkers(i,j,k,n);
+    });       
+#endif    
+#if (CNS_USE_EB && !AMREX_USE_GPIBM)
+    amrex::ParallelFor(bxg, 2,
+    [=] AMREX_GPU_DEVICE (int i, int j, int k, int n) noexcept
+    {
+    geoMarkers(i,j,k,n) = ebMarkers(i,j,k,n);
+    });
+#endif
+  
     // Euler/Diff Fluxes including boundary/discontinuity corrections
     // Note: we are over-writing state (cons) with flux derivative
-#ifdef AMREX_USE_GPIBM    
-    prob_rhs.eflux_ibm(geom, mfi, prims, temp, state, cls_d, ibMarkers);
-    prob_rhs.dflux_ibm(geom, mfi, prims, temp, state, cls_d, ibMarkers);
+#if (AMREX_USE_GPIBM || CNS_USE_EB )      
+    prob_rhs.eflux_ibm(geom, mfi, prims, temp, state, cls_d, geoMarkers);
+    prob_rhs.dflux_ibm(geom, mfi, prims, temp, state, cls_d, geoMarkers);
 #else
     prob_rhs.eflux(geom, mfi, prims, temp, state, cls_d);
     prob_rhs.dflux(geom, mfi, prims, temp, state, cls_d);
@@ -313,28 +345,27 @@ void CNS::compute_rhs(MultiFab& statemf, Real dt, FluxRegister* fr_as_crse, Flux
     prob_rhs.src(mfi, prims, state, cls_d, dt);
 
     // Set solid point RHS to 0  (state hold RHS at this point)
-    // TODO: IBM::set_solid_state(mfi,state,cls_d)
-#if AMREX_USE_GPIBM
+#if AMREX_USE_GPIBM || CNS_USE_EB
     const Box& bx   = mfi.tilebox();
     amrex::ParallelFor(bx, cls_h.NCONS,
     [=] AMREX_GPU_DEVICE (int i, int j, int k, int n) noexcept
     {
-    state(i,j,k,n) = state(i,j,k,n)*(1 - int(ibMarkers(i,j,k,0)));
+      state(i,j,k,n) = state(i,j,k,n)*(1 - int(geoMarkers(i,j,k,0)));
     });
 #endif
+    // TODO: IBM::set_solid_state(mfi,state,cls_d)
 
-#if CNS_USE_EB
-    const Box& bx   = mfi.tilebox();
-    Array4<const Real> vf = (*EBM::eb.volfrac).const_array(mfi); 
-    amrex::ParallelFor(bx, cls_h.NCONS,
-    [=] AMREX_GPU_DEVICE (int i, int j, int k, int n) noexcept
-    {
-    state(i,j,k,n) *= vf(i,j,k);
-    });
+#if CNS_USE_EB    
+    // call to compute fluxes in cells close to boundary  !!
+    // eb.ebflux(geom,mfi,vf, prims, stats, cls_dt)
+
+    // Redistribution ************
     
 #endif
 
-    // Redistribution ************
+
+
+
 
 
     // // Flux register

@@ -21,7 +21,7 @@ class viscous_t {
   // vars accessed by functions 
   int order_sch=param::order;
 
-#ifdef AMREX_USE_GPIBM   
+#if (AMREX_USE_GPIBM || CNS_USE_EB )  
   void inline dflux_ibm(const Geometry& geom, const MFIter& mfi,
             const Array4<Real>& prims, const Array4<Real>& flx,
             const Array4<Real>& rhs, const cls_t* cls,const Array4<bool>& ibMarkers) {
@@ -88,7 +88,7 @@ class viscous_t {
       GpuArray<int, 3> vdir = {int(dir == 0), int(dir == 1), int(dir == 2)};
 
       // compute diffusion fluxes
-#ifdef AMREX_USE_GPIBM  
+#if (AMREX_USE_GPIBM || CNS_USE_EB )   
       amrex::Abort(" IBM +diffusion only No ready yet");
     
 #else    

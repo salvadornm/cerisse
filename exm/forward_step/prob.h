@@ -58,11 +58,11 @@ inline Vector<int> cons_vars_type={1,2,3,0,0};
 typedef closures_dt<indicies_t, visc_suth_t, cond_suth_t,
                     calorifically_perfect_gas_t<indicies_t>> ProbClosures;
 
-//typedef rhs_dt<rusanov_t<ProbClosures>, no_diffusive_t, no_source_t > ProbRHS;
-typedef rhs_dt<riemann_t<false, ProbClosures>, no_diffusive_t, no_source_t > ProbRHS;
+typedef rhs_dt<rusanov_t<ProbClosures>, no_diffusive_t, no_source_t > ProbRHS;
+//typedef rhs_dt<riemann_t<false, ProbClosures>, no_diffusive_t, no_source_t > ProbRHS;
 //typedef rhs_dt<skew_t<methodparm_t, ProbClosures>, no_diffusive_t, no_source_t > ProbRHS;
 
-
+// define EB class
 typedef ebm_t<ProbClosures> ProbEB;
 
 
@@ -152,6 +152,9 @@ user_tagging(int i, int j, int k, int nt_level, auto &tagfab,
              const auto &sdatafab, const auto &geomdata,
              const ProbParm &prob_parm, int level) {
 
+  const Real *prob_lo = geomdata.ProbLo();
+  const Real *dx = geomdata.CellSize();
+  Real x = prob_lo[0] + (i + Real(0.5)) * dx[0];
 
   Real rhot = sdatafab(i,j,k,ProbClosures::URHO);
 
@@ -164,22 +167,25 @@ user_tagging(int i, int j, int k, int nt_level, auto &tagfab,
 
   Real gradrho= sqrt(drhox*drhox+drhoy*drhoy);        
 
-  if (nt_level > 0)
-  {
+  //if (nt_level > 0)
+ // {
     //tag cells based on density gradient
     switch (level)
     {
       case 0:
-        tagfab(i,j,k) = (gradrho > 0.3);        
+        tagfab(i,j,k) = (gradrho > 0.1);        
         break;
       case 1:
         tagfab(i,j,k) = (gradrho > 0.2);        
         break;
       default:
-        tagfab(i,j,k) = (gradrho > 0.1);        
+        tagfab(i,j,k) = (gradrho > 0.3);        
         break;
     }
-  }
+
+     //tagfab(i,j,k) = (x < 1.0);
+
+ // }
 }
 ////////////////////////////////////////////////////////////////////////////////
 

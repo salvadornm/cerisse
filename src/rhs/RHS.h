@@ -31,7 +31,7 @@ class no_euler_t
 {
 public:
   template<typename... Args>
-#ifdef AMREX_USE_GPIBM  
+#if (AMREX_USE_GPIBM || CNS_USE_EB )  
   void eflux_ibm(Args&&... args){}
 #else  
   void eflux(Args&&... args){}
@@ -43,7 +43,7 @@ class no_diffusive_t
 {
 public:
   template<typename... Args>
-#ifdef AMREX_USE_GPIBM  
+#if (AMREX_USE_GPIBM || CNS_USE_EB )   
   void dflux_ibm(Args&&... args) {}
 #else
   void dflux(Args&&... args) {}  

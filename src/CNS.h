@@ -169,19 +169,18 @@ void cns_bcfill(amrex::Box const& bx, amrex::FArrayBox& data, const int dcomp,
                 const amrex::Real time, const amrex::Vector<amrex::BCRec>& bcr,
                 const int bcomp, const int scomp);
 
-#ifdef AMREX_USE_GPIBM
-  // declare main IB class instance
+// declare main IB class instance
+#ifdef AMREX_USE_GPIBM  
 namespace IBM{
   inline PROB::ProbIB ib;
 }
 #endif
 
+// declare main EB class instance
 #ifdef CNS_USE_EB
-  // declare main EB class instance
 namespace EBM{
   inline PROB::ProbEB eb;
 }
-
 #endif
 
 

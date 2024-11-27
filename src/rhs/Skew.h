@@ -179,7 +179,7 @@ class skew_t {
   Real Cdamp  = param::C4skew; 
 
 
-#ifdef AMREX_USE_GPIBM  
+#if (AMREX_USE_GPIBM || CNS_USE_EB )  
   void inline eflux_ibm(const Geometry& geom, const MFIter& mfi,
                     const Array4<Real>& prims, const Array4<Real>& flx,
                     const Array4<Real>& rhs,
@@ -232,7 +232,7 @@ class skew_t {
 
       int Qdir =  cls_t::QRHO + dir + 1; 
 
-#ifdef AMREX_USE_GPIBM  
+#if (AMREX_USE_GPIBM || CNS_USE_EB )  
       ParallelFor(bxgnodal,
                   [=,*this] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {
                     this->flux_dir_ibm(i, j, k,Qdir, vdir, cons, prims, lambda_max, flx, cls,ibMarkers);
@@ -245,7 +245,9 @@ class skew_t {
 #endif
       // dissipative fluxes 
       if constexpr (param::dissipation) {
-#ifdef AMREX_USE_GPIBM               
+
+#if (AMREX_USE_GPIBM || CNS_USE_EB )  
+
         ParallelFor(bxgnodal,
                   [=,*this] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {
                     this->fluxdissip_dir_ibm(i, j, k,Qdir, vdir, cons, prims, lambda_max, flx, cls, ibMarkers);
