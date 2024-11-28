@@ -7,6 +7,7 @@
 #include <Closures.h>
 #include <RHS.h>
 #include <ebm.h>
+#include <walltypes.h>
 
 
 // 2D Shock Reflection
@@ -62,8 +63,12 @@ typedef rhs_dt<rusanov_t<ProbClosures>, no_diffusive_t, no_source_t > ProbRHS;
 //typedef rhs_dt<riemann_t<false, ProbClosures>, no_diffusive_t, no_source_t > ProbRHS;
 //typedef rhs_dt<skew_t<methodparm_t, ProbClosures>, no_diffusive_t, no_source_t > ProbRHS;
 
-// define EB class
-typedef ebm_t<ProbClosures> ProbEB;
+// define type of wall and EBM class
+
+typedef adiabatic_wall_t<ProbClosures> TypeWall;
+
+typedef ebm_t<TypeWall,ProbClosures> ProbEB;
+
 
 
 void inline inputs() {

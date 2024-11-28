@@ -520,19 +520,17 @@ void CNS::post_regrid(int lbase, int new_finest) {
   EBM::eb.destroy_mf(level);
   EBM::eb.build_mf(grids, dmap, level);
 
-  // update volfrac and auxiliary data
+  // update volfrac and EB data
   const auto& ebfactory = dynamic_cast<EBFArrayBoxFactory const&>(Factory());
-  EBM::eb.volmf_a[level]  = &(ebfactory.getVolFrac()); 
-  
-  EBM::eb.normmcf_a[level] = &(ebfactory.getBndryNormal());
-  EBM::eb.areamcf_a[level] = ebfactory.getAreaFrac();
 
-  //auto const& flags = ebfactory.getMultiEBCellFlagFab();
-  
+  EBM::eb.volmf_a[level]  = &(ebfactory.getVolFrac()); 
+  EBM::eb.normmcf_a[level] = &(ebfactory.getBndryNormal());
+  EBM::eb.areamcf_a[level] = ebfactory.getAreaFrac();  
   EBM::eb.ebflags_a[level] = &(ebfactory.getMultiEBCellFlagFab());
+  EBM::eb.bcareamcf_a[level] = &(ebfactory.getBndryArea());
+  
   
   // EBM::eb.bndrycent = &(ebfactory.getBndryCent());
-  // EBM::eb.areafrac  = ebfactory.getAreaFrac();
   // EBM::eb.facecent  = ebfactory.getFaceCent();
 
   

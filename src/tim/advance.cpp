@@ -364,7 +364,7 @@ void CNS::compute_rhs(MultiFab& statemf, Real dt, FluxRegister* fr_as_crse, Flux
     // // snm
 
     if (FabType::singlevalued == t){
-    //  EBM::eb.ebflux(geom,mfi, prims, fluxt,state, cls_d,level);
+      EBM::eb.ebflux(geom,mfi, prims, fluxt,state, cls_d,level);
     }
   
 

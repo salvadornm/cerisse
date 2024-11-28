@@ -10,8 +10,11 @@
 
 #include <EBMultiFab.h>
 
+#include <walltypes.h>
 
-template <typename cls_t>
+
+
+template <typename wallmodel,typename cls_t>
 class ebm_t
 { 
 
@@ -33,11 +36,11 @@ public:
   // For each direction, area fraction is for the face of that direction.
   // Data are in the range of  with zero representing a covered face and 
   // one an un-cut face.
+  //
+  // bndryarea:: is in a MultiCutFab with a single component representing the dimensionless boundary area. 
+  // when the cell is isotropic (i.e., ), it’s trivial to convert it to physical units. (*dx)
 
-  //** */
-  const amrex::MultiCutFab* normbc;  // oboselete
-  std::array<const amrex::MultiCutFab*, AMREX_SPACEDIM> areafrac; // obsolete
-
+  
   //std::array<const amrex::MultiCutFab*, AMREX_SPACEDIM> facecent;
   //const amrex::MultiCutFab* bndrycent;
 
@@ -55,10 +58,11 @@ public:
   // multifab  pointers to vfrac 
   Vector<const MultiFab*> volmf_a;      
 
-  // multicutfab pointers to area and normals to surface
+  // multicutfab pointers to areafrac,normbc and bndryarea 
   Vector<std::array<const amrex::MultiCutFab*, AMREX_SPACEDIM>> areamcf_a;
   Vector<const MultiCutFab*> normmcf_a;
-
+  Vector<const MultiCutFab*> bcareamcf_a;
+  
   const amrex::Real isodxerr = 1.e-8;        // relative isotropy error ||dx-dy||/dx
   const amrex::Real vfracmin = 1.e-6;        // minimum to consider a cell "empty"
   const amrex::Real vfracmax = 1.0-vfracmin; // maximum to consider a cell "not-full"
@@ -115,6 +119,7 @@ public:
     // size of multiCut Arrays
     areamcf_a.resize(max_level + 1);
     normmcf_a.resize(max_level + 1);
+    bcareamcf_a.resize(max_level + 1); 
         
   }
   ////////////////////////////////////////////////////////////////////////////
@@ -138,7 +143,6 @@ public:
     auto& mfab = *bmf_a[lev];
 
     for (MFIter mfi(mfab, false); mfi.isValid(); ++mfi) {
-      auto& ibFab = mfab.get(mfi);
       const Box& bx = mfi.tilebox();
       const auto& ebMarkers = mfab.array(mfi); // boolean array
      
@@ -176,26 +180,36 @@ public:
 
     }
   }
-////////////////////////////////////////////////////////////////////////////
+  ////////////////////////////////////////////////////////////////////////////
   void inline ebflux(const Geometry& geom, const MFIter& mfi,
                      const Array4<Real>& prims, const Array4<Real>& flx,
                      const Array4<Real>& rhs, const cls_t* cls, int lev) {
 
 
-   amrex::Print( ) << " oo ebflux  lev=" << lev << std::endl;  
+   //amrex::Print( ) << " oo ebflux  lev=" << lev << std::endl;  
 
     const Box& ebbox  = mfi.growntilebox(0);  // box without ghost points 
     const GpuArray<Real, AMREX_SPACEDIM> dxinv = geom.InvCellSizeArray();
+    const Real *dx = geom.CellSize();
+
 
     // extract EB arrays given a level and mfi
     Array4<const Real> vfrac = (*volmf_a[lev]).const_array(mfi);  
-                     
+
+    // areas                     
     Array4<const Real> const& apx = areamcf_a[lev][0]->const_array(mfi);
     Array4<const Real> const& apy = areamcf_a[lev][1]->const_array(mfi);
 #if (AMREX_SPACEDIM==3)    
     Array4<const Real> const& apz = areamcf_a[lev][2]->const_array(mfi);
 #endif    
-        
+
+    // norm array  (fab with SPACEDIM component)
+    Array4<const Real> const& normxyz = (*normmcf_a[lev]).const_array(mfi);  
+
+    // bcarea array (fav with one component) 
+    Array4<const Real> const& bcarea = (*bcareamcf_a[lev]).const_array(mfi);  
+
+            
     // markers 
     const auto& ebMarkers = (*bmf_a[lev]).array(mfi);
 
@@ -203,12 +217,22 @@ public:
     const auto& flag = (*ebflags_a[lev])[mfi];
 
     amrex::ParallelFor(
-          ebbox, [=] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {
+        ebbox, [=] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {
 
-          // only applied to covered cells (could be doen with flags)
+          // only applied to covered cells (could be done with flags)
 
           if (ebMarkers(i,j,k,1)){
             Real vfracinv = 1.0/vfrac(i,j,k);
+
+            // if ((j==2) && (i < 30)) {
+            // printf(" sld L=%d P=%d R=%d  \n",ebMarkers(i-1,j,k,0),ebMarkers(i,j,k,0),ebMarkers(i+1,j,k,0));
+            // printf(" cut L=%d P=%d R=%d  \n",ebMarkers(i-1,j,k,1),ebMarkers(i,j,k,1),ebMarkers(i+1,j,k,1));
+            //  printf(" i=%d j=%d apx(+1)= %f apx= %f \n",i,j,apx(i+1,j,k),apx(i,j,k) );
+            //  printf(" norm =%f %f \n",normxyz(i,j,k,0),normxyz(i,j,k,1));
+            //  printf(" bcarea =%f  bc*dx %f \n",bcarea(i,j,k,0),bcarea(i,j,k,0)*dx[0]);             
+            //  }
+
+
             for (int n = 0; n < cls_t::NCONS; n++) {
               // fluxes  from fluid faces
               Real fxp = flx(i+1,j,k,n); 
@@ -216,12 +240,21 @@ public:
               Real fyp = flx(i,j+1,k,n); 
               Real fym = flx(i,j,k,n);
 
-              // warning overwrite rhs in the cut-cells
+              //  overwrite rhs in the cut-cells
 #if (AMREX_SPACEDIM==2)            
               rhs(i, j, k, n) = -vfracinv*(
               dxinv[0] * (apx(i + 1, j, k) * fxp - apx(i, j, k) * fxm) +
               dxinv[1] * (apy(i, j + 1, k) * fyp - apy(i, j, k) * fym) );
 #endif            
+
+            //  //temp snm
+            //  if ((j==2) && (i < 30)) {
+            //  printf(" n=%d fxR= %f fxL = %f vfrac=%f\n",n,fxp,fxm,vfrac(i,j,k));
+            //  }
+
+
+
+
 #if (AMREX_SPACEDIM==3)            
               Real fzp = flx(i,j,k+1,n); 
               Real fzm = flx (i,j,k,n);
@@ -232,17 +265,34 @@ public:
 #endif      
             }
 
-          // add wall fluxes
-                   
-          // wall fluxes ...(isothermal, adiabatic)
-          // wall_flux(i,j,k,primscell,flux)
+            // build wall fluxes
+            amrex::GpuArray<Real, cls_t::NCONS> flux_wall = {0.0};                             
+            // primitive array (can we do it wioth a nice pointer?)
+            amrex::GpuArray<Real, cls_t::NPRIM> prim_wall = {0.0};    
+            for (int n = 0; n < cls_t::NCONS; n++) {
+              prim_wall[n] = prims(i,j,k,n);          
+            }  
+            // normal to surface 
+            amrex::Real norm_wall [AMREX_SPACEDIM]= {0.0}; 
+            for (int n = 0; n < AMREX_SPACEDIM; n++) {
+              norm_wall[n] = -normxyz(i,j,k,n); // so the normal points towards the liquid
+            }
 
+            // calculate wall flux
+            wallmodel::wall_flux(geom,i,j,k,norm_wall,prim_wall,flux_wall,cls);
+ 
+            for (int n = 0; n < cls_t::NCONS; n++) {
+              rhs(i,j,k) += flux_wall[n]*vfracinv*bcarea(i,j,k,0)*dx[0];
+            }
+            
           }
 
-          });
+        });
   }                      
-////////////////////////////////////////////////////////////////////////////
- // wall flux
+ 
+  
+        
+
 
 
 };
