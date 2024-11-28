@@ -275,15 +275,16 @@ void CNS::compute_rhs(MultiFab& statemf, Real dt, FluxRegister* fr_as_crse, Flux
   const PROB::ProbClosures& cls_h = *CNS::h_prob_closures;
   // const PROB::ProbParm& parms = *d_prob_parm;
 
+
   for (MFIter mfi(statemf, false); mfi.isValid(); ++mfi) {
     Array4<Real> const& state = statemf.array(mfi);
 
-    // const Box& bxgnodal = mfi.grownnodaltilebox(-1, 1);  // extent is 0,N_cell+1
     const Box& bxg = mfi.growntilebox(cls_h.NGHOST);
 
+    // primitives and fluxes arrays
     FArrayBox primf(bxg, cls_h.NPRIM, The_Async_Arena());
     FArrayBox tempf(bxg, cls_h.NCONS, The_Async_Arena());
-    Array4<Real> const& temp = tempf.array();
+    Array4<Real> const& fluxt = tempf.array();
     Array4<Real> const& prims= primf.array();
 
     // We want to minimise function calls. So, we call prims2cons, flux and
@@ -334,11 +335,41 @@ void CNS::compute_rhs(MultiFab& statemf, Real dt, FluxRegister* fr_as_crse, Flux
     // Euler/Diff Fluxes including boundary/discontinuity corrections
     // Note: we are over-writing state (cons) with flux derivative
 #if (AMREX_USE_GPIBM || CNS_USE_EB )      
-    prob_rhs.eflux_ibm(geom, mfi, prims, temp, state, cls_d, geoMarkers);
-    prob_rhs.dflux_ibm(geom, mfi, prims, temp, state, cls_d, geoMarkers);
+    prob_rhs.eflux_ibm(geom, mfi, prims, fluxt, state, cls_d, geoMarkers);
+    prob_rhs.dflux_ibm(geom, mfi, prims, fluxt, state, cls_d, geoMarkers);
 #else
-    prob_rhs.eflux(geom, mfi, prims, temp, state, cls_d);
-    prob_rhs.dflux(geom, mfi, prims, temp, state, cls_d);
+    prob_rhs.eflux(geom, mfi, prims, fluxt, state, cls_d);
+    prob_rhs.dflux(geom, mfi, prims, fluxt, state, cls_d);
+#endif
+
+#if CNS_USE_EB    
+    // compute fluxes next boundary  !!??
+    // SNM testing
+    const Box&  ebbox  = mfi.growntilebox(0);  // box without ghost points 
+    const auto& flag = (*EBM::eb.ebflags_a[level])[mfi];
+    FabType t = flag.getType(ebbox);
+
+    // snm
+    // if (FabType::regular == t) {
+    //     printf(" TEST This box is regular\n") ;
+    // } else if (FabType::covered == t) {
+    //     printf(" TEST This box is covered \n") ;
+    // } else if (FabType::singlevalued == t) {
+    //     printf(" TEST This box is cut cell  \n") ;
+    // }         
+    //   else {
+    //     printf(" EB::ERROR  \n") ;
+    //     exit(1);               
+    // }
+    // // snm
+
+    if (FabType::singlevalued == t){
+    //  EBM::eb.ebflux(geom,mfi, prims, fluxt,state, cls_d,level);
+    }
+  
+
+    // Redistribution ************
+    
 #endif
 
     // Source terms, including update mask (e.g inside IB)
@@ -355,13 +386,9 @@ void CNS::compute_rhs(MultiFab& statemf, Real dt, FluxRegister* fr_as_crse, Flux
 #endif
     // TODO: IBM::set_solid_state(mfi,state,cls_d)
 
-#if CNS_USE_EB    
-    // call to compute fluxes in cells close to boundary  !!
-    // eb.ebflux(geom,mfi,vf, prims, stats, cls_dt)
 
-    // Redistribution ************
-    
-#endif
+
+
 
 
 

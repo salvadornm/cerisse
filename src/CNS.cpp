@@ -198,39 +198,6 @@ void CNS::buildMetrics() {
   amrex::Print() << "Mesh size (dx,dy,dz) = ";
   amrex::Print() << AMREX_D_TERM(dx[0], << "  " << dx[1], << "  " << dx[2]) << "  \n";
 
-#if CNS_USE_EB
-  static_assert(AMREX_SPACEDIM > 1, "EB only supports 2D and 3D");
-
-  ParmParse ppeb2("eb2");
-  std::string geom_type = "all_regular";
-  ppeb2.query("geom_type", geom_type);
-
-  if (geom_type != "all_regular") {
-    // make sure dx == dy == dz if use EB
-    const Real* dx = geom.CellSize();
-    if (AMREX_D_TERM(,  std::abs(dx[0] - dx[1]) > 1.e-12 * dx[0],
-                     || std::abs(dx[0] - dx[2]) > 1.e-12 * dx[0])) {
-      amrex::Abort("EB must have dx == dy == dz (for cut surface fluxes)\n");
-    }
-  }
-
-  //  fill EB related arrays (directly from cerisse0)
-  const auto& ebfactory = dynamic_cast<EBFArrayBoxFactory const&>(Factory());
-  EBM::eb.volfrac   = &(ebfactory.getVolFrac());
-  EBM::eb.bndrycent = &(ebfactory.getBndryCent());
-  EBM::eb.areafrac  = ebfactory.getAreaFrac();
-  EBM::eb.facecent  = ebfactory.getFaceCent();
-
-  // // Level mask for redistribution
-  // EBM::eb.level_mask.clear();
-  // EBM::eb.level_mask.define(grids, dmap, 1, 3);
-  // EBM::eb.level_mask.BuildMask( geom.Domain(), geom.periodicity(), CNSConstants::level_mask_covered,
-  //   CNSConstants::level_mask_notcovered, CNSConstants::level_mask_physbnd,
-  //   CNSConstants::level_mask_interior);
-#endif
-
-
-
 }
 
 void CNS::post_init(Real stop_time) {
@@ -551,13 +518,26 @@ void CNS::post_regrid(int lbase, int new_finest) {
 
 #ifdef CNS_USE_EB
   EBM::eb.destroy_mf(level);
-  
-  // update volfrac
-  const auto& ebfactory = dynamic_cast<EBFArrayBoxFactory const&>(Factory());
-  EBM::eb.volfrac   = &(ebfactory.getVolFrac());
-  
   EBM::eb.build_mf(grids, dmap, level);
+
+  // update volfrac and auxiliary data
+  const auto& ebfactory = dynamic_cast<EBFArrayBoxFactory const&>(Factory());
+  EBM::eb.volmf_a[level]  = &(ebfactory.getVolFrac()); 
+  
+  EBM::eb.normmcf_a[level] = &(ebfactory.getBndryNormal());
+  EBM::eb.areamcf_a[level] = ebfactory.getAreaFrac();
+
+  //auto const& flags = ebfactory.getMultiEBCellFlagFab();
+  
+  EBM::eb.ebflags_a[level] = &(ebfactory.getMultiEBCellFlagFab());
+  
+  // EBM::eb.bndrycent = &(ebfactory.getBndryCent());
+  // EBM::eb.areafrac  = ebfactory.getAreaFrac();
+  // EBM::eb.facecent  = ebfactory.getFaceCent();
+
+  
   EBM::eb.computeMarkers(level);
+
 #endif
 
 }
@@ -839,19 +819,6 @@ void CNS::writePlotFile(const std::string &dir, std::ostream &os,
       PathNameInHeader += BaseName;
       os << PathNameInHeader << '\n';
     }
-
-    //----------------------------------------------------------------------modified
-    // #ifdef AMREX_USE_EB
-    // if (EB2::TopIndexSpaceIfPresent()) {
-    //     volfrac threshold for amrvis
-    //     if (level == parent->finestLevel()) {
-    //         for (int lev = 0; lev <= parent->finestLevel(); ++lev) {
-    //             os << "1.0e-6\n";
-    //         }
-    //     }
-    // }
-    // #endif
-    //------------------------------------------------------------------------------
   }
   //
   // We combine all of the multifabs -- state, derived, etc -- into one
