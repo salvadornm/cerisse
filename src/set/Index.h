@@ -54,7 +54,7 @@ static constexpr int QW=3;
 static constexpr int QT=4;
 static constexpr int QPRES=5;
 static constexpr int QC=6;
-static constexpr int QG=7;
+static constexpr int QG=7; // why this needed?
 static constexpr int QEINT=8;
 static constexpr int QFS=9;
 
@@ -65,7 +65,7 @@ static constexpr int CLAM=2;  // heat conductivity
 static constexpr int CRHOD=3; // species diffusivity (rho*D)
 
 static constexpr int NCONS=UFS + NUM_SPECIES;
-static constexpr int NPRIM=QFS + NUM_SPECIES;
+static constexpr int NPRIM=QFS + NUM_SPECIES; //??? (shodul be 1 less)
 static constexpr int NWAVES=2 + NUM_SPECIES;
 static constexpr int NCOEF= 3 + NUM_SPECIES;
 static constexpr int NGHOST=3; // TODO: make it an automatic parameter

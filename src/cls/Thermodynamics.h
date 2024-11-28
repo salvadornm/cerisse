@@ -10,6 +10,7 @@ using namespace universal_constants;
 // Philosophy
 // Keep all thermodynamics functions local, acting on a single point
 
+////////////////////////////////////////////////////////////////////////////////////////
 template <typename idx_t>
 class calorifically_perfect_gas_t {
  protected:
@@ -120,7 +121,7 @@ class calorifically_perfect_gas_t {
       prims(i, j, k, idx_t::QPRES) = p;
       prims(i, j, k, idx_t::QT) = p / (rho * this->Rspec);
       prims(i, j, k, idx_t::QC) = std::sqrt(this->gamma * p * rhoinv);
-      prims(i, j, k, idx_t::QG) = this->gamma;
+      prims(i, j, k, idx_t::QG) = this->gamma; //???
       prims(i, j, k, idx_t::QEINT) = rhoei * rhoinv;
       prims(i, j, k, idx_t::QFS) = 1.0;
     });
@@ -271,6 +272,8 @@ class calorifically_perfect_gas_t {
   }
 };
 
+////////////////////////////////////////////////////////////////////////////////////////
+// TODO 
 class calorifically_perfect_gas_nasg_liquid_t {
  private:
   /* data */
@@ -291,10 +294,8 @@ class calorifically_perfect_gas_nasg_liquid_t {
 #ifdef USE_PELEPHYSICS
 #include <PelePhysics.H>
 
-// #define DEBUG_PP_EOS
-
-// Wrapper for PelePhysics EoS. No other places of the code should call
-// pele::physics::PhysicsType::eos().
+// Wrapper for PelePhysics EoS. No other places of the code should call pele::physics::PhysicsType::eos().
+////////////////////////////////////////////////////////////////////////////////////////
 template <typename idx_t>
 class multispecies_perfect_gas_t {
  protected:
@@ -428,36 +429,34 @@ class multispecies_perfect_gas_t {
     return eigenvals;
   }
 
-  // void prims2cons(i,j,k,){};
 
   // void prims2char(){};
 
-  // unused
-  // AMREX_GPU_DEVICE AMREX_FORCE_INLINE void prims2fluxes(
-  //     int& i, int& j, int& k, const Array4<Real>& prims, Array4<Real>&
-  //     fluxes, const GpuArray<int, 3>& vdir) {
-  //   Real rho = prims(i, j, k, idx.QRHO);
-  //   Real ux = prims(i, j, k, idx.QU);
-  //   Real uy = prims(i, j, k, idx.QV);
-  //   Real uz = prims(i, j, k, idx.QW);
-  //   Real P = prims(i, j, k, idx.QPRES);
-  //   Real udir = ux * vdir[0] + uy * vdir[1] + uz * vdir[2];
+  AMREX_GPU_DEVICE AMREX_FORCE_INLINE void prims2fluxes(
+      int& i, int& j, int& k, const Array4<Real>& prims, Array4<Real>&
+      fluxes, const GpuArray<int, 3>& vdir) {
 
-  //   Real ekin = Real(0.5) * (ux * ux + uy * uy + uz * uz);
-  //   Real ei;
-  //   this->RYP2E(rho, &prims(i, j, k, idx.QFS), P, ei);
-  //   Real rhoet = rho * ei + ekin;
+    Real rho = prims(i, j, k, idx.QRHO);
+    Real ux = prims(i, j, k, idx.QU);
+    Real uy = prims(i, j, k, idx.QV);
+    Real uz = prims(i, j, k, idx.QW);
+    Real P = prims(i, j, k, idx.QPRES);
+    Real udir = ux * vdir[0] + uy * vdir[1] + uz * vdir[2];
 
-  //   fluxes(i, j, k, idx.URHO) = rho * udir;
-  //   fluxes(i, j, k, idx.UMX) = rho * ux * udir + P * vdir[0];
-  //   fluxes(i, j, k, idx.UMY) = rho * uy * udir + P * vdir[1];
-  //   fluxes(i, j, k, idx.UMZ) = rho * uz * udir + P * vdir[2];
-  //   fluxes(i, j, k, idx.UET) = (rhoet + P) * udir;
-  //   for (int n = 0; n < NUM_SPECIES; ++n) {
-  //     fluxes(i, j, k, idx.UFS + n) = rho * prims(i, j, k, idx.QFS + n) *
-  //     udir;
-  //   }
-  // };
+    Real ekin = Real(0.5) * (ux * ux + uy * uy + uz * uz);
+    Real ei;
+    this->RYP2E(rho, &prims(i, j, k, idx.QFS), P, ei);
+    Real rhoet = rho * ei + ekin;
+
+    fluxes(i, j, k, idx.URHO) = rho * udir;
+    fluxes(i, j, k, idx.UMX) = rho * ux * udir + P * vdir[0];
+    fluxes(i, j, k, idx.UMY) = rho * uy * udir + P * vdir[1];
+    fluxes(i, j, k, idx.UMZ) = rho * uz * udir + P * vdir[2];
+    fluxes(i, j, k, idx.UET) = (rhoet + P) * udir;
+    for (int n = 0; n < NUM_SPECIES; ++n) {
+      fluxes(i, j, k, idx.UFS + n) = rho * prims(i, j, k, idx.QFS + n) * udir;
+    }
+  };
 
   // can move this to closures derived tyoe (closures_dt)
   // prims to cons
@@ -499,7 +498,7 @@ class multispecies_perfect_gas_t {
       prims(i, j, k, idx.QPRES) = p;
       prims(i, j, k, idx.QT) = T;
       prims(i, j, k, idx.QC) = cs;
-      prims(i, j, k, idx.QG) = gamma;
+      prims(i, j, k, idx.QG) = gamma; // why this is needed?
       prims(i, j, k, idx.QEINT) = ei;
       for (int n = 0; n < NUM_SPECIES; ++n) {
         prims(i, j, k, idx.QFS + n) = Y[n];

@@ -224,13 +224,16 @@ public:
           if (ebMarkers(i,j,k,1)){
             Real vfracinv = 1.0/vfrac(i,j,k);
 
-            // if ((j==2) && (i < 30)) {
-            // printf(" sld L=%d P=%d R=%d  \n",ebMarkers(i-1,j,k,0),ebMarkers(i,j,k,0),ebMarkers(i+1,j,k,0));
-            // printf(" cut L=%d P=%d R=%d  \n",ebMarkers(i-1,j,k,1),ebMarkers(i,j,k,1),ebMarkers(i+1,j,k,1));
-            //  printf(" i=%d j=%d apx(+1)= %f apx= %f \n",i,j,apx(i+1,j,k),apx(i,j,k) );
-            //  printf(" norm =%f %f \n",normxyz(i,j,k,0),normxyz(i,j,k,1));
-            //  printf(" bcarea =%f  bc*dx %f \n",bcarea(i,j,k,0),bcarea(i,j,k,0)*dx[0]);             
-            //  }
+            if ((j==0) && (i < 30)) {
+            printf(" sld L=%d P=%d R=%d  \n",ebMarkers(i-1,j,k,0),ebMarkers(i,j,k,0),ebMarkers(i+1,j,k,0));
+            printf(" cut L=%d P=%d R=%d  \n",ebMarkers(i-1,j,k,1),ebMarkers(i,j,k,1),ebMarkers(i+1,j,k,1));
+            printf(" sld S=%d P=%d N=%d  \n",ebMarkers(i,j-1,k,0),ebMarkers(i,j,k,0),ebMarkers(i,j-1,k,0));
+            printf(" cut S=%d P=%d N=%d  \n",ebMarkers(i,j-1,k,1),ebMarkers(i,j,k,1),ebMarkers(i,j+1,k,1));
+  
+             printf(" i=%d j=%d apx(+1)= %f apx= %f \n",i,j,apx(i+1,j,k),apx(i,j,k) );
+             printf(" norm =%f %f \n",normxyz(i,j,k,0),normxyz(i,j,k,1));
+             printf(" bcarea =%f  bc*dx %f \n",bcarea(i,j,k,0),bcarea(i,j,k,0)*dx[0]);             
+             }
 
 
             for (int n = 0; n < cls_t::NCONS; n++) {
@@ -248,9 +251,9 @@ public:
 #endif            
 
             //  //temp snm
-            //  if ((j==2) && (i < 30)) {
-            //  printf(" n=%d fxR= %f fxL = %f vfrac=%f\n",n,fxp,fxm,vfrac(i,j,k));
-            //  }
+             if ((j==0) && (i < 30)) {
+             printf(" n=%d fxR= %f fxL = %f vfrac=%f\n",n,fxp,fxm,vfrac(i,j,k));
+             }
 
 
 
@@ -268,9 +271,15 @@ public:
             // build wall fluxes
             amrex::GpuArray<Real, cls_t::NCONS> flux_wall = {0.0};                             
             // primitive array (can we do it wioth a nice pointer?)
-            amrex::GpuArray<Real, cls_t::NPRIM> prim_wall = {0.0};    
-            for (int n = 0; n < cls_t::NCONS; n++) {
+            amrex::GpuArray<Real, cls_t::NPRIM> prim_wall = {0.0};
+
+            //Real* primp = &prims(i,j,k,cls_t::NPRIM - 1);  //
+
+            for (int n = 0; n < cls_t::NPRIM; n++) {
               prim_wall[n] = prims(i,j,k,n);          
+               
+               if ((j==0) && (i < 30)) { printf("%d %f \n",n, prim_wall[n]);}
+
             }  
             // normal to surface 
             amrex::Real norm_wall [AMREX_SPACEDIM]= {0.0}; 
@@ -279,12 +288,23 @@ public:
             }
 
             // calculate wall flux
-            wallmodel::wall_flux(geom,i,j,k,norm_wall,prim_wall,flux_wall,cls);
+            wallmodel::wall_flux(geom,i,j,k,norm_wall,prim_wall,flux_wall,cls); 
+           
  
             for (int n = 0; n < cls_t::NCONS; n++) {
               rhs(i,j,k) += flux_wall[n]*vfracinv*bcarea(i,j,k,0)*dx[0];
+
+             //temp snm
+             if ((j==0) && (i < 30)) {
+              printf(" n=%d fluxwall = %f areabc=%f \n",n,flux_wall[n],bcarea(i,j,k,0));
+              }
+
             }
             
+             
+ 
+
+
           }
 
         });

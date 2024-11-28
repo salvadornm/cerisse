@@ -226,14 +226,22 @@ Real CNS::advance(Real time, Real dt, int /*iteration*/, int /*ncycle*/) {
 
     ParallelFor(bx, [=] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {
       if (ibMarkers(i, j, k, 1)) {
-        state(i, j, k, cls_d->UMX) = prims(i, j, k, cls_d->QRHO) * prims(i, j, k, cls_d->QU);
-        state(i, j, k, cls_d->UMY) = prims(i, j, k, cls_d->QRHO) * prims(i, j, k, cls_d->QV);
-        state(i, j, k, cls_d->UMZ) = prims(i, j, k, cls_d->QRHO) * prims(i, j, k, cls_d->QW);
-        state(i, j, k, cls_d->UET) = prims(i, j, k, cls_d->QPRES) / (cls_d->gamma - 1.0) +
-            0.5 * (prims(i, j, k, cls_d->QU) * prims(i, j, k, cls_d->QU) +
-                   prims(i, j, k, cls_d->QV) * prims(i, j, k, cls_d->QV) +
-                   prims(i, j, k, cls_d->QW) * prims(i, j, k, cls_d->QW));
-        state(i, j, k, cls_d->URHO) = prims(i, j, k, cls_d->QRHO);
+
+        IntVect iv(AMREX_D_DECL(i, j, k)); 
+        Real cons[cls_t::NCONS];
+        // Real* cons = &state(i,j,k,cls_t::NCONS - 1); (prims2cosn shoudl accept a pointer)
+        cls_h.prim2cons(iv,prims,cons);        
+        for (int n = 0; n < cls_t::NCONS; n++) {
+          state(i, j, k, n) = cons[n];
+        }
+        // state(i, j, k, cls_d->UMX) = prims(i, j, k, cls_d->QRHO) * prims(i, j, k, cls_d->QU);
+        // state(i, j, k, cls_d->UMY) = prims(i, j, k, cls_d->QRHO) * prims(i, j, k, cls_d->QV);
+        // state(i, j, k, cls_d->UMZ) = prims(i, j, k, cls_d->QRHO) * prims(i, j, k, cls_d->QW);
+        // state(i, j, k, cls_d->UET) = prims(i, j, k, cls_d->QPRES) / (cls_d->gamma - 1.0) +
+        //     0.5 * (prims(i, j, k, cls_d->QU) * prims(i, j, k, cls_d->QU) +
+        //            prims(i, j, k, cls_d->QV) * prims(i, j, k, cls_d->QV) +
+        //            prims(i, j, k, cls_d->QW) * prims(i, j, k, cls_d->QW));
+        // state(i, j, k, cls_d->URHO) = prims(i, j, k, cls_d->QRHO);
       }
     });
   }
