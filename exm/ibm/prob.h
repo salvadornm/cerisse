@@ -45,9 +45,9 @@ struct ProbParm
 typedef closures_dt<indicies_t, visc_suth_t, cond_suth_t,
                     calorifically_perfect_gas_t<indicies_t>> ProbClosures;
 
-//typedef rhs_dt<rusanov_t<ProbClosures>, no_diffusive_t, no_source_t>  ProbRHS;
+typedef rhs_dt<rusanov_t<ProbClosures>, no_diffusive_t, no_source_t>  ProbRHS;
 
-typedef rhs_dt<skew_t<true,false, 4, ProbClosures>, no_diffusive_t, no_source_t > ProbRHS;
+//typedef rhs_dt<skew_t<true,false, 4, ProbClosures>, no_diffusive_t, no_source_t > ProbRHS;
 
 
 typedef std::ratio<5,5> d_image;

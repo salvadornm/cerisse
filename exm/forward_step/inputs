@@ -1,8 +1,8 @@
 # Simulation time
-max_step  =   50
+max_step  =   10
 stop_time =  0.2
-#cfl = 0.3
-time_step = 1.0e-5
+cfl = 0.3
+#time_step = 1.0e-5
 
 
 # Geometry 

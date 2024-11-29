@@ -21,18 +21,18 @@ class EBFab: public BaseFab<bool> {
   ~EBFab() {};
 };
 ///
-/// \brief EBMultiFab holds an array of IBFab on a level
+/// \brief EBMultiFab holds an array of IBFab on a level 
 ///
 template<typename marker_t>
 class EBMultiFab : public FabArray<EBFab<marker_t>> {
  public:
   // constructor from BoxArray and DistributionMapping
-  explicit inline EBMultiFab<marker_t>(
+  explicit EBMultiFab(
       const BoxArray& bxs, const DistributionMapping& dm, const int nvar,
       const int ngrow, const MFInfo& info = MFInfo{true, amrex::The_Managed_Arena()},
       const FabFactory<EBFab<marker_t>>& factory = DefaultFabFactory<EBFab<marker_t>>()) : FabArray<EBFab<marker_t>>(bxs, dm, nvar, ngrow, info, factory) {};
 
-  EBMultiFab<marker_t>(EBMultiFab<marker_t>&& rhs) noexcept 
+  EBMultiFab(EBMultiFab&& rhs) noexcept 
                         : FabArray<EBFab<marker_t>>(std::move(rhs)) {};
 
   ~EBMultiFab() {};

@@ -3,7 +3,16 @@
 
 #include <AMReX_EB2.H>
 #include <AMReX_EB2_IF.H>
+#include <AMReX_EBCellFlag.H>
+#include <AMReX_EBFArrayBox.H>
 #include <AMReX_ParmParse.H>
+
+// snm new
+#include <AMReX_EBFluxRegister.H>
+#include <AMReX_Geometry.H>
+
+#include <AMReX_FArrayBox.H>
+
 
 #include <algorithm>
 #include <cmath>
@@ -11,6 +20,8 @@
 #include <EBMultiFab.h>
 
 #include <walltypes.h>
+
+#include <AMReX_MultiCutFab.H>
 
 
 
@@ -137,7 +148,6 @@ public:
   ////////////////////////////////////////////////////////////////////////////
   void computeMarkers(int lev)
   {
-
     // amrex::Print( ) << " oo computeMarkers  lev=" << lev << std::endl;  
 
     auto& mfab = *bmf_a[lev];
@@ -146,35 +156,16 @@ public:
       const Box& bx = mfi.tilebox();
       const auto& ebMarkers = mfab.array(mfi); // boolean array
      
-      // Array4<const Real> vf = (*volfrac).const_array(mfi); // obsolete     
       Array4<const Real> vf = (*volmf_a[lev]).const_array(mfi);      
+ 
+      const auto& flag_arr = (*ebflags_a[lev]).const_array(mfi);
 
       amrex::ParallelFor(
         bx, [=] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {                       
-        const Real vfrac = vf(i,j,k);
-        // solid marker
-        ebMarkers(i, j, k, 0) = vfrac < vfracmin ;
-        // next-to-solid marker:
-        // cell is nor empty (empty cell vfrac=1) nor solid (vfrac=0)
-        ebMarkers(i, j, k, 1) = (vfrac < vfracmax) && (vfrac > vfracmin);        
-      });
-      
-      // correct for empty cells close to surface 
-      amrex::ParallelFor(
-        bx, [=] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {                       
-#if (AMREX_SPACEDIM==2)             
-        ebMarkers(i, j, k, 1) =  ! ebMarkers(i, j, k, 0) && 
-        ( ebMarkers(i, j, k, 1) ||
-        ebMarkers(i+1, j, k, 0) || ebMarkers(i-1, j, k, 0) || 
-        ebMarkers(i, j+1, k, 0) || ebMarkers(i, j-1, k, 0) );
-#endif
-#if (AMREX_SPACEDIM==3)             
-        ebMarkers(i, j, k, 1) = ! ebMarkers(i, j, k, 0) && 
-        ( ebMarkers(i, j, k, 1) ||
-        ebMarkers(i+1, j, k, 0) || ebMarkers(i-1, j, k, 0) || 
-        ebMarkers(i, j+1, k, 0) || ebMarkers(i, j-1, k, 0) ||
-        ebMarkers(i, j, k+1, 0) || ebMarkers(i, j, k-1, 0) );
-#endif
+
+        ebMarkers(i, j, k, 0) = flag_arr(i,j,k).isCovered();  
+        ebMarkers(i, j, k, 1) = flag_arr(i,j,k).isSingleValued();  
+  
       });
 
 
@@ -216,6 +207,8 @@ public:
     // just in case 
     const auto& flag = (*ebflags_a[lev])[mfi];
 
+    const int is = 80; int js= 15;
+
     amrex::ParallelFor(
         ebbox, [=] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {
 
@@ -224,16 +217,21 @@ public:
           if (ebMarkers(i,j,k,1)){
             Real vfracinv = 1.0/vfrac(i,j,k);
 
-            if ((j==0) && (i < 30)) {
-            printf(" sld L=%d P=%d R=%d  \n",ebMarkers(i-1,j,k,0),ebMarkers(i,j,k,0),ebMarkers(i+1,j,k,0));
-            printf(" cut L=%d P=%d R=%d  \n",ebMarkers(i-1,j,k,1),ebMarkers(i,j,k,1),ebMarkers(i+1,j,k,1));
-            printf(" sld S=%d P=%d N=%d  \n",ebMarkers(i,j-1,k,0),ebMarkers(i,j,k,0),ebMarkers(i,j-1,k,0));
-            printf(" cut S=%d P=%d N=%d  \n",ebMarkers(i,j-1,k,1),ebMarkers(i,j,k,1),ebMarkers(i,j+1,k,1));
+            // if ((j < js) && (i ==is )) {
+            // printf(" i = %d j = %d  k =%d \n",i,j,k);
+            // printf(" sld L=%d P=%d R=%d  \n",ebMarkers(i-1,j,k,0),ebMarkers(i,j,k,0),ebMarkers(i+1,j,k,0));
+            // printf(" cut L=%d P=%d R=%d  \n",ebMarkers(i-1,j,k,1),ebMarkers(i,j,k,1),ebMarkers(i+1,j,k,1));
+            // printf(" sld S=%d P=%d N=%d  \n",ebMarkers(i,j-1,k,0),ebMarkers(i,j,k,0),ebMarkers(i,j+1,k,0));
+            // printf(" cut S=%d P=%d N=%d  \n",ebMarkers(i,j-1,k,1),ebMarkers(i,j,k,1),ebMarkers(i,j+1,k,1));
   
-             printf(" i=%d j=%d apx(+1)= %f apx= %f \n",i,j,apx(i+1,j,k),apx(i,j,k) );
-             printf(" norm =%f %f \n",normxyz(i,j,k,0),normxyz(i,j,k,1));
-             printf(" bcarea =%f  bc*dx %f \n",bcarea(i,j,k,0),bcarea(i,j,k,0)*dx[0]);             
-             }
+            //  printf(" apx(i+1) = %f apx(i)= %f \n",i,j,apx(i+1,j,k),apx(i,j,k) );
+            //  printf(" apy(j+1) = %f apy(j)= %f \n",i,j,apy(i,j+1,k),apy(i,j,k) );
+             
+
+            //  printf(" norm =%f %f \n",normxyz(i,j,k,0),normxyz(i,j,k,1));
+            //  printf(" bcarea =%f  bc*dx %f \n",bcarea(i,j,k,0),bcarea(i,j,k,0)*dx[0]);   
+            //  printf(" vfrac=%f \n",vfrac(i,j,k));
+            //  }
 
 
             for (int n = 0; n < cls_t::NCONS; n++) {
@@ -250,10 +248,10 @@ public:
               dxinv[1] * (apy(i, j + 1, k) * fyp - apy(i, j, k) * fym) );
 #endif            
 
-            //  //temp snm
-             if ((j==0) && (i < 30)) {
-             printf(" n=%d fxR= %f fxL = %f vfrac=%f\n",n,fxp,fxm,vfrac(i,j,k));
-             }
+            // //  //temp snm
+            //  if ((j<js) && (i ==is )) {
+            //  printf(" n= %d fxp= %f fxm= %f fyp= %f fym= %f\n",n,fxp,fxm,fyp,fym);
+            //  }
 
 
 
@@ -278,7 +276,7 @@ public:
             for (int n = 0; n < cls_t::NPRIM; n++) {
               prim_wall[n] = prims(i,j,k,n);          
                
-               if ((j==0) && (i < 30)) { printf("%d %f \n",n, prim_wall[n]);}
+              // if ((j<js) && (i ==is )) { printf("%d %f \n",n, prim_wall[n]);}
 
             }  
             // normal to surface 
@@ -292,12 +290,13 @@ public:
            
  
             for (int n = 0; n < cls_t::NCONS; n++) {
-              rhs(i,j,k) += flux_wall[n]*vfracinv*bcarea(i,j,k,0)*dx[0];
+              rhs(i,j,k,n) += flux_wall[n]*vfracinv*bcarea(i,j,k,0)*dxinv[0];
 
              //temp snm
-             if ((j==0) && (i < 30)) {
-              printf(" n=%d fluxwall = %f areabc=%f \n",n,flux_wall[n],bcarea(i,j,k,0));
-              }
+            //  if ((j<js) && (i ==is )) {
+            //   printf(" n=%d fluxwall = %f areabc=%f \n",n,flux_wall[n],bcarea(i,j,k,0));
+            //   printf(" RHS = %f \n", rhs(i,j,k,n));
+            //   }
 
             }
             

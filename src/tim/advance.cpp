@@ -228,10 +228,10 @@ Real CNS::advance(Real time, Real dt, int /*iteration*/, int /*ncycle*/) {
       if (ibMarkers(i, j, k, 1)) {
 
         IntVect iv(AMREX_D_DECL(i, j, k)); 
-        Real cons[cls_t::NCONS];
+        Real cons[cls_h.NCONS];
         // Real* cons = &state(i,j,k,cls_t::NCONS - 1); (prims2cosn shoudl accept a pointer)
-        cls_h.prim2cons(iv,prims,cons);        
-        for (int n = 0; n < cls_t::NCONS; n++) {
+        cls_h.prims2cons(iv,prims,cons);        
+        for (int n = 0; n < cls_h.NCONS; n++) {
           state(i, j, k, n) = cons[n];
         }
         // state(i, j, k, cls_d->UMX) = prims(i, j, k, cls_d->QRHO) * prims(i, j, k, cls_d->QU);
@@ -282,7 +282,6 @@ void CNS::compute_rhs(MultiFab& statemf, Real dt, FluxRegister* fr_as_crse, Flux
   const PROB::ProbClosures* cls_d = CNS::d_prob_closures;
   const PROB::ProbClosures& cls_h = *CNS::h_prob_closures;
   // const PROB::ProbParm& parms = *d_prob_parm;
-
 
   for (MFIter mfi(statemf, false); mfi.isValid(); ++mfi) {
     Array4<Real> const& state = statemf.array(mfi);
@@ -355,22 +354,10 @@ void CNS::compute_rhs(MultiFab& statemf, Real dt, FluxRegister* fr_as_crse, Flux
     // SNM testing
     const Box&  ebbox  = mfi.growntilebox(0);  // box without ghost points 
     const auto& flag = (*EBM::eb.ebflags_a[level])[mfi];
+
+    //const auto& flag_arr = flag.const_array(mfi); //<<
+
     FabType t = flag.getType(ebbox);
-
-    // snm
-    // if (FabType::regular == t) {
-    //     printf(" TEST This box is regular\n") ;
-    // } else if (FabType::covered == t) {
-    //     printf(" TEST This box is covered \n") ;
-    // } else if (FabType::singlevalued == t) {
-    //     printf(" TEST This box is cut cell  \n") ;
-    // }         
-    //   else {
-    //     printf(" EB::ERROR  \n") ;
-    //     exit(1);               
-    // }
-    // // snm
-
     if (FabType::singlevalued == t){
       EBM::eb.ebflux(geom,mfi, prims, fluxt,state, cls_d,level);
     }

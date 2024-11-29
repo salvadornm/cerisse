@@ -528,7 +528,7 @@ void CNS::post_regrid(int lbase, int new_finest) {
   EBM::eb.areamcf_a[level] = ebfactory.getAreaFrac();  
   EBM::eb.ebflags_a[level] = &(ebfactory.getMultiEBCellFlagFab());
   EBM::eb.bcareamcf_a[level] = &(ebfactory.getBndryArea());
-  
+    
   
   // EBM::eb.bndrycent = &(ebfactory.getBndryCent());
   // EBM::eb.facecent  = ebfactory.getFaceCent();
