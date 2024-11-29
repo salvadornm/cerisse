@@ -207,7 +207,7 @@ public:
     // just in case 
     const auto& flag = (*ebflags_a[lev])[mfi];
 
-    const int is = 80; int js= 15;
+    const int is = 19; int js= 5;
 
     amrex::ParallelFor(
         ebbox, [=] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {
@@ -217,25 +217,26 @@ public:
           if (ebMarkers(i,j,k,1)){
             Real vfracinv = 1.0/vfrac(i,j,k);
 
-            // if ((j < js) && (i ==is )) {
-            // printf(" i = %d j = %d  k =%d \n",i,j,k);
-            // printf(" sld L=%d P=%d R=%d  \n",ebMarkers(i-1,j,k,0),ebMarkers(i,j,k,0),ebMarkers(i+1,j,k,0));
-            // printf(" cut L=%d P=%d R=%d  \n",ebMarkers(i-1,j,k,1),ebMarkers(i,j,k,1),ebMarkers(i+1,j,k,1));
-            // printf(" sld S=%d P=%d N=%d  \n",ebMarkers(i,j-1,k,0),ebMarkers(i,j,k,0),ebMarkers(i,j+1,k,0));
-            // printf(" cut S=%d P=%d N=%d  \n",ebMarkers(i,j-1,k,1),ebMarkers(i,j,k,1),ebMarkers(i,j+1,k,1));
+            if ((j==js) && (i ==is )) {
+            printf(" i = %d j = %d  k =%d \n",i,j,k);
+            printf(" sld L=%d P=%d R=%d  \n",ebMarkers(i-1,j,k,0),ebMarkers(i,j,k,0),ebMarkers(i+1,j,k,0));
+            printf(" cut L=%d P=%d R=%d  \n",ebMarkers(i-1,j,k,1),ebMarkers(i,j,k,1),ebMarkers(i+1,j,k,1));
+            printf(" sld S=%d P=%d N=%d  \n",ebMarkers(i,j-1,k,0),ebMarkers(i,j,k,0),ebMarkers(i,j+1,k,0));
+            printf(" cut S=%d P=%d N=%d  \n",ebMarkers(i,j-1,k,1),ebMarkers(i,j,k,1),ebMarkers(i,j+1,k,1));
   
-            //  printf(" apx(i+1) = %f apx(i)= %f \n",i,j,apx(i+1,j,k),apx(i,j,k) );
-            //  printf(" apy(j+1) = %f apy(j)= %f \n",i,j,apy(i,j+1,k),apy(i,j,k) );
+             printf(" apx(i+1) = %f apx(i)= %f \n",apx(i+1,j,k),apx(i,j,k) );
+             printf(" apy(j+1) = %f apy(j)= %f \n",apy(i,j+1,k),apy(i,j,k) );
              
 
-            //  printf(" norm =%f %f \n",normxyz(i,j,k,0),normxyz(i,j,k,1));
-            //  printf(" bcarea =%f  bc*dx %f \n",bcarea(i,j,k,0),bcarea(i,j,k,0)*dx[0]);   
-            //  printf(" vfrac=%f \n",vfrac(i,j,k));
-            //  }
+             printf(" norm =%f %f \n",normxyz(i,j,k,0),normxyz(i,j,k,1));
+             printf(" bcarea =%f  bc*dx %f \n",bcarea(i,j,k,0),bcarea(i,j,k,0)*dx[0]);   
+             printf(" vfrac=%f \n",vfrac(i,j,k));
+             }
 
 
             for (int n = 0; n < cls_t::NCONS; n++) {
-              // fluxes  from fluid faces
+              // fluxes  from fluid faces  NOT CORRECT REBUILD
+              // ---> use CD ?? function
               Real fxp = flx(i+1,j,k,n); 
               Real fxm = flx(i,j,k,n);
               Real fyp = flx(i,j+1,k,n); 
@@ -248,10 +249,10 @@ public:
               dxinv[1] * (apy(i, j + 1, k) * fyp - apy(i, j, k) * fym) );
 #endif            
 
-            // //  //temp snm
-            //  if ((j<js) && (i ==is )) {
-            //  printf(" n= %d fxp= %f fxm= %f fyp= %f fym= %f\n",n,fxp,fxm,fyp,fym);
-            //  }
+            //  //temp snm
+             if ((j==js) && (i ==is )) {
+             printf(" n= %d fxp= %f fxm= %f fyp= %f fym= %f\n",n,fxp,fxm,fyp,fym);
+             }
 
 
 
@@ -276,7 +277,7 @@ public:
             for (int n = 0; n < cls_t::NPRIM; n++) {
               prim_wall[n] = prims(i,j,k,n);          
                
-              // if ((j<js) && (i ==is )) { printf("%d %f \n",n, prim_wall[n]);}
+              if ((j==js) && (i ==is )) { printf("%d %f \n",n, prim_wall[n]);}
 
             }  
             // normal to surface 
@@ -290,13 +291,17 @@ public:
            
  
             for (int n = 0; n < cls_t::NCONS; n++) {
+
+               if ((j==js) && (i ==is )) {
+                  printf(" RHS = %f \n", rhs(i,j,k,n));
+               }                  
+
               rhs(i,j,k,n) += flux_wall[n]*vfracinv*bcarea(i,j,k,0)*dxinv[0];
 
              //temp snm
-            //  if ((j<js) && (i ==is )) {
-            //   printf(" n=%d fluxwall = %f areabc=%f \n",n,flux_wall[n],bcarea(i,j,k,0));
-            //   printf(" RHS = %f \n", rhs(i,j,k,n));
-            //   }
+             if ((j==js) && (i ==is )) {
+              printf(" n=%d fluxwall = %f RHS=%f \n",n,flux_wall[n],rhs(i,j,k,n));           
+              }
 
             }
             
@@ -308,9 +313,12 @@ public:
 
         });
   }                      
- 
+  ////////////////////////////////////////////////////////////////////////////
+  /// flux function call  prims2fluxes
   
         
+
+
 
 
 

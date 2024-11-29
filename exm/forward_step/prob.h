@@ -48,7 +48,7 @@ struct methodparm_t {
   public:
 
   static constexpr bool dissipation = true;         // no dissipation
-  static constexpr int  order = 4;                  // order numerical scheme   
+  static constexpr int  order = 2;                  // order numerical scheme   
   static constexpr Real C2skew=0.5,C4skew=0.0016;   // Skew symmetric default
 
 };
@@ -59,9 +59,9 @@ inline Vector<int> cons_vars_type={1,2,3,0,0};
 typedef closures_dt<indicies_t, visc_suth_t, cond_suth_t,
                     calorifically_perfect_gas_t<indicies_t>> ProbClosures;
 
-typedef rhs_dt<rusanov_t<ProbClosures>, no_diffusive_t, no_source_t > ProbRHS;
+//typedef rhs_dt<rusanov_t<ProbClosures>, no_diffusive_t, no_source_t > ProbRHS;
 //typedef rhs_dt<riemann_t<false, ProbClosures>, no_diffusive_t, no_source_t > ProbRHS;
-//typedef rhs_dt<skew_t<methodparm_t, ProbClosures>, no_diffusive_t, no_source_t > ProbRHS;
+typedef rhs_dt<skew_t<methodparm_t, ProbClosures>, no_diffusive_t, no_source_t > ProbRHS;
 
 // define type of wall and EBM class
 
