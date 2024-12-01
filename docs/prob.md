@@ -7,7 +7,7 @@ coverY: 0
 
 # PROB
 
-The `prob.h` file creates the namespace **PROB**, that defines th eprobelm to be solved and the methods to do it. file form one of the examples as a starting point
+The `prob.h` file creates the namespace **PROB**, that defines the probelm to be solved and the methods to do it. Check the file from one of the examples(LINK) as a starting point
 
 <figure><img src=".gitbook/assets/prob.png" alt=""><figcaption></figcaption></figure>
 
@@ -40,14 +40,16 @@ In some cases in convenient to defined a a few global constants , such as
 static constexpr Real Reynolds = 3000.0;  
 ```
 
-These arte defined as `static constexpr`, so they are evaluated at compile time, making it efficient for use in other compile-time expressions. Global constant can be used in the method and the ProbParm strcuture and also in the parmeters to methods (see below), unlike the ProbParm strycture which is used in user functions.
+These constants are defined as `static constexpr`, allowing them to be evaluated at compile time. This makes them efficient for use in other compile-time expressions.
+Global constants can be utilized within methods, the **ProbParm** structure, and as parameters to methods  Unlike the **ProbParm** structure, global constants are directly accessible in 
+all user-defined functions.
 
-NOTE: By default Cerisse uses SI units (unlike PeleC) or no-units, include the file "Constants.h" to acesse conversion factors (CGS to SI and viceversa) as well as universal constants with appropiate precision.
+
+NOTE: By default Cerisse uses SI units (unlike PeleC) or no-units, include the file "Constants.h" to access conversion factors (CGS to SI and viceversa) as well as universal constants with appropiate precision.
 
 ## Themodynamic and Transport Closures
 
-The namespace PROB needs to define the **closures\_dt** template, which creates the physical "closures" of the problems, that means which themrodynamics model is used as well as transport properties
-
+The namespace **PROB** needs to define the **closures\_dt** template, which creates the physical "closures" of the problems, that means which themrodynamics modesl are used as well as transport properties
 For example:
 
 ```cpp
@@ -185,11 +187,36 @@ NOTE: indicies is common, an dit allocates spaces for so in 1D `state(i,j,k,cls.
 
 ## Source
 
-Source term
+A user-specific source term can be created by defining a template
+
+```cpp
+template <typename cls_t > class user_source_t;
+```
+
+```cpp
+template <typename cls_t>
+class user_source_t {
+  public:
+  void inline src(const amrex::MFIter &mfi,
+                  const amrex::Array4<const amrex::Real> &prims,
+                  const amrex::Array4<amrex::Real> &rhs, const cls_t *cls_d,
+                  amrex::Real dt){
+    const Box bx = mfi.tilebox();
+    ProbParm const prob_parm;
+    amrex::ParallelFor(bx,
+      [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept
+      {
+      const auto& cls = *cls_d;
+      //  Pressure Source           
+      rhs(i,j,k,cls.UMX) += prob_parm.dpdx;  
+      });
+  };
+};
+```
 
 ## Boundary Condition
 
-The `prob.h` can be used to implement user-specific boundary conditions (transient, turbulent, etc). To do that, a local template is defined
+The `prob.h` can be used to implement user-specific boundary conditions (transient, turbulent, etc). To do that, a local template is defined (see boundaries tab for detail).
 
 ## Other
 

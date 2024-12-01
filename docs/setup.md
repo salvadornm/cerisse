@@ -28,12 +28,12 @@ $$
 \frac{\partial U}{\partial t} = \mbox{RHS}(U)
 $$
 
-Here, $$U$$ represents a vector of conserved variables, while $$\mbox{RHS}(U)$$ is a general term that includes contributions from Euler terms, viscous terms, and source terms. Any changes to this file require the code to be recompiled (by running `make`). The tab [PROB](prob.md) explaisn in detail the confiuguration of this file.
+Here, $$U$$ represents a vector of conserved variables, while $$\mbox{RHS}(U)$$ is a general term that includes contributions from convectie(Euler) terms, viscous terms, and source terms. Any changes to this file require the code to recompile (by running `make`). The tab [PROB](prob.md) explains in detail the configuration of this file.
 
 ## Compiler options
 
-The second part is defiend in the `GNUMakefile` file. The file controls general compiler options, as well as dimensions of the problem, precision and hard-coded chemistry options (if PelePhysics used). Some of these options are pased to _**AMREX**_, to ensure that only the required memory will be used as well as ensure faster run times. This file would probably be changed only once for every new problem. Any changes to this file require the code to be recompiled from scratch (by running `make clean` and then `make` ).
+The second  configuration file is the `GNUMakefile`. This file controls general compiler options, as well as dimensions of the problem, precision and chemistry options (if **PelePhysics** used). Some of these options are pased to **AMReX**, to ensure that only the required memory will be used and therefore faster run times. This file should probably be changed only once for every new problem. Any changes to this file require the code to be recompiled from *scratch* (by running `make clean` and then `make` ).
 
 ## Control parameters
 
-The third part is the `input` file that covers the size of the problem, gris, time-stepping, output files. This file is assumed to be modifed often and does not require recompiling.
+The third file is the `input` file that defines the size of the problem, gris, time-stepping, output files. This file is assumed to be modifed often and does not require recompiling. Details in here.

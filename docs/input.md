@@ -55,7 +55,7 @@ In the tables below, _DIM_ means the number of dimensions, _Int_ means integer, 
 # 0 = Interior                               3 = Symmetry
 # 1 = Inflow / UserBC                        4 = SlipWall =3
 # 2 = Outflow (First Order Extrapolation)    5 = NoSlipWall (adiabatic)
-cns.lo_bc = 1 5.0
+cns.lo_bc = 1 5 0
 cns.hi_bc = 2 5 0
 ```
 
@@ -68,7 +68,51 @@ In the above example, the bc in _x_ would be inflow (at lower boundary) and outf
 
 If option "0" is selected, the corresponding `geometry.is_periodic` must also be set.
 
-If option "1" is selected, the `bcnormal` function in `prob.H` will be activated.
+If option "1" is selected, the `bcnormal` function in `prob.H` will be activated
+(see boundary conditions).
 
-There are also 3 options to control the BC for embedded boundaries, `cns.eb_no_slip` (default true), `cns.eb_isothermal` (default false), and a real number `cns.eb_wall_temp` if isothermal wall is selected.
+
+### Geometry EB options
+
+In the **input** file, users should specify the geometry of the embedded boundary with `eb2.geom_type`, then supply the required parameters in the format of `eb2.{geom_param}`. 
+
+| eb2.geom_type | additional parameters required             |
+| ------------- | ------------------------------------------ |
+| `all_regular` | no EB, no additional parameters needed
+| `plane`       | `plane_point` - a point where the plane intersects, `plane_normal` - the normal vector of the plane that points into the solid
+| `sphere`      | `sphere_center`,  `sphere_radius`, `sphere_has_fluid_inside` - bool value fluid inside or outside
+| `cylinder`    | `cylinder_center`, `cylinder_radius`, `cylinder_height`, `cylinder_direction` - (0,1,2) for (x,y,z), and `cylinder_has_fluid_inside`
+| `box`         | `box_lo` and `box_hi` - lower and upper corners of the box, and `box_has_fluid_inside`
+| `stl`         | `stl_file` - the STL file name, `stl_scale` - the scaling factor in all directions, and `stl_center` - center of object in relation to the cooridinate system in the file, and `stl_reverse_normal` - essentially stl_has_fluid_inside
+| `triangles`   | `num_tri` - number of triangles, up to 5 (change the value in `custom_geometry.cpp` if needed), <br> for each triangle, `{i}` from 0 to num_tri-1, `tri_{i}_point_0`, `tri_{i}_point_1`, `tri_{i}_point_2` - three points that define the triangle, give the points in anti-clockwise direction to set solid inside of the triangle. The z-coordinate isn't really needed because the triangle will be extruded in the z-direction.
+| `combustor`   | `far_wall_loc`, `ramp_plane1_point`,  `ramp_plane2_point`, `ramp_plane2_normal`, `ramp_plane3_point`, `pipe_lo`, `pipe_hi`
+| `converging-nozzle` | `d_inlet`, `l_inlet`, `d_exit`, `l_nozzle`
+
+NOTE: You can only choose one geometry type and one geometry. If you want to use multiple geometries, you need to define your own geometry
+
+Below are some examples:
+```ini
+eb2.geom_type = all_regular
+
+eb2.geom_type = cylinder
+eb2.cylinder_direction = 2
+eb2.cylinder_radius = 0.25
+eb2.cylinder_center = 1.0 2.0 0.0
+eb2.cylinder_has_fluid_inside = 0
+
+eb2.geom_type = box
+eb2.box_lo = -1.0 -1.0 0.0
+eb2.box_hi =  1.0  2.0  0.0
+eb2.box_has_fluid_inside = 0
+
+# This gives the same geometry as the box above
+eb2.geom_type = triangles 
+triangles.num_tri = 2
+triangles.tri_0_point_0 = -1.0  1.0 0.0
+triangles.tri_0_point_1 = -1.0 -1.0 0.0
+triangles.tri_0_point_2 =  1.0 -1.0 0.0
+triangles.tri_1_point_0 = -1.0  1.0 0.0
+triangles.tri_1_point_1 =  1.0 -1.0 0.0
+triangles.tri_1_point_2 =  1.0  1.0 0.0
+```
 

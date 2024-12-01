@@ -13,14 +13,26 @@
   * [PROB](prob.md)
   * [Input](input.md)
   * [Makefile](makefile.md)
+  * [Boundaries](bc.md)
+  * [Chemistry](chemistry.md)
+  * [Analysis](analysis.md)
 
 ## EXAMPLES
 
 * [Examples](examples.md)
-  * [one dimension](onedim.md)
+  * [1-D](onedim.md)
+  * [2-D](onedim.md)
+  * [3-D](onedim.md)
+  
 
 ## THEORY
 
 * [Equations](equations.md)
+  * [DNS](theory/equations/dns.md) 
   * [LES](les.md)
   * [Numerical Methods](theory/equations/numerical-methods.md)
+
+## CODE
+* [Overview](code.md)
+  * [Variables](indexvar.md)
+  * [Euler Solver](fluxsolver.md)

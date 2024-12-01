@@ -59,7 +59,7 @@ To install auxiliar packages, **AMReX** and **PelePhysics**
 
 ```bash
 $ cd cerisse/lib/
-$ ./install_script safe
+$ ./install.sh safe
 ```
 
 It will connect to Github and download the required packages. `$ ./install git`, will install latest release commit in the **development** branch of AMReX. The install **safe** option will install version **23.11** of **AMReX** and **23.03** of **PelePhysics**. Downloads are fast with 27 and 30 M respectively. All installation files will live under `./lib`
@@ -70,8 +70,8 @@ To install CGAL libraries go to folder
 
 ```bash
 $ cd cerisse/lib/
-$ ./install_script test
-$ ./install_script cgal
+$ ./install.sh test
+$ ./install.sh cgal
 ```
 
 This will install **5.6.1** CGAL version as well as **boost** folder. All installation files will live under `./lib`.

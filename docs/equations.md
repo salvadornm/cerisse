@@ -1,93 +1,61 @@
----
-icon: lambda
-cover: >-
-  https://images.unsplash.com/photo-1608792992053-f397e328a56d?crop=entropy&cs=srgb&fm=jpg&ixid=M3wxOTcwMjR8MHwxfHNlYXJjaHwxfHxtYXRofGVufDB8fHx8MTczMDk3OTE2OHww&ixlib=rb-4.0.3&q=85
-coverY: 0
----
-
 # Equations
 
-### Continuity
+Cerisse solves equations in the general form
 
 $$
-\frac{\partial \rho }{\partial t} + \frac{\partial \rho u_j }{\partial x_j} = 0
+\frac{\partial \mathbf{U} }{\partial t} + \frac{\partial \mathbf{F}_j }{\partial x_j}  + \frac{\partial \mathbf{F}_{visc} }{\partial x_j} =  \mathbf{S}
 $$
 
-### Momentum
+Where $$\mathbf{U}$$ is the array in conservative variables
 
 $$
-\frac{\partial \rho u_i }{\partial t} + \frac{\partial \rho u_i u_j}{\partial x_j} = -\frac{\partial p}{\partial x_i} + \frac{\partial \tau_{ij}}{\partial x_j}
+\mathbf{U} = \begin{bmatrix} \rho \\ \rho u_i  \\ E_t \\ \rho Y_1 \\ \rho Y_2 \\ ... \end{bmatrix}
 $$
 
-### Chemical species transport
+and $$\mathbf{F}$$ represent the fluxes of the conserved variables across a surface.
+For example in x-direction.
 
 $$
-\frac{\partial \rho Y_k }{\partial t} + \frac{\partial \rho u_j Y_k}{\partial x_j} = \frac{\partial J_j^k}{\partial x_j} + \rho \dot{\omega}_k
+\mathbf{F}_x =
+\begin{bmatrix}
+\rho u \\ \rho u_2 + p \\ \rho u v \\ \rho u w \\ u(E_t + p) \\ \rho u Y_1 \\ \rho u Y_2 \\ ...
+\end{bmatrix}
 $$
+These are called the The Euler fluxes. If these fluzes are the only present, the resultant equations are the **Euler Equations** 
 
-The code solves for the partial densities $$\rho_k = \rho Y_k$$
+$$\mathbf{F}_{visc}$$ represents the fluxes due to molecular transport (viscous streess, heat fluxes, mass disffusion, etc).
+While $$\mathbf{S}$$ is a generic source term.
+While combining these terms appropiately we can build differnt type of equations (check PROB), such as Euler, Navier-Stokes, Reactive Navier-Stokes, Non-equilbrium thermodynamics, etc.
+The reactive equations can be see in the DNS tab.
 
-$$
-\frac{\partial \rho_k }{\partial t} + \frac{\partial  \rho_k u_j }{\partial x_j} = \frac{\partial J_j^k}{\partial x_j} + \rho \dot{\omega}_k
-$$
+## Finite Volume Method
 
-### Total Energy
-
-$$
-\frac{\partial E_t }{\partial t} + \frac{\partial (E_t + p) u_j}{\partial x_j} = \frac{\partial u_i \tau_{ij}}{\partial x_j}+ \frac{\partial q_j }{\partial x_j} + \sum_k \frac{ \partial h_k J_j^k}{\partial x_j}
-$$
-
-where $$E_t = \rho e_i + \rho k$$ is the total energy plus kinetic energy.
-
-## Closures
-
-### Transport fluxes
-
-The main cosures assume Newtonian flows, Fourier heat transfer and and Fickian diffusion and also (optionally) Soret diffusion The **shear stress** is given by
+The expression can be written in divergence form
 
 $$
-\tau_{ij} = 2 \mu S_{ij} + (\mu_b - \frac{2}{3} \mu)\nabla \cdot \vec{v} \delta_{ij}
+\frac{\partial \mathbf{U} }{\partial t} =  
+-\nabla \cdot \left( \mathbf{F} +  \mathbf{F}_{visc} \right) + \mathbf{S} =  -\nabla \cdot \mathbf{F}^\ast + \mathbf{S}
 $$
 
-where $$\mu$$ and $$\mu_b$$ are the dynamic viscosity (or coefficient of shear viscoisty) and coefficient of bulk viscosity respectively. The **heat flux** follows Fourier's law
-
+Integrating over cell and dividing over control volume $V_{ijk}$
 $$
-q_j = -\lambda \frac{\partial T }{\partial x_j}
-$$
-
-where $$\lambda$$ is the conductivity. The **diffusion flux** follows Fickian transport, which based in mole fraction is:
-
-$$
-\overline{J}_j^k = - D_k \frac{\partial X_k }{\partial x_j}
+\frac{1}{V_{ijk}} \int \frac{\partial \mathbf{U} }{\partial t} dV =  
+\frac{1}{V_{ijk}}  \int -\nabla \cdot \mathbf{F}^\ast  \, dV +  \frac{1}{V_{ijk}}   \int \mathbf{S} dV
 $$
 
-and in mass fraction
-
+Defining the cell-averaged value as
 $$
-J_j^k = \rho \frac{M_k}{M} \overline{J}_j^k =
-- \rho \frac{M_k}{M} D_k \frac{\partial X_k }{\partial x_j}
+\phi_{ijk} = \frac{1}{V_{ijk}}  \int \phi dV   
 $$
-
-The diffusion coefficients on the mixture are defined as
-
+and using divergence theorem
 $$
-D_k = \frac{1 - Y_k}{\sum_j X_j/\mathcal{D}_{jk}}
+\frac{\partial \mathbf{U}_{ijk} }{\partial t} =  
+\frac{1}{V_{ijk}}  \oint_{\delta V} \mathbf{F}^\ast  \cdot \mathbf{n} \, dA +  \mathbf{S}_{ijk}
 $$
-
-based on binary diffusion coefficients $$\mathcal{D}_{ij}$$
-
-## Equations of state
-
-The equations of state are of the form
-
+Using polyhedral cells, the following expression  follows by summing over the cells faces
 $$
-p = f(\rho,T,Y_k)
+ \frac{\partial \mathbf{U}_{ijk} }{\partial t}  =  
+\frac{1}{V_{ijk}}  \sum_{f} \mathbf{F}_f^\ast \cdot \mathbf{n}_f \, A_f +  \mathbf{S}_{ijk}
 $$
-
-and the calorific equation of state
-
-$$
-e_i = f(\rho,T,Y_k)
-$$
-
-The current implementations include perfect gas, ideal gas and Soave-Redlich-Kwong (through PelePhysics), including mixtures.
+The above formulation ensures global conservation as the fluxes of
+ shared faces between two control volumes cancel out.

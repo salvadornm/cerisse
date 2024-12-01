@@ -40,7 +40,7 @@ where `/home/snm/work/cerisse` corresponds to the installation directory. Curren
 
 ## Documentation Editing
 
-Althoigh the main docuementation is onine in Gitbooks. It is possible to generate this doumentation by locally typng in the parent directory: `mkdocs serve` and the point the browser to [127.0.0.1.8000](http://127.0.0.1:8000)
+Althoigh the main documentation is onine in Gitbooks. It is possible to generate the documentation by locally typing in the parent directory: `$ mkdocs serve` and the point the browser to [127.0.0.1.8000](http://127.0.0.1:8000) in your browser. The formatting of this documentation may be off (inline equations in particular) and not all images wikk appear.
 
 You may need to install the `python-markdown-math` extension for rendering equations and the `markdown-callouts` extension for correctly displaying the warning and note blocks. For help editing the documentation visit [mkdocs.org](https://www.mkdocs.org).
 

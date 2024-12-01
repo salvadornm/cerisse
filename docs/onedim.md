@@ -9,7 +9,7 @@ coverY: 0
 
 # one dimension
 
-### Sod's Shock Tube
+## Sod's Shock Tube
 
 The Sod Shock tube is a classical Riemann problem used to test the accuracy of computational methods, in particular the capacity of numerical methods to handle shocks.
 

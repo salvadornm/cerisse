@@ -11,12 +11,23 @@ nav:
       - PROB: prob.md
       - Input: input.md
       - Make: makefile.md
+      - BC: bc.md
+      - CHEM: chemistry.md
+      - Analysis: analysis.md
    - EXAMPLES:
       - Examples: examples.md
       - OneDim: onedim.md
+      - TwoDim: twodim.md
+      - ThreeDim: threedim.md
    - THEORY:
-      - DNS: equations.md
+      - Equations: equations.md
+      - DNS: theory/equations/dns.md
       - LES: les.md
+      - Numerics: theory/equations/numerical-methods.md
+   - CODE:
+      - structure: code.md
+      - index: indexvar.md
+      - solver: fluxsolver.md
 extra_javascript:
   - https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.4/MathJax.js?config=TeX-AMS-MML_HTMLorMML
 markdown_extensions:
