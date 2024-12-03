@@ -110,7 +110,6 @@ class user_source_t {
       { 
       const auto& cls = *cls_d;
     
-    //  user_source(i,j,k,prims,rhs,lprobparm,cls,dx);           
       Real rho = prims(i, j, k, cls.QRHO);
       rhs(i,j,k,cls.UMY) += prob_parm.grav*rho; 
       rhs(i,j,k,cls.UET) += prob_parm.grav*rho*prims(i, j, k, cls.QV);
@@ -127,13 +126,6 @@ user_tagging(int i, int j, int k, int nt_level, auto &tagfab,
 
 
   Real rhot = sdatafab(i,j,k,ProbClosures::URHO);
-
-  Real dengrad_threshold = 0.5;
-  Real drhox = Math::abs(sdatafab(i+1,j,k,ProbClosures::URHO) -
-   sdatafab(i,j,k,ProbClosures::URHO))/rhot;
-
-  Real drhoy = Math::abs(sdatafab(i,j+1,k,ProbClosures::URHO) -
-   sdatafab(i,j-1,k,ProbClosures::URHO))/rhot;
 
   if (nt_level > 0) 
   {
