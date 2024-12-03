@@ -1,20 +1,21 @@
 # Eulerian solver
 
-This page explains the rationale between a new finite volume solver for the Euler equations.
-The central differemce will be used as an example.
+This page explains a finite volume solvers for the Euler equations and
+the central differemce will be used as an example.
 A naive finite volume solver would be, in one-dimension 
 
 $$
-\left. \frac{\partial U}{\partial t} \right|_{i} = ( F_{i+1/2} -  F_{i-1/2} )
+\left. \frac{\partial U}{\partial t} \right|_{i} =\frac{ F_{i+1/2} -  F_{i-1/2} }{ \Delta x}
 $$
 
 where  $$U = ( \rho, \rho u, \rho e_T) $$ is the vector of conservative variables and 
 $$F = ( \rho u, \rho u^2 + P, \rho u e_T + u P  )$$ would be the convective flux function.
 
+All the details of the solver are self-contained in a template
 
-## Template 
+## Template Solver
 
-The numeric scheme is often initialised
+The numeric scheme template often requires initialisation.
 
 ```cpp
 template <typename param, typename cls_t>
@@ -25,8 +26,9 @@ class skew_t {
   skew_t() {}
   ..
 ```
-**param** is a lightweight structure that is passed to the template (from `prob.h`) to define optional parameters such as order of the scheme, constant (if needed), dissipation, etc. (see PROB)
-
+**param** is a lightweight structure that is passed to the template (from `prob.h`) to define optional parameters such as order of the scheme, constant (if needed), dissipation, etc. (see PROB).
+The class **cls_t**  correspond to the Problem closures, i.e. the index, thermodyanmic and tarnsport properties and so on.
+The class should contain, at least,  a function that computes the 
 
 ## Flux function
 

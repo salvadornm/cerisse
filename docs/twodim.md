@@ -2,7 +2,7 @@
 
 ## Convection vortex
 
-This test (located in ```exm/numeerics/covo```) consist of the convection of a two-dimensional vortex in an ideal gas under Mach = 0.1 using Euler equations. The physical parameters are defined following Onera’s original definition.
+This test (located in ```exm/numerics/covo```) consist of the convection of a two-dimensional vortex in an ideal gas under Mach = 0.1 using Euler equations. The physical parameters are defined following Onera’s original definition.
 
 The vortex in the centre of the domain is defined by the stream function
 

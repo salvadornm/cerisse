@@ -21,18 +21,21 @@
 
 * [Examples](examples.md)
   * [1-D](onedim.md)
-  * [2-D](onedim.md)
-  * [3-D](onedim.md)
+  * [2-D](twodim.md)
+  * [3-D](threedim.md)
 
 ## THEORY
 
 * [Equations](equations.md)
   * [DNS](theory/equations/dns.md)
-  * [LES](les.md)
+  * [LES](theory/equations/les.md)
+  * [Turbulet Combustion](theory/equations/turbcomb.md)
   * [Numerical Methods](theory/equations/numerical-methods.md)
+  * [Solid boundaries](theory/ibmeb.md)
 
 ## CODE
 
 * [Overview](code.md)
   * [Variables](indexvar.md)
   * [Euler Solver](fluxsolver.md)
+  * [Thermo Solver](thermosolver.md)

@@ -43,3 +43,31 @@ class visc_suth_t {
   }
 };
 ```
+
+## Code Development
+
+Use AmReX methodology
+
+To add a new feature, the procedure is:
+
+1. Create a branch for the new feature (locally):
+
+```bash
+$ git checkout -b AmazingNewFeature
+```
+
+2. Develop the feature, merging changes often from the **develop** branch into your AmazingNewFeature branch: 
+
+```bash
+$ git commit -m "Developed AmazingNewFeature"
+$ git checkout develop
+$ git pull                      # fix any identified conflicts between local and remote branches of "develop"
+$ git checkout AmazingNewFeature
+$ git rebase develop        # fix any identified conflicts between "develop" and "AmazingNewFeature"
+```
+
+3. To mare sure the feature does not bertak the code do test
+
+```bash
+$ cerisse test
+```

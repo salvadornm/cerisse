@@ -22,9 +22,9 @@ layout:
 
 [![License](https://img.shields.io/badge/License-BSD\_3--Clause-blue.svg)](https://opensource.org/licenses/BSD-3-Clause)
 
-**A research computational solver for Large Eddy Simulation (LES) and Direct Numerical Simulation (DNS) of high-speed compressible turbulent reactive flows.**
+**A research computational solver for Large Eddy Simulation  and Direct Numerical Simulation of high-speed compressible turbulent reactive flows.**
 
-The solver employs high-order finite volume methods with adaptive mesh refinement (AMR) and embedded/immersed boundary techniques to capture complex geometries.
+The solver employs high-order finite volume methods with adaptive mesh refinement and embedded/immersed boundary techniques to capture complex geometries.
 
 
 
@@ -38,29 +38,40 @@ The solver is designed for studying high-speed, turbulent reactive flows in a ra
 
 #### Philosophy
 
-Cerisse is a research-oriented code, distinct from commercial software like Star-CCM, Fluent, or Converge. Unlike general-purpose solvers such as OpenFOAM, which provide broad support for a wide range of equations, Cerisse is specifically tailored to high-speed turbulent reactive flows. Although it is efficient and fast, it is not exclusively designed for DNS, as a code like PeleC would be for similar applications. However, Cerisse can still be effectively used as a highly scalable DNS/LES production code
+Cerisse is a research-oriented code, distinct from commercial software like Star-CCM, Fluent, or Converge. Unlike general-purpose solvers such as OpenFOAM, which provide broad support for a wide range of equations, Cerisse is tailored to high-speed turbulent reactive flows. Although it is efficient and fast, it is not exclusively designed for DNS, as a code like 
+[PeleC](https://github.com/AMReX-Combustion/PeleC) would be for similar applications. However, Cerisse can still be effectively used as a highly scalable DNS/LES production code.
 
-The primary goal of Cerisse is to streamline the implementation of new numerical methods, turbulence and combustion models, and solution approaches, allowing users to quickly test these developments. Users can define their problem setup and solution methods within just two files, simplifying customization and experimentation
+The primary goal of Cerisse is to streamline the implementation of new numerical methods, turbulence and combustion models, and solution approaches, allowing users to quickly test these developments. Users can define their problem setup and solution methods within just two files, simplifying customization and experimentation.
 
-Cerisse does not rely on a single numerical scheme; instead, users can select from a range of schemes within the finite volume framework, each offering different trade-offs in speed and accuracy. Available options include central-difference, skew-symmetric, WENO, TENO, and KEEP schemes, or users can create custom solvers tailored to their specific needs. The code is structured to facilitate the development of new models and methods within this framework.
+Cerisse does not rely on a single numerical scheme; instead, users can select from a range of schemes within the **finite volume** framework, each offering different trade-offs in speed and accuracy. Available options include central-difference, skew-symmetric, WENO, TENO, and KEEP schemes, or users can create custom solvers tailored to their specific needs. The code is structured to facilitate the development of new models and methods within this framework.
 
-Additionally, Cerisse includes advanced LES and combustion models—such as Eulerian Stochastic Fields, PaSR, and Artificial Thickening Flame—representing the latest in turbulence and combustion modeling advancements.
+Additionally, Cerisse includes advanced LES and combustion models—such as Eulerian Stochastic Fields, Partial Stirred Reactor, and Artificial Thickening Flame—representing the latest in LES turbulent combustion modeling advancements.
 
 #### Implementation
 
-Cerisse is writte in C++, relying heavily use of templates. The problem definition and solver selction are perfomed by a C++ file. This ensures a relatively efficient code (at the expense of compilation time) with few dependencies. The code only uses what it needs. The code runs on Linux and MacOS.
+Cerisse is written in C++ and makes extensive use of templates. Problem definition and solver selection are handled through a C++ file, enabling efficient code execution at the cost of longer compilation times. The design minimizes dependencies, ensuring the code uses only what is necessary. Cerisse is compatible with both Linux and macOS, supports parallelization using MPI or using GPUs.
 
-Cerisse uses AMREX libraries [AMREX](https://amrex-codes.github.io/amrex/), which ensures efefctive parallelization in GPU and CPU, as well as [PelePhysics](https://pelephysics.readthedocs.io/en/latest/) repository for chemistry and transport models. However, simpler (or more complex) Thermodynamics and Transport models can be used and integrated. Cerisse does not use a _mesh_ and complex geometries are represented by incorporating directly the geometry. Results can be visualised by common open post-processing tools or load into python for further analysis.
+Cerisse uses AMREX libraries [AMREX](https://amrex-codes.github.io/amrex/), which ensures effective parallelization in GPU and CPU, as well as [PelePhysics](https://pelephysics.readthedocs.io/en/latest/) repository for chemistry and transport models. However, simpler (or more complex) Thermodynamics and Transport models can be used and integrated. Cerisse does not use a _mesh_ and complex geometries are represented by incorporating directly the geometry. Results can be visualised by common open post-processing tools or load into python for further analysis.
 
 #### Download and Install
 
-The code source code is [GitHub](https://github.com/salvadornm/cerisse) Check the [QuickStart](quickstart.md) on how to download, installing the and run a simple example case.
+The code source for [Cerisse2](https://github.com/salvadornm/cerisse/tree/cerisse2)
+while code for (old) [Cerisse](https://github.com/salvadornm/cerisse)
+Releases will appear  soon in [Downloads](https://github.com/salvadornm/cerisse/releases).
+
+NOTE: This documentation is created for Cerisse2, which corresponds to the **cerisse2** branch on GitHub.
+Please note that some features from the original Cerisse (**main** branch) have not yet been ported to this version.
+
+Refer to the [QuickStart Guide](quickstart.md) for instructions on downloading, installing, and running a simple example case.
 
 #### Citation
 
 This open-source software is distributed under the BSD3 license. If you use it in your work, please cite it as
 
-Monal Patel, Enson Un, Navarro-Martinez 'Cerisse', Zenodo 99999 (2024) [![Static Badge](https://zenodo.org/badge/DOI/10.5281/zenodo.13793622.svg)](https://zenodo.org/records/9999999)
+NOTE: Monal Patel, Enson Un, Salvador Navarro-Martinez 'Cerisse', Zenodo (2024)
+
+
+
 
 Cite as well the **AMReX** [![Citing](http://joss.theoj.org/papers/10.21105/joss.01370/status.svg)](https://doi.org/10.21105/joss.01370)
 

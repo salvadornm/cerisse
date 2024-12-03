@@ -109,7 +109,7 @@ reactions:
 
 See details of yaml format in [YAML](https://cantera.org/tutorials/yaml/defining-phases.html)
 
-### Generate a New mechanism
+### Generate a new mechanism
 
 For all the available mechanisms, a Cantera yaml format is provided. If CHEMKIN files are present Pelephysics rely on Cantera’s _**ck2yaml**_ utility to convert CHEMKIN files to the Cantera yaml format. They are converter scripts to faciliatte this process. Check [PelePhysics Tutorial](https://pelephysics.readthedocs.io/en/latest/EOS.html)
 

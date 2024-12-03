@@ -81,13 +81,24 @@ based on binary diffusion coefficients $$\mathcal{D}_{ij}$$
 The equations of state are of the form
 
 $$
-p = f(\rho,T,Y_k)
+p = f(\rho,T,Y_k) \; \mbox{ and } \; e_i = f(\rho,T,Y_k)
 $$
 
-and the calorific equation of state
+### Ideal gas
+For a mixture of ideal gases
 
 $$
-e_i = f(\rho,T,Y_k)
+p = \rho \frac{R}{M} T   \; \mbox{ with  } \; M = \sum_k X_k M_k
 $$
+
+and the mass specific enthalpy
+
+$$
+h = h_k^0 Y_k + \int_{T^0}^T C_p dT
+$$
+
+and the specific  internal energy can be directly obtained by $$e = h - p/\rho$$
+
+
 
 The current implementations include perfect gas, ideal gas and Soave-Redlich-Kwong (through PelePhysics), including mixtures.

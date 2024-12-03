@@ -1,0 +1,34 @@
+# This CITATION.cff file was generated with cffinit.
+# Visit https://bit.ly/cffinit to generate yours today!
+
+cff-version: 1.2.0
+title: Cerisse
+message: >-
+  If you use this software, please cite it using the
+  metadata from this file.
+type: software
+authors:
+  - given-names: Salvador
+    family-names: Navarro-Martinez
+    email: s.navarro@imperial.ac.uk
+    affiliation: Imperial College London/University of Zaragoza
+    orcid: 'https://orcid.org/0000-0001-8342-6573'
+  - given-names: Tin
+    family-names: Un
+    affiliation: Imperial College London
+  - given-names: Monal
+    family-names: Patel
+    affiliation: University of Maryland
+repository-code: 'https://github.com/salvadornm/cerisse'
+abstract: >-
+  A research computational solver for Large Eddy Simulation 
+  and Direct Numerical Simulation of high-speed compressible
+  turbulent reactive flows.
+keywords:
+  - Compressible
+  - AMR
+  - Finite Volume
+  - Chemistry
+  - Combustion
+  - Supersonic
+license: BSD-3-Clause

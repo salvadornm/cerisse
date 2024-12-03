@@ -22,12 +22,15 @@ nav:
    - THEORY:
       - Equations: equations.md
       - DNS: theory/equations/dns.md
-      - LES: les.md
+      - LES: theory/equations/les.md
+      - TurbComb: theory/equations/turbcomb.md
       - Numerics: theory/equations/numerical-methods.md
+      - Geometry: theory/ibmeb.md
    - CODE:
       - structure: code.md
       - index: indexvar.md
       - solver: fluxsolver.md
+      - thermo: thermosolver.md
 extra_javascript:
   - https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.4/MathJax.js?config=TeX-AMS-MML_HTMLorMML
 markdown_extensions:

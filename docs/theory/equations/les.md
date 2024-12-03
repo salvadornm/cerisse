@@ -12,9 +12,9 @@ $$
 where $$\Delta$$ is the characteristic filter width in
 each respective direction and $$\overline{\phi} $$ is the filtered quantity.
 
-The actual form of the filter is usually *implicit* and not need. Is common 
-to use a box/top-hat filter of the form below where the cut-off scale/filter
-width is usually taken as proprtional not the mesh size $$\Delta \propto h$$
+The actual form of the filter is usually *implicit* and not needed while soling the LES equations.
+Is common  to use a box/top-hat filter of the form below where the cut-off scale/filter
+width is usually taken proportional not the mesh size $$\Delta \propto h$$
 
 $$
 G(\mathbf{x}-\mathbf{x}',\Delta) =
@@ -98,5 +98,5 @@ $$
 
 ### References
 
-Omer Rathore, "Numerical Simulation of Combustion
+[^1]: Omer Rathore, "Numerical Simulation of Combustion
 Instability" *PhD Thesis*, Imperial College London (2022)
