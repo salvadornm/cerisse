@@ -93,6 +93,8 @@ A STL file name needs to be defined in the input
 ib.filename = sphere_fine_20k.stl
 ```
 
+FIG EXAMPLE
+
 ### prob.h
 
 A IBM header needs to be included
@@ -103,8 +105,25 @@ A IBM header needs to be included
 
 ```cpp
 typedef std::ratio<5,5> d_image;
-typedef eib_t<1,1,d_image,ProbClosures> ProbIB;
+typedef eib_t<2,1,d_image,ProbClosures> ProbIB;
 ```
+
+The `std::ratio<5,5> d_image; ` defines a rational number 5/5 (with numerator 5 and denominator 5) which is equivalent in modern C++ to:
+
+```cpp
+using d_image = std::ratio<5, 5>;
+```
+
+The template class **eib_t** is defined as
+```cpp
+template <int iorder_tparm, int eorder_tparm, typename cim_tparm, typename cls_t>
+```
+
+where `iorder_tparm` is the interpolation order, in the above example 2,
+`eorder_tparm` the extrapolation order  (the 1 in `eib_t<2,1,d_image,ProbClosures>`),
+`cim_tparm` is the interpolation distance factor relative to mesh diagonal, in the above 
+example to 5/5=1 and therfore the distance is the diagonal $$\sqrt{2} h $$ in 2D. (LINK to Theory)
+All information of IBM is tored in the class ProbIB in `CNS.h`
 
 #### markers
 

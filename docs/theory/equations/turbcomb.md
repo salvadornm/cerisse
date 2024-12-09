@@ -14,7 +14,7 @@ $$
 
 The transformation "thickens" the flame but maintains the correct flame speed by increasing diffusion accordingly.
 
-The sub-grid wrinkling requires modelling and this is usually done in the ATF context by the inclusion of a so called \emph{efficiency function}.
+The sub-grid wrinkling requires modelling and this is usually done in the ATF context by the inclusion of a so called efficiency function.
 The efficiency function, $$E$$, is defined by a dimensionless wrinkling factor $$\mathcal{E}$$, and its ratio between a laminar flame compared with its thickened counterpart. Inclusion into the ATF model results in a modification to the reactive scalar transport equation:
 
 $$
@@ -35,6 +35,8 @@ where $$\beta$$ is a  constant and $$\vert <\nabla  \vec{n} >_{sgs}\vert$$ is th
 
 
 ## PasR
+
+The Partially Stired Reactor Model
 
 ## Eulerian Stochastic Fields
 

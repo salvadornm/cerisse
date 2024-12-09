@@ -34,10 +34,10 @@ $$
 ### Total Energy
 
 $$
-\frac{\partial E_t }{\partial t} + \frac{\partial (E_t + p) u_j}{\partial x_j} = \frac{\partial u_i \tau_{ij}}{\partial x_j}+ \frac{\partial q_j }{\partial x_j} + \sum_k \frac{ \partial h_k J_j^k}{\partial x_j}
+\frac{\partial E_t }{\partial t} + \frac{\partial (E_t + p) u_j}{\partial x_j} = \frac{\partial u_i \tau_{ij}}{\partial x_j} - \frac{\partial q_j }{\partial x_j} + \sum_k \frac{ \partial h_k J_j^k}{\partial x_j}
 $$
 
-where $$E_t = \rho e_i + \rho k$$ is the total energy plus kinetic energy.
+where $$E_t = \rho e + \rho k$$ is the total energy plus kinetic energy.
 
 ## Closures
 

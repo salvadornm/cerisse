@@ -5,6 +5,8 @@
 [//]: # (HLLC intro 2-3 lines)
 
 
+Cerisse employs the Harten-Lax-van Leer Contact (HLLC) solver, developed by Toro et al. (1994)[^9]. The HLLC solver enhances apporximate Riemann Solvers  by incorporating the intermediate contact wave, a feature that is particularly crucial for accurate modeling in reactive flows applications. To compute the fluxes, the solver is coupled with a second-order Total Variation Diminishing (TVD) scheme, which ensures numerical stability and reduces spurious oscillations
+
 The value of $U$ in the interface is defined by
 
 $$
@@ -132,7 +134,7 @@ Compact Scheme
 ## Skew-symmetric
 
 
-Numerical errors associated with discretization can be categorized into truncation and aliasing errors (Kravchenko and Moin, 1997; Lilly, 1965). Therefore, the concept of numerical order alone is insufficient to fully characterize performance.
+Numerical errors associated with discretization can be categorized into truncation and aliasing errors (Kravchenko and Moin, 1997[^4]; Lilly, 1965[^5]). Therefore, the concept of numerical order alone is insufficient to fully characterize performance.
 Key properties such as dissipation, dispersion, and conservation are strongly influenced by the discretization scheme used for the convective term. To illustrate this, consider a one-dimensional scalar equation and three possible formulations for the nonlinear, hyperbolic term:
 
 $$
@@ -158,9 +160,9 @@ $$
 
 Although the three forms above are equivalent at the continuous level, their discretizations differ significantly in terms of intrinsic properties and performance.
 
-The skew-symmetric form, when used with centered schemes, has been demonstrated to conserve quadratic quantities of interest—such as kinetic energy in the incompressible limit [^1]. This conservation is attributed to the reduction of aliasing errors (Kravchenko and Moin, 1997; Lilly, 1965). Furthermore, a Fourier analysis of the three forms reveals that the skew-symmetric formulation (H_skew) possesses superior built-in de-aliasing characteristics (Blaisdell et al. 1996).
+The skew-symmetric form, when used with centered schemes, has been demonstrated to conserve quadratic quantities of interest—such as kinetic energy in the incompressible limit [^1]. This conservation is attributed to the reduction of aliasing errors. Furthermore, a Fourier analysis of the three forms reveals that the skew-symmetric formulation possesses superior built-in de-aliasing characteristics (Blaisdell et al. 1996) [^2].
 
-The method implemented here is the approach of Ducros et al. (2000), which capitalises
+The method implemented here is the approach of Ducros et al. (2000) [^3], which capitalises
 on the built in de-aliasing property of the skew-symmetric operator of centred schemes, while
 ensuring local conservation by employing the flux-based formulation:
 
@@ -271,19 +273,32 @@ $$
 The sensor based on a variable $$\phi$$ is :
 
 $$
-\psi_{i} = \frac{|P|}{P + \varepsilon}
+\psi_{i} = 2 \frac{|\phi_{i+1} - 2\phi_i + \phi_{i-1} |}{P_{JST} + P_{TVD} +   \varepsilon}
+$$
+
+$$ \varepsilon $$ is simply a small offset to ensure the denominator is never zero, while
+$$P_{TVD} = |\phi_{i+1} -\phi_{i} | + |\phi_{i} -\phi_{i-1}  | $$
+and $$P_{JST} = \phi_{i+1} - 2\phi_i + \phi_{i-1} $$
+
+The original formulation  works with a sensor on pressure. 
+Cerisse implements the improved approach of Bouheraoua
+(2014)[^10] by including an additional density sensor and coupling the two as :
+
+
+$$
+\psi = \frac{\psi_\rho^2 + \psi_P^2}{\psi_\rho + \psi_P}
 $$
 
 ## WENO and TENO
 
 
-Weighted Essentially Non-Oscillatory (WENO) methods, introduced by Liu et al. (1994), employ a nonlinear adaptive procedure to automatically select the locally smoothest stencil. This approach aims to avoid using stencils that cross discontinuities when interpolating the interface flux.
+Weighted Essentially Non-Oscillatory (WENO) methods, introduced by Liu et al. (1994)[^6], employ a nonlinear adaptive procedure to automatically select the locally smoothest stencil. This approach aims to avoid using stencils that cross discontinuities when interpolating the interface flux.
 
 The WENO family encompasses various variations, which can be further classified. Despite these differences, all WENO methods share a common feature: the interface flux is expressed as a linear combination of fluxes derived from the stencils.
 
 
 $$
-f_{i+1/2} = \sum_s w_s f^s_{i+2}  \;\; \;\;  w_s = \frac{\alpha_s}{\sum_s \alpha_s} 
+F_{i+1/2} = \sum_s w_s F^s_{i+2}  \;\; \;\;  w_s = \frac{\alpha_s}{\sum_s \alpha_s} 
 $$
 
 Reconstruction in characteristic variables improves
@@ -292,15 +307,34 @@ is known to be excessively dissipative in smooth parts of the flow
 
 ### TENO
 
-Designed to
-reduce numerical dissipation further than WENO-CU.
+Designed[^8] to
+reduce numerical dissipation further than WENO  
 
 
 ## KEEP
 
-Central KEEP (_non-dissipative and physically-consistent kinetic energy and entropy preserving_) schemes for compressible flows
+Central KEEP (_non-dissipative and physically-consistent kinetic energy and entropy preserving_) schemes for compressible flows[^7]
 
 ### References
 
-[^1]: Morinishi, Y. (1995). Conservative properties of finite difference schemes for incompressible
-flow. Center for Turbulence Research Annual Research Briefs.
+[^1]: Morinishi, Y. (1995). Conservative properties of finite difference schemes for incompressible flow. 
+[Center for Turbulence Research Annual Research Briefs](https://ntrs.nasa.gov/citations/19960022304)
+[^2]: Blaisdell, G., Spyropoulos, E., and Qin, J. (1996). The effect of the formulation of nonlinear terms on aliasing errors in spectral methods. 
+[Applied Numerical Mathematics, 21(3):207–219](https://doi.org/10.1016/0168-9274(96)00005-0)
+[^3]: Ducros, F., Laporte, F., Soulères, T., Guinot, V., Moinat, P., and Caruelle, B. (2000). High order fluxes for conservative skew-symmetric-like schemes in structured meshes: application to compressible flows. 
+[Journal of Computational Physics, 161(1):114–139](https://doi.org/10.1006/jcph.2000.6492)
+[^4]: Kravchenko, A. and Moin, P. (1997). On the effect of numerical errors in large eddy
+simulations of turbulent flows. 
+[Journal of Computational physics, 131(2):310–322](https://doi.org/10.1006/jcph.1996.5597)
+[^5]: Lilly, D. K. (1965). On the computational stability of numerical solutions of time-dependent non-linear geophysical fluid dynamics problems. 
+[Monthly Weather Review, 93(1):11–25](https://doi.org/10.1175/1520-0493(1965)093%3C0011:OTCSON%3E2.3.CO;2) 
+[^6]: Liu, X.-D., Osher, S., and Chan, T. (1994). Weighted essentially non-oscillatory schemes.
+[Journal of Computational physics, 115(1):200–212](https://doi.org/10.1006/jcph.1994.1187)
+[^7]: Yuichi Kuya, Soshi Kawai, (2020) A stable and non-dissipative kinetic energy and entropy preserving (KEEP) scheme for non-conforming block boundaries on Cartesian grids,
+[Computers & Fluids, Volume 200, 104427](https://doi.org/10.1016/j.compfluid.2020.104427)
+[^8]: Fu, L., Hu, X. Y., and Adams, N. A. (2017). Targeted eno schemes with tailored resolution property for hyperbolic conservation laws. 
+[Journal of Computational Physics, 349:97–121](https://doi.org/10.1016/j.jcp.2017.07.054)
+[^9]: Toro, E. F., Spruce, M., and Speares, W. (1994). Restoration of the contact surface in the hll-riemann solver. 
+[Shock waves, 4(1):25–34](https://doi.org/10.1007/BF01414629)
+[^10]: Bouheraoua, L. (2014). Simulation aux grandes échelles et modélisation de la combustion
+supersonique. [PhD thesis](https://theses.hal.science/tel-01197487v1), Rouen, INSA. 

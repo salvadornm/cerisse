@@ -68,8 +68,7 @@ Refer to the [QuickStart Guide](quickstart.md) for instructions on downloading, 
 
 This open-source software is distributed under the BSD3 license. If you use it in your work, please cite it as
 
-NOTE: Monal Patel, Enson Un, Salvador Navarro-Martinez 'Cerisse', Zenodo (2024)
-
+NOTE: Monal Patel, Enson Un, Salvador Navarro-Martinez 'Cerisse',GitHub (2024)
 
 
 
