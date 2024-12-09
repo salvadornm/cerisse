@@ -26,10 +26,8 @@ struct ProbParm {
 };
 ```
 
-
-
 {% hint style="info" %}
-The file uses thet AMReX type Real instead of  floats, which can be single or double precision. Check `GNU_Makefile`for set-up  [makefile.md](makefile.md "mention")
+The file uses thet AMReX type Real instead of floats, which can be single or double precision. Check `GNU_Makefile`for set-up [makefile.md](makefile.md "mention")
 {% endhint %}
 
 ### Global Constants
@@ -40,17 +38,13 @@ In some cases in convenient to defined a a few global constants , such as
 static constexpr Real Reynolds = 3000.0;  
 ```
 
-These constants are defined as `static constexpr`, allowing them to be evaluated at compile time. This makes them efficient for use in other compile-time expressions.
-Global constants can be utilized within methods, the **ProbParm** structure, and as parameters to methods  Unlike the **ProbParm** structure, global constants are directly accessible in 
-all user-defined functions.
-
+These constants are defined as `static constexpr`, allowing them to be evaluated at compile time. This makes them efficient for use in other compile-time expressions. Global constants can be utilized within methods, the **ProbParm** structure, and as parameters to methods Unlike the **ProbParm** structure, global constants are directly accessible in all user-defined functions.
 
 NOTE: By default Cerisse uses SI units (unlike PeleC) or no-units, include the file "Constants.h" to access conversion factors (CGS to SI and viceversa) as well as universal constants with appropiate precision.
 
 ## Themodynamic and Transport Closures
 
-The namespace **PROB** needs to define the **closures\_dt** template, which creates the physical "closures" of the problems, that means which themrodynamics modesl are used as well as transport properties
-For example:
+The namespace **PROB** needs to define the **closures\_dt** template, which creates the physical "closures" of the problems, that means which themrodynamics modesl are used as well as transport properties For example:
 
 ```cpp
 typedef closures_dt<indicies_t, visc_suth_t, cond_suth_t,
@@ -61,7 +55,7 @@ The line above selects a problem that uses the structure `indicies_t`, which var
 
 Options in _**closures\_dt**_, all units in SI (October 2024)
 
-<table><thead><tr><th width="261">Closure</th><th width="146">Options</th><th width="193" align="center">defaults</th><th>Description</th></tr></thead><tbody><tr><td><code>visc_suth_t</code></td><td>no</td><td align="center"><br><span class="math">\mu =1.458\cdot 10^{-6}</span> at  <br><span class="math">T=110.4</span></td><td>Sutherland Viscosity</td></tr><tr><td><code>cond_suth_t</code></td><td>no</td><td align="center"><br><span class="math">\lambda =2.495 \cdot 10^{-3}</span>  at  <span class="math">T=194</span></td><td>Sutherland Conductivity</td></tr><tr><td><code>visc_const_t</code></td><td>viscosity</td><td align="center"><span class="math">\mu= 1.85  \cdot 10^{-5}</span></td><td>Constant Viscosity</td></tr><tr><td><code>cond_const_t</code></td><td>conductivity</td><td align="center"> <span class="math">\lambda = 0.0262</span></td><td>Constant Conductivity</td></tr><tr><td><code>transport_const_t</code></td><td>viscosity</td><td align="center"><span class="math">\mu = 1.85 \cdot 10^{-5}</span> and <span class="math">\lambda = 0.0262</span></td><td>Constant Viscosity and <a data-footnote-ref href="#user-content-fn-1">Conductivity</a></td></tr><tr><td><code>calorifically_perfect_gas_t</code></td><td>no</td><td align="center"><span class="math">\gamma =1.4</span>  <span class="math">M=28.96 \cdot  10^{-3}</span></td><td>perfect <a data-footnote-ref href="#user-content-fn-2">gas</a></td></tr><tr><td><code>multispecies_perfect_gas_t</code></td><td>no</td><td align="center">PelePhysics</td><td>Used for <strong>PelePhsics</strong> options </td></tr></tbody></table>
+<table><thead><tr><th width="261">Closure</th><th width="146">Options</th><th width="193" align="center">defaults</th><th>Description</th></tr></thead><tbody><tr><td><code>visc_suth_t</code></td><td>no</td><td align="center"><br><span class="math">\mu =1.458\cdot 10^{-6}</span> at<br><span class="math">T=110.4</span></td><td>Sutherland Viscosity</td></tr><tr><td><code>cond_suth_t</code></td><td>no</td><td align="center"><br><span class="math">\lambda =2.495 \cdot 10^{-3}</span> at <span class="math">T=194</span></td><td>Sutherland Conductivity</td></tr><tr><td><code>visc_const_t</code></td><td>viscosity</td><td align="center"><span class="math">\mu= 1.85  \cdot 10^{-5}</span></td><td>Constant Viscosity</td></tr><tr><td><code>cond_const_t</code></td><td>conductivity</td><td align="center"><span class="math">\lambda = 0.0262</span></td><td>Constant Conductivity</td></tr><tr><td><code>transport_const_t</code></td><td>viscosity</td><td align="center"><span class="math">\mu = 1.85 \cdot 10^{-5}</span> and <span class="math">\lambda = 0.0262</span></td><td>Constant Viscosity and <a data-footnote-ref href="#user-content-fn-1">Conductivity</a></td></tr><tr><td><code>calorifically_perfect_gas_t</code></td><td>no</td><td align="center"><span class="math">\gamma =1.4</span> <span class="math">M=28.96 \cdot  10^{-3}</span></td><td>perfect <a data-footnote-ref href="#user-content-fn-2">gas</a></td></tr><tr><td><code>multispecies_perfect_gas_t</code></td><td>no</td><td align="center">PelePhysics</td><td>Used for <strong>PelePhsics</strong> options</td></tr></tbody></table>
 
 ### Passing Arguments
 
@@ -80,8 +74,6 @@ typedef closures_dt<indicies_t, visc_const_t<methodparm_t>, cond_const_t<default
 ```
 
 The problem will use a vicosity of **2.85e-5** and a conductivity of **0.0262** (default values using the structure **defaultparm\_t** ).
-
-
 
 {% hint style="info" %}
 To use the default values, the line `#include <NumParam.h>` has to be included in the headers
@@ -118,8 +110,6 @@ corresponding to the Euler equations, with skew-symmetric numerical scheme (with
 **euler** options in _**rhs\_dt**_ (October 2024)
 
 <table><thead><tr><th width="208">euler</th><th width="90">Options</th><th width="87" align="center">IBM</th><th width="152" align="center">defaults</th><th>Description</th></tr></thead><tbody><tr><td><code>riemann_t</code></td><td>no</td><td align="center">no</td><td align="center">-</td><td><a href="theory/equations/numerical-methods.md#riemann-solver-with-muscl">Second TVD - HLLC Riemann solver</a></td></tr><tr><td><code>skew_t</code></td><td>yes</td><td align="center">yes</td><td align="center">4th order, no dissipation</td><td><a href="theory/equations/numerical-methods.md#skew-symmetric">2/4/6 order Skew-symmetric scheme</a></td></tr><tr><td><code>keep_euler_t</code></td><td>yes</td><td align="center">no</td><td align="center">no default</td><td><a href="theory/equations/numerical-methods.md#keep">2/4/6 order KEEP scheme</a></td></tr><tr><td><code>weno_t</code></td><td>yes</td><td align="center">no</td><td align="center">no default</td><td><a href="theory/equations/numerical-methods.md#weno">WENO</a> or <a href="theory/equations/numerical-methods.md#teno">TENO</a> 5th order scheme</td></tr><tr><td><code>rusanov_t</code></td><td>no</td><td align="center">yes</td><td align="center">-</td><td><a href="theory/equations/numerical-methods.md#rusanov-scheme">Rusanov 2nd order scheme</a></td></tr><tr><td><code>no_euler_t</code></td><td>no</td><td align="center">yes</td><td align="center">-</td><td>0 (not solving Euler)</td></tr></tbody></table>
-
-
 
 {% hint style="danger" %}
 Not all options available yet !!

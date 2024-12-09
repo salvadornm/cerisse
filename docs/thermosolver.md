@@ -1,12 +1,8 @@
-# Thermodynamics solver
-
-T
+# Thermo Solver
 
 ## Template Thermodynamics
 
-Thermodynamics template is quite large, usually only requiring the index of the variables.
-It is usually built with some public parameters (gamma,mw, etc.) and a set of functions
-that are reuired by numerical solvers
+Thermodynamics template is quite large, usually only requiring the index of the variables. It is usually built with some public parameters (gamma,mw, etc.) and a set of functions that are reuired by numerical solvers
 
 ```cpp
 template <typename idx_t>
@@ -30,22 +26,20 @@ class calorifically_perfect_gas_t {
 
 ### Functions
 
-| **Function**        | **Feature**                                                                       |
-|---------------------|-----------------------------------------------------------------------------------|
-|  `RYP2E`            | computes specific internal energy as a function of pressure and density           |
-| `RYE2TP`            | computes temperature  and pressure as a function of density and energy     |
-| `RYE2Cs`            | computes sound speed  |
-|  `cons2eigenvals`   | compute eigenvalues array from array of conervative variable |
-| `prims2fluxes`      | compute fluxes from primtive array |
-| `cons2prims`        | converts conservative array  to primitive variables array |
-| `prims2cons`        | converts primitve  to conservative variables |
-| `max_char_speed`    | calcualtes maximum charatersic wave speed |
-| `cons2char`         | converts conservative array to characteristic variables array |
-| `char2cons`         | converts characteristic variable array to consetvative variables array |
-
+| **Function**     | **Feature**                                                             |
+| ---------------- | ----------------------------------------------------------------------- |
+| `RYP2E`          | computes specific internal energy as a function of pressure and density |
+| `RYE2TP`         | computes temperature and pressure as a function of density and energy   |
+| `RYE2Cs`         | computes sound speed                                                    |
+| `cons2eigenvals` | compute eigenvalues array from array of conervative variable            |
+| `prims2fluxes`   | compute fluxes from primtive array                                      |
+| `cons2prims`     | converts conservative array to primitive variables array                |
+| `prims2cons`     | converts primitve to conservative variables                             |
+| `max_char_speed` | calcualtes maximum charatersic wave speed                               |
+| `cons2char`      | converts conservative array to characteristic variables array           |
+| `char2cons`      | converts characteristic variable array to consetvative variables array  |
 
 The calls of this functions are (all declared `AMREX_GPU_DEVICE AMREX_FORCE_INLINE`)
-
 
 ```cpp
 void RYP2E(const Real R, const Real* /*Y*/, const Real P, Real& E) const {
@@ -105,5 +99,4 @@ class cond_const_t {
 };
 ```
 
-This template requires an input parameter (as a **struct**) that defiens the parameter.
-Viscous solver will use  a `cond(T)` function
+This template requires an input parameter (as a **struct**) that defiens the parameter. Viscous solver will use a `cond(T)` function

@@ -29,7 +29,7 @@
 * [Equations](equations.md)
   * [DNS](theory/equations/dns.md)
   * [LES](theory/equations/les.md)
-  * [Turbulet Combustion](theory/equations/turbcomb.md)
+  * [Turbulent Combustion](theory/equations/turbcomb.md)
   * [Numerical Methods](theory/equations/numerical-methods.md)
   * [Solid boundaries](theory/ibmeb.md)
 

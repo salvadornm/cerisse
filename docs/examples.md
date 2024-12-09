@@ -4,16 +4,11 @@ In the `exm/` folder, you will find several tests designed to compare numerical 
 
 ## One dimensional Examples
 
-<table><thead><tr><th>Example</th><th width="213">Folder</th><th>Numerics</th><th>Notes</th></tr></thead><tbody><tr><td><a href="onedim.md#sods-shock-tube">Shock-Tube</a></td><td><code>numerics/riemann</code></td><td><a href="theory/equations/numerical-methods.md#riemann-solver-with-muscl">Riemann</a>, <a href="theory/equations/numerical-methods.md#skew-symmetric">Skew</a></td><td></td></tr><tr><td><a href="onedim.md#shu-osher-problem">Shu-Osher</a></td><td><code>numerics/shu</code></td><td><a href="theory/equations/numerical-methods.md#riemann-solver-with-muscl">Riemann</a>, <a href="theory/equations/numerical-methods.md#skew-symmetric">Skew</a></td><td></td></tr><tr><td>Reactive Shock</td><td><code>reactive_sod</code></td><td><a href="theory/equations/numerical-methods.md#teno">TENO</a></td><td>Chemistry</td></tr></tbody></table>
+<table><thead><tr><th>Example</th><th width="213">Folder</th><th>Numerics</th><th>Notes</th></tr></thead><tbody><tr><td><a href="onedim.md#sods-shock-tube">Shock-Tube</a></td><td><code>numerics/riemann</code></td><td><a href="theory/equations/numerical-methods.md#riemann-solver-with-muscl">Riemann</a> <a href="theory/equations/numerical-methods.md#skew-symmetric">Skew</a></td><td></td></tr><tr><td><a href="onedim.md#shu-osher-problem">Shu-Osher</a></td><td><code>numerics/shu</code></td><td><a href="theory/equations/numerical-methods.md#riemann-solver-with-muscl">Riemann</a><a href="theory/equations/numerical-methods.md#skew-symmetric">Skew</a></td><td></td></tr><tr><td>Reactive Shock</td><td><code>reactive_sod</code></td><td><a href="theory/equations/numerical-methods.md#teno">TENO</a></td><td>Chemistry</td></tr></tbody></table>
 
 ## Two dimensional Examples
 
-| Example           | Folder          | Numerics      | Notes      |
-| ----------------- | --------------- | ------------- | ---------- |
-| Convection vortex | `numerics/covo` | Riemann, Skew |            |
-| Shock Reflection  | `shock_reflect` | Riemann       |            |
-| Mixing Layer      | `mixing_layer`  | Skew          | Chem/Stats |
-| _Forward Step_    | `forward_step`  | Riemann       | EB         |
+<table><thead><tr><th width="156">Example</th><th width="193">Folder</th><th width="108">Numerics</th><th>Notes</th></tr></thead><tbody><tr><td><a href="twodim.md#convection-vortex">Convection vortex</a></td><td><code>numerics/covo</code></td><td>Riemann Skew</td><td></td></tr><tr><td><a href="twodim.md#shock-reflection">Shock Reflection</a></td><td><code>shock_reflect</code></td><td>Riemann</td><td></td></tr><tr><td>Mixing Layer</td><td><code>mixing_layer</code></td><td>Skew</td><td>Stats</td></tr><tr><td><em>Forward Step</em></td><td><code>forward_step</code></td><td>Riemann</td><td>EB</td></tr></tbody></table>
 
 ## Three dimensional Examples
 
