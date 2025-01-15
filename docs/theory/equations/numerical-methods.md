@@ -6,9 +6,9 @@ Cerisse has implemented several numerical methods within the finite volume frame
 
 Cerisse employs the Harten-Lax-van Leer Contact (HLLC) solver, developed by Toro et al. (1994). The HLLC solver enhances approximate Riemann Solvers by incorporating the intermediate contact wave, a feature that is particularly crucial for accurate modelling in reactive flows applications.
 
-<figure><img src="../../.gitbook/assets/rieman.jpg" alt=""><figcaption><p>Scheme of the HLLC Riemann Solver with three waves propagating ar speed SL, SM and SR.<br>Two acoustic waves and one contact. The waves separate four constant states <span class="math">U_L</span> , <span class="math">U_L^\ast</span>, <span class="math">U_R^\ast</span>, <span class="math"> U_R</span></p></figcaption></figure>
+<figure><img src="../../.gitbook/assets/rieman.jpg" alt=""><figcaption><p>Scheme of the HLLC Riemann Solver with three waves propagating ar speed SL, SM and SR.<br>Two acoustic waves and one contact. The waves separate four constant states <span class="math">U_L</span> , <span class="math">U_L^\ast</span>, <span class="math">U_R^\ast</span>, <span class="math">U_R</span></p></figcaption></figure>
 
-&#x20;The value of $$U_{RP}$$ in the interface is defined by
+The value of $$U_{RP}$$ in the interface is defined by
 
 $$
 U_{RP}= \left\{ \begin{array}{cl}
@@ -42,13 +42,13 @@ $$
 S_M = \frac{\rho_r q_r(S_R - q_r)-\rho_l q_l(S_L - q_l) + p_l - p_r}{\rho_r (S_R - q_r)-\rho_l (S_L - q_l)}
 $$
 
-From the contact wave speed,  the Rankine-Hugoniot conditions are applied to each acoustic wave to find the average state.  In the left wave, the jump relations are:
+From the contact wave speed, the Rankine-Hugoniot conditions are applied to each acoustic wave to find the average state. In the left wave, the jump relations are:
 
 $$
 F_l^\ast - F_l = S_L (U_l^\ast - U_l)
 $$
 
-The density of the inytermediate left state is:&#x20;
+The density of the inytermediate left state is:
 
 $$
 \rho_l^\ast = \rho_l \frac{S_L - q_l}{S_L - S_M }
@@ -88,8 +88,6 @@ $$
 
 where $$\tilde{q}=\tilde{u} n_x+\tilde{v} n_y +\tilde{w} n_z$$ and the average state are (same for otehr components)
 
-
-
 where $$\tilde{T}$$ is obtained through the average enthalpy
 
 $$
@@ -124,8 +122,6 @@ $$
 F_{i+1/2}= \frac{1}{2} \left( F_{i+1} + F_{i} \right) - \frac{1}{2} \left( \left| \lambda_{i+1} \right| + \left| \lambda_i \right| \right) (U_{i+1} - U_i)
 $$
 
-
-
 where $$\lambda_i$$ ​ is the local characteristic speed at the i-th cell (often taken as the maximum eigenvalue of the Jacobian of the flux function).
 
 ### Skew-symmetric
@@ -147,8 +143,6 @@ $$
 $$
 H_{skew} = \frac{1}{2} \left( H_{conv}+ H_{div} \right) = \frac{1}{2} \frac{\partial UV }{\partial x} +\frac{1}{2} \left( U \frac{\partial V }{\partial x} + V \frac{\partial U }{\partial x} \right)
 $$
-
-
 
 Although the three forms above are equivalent at the continuous level, their discretizations differ significantly in terms of intrinsic properties and performance.
 
@@ -184,7 +178,7 @@ $$
 F^{adv}_{i+1/2} = F^{skew}_{i+1/2} + \left . \alpha_2 \frac{\partial U}{\partial x} \right |_{i+1/2} +\left . \ \alpha_4 \frac{\partial^3 U}{\partial x^3} \right |_{i+1/2}
 $$
 
-The terms can be rewritten using differences, the shock term is&#x20;
+The terms can be rewritten using differences, the shock term is
 
 $$
 \left . \alpha_2 \frac{\partial U}{\partial x} \right |_{i+1/2} \approx \alpha_2 \frac{\Delta U_{i+1/2} }{\Delta x}
@@ -211,114 +205,121 @@ $$
 and replacing the difference, we get
 
 $$
-F^{damp}_{i+1/2} = \epsilon_{i+1/2}^{(4)} \left( U\_{i+2} - 3 U\_{i+1} + 3 U\_i - U\_{i-1} \right)
+F^{damp}_{i+1/2} = \epsilon_{i+1/2}^{(4)} \left( U\_{i+2} - 3 U_{i+1} + 3 U_i - U_{i-1} \right)
 $$
 
 For high-order schemes, the damping term accuracy can be increased by using a high-order central scheme:
 
 $$
-\frac{\partial^2 \Delta U}{\partial x^2} = \frac{ -1 /12 \Delta U\_{i+5/2} + 4/3 \Delta U\_{i+3/2} - 5/2 \Delta U\_{i+1/2} + 4/3 \Delta U\_{i-1/2} -1/12 \Delta U\_{i-3/2} }{\Delta x^2} + \mathcal{O}(\Delta x^4)
+\frac{\partial^2 \Delta U}{\partial x^2} = \frac{ -1 /12 \Delta U_{i+5/2} + 4/3 \Delta U_{i+3/2} - 5/2 \Delta U_{i+1/2} + 4/3 \Delta U_{i-1/2} -1/12 \Delta U_{i-3/2} }{\Delta x^2} + \mathcal{O}(\Delta x^4)
 $$
+
+
 
 the flux is similarly written as
 
 $$
-F^{damp}_{i+1/2} = \frac{ \epsilon_{i+1/2}^{(4)} }{12} \left( -U\_{i+3} + 17 U\_{i+2} - 46 U\_{i+1} + 46 U\_i - 17 U\_{i-1} + U\_{i-2} \right)
+F^{damp}_{i+1/2} = \frac{ \epsilon_{i+1/2}^{(4)} }{12} \left( -U_{i+3} + 17 U_{i+2} - 46 U_{i+1} + 46 U_i - 17 U_{i-1} + U_{i-2} \right)
 $$
 
 The parameters $$\epsilon_{i+1/2}^{(2)}$$ and $$\epsilon_{i+1/2}^{(4)}$$ control the second and fourth order dissipation.
 
 $$
-\epsilon\_{i+1/2}^{(2)}= k^{(2)} | \lambda\_{i+1/2} | \psi\_{i+1/2}
+\epsilon_{i+1/2}^{(2)}= k^{(2)} | \lambda_{i+1/2} | \psi_{i+1/2}
 $$
-where $$\psi$$ is the shock/discontinuty detector (with vakue of 1 close to jumps) and $$\lambda$$ is the eigenvalue
+
+where $$\psi$$ is the shock/discontinuty detector (with value of 1 close to jumps) and $$\lambda$$ is the eigenvalue
 
 $$
-\frac{\partial \rho k }{\partial t} + \frac{\partial \rho k }{\partial x\_j} = - u \frac{\partial p }{\partial x\_j}
+\frac{\partial \rho k }{\partial t} + \frac{\partial \rho k }{\partial x_j} = - u \frac{\partial p }{\partial x_j}
 $$
 
 The sensor based on a variable $$\phi$$ is :
 
 $$
-\psi\_{i} = 2 \frac{|\phi\_{i+1} - 2\phi\_i + \phi\_{i-1} |}{P\_{JST} + P\_{TVD} + \varepsilon}
+\psi_{i} = 2 \frac{|\phi_{i+1} - 2\phi_i + \phi_{i-1} |}{P_{JST} + P_{TVD} + \varepsilon}
 $$
+
 where $$\varepsilon$$ is simply a small offset to ensure the denominator is never zero, while $$P_{TVD} = |\phi_{i+1} -\phi_{i} | + |\phi_{i} -\phi_{i-1} |$$and $$P_{JST} = \phi_{i+1} - 2\phi_i + \phi_{i-1}$$
 
 The original formulation works with a sensor on pressure. Cerisse implements the improved approach of Bouheraoua (2014) by including an additional density sensor and coupling the two as :
 
 $$
-\psi = \frac{\psi\_\rho^2 + \psi\_P^2}{\psi\_\rho + \psi\_P}
+\psi = \frac{\psi_\rho^2 + \psi_P^2}{\psi_\rho + \psi_P}
 $$
 
-
-## WENO and TENO
+### WENO and TENO
 
 Weighted Essentially Non-Oscillatory (WENO) methods, introduced by Liu et al. (1994), employ a nonlinear adaptive procedure to automatically select the locally smoothest stencil. This approach aims to avoid using stencils that cross discontinuities when interpolating the interface flux.
 
 The WENO family encompasses various variations, which can be further classified. Despite these differences, all WENO methods share a common feature: the interface flux is expressed as a linear combination of fluxes derived from the stencils.
 
 $$
-F\_{i+1/2} = \sum\_s w\_s F^s\_{i+2} ;; ;; w\_s = \frac{\alpha\_s}{\sum\_s \alpha\_s}
+F_{i+1/2} = \sum_s w_s F^s_{i+2}  \; \;  w_s = \frac{\alpha_s}{\sum_s \alpha_s}
 $$
 
 Reconstruction in characteristic variables improves performance, as the post-shock oscillations are reduced. WENO is known to be excessively dissipative in smooth parts of the flow
 
 ### TENO
 
-Designed to reduce numerical dissipation further than WENO
-(TOWRITE)
+Designed to reduce numerical dissipation further than WENO (TOWRITE)
 
 ## KEEP
 
-Central KEEP (_non-dissipative and physically-consistent kinetic energy and entropy preserving_) schemes for compressible flows
-These scheme are based on splitting the energy equation.
+Central KEEP (_non-dissipative and physically-consistent kinetic energy and entropy preserving_) schemes for compressible flows These scheme are based on splitting the energy equation.
 
 $$
-\frac{\partial E\_t }{\partial t} + \frac{\partial (\rho e + \rho k + p) u\_j}{\partial x\_j} = 0
+\frac{\partial E_t }{\partial t} + \frac{\partial (\rho e + \rho k + p) u_j}{\partial x_j} = 0
 $$
 
-where $$E_t = \rho e + \rho k$$ is the total energy plus kinetic energy.
-In the inviscid limit, from the momentum equation is possible to derive the kinetic energy equation
+where $$E_t = \rho e + \rho k$$ is the total energy plus kinetic energy. In the inviscid limit, from the momentum equation is possible to derive the kinetic energy equation
 
 $$
-\frac{\partial \rho k }{\partial t} + \frac{\partial \rho u\_j k }{\partial x\_j} + u \frac{\partial p }{\partial x\_j} = 0
+\frac{\partial \rho k }{\partial t} + \frac{\partial \rho u_j k }{\partial x_j} + u \frac{\partial p }{\partial x_j} = 0
 $$
 
 which implies
 
 $$
-\frac{\partial \rho e }{\partial t} + \frac{\partial \rho u\_j e }{\partial x\_j} + p \frac{\partial u }{\partial x\_j} = 0
+\frac{\partial \rho e }{\partial t} + \frac{\partial \rho u_j e }{\partial x_j} + p \frac{\partial u_j }{\partial x_j} = 0
 $$
 
+
+
 using the fundamental equation of thermodynmics in differential form
+
 $$
 d e = T d s - \frac{p}{\rho^2} d \rho
 $$
 
-it can be shown (see original paper) that if mass is conserved and internal energy follows the above expression and then  entropy is conserved
+it can be shown (see original paper) that if mass is conserved and internal energy follows the above expression and then entropy is conserved
 
 $$
-\frac{\partial \rho s }{\partial t} + \frac{\partial \rho u\_j s }{\partial x\_j} = 0
-$$$
+\frac{\partial \rho s }{\partial t} + \frac{\partial \rho u_j s }{\partial x_j} = 0
+$$
+
+
 
 The KEEP scheme still need a shock capturing term.
 
 ### Split terms
 
-Given a function $$ f = a b $$, there are two forms to split the derivate
+Given a function $$f = a b$$, there are two forms to split the derivate
 
 Divergence form of the derivative
+
 $$
 \frac{\partial f}{\partial x} = \frac{\partial a b}{\partial x}
 $$
 
 Quadratic split
+
 $$
 \frac{\partial f}{\partial x} =\
 \frac{1}{2}\left( a \frac{\partial b }{\partial x} + b \frac{\partial a }{\partial x} + \frac{\partial a b}{\partial x} \right)
 $$
 
-These formulations are analytically equivalent. With a function $$ f = a b c $$,  there are three forms to split the derivative
+These formulations are analytically equivalent. With a function $$f = a b c$$, there are three forms to split the derivative
 
 Divergence form
 
@@ -327,12 +328,14 @@ $$
 $$
 
 The quadratic form
+
 $$
 \frac{\partial f}{\partial x} =\
 \frac{1}{2}\left( a \frac{\partial b c}{\partial x} + b c \frac{\partial a }{\partial x} + \frac{\partial abc }{\partial x} \right)
 $$
 
 The cubic form
+
 $$
 \frac{\partial f}{\partial x} =\
 \frac{1}{4}\left( a \frac{\partial b c}{\partial x} + b \frac{\partial a c }{\partial x} + c \frac{\partial a b}{\partial x} + a b \frac{\partial c }{\partial x} + a c \frac{\partial b }{\partial x} + b c \frac{\partial a }{\partial x} +\
@@ -341,34 +344,22 @@ $$
 
 ### References
 
-[1]: Morinishi, Y. (1995). Conservative properties of finite difference schemes for incompressible flow. 
-[Center for Turbulence Research Annual Research Briefs](https://ntrs.nasa.gov/citations/19960022304)
+\[1]: Morinishi, Y. (1995). Conservative properties of finite difference schemes for incompressible flow. [Center for Turbulence Research Annual Research Briefs](https://ntrs.nasa.gov/citations/19960022304)
 
-[2]: Blaisdell, G., Spyropoulos, E., and Qin, J. (1996). The effect of the formulation of nonlinear terms on aliasing errors in spectral methods. 
-[Applied Numerical Mathematics, 21(3):207–219](https://doi.org/10.1016/0168-9274(96)00005-0)
+\[2]: Blaisdell, G., Spyropoulos, E., and Qin, J. (1996). The effect of the formulation of nonlinear terms on aliasing errors in spectral methods. [Applied Numerical Mathematics, 21(3):207–219](https://doi.org/10.1016/0168-9274\(96\)00005-0)
 
-[3]: Ducros, F., Laporte, F., Soulères, T., Guinot, V., Moinat, P., and Caruelle, B. (2000). High order fluxes for conservative skew-symmetric-like schemes in structured meshes: application to compressible flows. 
-[Journal of Computational Physics, 161(1):114–139](https://doi.org/10.1006/jcph.2000.6492)
+\[3]: Ducros, F., Laporte, F., Soulères, T., Guinot, V., Moinat, P., and Caruelle, B. (2000). High order fluxes for conservative skew-symmetric-like schemes in structured meshes: application to compressible flows. [Journal of Computational Physics, 161(1):114–139](https://doi.org/10.1006/jcph.2000.6492)
 
-[4]: Kravchenko, A. and Moin, P. (1997). On the effect of numerical errors in large eddy
-simulations of turbulent flows. 
-[Journal of Computational physics, 131(2):310–322](https://doi.org/10.1006/jcph.1996.5597)
+\[4]: Kravchenko, A. and Moin, P. (1997). On the effect of numerical errors in large eddy simulations of turbulent flows. [Journal of Computational physics, 131(2):310–322](https://doi.org/10.1006/jcph.1996.5597)
 
-[5]: Lilly, D. K. (1965). On the computational stability of numerical solutions of time-dependent non-linear geophysical fluid dynamics problems. 
-[Monthly Weather Review, 93(1):11–25](https://doi.org/10.1175/1520-0493(1965)093%3C0011:OTCSON%3E2.3.CO;2) 
+\[5]: Lilly, D. K. (1965). On the computational stability of numerical solutions of time-dependent non-linear geophysical fluid dynamics problems. [Monthly Weather Review, 93(1):11–25](https://doi.org/10.1175/1520-0493\(1965\)093%3C0011:OTCSON%3E2.3.CO;2)
 
-[6]: Liu, X.-D., Osher, S., and Chan, T. (1994). Weighted essentially non-oscillatory schemes.
-[Journal of Computational physics, 115(1):200–212](https://doi.org/10.1006/jcph.1994.1187)
+\[6]: Liu, X.-D., Osher, S., and Chan, T. (1994). Weighted essentially non-oscillatory schemes. [Journal of Computational physics, 115(1):200–212](https://doi.org/10.1006/jcph.1994.1187)
 
-[7]: Yuichi Kuya, Soshi Kawai, (2020) A stable and non-dissipative kinetic energy and entropy preserving (KEEP) scheme for non-conforming block boundaries on Cartesian grids,
-[Computers & Fluids, Volume 200, 104427](https://doi.org/10.1016/j.compfluid.2020.104427)
+\[7]: Yuichi Kuya, Soshi Kawai, (2020) A stable and non-dissipative kinetic energy and entropy preserving (KEEP) scheme for non-conforming block boundaries on Cartesian grids, [Computers & Fluids, Volume 200, 104427](https://doi.org/10.1016/j.compfluid.2020.104427)
 
-[8]: Fu, L., Hu, X. Y., and Adams, N. A. (2017). Targeted eno schemes with tailored resolution property for hyperbolic conservation laws. 
-[Journal of Computational Physics, 349:97–121](https://doi.org/10.1016/j.jcp.2017.07.054)
+\[8]: Fu, L., Hu, X. Y., and Adams, N. A. (2017). Targeted eno schemes with tailored resolution property for hyperbolic conservation laws. [Journal of Computational Physics, 349:97–121](https://doi.org/10.1016/j.jcp.2017.07.054)
 
-[9]: Toro, E. F., Spruce, M., and Speares, W. (1994). Restoration of the contact surface in the hll-riemann solver. 
-[Shock waves, 4(1):25–34](https://doi.org/10.1007/BF01414629)
+\[9]: Toro, E. F., Spruce, M., and Speares, W. (1994). Restoration of the contact surface in the hll-riemann solver. [Shock waves, 4(1):25–34](https://doi.org/10.1007/BF01414629)
 
-[10]: Bouheraoua, L. (2014). Simulation aux grandes échelles et modélisation de la combustion
-supersonique. [PhD thesis](https://theses.hal.science/tel-01197487v1), Rouen, INSA.
-$$
+\[10]: Bouheraoua, L. (2014). Simulation aux grandes échelles et modélisation de la combustion supersonique. [PhD thesis](https://theses.hal.science/tel-01197487v1), Rouen, INSA.
