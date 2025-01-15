@@ -1,9 +1,13 @@
 # Numerical Methods
 
+Cerisse has implemented several numerical methods within the finite volume framework. While most of these methods are designed for high-speed flows, not all are limited to such cases. The method discussed here specifically addresses the Euler (convective) term of the equations.
+In compressible flows, high-frequency noise can accumulate when physical scales are not adequately resolved, especially near discontinuities. To mitigate this, many methods either directly filter or dissipate the noise, or use upwind-type stencils that indirectly introduce dissipation.
+It is important to note that no perfect numerical scheme exists; a compromise must be made between accuracy, speed, and stability.
+In the sections below, a brief overview of the rationale behind the numerical methods is provided. This description is not exhaustive, and the reader is encouraged to refer to the original papers for a more comprehensive explanation.
+
 ## HLLC Riemann Solver
 
-Cerisse employs the Harten-Lax-van Leer Contact (HLLC) solver, developed by Toro et al. (1994). The HLLC solver enhances approximate Riemann Solvers by incorporating the intermediate contact wave, a feature that is particularly crucial for accurate modelling in reactive flows applications. To compute the fluxes, the solver is coupled with a second-order Total Variation Diminishing (TVD) scheme, which ensures numerical stability and reduces spurious oscillations
-
+Cerisse employs the Harten-Lax-van Leer Contact (HLLC) solver, developed by Toro et al. (1994). The HLLC solver enhances approximate Riemann Solvers by incorporating the intermediate contact wave, a feature that is particularly crucial for accurate modelling in reactive flows applications.
 The value of $$U_{RP}$$  in the interface is defined by $$U_l$$  if  $$S_L>0$$,
 
 &#x20; $$U_l^\ast$$ if  $$S_L \leq 0 < S_M$$ , $$U_r^{\ast}$$   if  $$S_M \leq 0  \leq S_R$$   and  $$U_r$$  if $$S_R <0$$
@@ -12,11 +16,12 @@ The value of $$U_{RP}$$  in the interface is defined by $$U_l$$  if  $$S_L>0$$,
 
 ### The Average State
 
-Assuming the sonic waves speeds, $$S_L$$ and $$S_R$$ are known, we need $$S_M$$ to estimate the average states $$U^\ast$$. The normal velocity and the pressure do not change across a contact discontinuity, therefore the normal velocity is the contact wave speed
+Assuming the sonic waves speeds, $$S_L$$ and $$S_R$$ are known, we need $$S_M$$ to estimate the average states $$U^\ast$$. The normal velocity and the pressure do not change across a contact discontinuity (mechanical equilbrium) and therefore the normal velocity is the contact wave speed
 
 $$
 S_M=u_l^{\ast}=u_r^{\ast}=u^{\ast}
 $$
+
 
 and the pressure
 
@@ -30,32 +35,11 @@ $$
 S_M = \frac{\rho_r q_r(S_R - q_r)-\rho_l q_l(S_L - q_l) + p_l - p_r}{\rho_r (S_R - q_r)-\rho_l (S_L - q_l)}
 $$
 
-From the contact wave speed, we may derive the particle velocity and apply the Rankine-Hugoniot conditions to each acoustic wave to find the average state. In the left wave, the jump relations are
-
-$$
-F_l^{\ast} - F_l= S_L (U_l^{\ast} - U_l)
-$$
-
-In three dimensional systems the previous equation expand to
-
-$$
-S_L \left(\begin{array}{l} \rho_l^{\ast} \\ \rho_l^{\ast}u_l^{\ast} \\ \rho_l^{\ast} v_l^{\ast} \\ \rho_l^{\ast} w_l^{\ast} \\e_l^{\ast} \end{array} \right) - \left(\begin{array}{l} \rho_l^{\ast} q_l^{\ast} \\ \rho_l^{\ast} u_l^{\ast} q_l^{\ast} + p^{\ast}n_x \\ \rho_l^{\ast} v_l^{\ast} q_l^{\ast} + p^{\ast}n_y \\ \rho_l^{\ast} w_l^{\ast} q_l^{\ast} + p^{\ast}n_z \\(e_l^{\ast}+p^{\ast})q_l^{\ast}\end{array} \right) = S_L \left(\begin{array}{l}
+From the contact wave speed, we may derive the velocity and apply the Rankine-Hugoniot conditions to each acoustic wave to find the average state. In the left wave, the jump relations are
+F(U_{RP}
+ \\ \rho_l^{\ast}u_l^{\ast} \\ \rho_l^{\ast} v_l^{\ast} \\ \rho_l^{\ast} w_l^{\ast} \\e_l^{\ast} \end{array} \right) - \left(\begin{array}{l} \rho_l^{\ast} q_l^{\ast} \\ \rho_l^{\ast} u_l^{\ast} q_l^{\ast} + p^{\ast}n_x \\ \rho_l^{\ast} v_l^{\ast} q_l^{\ast} + p^{\ast}n_y \\ \rho_l^{\ast} w_l^{\ast} q_l^{\ast} + p^{\ast}n_z \\(e_l^{\ast}+p^{\ast})q_l^{\ast}\end{array} \right) = S_L \left(\begin{array}{l}
 \rho_l \\ \rho_l u_l \\ \rho_l v_l\\ \rho_l w_l\\e_l \end{array}\right)- \left( \begin{array}{l} \rho_l q_l \\ \rho_l u_l q_l +p_l n_x\\ \rho_l v_l q_l + p_l n_y \\ \rho_l w_l q_l + p_l n_z \\ (e_l + p_l) q_l
-\end{array} \right)
-$$
-
-which is easily solved when the contact wave speed is known. Straightforwardly, the first equation gives
-
-$$
-\rho_l^{\ast} = \rho_l \frac{S_L-q_l}{S_L-S_M}
-$$
-
-Combining both expressions we obtain the intermediate pressure
-
-$$
-p^{\ast} = \rho_l (q_L-S_l)(q_l-S_M) + p_l
-$$
-
+\end{array} \right)F(U_{RP}
 and solutions to the intermediate-left state (in conserved variables)
 
 $$
@@ -68,28 +52,29 @@ $$
 e_l^{\ast} = \frac{(S_L-q_l)\rho E_l -p_lq_l+p^{\ast}S_M}{S_L-S_M}
 $$
 
-The procedure to compute the intermediate-right state solution is analogous, but applying the Rankine-Hugoniot condition in the right sonic wave, that is interchanging the subscripts $$l$$ or $$L$$ to $$r$$ and $$R$$, respectively. in previous equations From the two intermediate states the flux may be obtained and replaced in the numerical scheme.
+The procedure to compute the intermediate-right state solution is analogous, but applying the Rankine-Hugoniot condition in the right sonic wave, that is interchanging the subscripts $$l$$ or $$L$$ to $$r$$ and $$R$$, respectively. in previous equations From the two intermediate states the flux may be obtained and replaced in the numerical scheme. The first-order scheme is
+
+$$
+F_{i+1/2}= F(U_{RP})
+$$
+
+
 
 ### The Sonic Wave Speed Estimates
 
 To compute the intermediate states the sonic wave speeds ($$S_L,S_R$$) are needed. Following Batten, the wave speeds can be obtained from
 
 $$
-S_L = \mbox{min}(q_l - c_l,\tilde{q}-\tilde{c}) \\
-S_R = \mbox{max}(q_r + c_r,\tilde{q}+\tilde{c})
+S_L = \mbox{min}(q_l - c_l,\tilde{q}- \tilde{c})
 $$
 
-where $$\tilde{q}=\tilde{u} n_x+\tilde{v} n_y +\tilde{w} n_z$$ and the average states are given by
+and
+
 
 $$
-\tilde{u}=\frac{(u_l+r_{\rho} u_r)}{(1+r_{\rho})}
+S_R = \mbox{min}(q_r + c_r,\tilde{q} + \tilde{c})
 $$
 
-The average sound speed is obtained from the average state
-
-$$
-\tilde{c}=\sqrt{(\gamma-1)C_p \tilde{T}}
-$$
 
 where $$\tilde{T}$$ is obtained through the average enthalpy
 
@@ -104,14 +89,23 @@ $$
 $$
 
 where $$r_{\rho}$$ is the ratio of densities
-
 $$
 r_{\rho}=\sqrt{\rho_r/\rho_l}
 $$
 
+### High order extension
+
+The above scheme is formalñly first-order, a high order extension can be build by using a  Total Variation Diminishing (TVD) reconstruction
+
 ## Rusanov Scheme
 
-Compact Scheme
+The Rusanov flux is a simple upwind flux that requires a single wave-speed estimate. In the current implementation, it is very compact and can be used to perform quick tests. The numerical flux function is typically given by:
+
+$$
+F_{i+1/2}= \frac{1}{2} \left( F_{i+1} + F_{i}  \right) - \frac{1}{2} \left( \left| \lambda_{i+1} \right| + \left| \lambda_i \right| \right) (U_{i+1} - U_i)
+$$·
+
+where $$ \lambda_i $$ ​ is the local characteristic speed at the i-th cell (often taken as the maximum eigenvalue of the Jacobian of the flux function).
 
 ## Skew-symmetric
 
@@ -153,15 +147,7 @@ $$
 F^{adv,skew}_{i+1/2} = \frac{1}{4} \left( U_{i} + U_{i+1} \right) \left( V_{i} + V_{i+1}   \right)
 $$
 
-and a fourth-order formulation is
-
-$$
-F^{adv,skew}_{i+1/2}  =   \frac{1}{3} \left( U_{i} + U_{i+1} \right) \left( V_{i} + V_{i+1}   \right) 
-  -\frac{1}{24} \left( U_{i-1} V_{i-1} +   U_{i-1} V_{i+1} +   U_{i} V_{i} +  U_{i} V_{i+2}  +
-                            U_{i+1} V_{i-1} +   U_{i+1} V_{i+1} +   U_{i+2} V_{i} +  U_{i+2} V_{i+2}   \right)
-$$
-
-At its core, the skew-symmetric scheme, despite its built-in de-aliasing properties, remains a derivative of the family of centered schemes. As such, it can still face stability challenges. Additional strategies to mitigate oscillations and effectively handle shock waves follows
+and a fourth-order formulation isF(U_{RP}heme, despite its built-in de-aliasing properties, remains a derivative of the family of centered schemes. As such, it can still face stability challenges. Additional strategies to mitigate oscillations and effectively handle shock waves follows
 
 ### Artificial dissipation
 
@@ -228,18 +214,8 @@ $$
 
 where $$\psi$$ is the shock/discontinuty detector (1 close to jumps) and $$\lambda$$ is the eigenvalue
 
-$$
-\epsilon_{i+1/2}^{(4)}=  \max \left (0, k^{(4)} | \lambda_{i+1/2}|  - \epsilon_{i+1/2}^{(2)}  \right)
-$$
-
-The $$- \epsilon_{i+1/2}^{(2)}$$ term, switched off the damping term in the presence of a shock. The shock term is only active if $$\psi > 0$$ The constant values are $$k^{(2)} \sim 0.1-1$$ and $$k^{(4)} \sim 0.01-0.05$$.
-
-### Shock Sensor
-
-The switch $$\psi$$, is computed as the maximum between the sensor value at the node just before and after the interface
-
-$$
-\psi_{i+1/2} = \mbox{max}(\psi_i,\psi_{i+1} )
+$$$$
+\frac{\partial \rho k  }{\partial t} + \frac{\partial \rho k }{\partial x_j} =  - u \frac{\partial p }{\partial x_j} 
 $$
 
 The sensor based on a variable $$\phi$$ is :
@@ -275,6 +251,73 @@ Designed to reduce numerical dissipation further than WENO
 ## KEEP
 
 Central KEEP (_non-dissipative and physically-consistent kinetic energy and entropy preserving_) schemes for compressible flows
+These scheme are base din splitting the energy equation.
+
+$$
+\frac{\partial E_t }{\partial t} + \frac{\partial (\rho e + \rho k + p) u_j}{\partial x_j} = 0
+$$
+
+where $$E_t = \rho e + \rho k$$ is the total energy plus kinetic energy.
+In the inviscid limit, from the momentum equation is possible to derive the kinetic energy equation
+
+$$
+\frac{\partial \rho k  }{\partial t} + \frac{\partial \rho u_j k }{\partial x_j} + u \frac{\partial p }{\partial x_j} = 0 
+$$
+which implies
+$$
+\frac{\partial \rho e  }{\partial t} + \frac{\partial \rho u_j e }{\partial x_j} + p \frac{\partial u }{\partial x_j} = 0 
+$$
+from
+$$
+d e =  T d s - \frac{p}{\rho^2} d \rho 
+$$
+which implies conservation of entropy
+$$
+\frac{\partial \rho s  }{\partial t} + \frac{\partial \rho u_j s }{\partial x_j} = 0 
+$$
+
+KEEP stil need a shock capturing term.
+
+### Split terms
+
+Given a function $$ f = a b $$, there are two forms to split the derivate
+
+Divergence
+$$
+\frac{\partial f}{\partial x} =  \frac{\partial a b}{\partial x}
+$$
+
+Quadratic
+
+$$
+\frac{\partial f}{\partial x} =  
+\frac{1}{2}\left( a \frac{\partial b }{\partial x} + b \frac{\partial a }{\partial x}  + \frac{\partial a b}{\partial x}    \right)
+$$
+
+These formulations are analytically equivalent. With a function $$ f = a b c $$,  there are three forms to split the derivate
+
+Divergence
+$$
+\frac{\partial f}{\partial x} =  \frac{\partial a b c}{\partial x}
+$$
+
+Quadratic
+
+$$
+\frac{\partial f}{\partial x} =  
+\frac{1}{2}\left( a \frac{\partial b c}{\partial x} + b c \frac{\partial a }{\partial x}  + \frac{\partial abc }{\partial x}    \right)
+$$
+
+Cubic
+
+$$
+\frac{\partial f}{\partial x} =  
+\frac{1}{4}\left( a \frac{\partial b c}{\partial x} + b \frac{\partial a c }{\partial x}  + c \frac{\partial a b}{\partial x} +
+                  a b \frac{\partial c }{\partial x}  + a c \frac{\partial b }{\partial x}  + b c \frac{\partial a }{\partial x}  +  
+                  \frac{\partial abc }{\partial x}    \right)
+$$
+
+
 
 ### References
 

@@ -9,7 +9,7 @@ coverY: 0
 
 Cerisse integrates a collection of C++ source code and libraries (such as AMReX, PelePhysics, etc.) along with the configuration of the problem setup. These pages explain how a case is initialised, detailing what problem will be solved and how.
 
-When creating a new problem, it's best to set up a new directory (e.g., `wrk`) with three files within it.
+When creating a new problem, it is best to set up a new directory (e.g., `wrk`) with three files:
 
 ```bash
 $ls wrk

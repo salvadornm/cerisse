@@ -43,7 +43,8 @@ where $$E_t = \rho e + \rho k$$ is the total energy plus kinetic energy.
 
 ### Transport fluxes
 
-The main cosures assume Newtonian flows, Fourier heat transfer and and Fickian diffusion and also (optionally) Soret diffusion The **shear stress** is given by
+The main closures assume Newtonian flows, Fourier heat transfer and Fickian diffusion and also (optionally) Soret diffusion.
+The **shear stress** is given by
 
 $$
 \tau_{ij} = 2 \mu S_{ij} + (\mu_b - \frac{2}{3} \mu)\nabla \cdot \vec{v} \delta_{ij}
@@ -97,8 +98,5 @@ $$
 h = h_k^0 Y_k + \int_{T^0}^T C_p dT
 $$
 
-and the specific  internal energy can be directly obtained by $$e = h - p/\rho$$
-
-
-
+and the specific  internal energy can be directly obtained by $$e = h - p/\rho$$.
 The current implementations include perfect gas, ideal gas and Soave-Redlich-Kwong (through PelePhysics), including mixtures.

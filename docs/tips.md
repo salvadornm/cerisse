@@ -22,6 +22,14 @@ $ conda install --channel conda-forge yt
 
 Beware of the combination Python **3.9** and **yt**. It is recommended to use newer Python, **>3.11** recommended. Check [yt Website](https://yt-project.org) for details and tutorials. Most of the examples in the manual use it for quick analysis and plotting in a `plot.py` script.
 
+In recent systems (for example Ubuntu 24), the use of virtual environments is enforced and the above lines will not work unless a virtual environment is used (or altenative ways created). For example, if the ```virtual``` environment exist, to activate it type:
+
+```bash
+$ source ~/virtual/bin/activate
+```
+
+You will need to do this to install python package, such as yt and markdown, required for postprocessing or managing the documentation.
+
 ## Cerisse script
 
 The **cerisse** script can help to clean directories, create backups, create visit files for movies quickly. It is useful for day to day running and avoid file creep-up. The script is installed in `bin` and can be used by

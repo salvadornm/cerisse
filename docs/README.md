@@ -55,8 +55,8 @@ Cerisse uses AMREX libraries [AMREX](https://amrex-codes.github.io/amrex/), whic
 
 #### Download and Install
 
-The code source for [Cerisse2](https://github.com/salvadornm/cerisse/tree/cerisse2)
-while code for (old) [Cerisse](https://github.com/salvadornm/cerisse)
+The code source can be download  in [Cerisse2](https://github.com/salvadornm/cerisse/tree/cerisse2)
+while the code for the old version in [Cerisse](https://github.com/salvadornm/cerisse)
 Releases will appear  soon in [Downloads](https://github.com/salvadornm/cerisse/releases).
 
 NOTE: This documentation is created for Cerisse2, which corresponds to the **cerisse2** branch on GitHub.
