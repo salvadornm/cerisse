@@ -181,7 +181,7 @@ $$
 The second-derivative term is used to capture discontinuities (hereafter _shock_ term) and the fourth-derivative is to control high-frequency noise (_damping_ term). The shock term acts near discontinuities and the damping in smooth parts of the flow. Using the same conservative form as before, the flux is modified by
 
 $$
-F^{adv}_{i+1/2} = F^{skew}_{i+1/2} + \left . \alpha_2 \frac{\partial U}{\partial x} \right |_{i+1/2} +\left . \ \alpha_4 \frac{\partial^3 U}{\partial x^3} \right |{i+1/2}
+F^{adv}_{i+1/2} = F^{skew}_{i+1/2} + \left . \alpha_2 \frac{\partial U}{\partial x} \right |_{i+1/2} +\left . \ \alpha_4 \frac{\partial^3 U}{\partial x^3} \right |_{i+1/2}
 $$
 
 The terms can be rewritten using differences, the shock term is&#x20;
@@ -198,7 +198,9 @@ $$
 
 The damping term is similarly
 
-&#x20;$$\left . \alpha_4 \frac{\partial^3 U}{\partial x^3} \right |_{i+1/2} \approx \frac{\alpha_4}{\Delta x} \left . \frac{\partial^2 \Delta U}{\partial x^2} \right |_{i+1/2}$$
+$$
+\left . \alpha_4 \frac{\partial^3 U}{\partial x^3} \right |_{i+1/2} \approx \frac{\alpha_4}{\Delta x} \left . \frac{\partial^2 \Delta U}{\partial x^2} \right |_{i+1/2}
+$$
 
 Using central differences for $${\partial^2 \Delta U}/{\partial x^2}$$ as
 
@@ -212,8 +214,7 @@ $$
 F^{damp}_{i+1/2} = \epsilon_{i+1/2}^{(4)} \left( U\_{i+2} - 3 U\_{i+1} + 3 U\_i - U\_{i-1} \right)
 $$
 
-$$
-For high-order schemes, the damping term accuracy can be increased, by using a high-order central scheme:
+For high-order schemes, the damping term accuracy can be increased by using a high-order central scheme:
 
 $$
 \frac{\partial^2 \Delta U}{\partial x^2} = \frac{ -1 /12 \Delta U\_{i+5/2} + 4/3 \Delta U\_{i+3/2} - 5/2 \Delta U\_{i+1/2} + 4/3 \Delta U\_{i-1/2} -1/12 \Delta U\_{i-3/2} }{\Delta x^2} + \mathcal{O}(\Delta x^4)
@@ -230,13 +231,14 @@ The parameters $$\epsilon_{i+1/2}^{(2)}$$ and $$\epsilon_{i+1/2}^{(4)}$$ control
 $$
 \epsilon\_{i+1/2}^{(2)}= k^{(2)} | \lambda\_{i+1/2} | \psi\_{i+1/2}
 $$
-where $$\psi$$ is the shock/discontinuty detector (1 close to jumps) and $$\lambda$$ is the eigenvalue
+where $$\psi$$ is the shock/discontinuty detector (with vakue of 1 close to jumps) and $$\lambda$$ is the eigenvalue
 
 $$
 \frac{\partial \rho k }{\partial t} + \frac{\partial \rho k }{\partial x\_j} = - u \frac{\partial p }{\partial x\_j}
 $$
 
 The sensor based on a variable $$\phi$$ is :
+
 $$
 \psi\_{i} = 2 \frac{|\phi\_{i+1} - 2\phi\_i + \phi\_{i-1} |}{P\_{JST} + P\_{TVD} + \varepsilon}
 $$
@@ -247,6 +249,7 @@ The original formulation works with a sensor on pressure. Cerisse implements the
 $$
 \psi = \frac{\psi\_\rho^2 + \psi\_P^2}{\psi\_\rho + \psi\_P}
 $$
+
 
 ## WENO and TENO
 
@@ -292,8 +295,7 @@ $$
 d e = T d s - \frac{p}{\rho^2} d \rho
 $$
 
-it can be shown (see original paper) that if mass is conserved and internal energy follows the above expression
-then entropy is conserved
+it can be shown (see original paper) that if mass is conserved and internal energy follows the above expression and then  entropy is conserved
 
 $$
 \frac{\partial \rho s }{\partial t} + \frac{\partial \rho u\_j s }{\partial x\_j} = 0
