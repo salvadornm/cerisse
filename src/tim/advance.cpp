@@ -290,10 +290,22 @@ void CNS::compute_rhs(MultiFab& statemf, Real dt, FluxRegister* fr_as_crse, Flux
 
     // primitives and fluxes arrays
     FArrayBox primf(bxg, cls_h.NPRIM, The_Async_Arena());
-    FArrayBox tempf(bxg, cls_h.NCONS, The_Async_Arena());
-    Array4<Real> const& fluxt = tempf.array();
     Array4<Real> const& prims= primf.array();
 
+    // .................................
+    //FArrayBox tempf(bxg, cls_h.NCONS, The_Async_Arena());
+    //Array4<Real> const& fluxt = tempf.array();  // >- original
+
+  
+    std::array<FArrayBox ,AMREX_SPACEDIM> fluxt;
+    for (int dir=0; dir < AMREX_SPACEDIM; ++dir)
+    {
+      fluxt[dir].resize(amrex::surroundingNodes(bxg, dir),cls_h.NCONS, The_Async_Arena() );
+      fluxt[dir].setVal<RunOn::Device>(0.);
+    }
+    // ...................................
+
+    
     // We want to minimise function calls. So, we call prims2cons, flux and
     // source term evaluations once per fab from CPU, to be run on GPU.
     cls_h.cons2prims(mfi, state, prims);
@@ -342,28 +354,40 @@ void CNS::compute_rhs(MultiFab& statemf, Real dt, FluxRegister* fr_as_crse, Flux
     // Euler/Diff Fluxes including boundary/discontinuity corrections
     // Note: we are over-writing state (cons) with flux derivative
 #if (AMREX_USE_GPIBM || CNS_USE_EB )      
-    prob_rhs.eflux_ibm(geom, mfi, prims, fluxt, state, cls_d, geoMarkers);
-    prob_rhs.dflux_ibm(geom, mfi, prims, fluxt, state, cls_d, geoMarkers);
+    prob_rhs.eflux_ibm(geom, mfi, prims, {AMREX_D_DECL(&fluxt[0], &fluxt[1], &fluxt[2])},state, cls_d, geoMarkers);    
+    //prob_rhs.dflux_ibm(geom, mfi, prims, {AMREX_D_DECL(&fluxt[0], &fluxt[1], &fluxt[2])}, state, cls_d, geoMarkers);
 #else
-    prob_rhs.eflux(geom, mfi, prims, fluxt, state, cls_d);
-    prob_rhs.dflux(geom, mfi, prims, fluxt, state, cls_d);
+    prob_rhs.eflux(geom, mfi, prims, {AMREX_D_DECL(&fluxt[0], &fluxt[1], &fluxt[2])}, state, cls_d);
+    prob_rhs.dflux(geom, mfi, prims, {AMREX_D_DECL(&fluxt[0], &fluxt[1], &fluxt[2])}, state, cls_d);
 #endif
 
+    // add flux derivative to rhs, i.e.  rhs + = (flx[i] - flx[i+1])/dx
+    // for (int dir = 0; dir < AMREX_SPACEDIM; dir++) {
+    //     GpuArray<int, 3> vdir = {int(dir == 0), int(dir == 1), int(dir == 2)};
+    //     auto const& flx = flxt[dir]->array();  // change
+    //     ParallelFor(bx, cls_t::NCONS,
+    //               [=] AMREX_GPU_DEVICE(int i, int j, int k, int n) noexcept {
+    //                 state(i, j, k, n) +=
+    //                     dxinv[dir] * (flx(i, j, k, n) - flx(i+vdir[0], j+vdir[1], k+vdir[2], n));
+    //               });
+    //   }                  
+
+                        
+
+  
+
+
 #if CNS_USE_EB    
-    // compute fluxes next boundary  !!??
-    // SNM testing
+    // internal geometry fluxes
     const Box&  ebbox  = mfi.growntilebox(0);  // box without ghost points 
     const auto& flag = (*EBM::eb.ebflags_a[level])[mfi];
-
-    //const auto& flag_arr = flag.const_array(mfi); //<<
-
     FabType t = flag.getType(ebbox);
     if (FabType::singlevalued == t){
-      EBM::eb.ebflux(geom,mfi, prims, fluxt,state, cls_d,level);
+      EBM::eb.ebflux(geom,mfi, prims, {AMREX_D_DECL(&fluxt[0], &fluxt[1], &fluxt[2])},state, cls_d,level);
     }
   
 
-    // Redistribution ************
+    // Redistribution ** printf("---- EBM 313  -----\n");**********
     
 #endif
 

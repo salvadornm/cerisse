@@ -180,10 +180,16 @@ class skew_t {
 
 
 #if (AMREX_USE_GPIBM || CNS_USE_EB )  
-  void inline eflux_ibm(const Geometry& geom, const MFIter& mfi,
-                    const Array4<Real>& prims, const Array4<Real>& flx,
+  // void inline eflux_ibm(const Geometry& geom, const MFIter& mfi,
+  //                   const Array4<Real>& prims, const Array4<Real>& flx,
+  //                   const Array4<Real>& rhs,
+  //                    const cls_t* cls,const Array4<bool>& ibMarkers) {
+
+void inline eflux_ibm(const Geometry& geom, const MFIter& mfi,
+                    const Array4<Real>& prims, std::array<FArrayBox*, AMREX_SPACEDIM> const &flxt,
                     const Array4<Real>& rhs,
                      const cls_t* cls,const Array4<bool>& ibMarkers) {
+
 #else
   void inline eflux(const Geometry& geom, const MFIter& mfi,
                     const Array4<Real>& prims, const Array4<Real>& flx,
@@ -209,7 +215,7 @@ class skew_t {
     // copy conservative variables from rhs to cons and clear rhs
     ParallelFor(bxg, cls_t::NCONS, [=] AMREX_GPU_DEVICE(int i, int j, int k, int n) noexcept {
       cons(i,j,k,n) = rhs(i,j,k,n);
-      rhs(i, j, k, n)=0.0;
+      rhs(i, j, k, n)=0.0;              
       });
 
     int imask = 3; // reduce order 
@@ -232,6 +238,9 @@ class skew_t {
 
       int Qdir =  cls_t::QRHO + dir + 1; 
 
+      auto const& flx = flxt[dir]->array(); 
+  
+
 #if (AMREX_USE_GPIBM || CNS_USE_EB )  
       ParallelFor(bxgnodal,
                   [=,*this] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {
@@ -243,6 +252,8 @@ class skew_t {
                     this->flux_dir(i, j, k,Qdir, vdir, cons, prims, lambda_max, flx, cls);
                   });                  
 #endif
+
+      
       // dissipative fluxes 
       if constexpr (param::dissipation) {
 
@@ -258,14 +269,20 @@ class skew_t {
                     this->fluxdissip_dir(i, j, k,Qdir, vdir, cons, prims, lambda_max, flx, cls);
                   });  
 #endif
+        
+
       }
-      // add flux derivative to rhs, i.e.  rhs + = (flx[i] - flx[i+1])/dx
+      // add flux derivative to rhs, i.e.  rhs + = (flx[i] - flx[i+1])/dx (THIS WILL GO)
       ParallelFor(bx, cls_t::NCONS,
                   [=] AMREX_GPU_DEVICE(int i, int j, int k, int n) noexcept {
                     rhs(i, j, k, n) +=
                         dxinv[dir] * (flx(i, j, k, n) - flx(i+vdir[0], j+vdir[1], k+vdir[2], n));
                   });
+
     }
+
+  
+
   }
 
   // ............................................................. 
@@ -328,6 +345,7 @@ class skew_t {
 
     if (intersolid_flx) return;  // flux =0  inside solid 
       
+
     // reduce to second order order scheme based on marker
     if (wall_flx)
     {   
@@ -348,6 +366,7 @@ class skew_t {
     else
     {
       il= i-halfsten*vdir[0]; jl= j-halfsten*vdir[1]; kl= k-halfsten*vdir[2];
+
       for (int l = 0; l < order; l++) {  
         V[l] = prims(il,jl,kl,Qdir); 
         for (int nvar = 0; nvar < cls_t::NCONS; nvar++) {U[l][nvar] = cons(il,jl,kl,nvar);}
@@ -355,14 +374,14 @@ class skew_t {
         U[l][cls_t::UET] = cons(il,jl,kl,cls_t::UET)  + P[l];
         il +=  vdir[0];jl +=  vdir[1];kl +=  vdir[2];
       } 
-      // fluxes
-      for (int nvar = 0; nvar < cls_t::NCONS; nvar++)  {
-        flx(i, j, k, nvar) =  0.0_rt;     
+      // fluxes      
+      for (int nvar = 0; nvar < cls_t::NCONS; nvar++)  {        
+        flx(i, j, k, nvar) =  0.0_rt;             
         for (int l = 0; l < order; l++) { 
           for (int m = 0; m < order; m++) { 
             flx(i, j, k, nvar) += coefskew(l,m)*U[l][nvar]*V[m];  
           } 
-        }
+        }        
       }  
       // pressure flux (symmetric interpolation)    
       for (int l = 0; l < order; l++) { 

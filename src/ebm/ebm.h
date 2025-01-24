@@ -173,7 +173,9 @@ public:
   }
   ////////////////////////////////////////////////////////////////////////////
   void inline ebflux(const Geometry& geom, const MFIter& mfi,
-                     const Array4<Real>& prims, const Array4<Real>& flx,
+                     const Array4<Real>& prims, 
+                   //  const Array4<Real>& flx, 
+                     std::array<FArrayBox*, AMREX_SPACEDIM> const &flxt,
                      const Array4<Real>& rhs, const cls_t* cls, int lev) {
 
 
@@ -183,23 +185,15 @@ public:
     const GpuArray<Real, AMREX_SPACEDIM> dxinv = geom.InvCellSizeArray();
     const Real *dx = geom.CellSize();
 
-
     // extract EB arrays given a level and mfi
-    Array4<const Real> vfrac = (*volmf_a[lev]).const_array(mfi);  
-
-    // areas                     
-    Array4<const Real> const& apx = areamcf_a[lev][0]->const_array(mfi);
-    Array4<const Real> const& apy = areamcf_a[lev][1]->const_array(mfi);
+    Array4<const Real> vfrac = (*volmf_a[lev]).const_array(mfi);             // vfrac
+    Array4<const Real> const& apx = areamcf_a[lev][0]->const_array(mfi);     // areas free in faces x
+    Array4<const Real> const& apy = areamcf_a[lev][1]->const_array(mfi);     // faces in y 
 #if (AMREX_SPACEDIM==3)    
-    Array4<const Real> const& apz = areamcf_a[lev][2]->const_array(mfi);
+    Array4<const Real> const& apz = areamcf_a[lev][2]->const_array(mfi);     //   faces in z
 #endif    
-
-    // norm array  (fab with SPACEDIM component)
-    Array4<const Real> const& normxyz = (*normmcf_a[lev]).const_array(mfi);  
-
-    // bcarea array (fav with one component) 
-    Array4<const Real> const& bcarea = (*bcareamcf_a[lev]).const_array(mfi);  
-
+    Array4<const Real> const& normxyz = (*normmcf_a[lev]).const_array(mfi);  // normal to surface (NDIM components)     
+    Array4<const Real> const& bcarea = (*bcareamcf_a[lev]).const_array(mfi); // area wall
             
     // markers 
     const auto& ebMarkers = (*bmf_a[lev]).array(mfi);
@@ -207,7 +201,17 @@ public:
     // just in case 
     const auto& flag = (*ebflags_a[lev])[mfi];
 
+    auto const& flx_x = flxt[0]->array(); 
+    auto const& flx_y = flxt[1]->array(); 
+#if (AMREX_SPACEDIM==3)     
+    auto const& flx_z = flxt[2]->array(); 
+#endif
+
+    // printf("---- EBM after fluxes -----\n");
+
+    // temp
     const int is = 19; int js= 5;
+
 
     amrex::ParallelFor(
         ebbox, [=] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {
@@ -217,54 +221,44 @@ public:
           if (ebMarkers(i,j,k,1)){
             Real vfracinv = 1.0/vfrac(i,j,k);
 
-            if ((j==js) && (i ==is )) {
-            printf(" i = %d j = %d  k =%d \n",i,j,k);
-            printf(" sld L=%d P=%d R=%d  \n",ebMarkers(i-1,j,k,0),ebMarkers(i,j,k,0),ebMarkers(i+1,j,k,0));
-            printf(" cut L=%d P=%d R=%d  \n",ebMarkers(i-1,j,k,1),ebMarkers(i,j,k,1),ebMarkers(i+1,j,k,1));
-            printf(" sld S=%d P=%d N=%d  \n",ebMarkers(i,j-1,k,0),ebMarkers(i,j,k,0),ebMarkers(i,j+1,k,0));
-            printf(" cut S=%d P=%d N=%d  \n",ebMarkers(i,j-1,k,1),ebMarkers(i,j,k,1),ebMarkers(i,j+1,k,1));
+            // if ((j==js) && (i ==is )) {
+            // printf(" i = %d j = %d  k =%d \n",i,j,k);
+            // printf(" sld L=%d P=%d R=%d  \n",ebMarkers(i-1,j,k,0),ebMarkers(i,j,k,0),ebMarkers(i+1,j,k,0));
+            // printf(" cut L=%d P=%d R=%d  \n",ebMarkers(i-1,j,k,1),ebMarkers(i,j,k,1),ebMarkers(i+1,j,k,1));
+            // printf(" sld S=%d P=%d N=%d  \n",ebMarkers(i,j-1,k,0),ebMarkers(i,j,k,0),ebMarkers(i,j+1,k,0));
+            // printf(" cut S=%d P=%d N=%d  \n",ebMarkers(i,j-1,k,1),ebMarkers(i,j,k,1),ebMarkers(i,j+1,k,1));
   
-             printf(" apx(i+1) = %f apx(i)= %f \n",apx(i+1,j,k),apx(i,j,k) );
-             printf(" apy(j+1) = %f apy(j)= %f \n",apy(i,j+1,k),apy(i,j,k) );
+            //  printf(" apx(i+1) = %f apx(i)= %f \n",apx(i+1,j,k),apx(i,j,k) );
+            //  printf(" apy(j+1) = %f apy(j)= %f \n",apy(i,j+1,k),apy(i,j,k) );
              
 
-             printf(" norm =%f %f \n",normxyz(i,j,k,0),normxyz(i,j,k,1));
-             printf(" bcarea =%f  bc*dx %f \n",bcarea(i,j,k,0),bcarea(i,j,k,0)*dx[0]);   
-             printf(" vfrac=%f \n",vfrac(i,j,k));
-             }
+            //  printf(" norm =%f %f \n",normxyz(i,j,k,0),normxyz(i,j,k,1));
+            //  printf(" bcarea =%f  bc*dx %f \n",bcarea(i,j,k,0),bcarea(i,j,k,0)*dx[0]);   
+            //  printf(" vfrac=%f \n",vfrac(i,j,k));
+            //  }
 
-
+            // rebuild fluxes
             for (int n = 0; n < cls_t::NCONS; n++) {
-              // fluxes  from fluid faces  NOT CORRECT REBUILD
-              // ---> use CD ?? function
-              Real fxp = flx(i+1,j,k,n); 
-              Real fxm = flx(i,j,k,n);
-              Real fyp = flx(i,j+1,k,n); 
-              Real fym = flx(i,j,k,n);
+              Real fxp = flx_x(i+1,j,k,n); 
+              Real fxm = flx_x(i,j,k,n);
+              Real fyp = flx_y(i,j+1,k,n); 
+              Real fym = flx_y(i,j,k,n);
 
               //  overwrite rhs in the cut-cells
-#if (AMREX_SPACEDIM==2)            
-              rhs(i, j, k, n) = -vfracinv*(
-              dxinv[0] * (apx(i + 1, j, k) * fxp - apx(i, j, k) * fxm) +
-              dxinv[1] * (apy(i, j + 1, k) * fyp - apy(i, j, k) * fym) );
-#endif            
-
-            //  //temp snm
-             if ((j==js) && (i ==is )) {
-             printf(" n= %d fxp= %f fxm= %f fyp= %f fym= %f\n",n,fxp,fxm,fyp,fym);
-             }
-
-
-
 
 #if (AMREX_SPACEDIM==3)            
-              Real fzp = flx(i,j,k+1,n); 
-              Real fzm = flx (i,j,k,n);
+              Real fzp = flx_z(i,j,k+1,n); 
+              Real fzm = flx_z(i,j,k,n);
               rhs(i, j, k, n) = -vfracinv*(
-              dxinv[0] * (apx(i + 1, j, k) * fxp - apx(i, j, k) * fxm) +
-              dxinv[1] * (apy(i, j + 1, k) * fyp - apy(i, j, k) * fym) +
-              dxinv[2] * (apz(i, j, k + 1) * fzp - apz(i, j, k) * fzm) );
+                dxinv[0] * (apx(i + 1, j, k) * fxp - apx(i, j, k) * fxm) +
+                dxinv[1] * (apy(i, j + 1, k) * fyp - apy(i, j, k) * fym) +
+                dxinv[2] * (apz(i, j, k + 1) * fzp - apz(i, j, k) * fzm) );
+#else
+              rhs(i, j, k, n) = -vfracinv*(
+                dxinv[0] * (apx(i + 1, j, k) * fxp - apx(i, j, k) * fxm) +
+                dxinv[1] * (apy(i, j + 1, k) * fyp - apy(i, j, k) * fym) );            
 #endif      
+
             }
 
             // build wall fluxes
@@ -275,13 +269,11 @@ public:
             //Real* primp = &prims(i,j,k,cls_t::NPRIM - 1);  //
 
             for (int n = 0; n < cls_t::NPRIM; n++) {
-              prim_wall[n] = prims(i,j,k,n);          
-               
-              if ((j==js) && (i ==is )) { printf("%d %f \n",n, prim_wall[n]);}
-
+              prim_wall[n] = prims(i,j,k,n);                         
             }  
             // normal to surface 
-            amrex::Real norm_wall [AMREX_SPACEDIM]= {0.0}; 
+            amrex::Real norm_wall [AMREX_SPACEDIM]= {0.0};
+   
             for (int n = 0; n < AMREX_SPACEDIM; n++) {
               norm_wall[n] = -normxyz(i,j,k,n); // so the normal points towards the liquid
             }
@@ -291,31 +283,25 @@ public:
            
  
             for (int n = 0; n < cls_t::NCONS; n++) {
-
-               if ((j==js) && (i ==is )) {
-                  printf(" RHS = %f \n", rhs(i,j,k,n));
-               }                  
-
               rhs(i,j,k,n) += flux_wall[n]*vfracinv*bcarea(i,j,k,0)*dxinv[0];
 
              //temp snm
-             if ((j==js) && (i ==is )) {
-              printf(" n=%d fluxwall = %f RHS=%f \n",n,flux_wall[n],rhs(i,j,k,n));           
-              }
+            //  if ((j==js) && (i ==is )) {
+            //   printf(" n=%d fluxwall = %f RHS=%f \n",n,flux_wall[n],rhs(i,j,k,n));           
+            //   }
 
             }
             
              
  
 
-
+          ///////////////////   
           }
+         
 
         });
+
   }                      
-  ////////////////////////////////////////////////////////////////////////////
-  /// flux function call  prims2fluxes
-  
         
 
 
