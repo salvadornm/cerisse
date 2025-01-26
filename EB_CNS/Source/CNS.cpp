@@ -427,6 +427,14 @@ void CNS::post_restart()
   }
 #endif
 
+  // Initialise LES model
+  if (do_les || do_pasr) {
+    ParmParse pp("cns");
+    std::string les_model_name;
+    pp.get("les_model", les_model_name);
+    les_model = LESModel::create(les_model_name);
+  }
+
   ProbParm const* lprobparm = d_prob_parm;
   const auto geomdata = geom.data();
   auto const& sarrs = S_new.arrays();
