@@ -15,16 +15,27 @@ class rusanov_t {
   AMREX_GPU_HOST_DEVICE
   ~rusanov_t() {}
 
-#if (AMREX_USE_GPIBM || CNS_USE_EB)
-  void inline eflux_ibm(const Geometry& geom, const MFIter& mfi,
-                    const Array4<Real>& prims, const Array4<Real>& flx,
-                    const Array4<Real>& rhs,
-                    const cls_t* cls, const Array4<bool>& ibMarkers) {
+// #if (AMREX_USE_GPIBM || CNS_USE_EB)
+//   void inline eflux_ibm(const Geometry& geom, const MFIter& mfi,
+//                     const Array4<Real>& prims, const Array4<Real>& flx,
+//                     const Array4<Real>& rhs,
+//                     const cls_t* cls, const Array4<bool>& ibMarkers) {
+// #else
+//   void inline eflux(const Geometry& geom, const MFIter& mfi,
+//                     const Array4<Real>& prims, const Array4<Real>& flx,
+//                     const Array4<Real>& rhs,
+//                     const cls_t* cls) {
+// #endif
+
+#if (AMREX_USE_GPIBM || CNS_USE_EB )  
+ void inline eflux_ibm(const Geometry& geom, const MFIter& mfi,
+                    const Array4<Real>& prims, std::array<FArrayBox*, AMREX_SPACEDIM> const &flxt,
+                    const Array4<Real>& rhs, const cls_t* cls,const Array4<bool>& ibMarkers) {
+
 #else
   void inline eflux(const Geometry& geom, const MFIter& mfi,
-                    const Array4<Real>& prims, const Array4<Real>& flx,
-                    const Array4<Real>& rhs,
-                    const cls_t* cls) {
+                    const Array4<Real>& prims, std::array<FArrayBox*, AMREX_SPACEDIM> const &flxt,
+                    const Array4<Real>& rhs, const cls_t* cls) {
 #endif
 
     const GpuArray<Real, AMREX_SPACEDIM> dxinv = geom.InvCellSizeArray();
@@ -62,6 +73,9 @@ class rusanov_t {
                     cls->prims2fluxes(i, j, k, prims, cell_fluxes, vdir);
                   });
 
+
+      auto const& flx = flxt[dir]->array();     
+      
       // compute interface fluxes at i-1/2, j-1/2, k-1/2
       ParallelFor(bxgnodal,
                   [=,*this] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {

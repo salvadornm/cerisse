@@ -221,22 +221,6 @@ public:
           if (ebMarkers(i,j,k,1)){
             Real vfracinv = 1.0/vfrac(i,j,k);
 
-            // if ((j==js) && (i ==is )) {
-            // printf(" i = %d j = %d  k =%d \n",i,j,k);
-            // printf(" sld L=%d P=%d R=%d  \n",ebMarkers(i-1,j,k,0),ebMarkers(i,j,k,0),ebMarkers(i+1,j,k,0));
-            // printf(" cut L=%d P=%d R=%d  \n",ebMarkers(i-1,j,k,1),ebMarkers(i,j,k,1),ebMarkers(i+1,j,k,1));
-            // printf(" sld S=%d P=%d N=%d  \n",ebMarkers(i,j-1,k,0),ebMarkers(i,j,k,0),ebMarkers(i,j+1,k,0));
-            // printf(" cut S=%d P=%d N=%d  \n",ebMarkers(i,j-1,k,1),ebMarkers(i,j,k,1),ebMarkers(i,j+1,k,1));
-  
-            //  printf(" apx(i+1) = %f apx(i)= %f \n",apx(i+1,j,k),apx(i,j,k) );
-            //  printf(" apy(j+1) = %f apy(j)= %f \n",apy(i,j+1,k),apy(i,j,k) );
-             
-
-            //  printf(" norm =%f %f \n",normxyz(i,j,k,0),normxyz(i,j,k,1));
-            //  printf(" bcarea =%f  bc*dx %f \n",bcarea(i,j,k,0),bcarea(i,j,k,0)*dx[0]);   
-            //  printf(" vfrac=%f \n",vfrac(i,j,k));
-            //  }
-
             // rebuild fluxes
             for (int n = 0; n < cls_t::NCONS; n++) {
               Real fxp = flx_x(i+1,j,k,n); 
@@ -263,13 +247,13 @@ public:
 
             // build wall fluxes
             amrex::GpuArray<Real, cls_t::NCONS> flux_wall = {0.0};                             
-            // primitive array (can we do it wioth a nice pointer?)
+            // primitive array
             amrex::GpuArray<Real, cls_t::NPRIM> prim_wall = {0.0};
 
             //Real* primp = &prims(i,j,k,cls_t::NPRIM - 1);  //
 
             for (int n = 0; n < cls_t::NPRIM; n++) {
-              prim_wall[n] = prims(i,j,k,n);                         
+              prim_wall[n] = prims(i,j,k,n);   // interpolate                       
             }  
             // normal to surface 
             amrex::Real norm_wall [AMREX_SPACEDIM]= {0.0};
@@ -284,17 +268,8 @@ public:
  
             for (int n = 0; n < cls_t::NCONS; n++) {
               rhs(i,j,k,n) += flux_wall[n]*vfracinv*bcarea(i,j,k,0)*dxinv[0];
-
-             //temp snm
-            //  if ((j==js) && (i ==is )) {
-            //   printf(" n=%d fluxwall = %f RHS=%f \n",n,flux_wall[n],rhs(i,j,k,n));           
-            //   }
-
             }
-            
-             
- 
-
+                      
           ///////////////////   
           }
          

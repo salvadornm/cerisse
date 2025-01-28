@@ -20,27 +20,26 @@ static constexpr Real Mw   = 28.96e-3;  // Molecular weight
 static constexpr Real gam  = 1.4;       // Adiabatic coefficient
 static constexpr Real Mach = 3.0;       // Mach Number
 
-
-
 // problem parameters 
-struct ProbParm {
-  Real gam = 1.4;
-  Real p_l    = 153546.24;    
-  Real T_l    = 169.167;
-  Real c_l    = sqrt(gam*gas_constant*T_l/Mw); 
-  Real u_l    =  c_l*Mach;
-  Real v_l    =  0.0;
-  Real rho_l  =  p_l*Mw/(gas_constant*T_l); 
-  Real eint_l =  p_l/ (gam - Real(1.0));
 
-  Real p_r    = 153546.24;    
-  Real T_r    = 153.0;
-  Real c_r    = sqrt(gam*gas_constant*T_r/Mw); 
-  Real u_r    = 0.0;
+struct ProbParm {  
+  Real p_l    = 1.0;    
+  Real rho_l  = 1.4;
+  Real c_l    = sqrt(gam*p_l/rho_l); // 1 
+  Real u_l    = c_l*Mach;   //3
+  Real v_l    = 0.0;
+  Real T_l    = p_l*Mw/(gas_constant*rho_l); 
+  Real eint_l = p_l/ (gam - Real(1.0));
+
+  Real p_r    = p_l;
+  Real rho_r  = rho_l;     
+  Real c_r    = sqrt(gam*p_r/rho_r); 
+  Real u_r    = 3.0; // temp
   Real v_r    = 0.0;
-  Real rho_r  = p_r*Mw/(gas_constant*T_r); ; 
+  Real T_r    = p_r*Mw/(gas_constant*rho_r); ; 
   Real eint_r = p_r/(gam - Real(1.0));;  
 };
+
 
 // numerical method parameters
 struct methodparm_t {

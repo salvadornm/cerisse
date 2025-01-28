@@ -3,6 +3,7 @@ DEBUG   = FALSE
 DIM     = 2
 COMP     = gcc
 CXXSTD    = c++20
+PRECISION = SINGLE
 
 TINY_PROFILE = FALSE
 
