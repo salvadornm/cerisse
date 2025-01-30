@@ -58,14 +58,13 @@ inline Vector<int> cons_vars_type={1,2,3,0,0};
 typedef closures_dt<indicies_t, visc_suth_t, cond_suth_t,
                     calorifically_perfect_gas_t<indicies_t>> ProbClosures;
 
+// define nuemrical scheme comment/uncomment to set up 
 //typedef rhs_dt<rusanov_t<ProbClosures>, no_diffusive_t, no_source_t > ProbRHS;
-//typedef rhs_dt<riemann_t<false, ProbClosures>, no_diffusive_t, no_source_t > ProbRHS;
-typedef rhs_dt<skew_t<methodparm_t, ProbClosures>, no_diffusive_t, no_source_t > ProbRHS;
+typedef rhs_dt<riemann_t<false, ProbClosures>, no_diffusive_t, no_source_t > ProbRHS;
+//typedef rhs_dt<skew_t<methodparm_t, ProbClosures>, no_diffusive_t, no_source_t > ProbRHS;
 
 // define type of wall and EBM class
-
 typedef adiabatic_wall_t<ProbClosures> TypeWall;
-
 typedef ebm_t<TypeWall,ProbClosures> ProbEB;
 
 

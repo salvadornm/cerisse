@@ -333,16 +333,23 @@ class skew_t {
     Real U[order][cls_t::NCONS];
 
     int il= i-vdir[0]; int jl= j-vdir[1]; int kl= k-vdir[2];
-    const bool wall_flx = marker(i,j,k,1) || marker(il,jl,kl,1);           // is a flux close to a GP
+    const bool close_to_wall = marker(i,j,k,1) || marker(il,jl,kl,1);           // //  flux close to a GP (IBM) or a cut-cell (EB)
     const bool intersolid_flx = marker(i,j,k,0) &&  marker(il,jl,kl,0);    // inter-flux
 
     if (intersolid_flx) return;  // flux =0  inside solid 
       
 
-    // reduce to second order order scheme based on marker
-    if (wall_flx)
+#ifdef CNS_USE_EB   
+    // in EBM wall flux will be computed afterwards
+    const bool next_to_wall = marker(i,j,k,0) || marker(il,jl,kl,0);
+    if (next_to_wall) return;  
+#endif
+
+
+    // reduce to second order scheme close to wall
+    if (close_to_wall)
     {   
-      il= i-vdir[0]; jl= j-vdir[1]; kl= k-vdir[2];
+      //il= i-vdir[0]; jl= j-vdir[1]; kl= k-vdir[2];
       for (int l = 0; l < 2; l++) {  
         V[l] = prims(il,jl,kl,Qdir); 
         for (int nvar = 0; nvar < cls_t::NCONS; nvar++) {U[l][nvar] = cons(il,jl,kl,nvar);}
@@ -389,11 +396,17 @@ class skew_t {
     const cls_t* cls,const Array4<bool>& marker) const {
 
     int il= i-vdir[0]; int jl= j-vdir[1]; int kl= k-vdir[2];
-    const bool wall_flx = marker(i,j,k,1) || marker(il,jl,kl,1);          
+    const bool close_to_wall  = marker(i,j,k,1) || marker(il,jl,kl,1);          //  flux close to a GP (IBM) or a cut-cell (EB)
     const bool intersolid_flx = marker(i,j,k,0) &&  marker(il,jl,kl,0);  
 
-    if (intersolid_flx) return;  // flux =0  inside solid 
-    
+    if (intersolid_flx) return;  // flux =0  inside solid
+
+#ifdef CNS_USE_EB   
+    // in EBM wall flux will be computed afterwards
+    const bool next_to_wall = marker(i,j,k,0) || marker(il,jl,kl,0);
+    if (next_to_wall) return;  
+#endif
+
     int i0[3],i1[3],i2[3],i3[3];
  
     const int idir = Qdir -1;
@@ -404,14 +417,17 @@ class skew_t {
     // loop over sensor variables
     int nv = 0;
     Real sen = Real(0.0);
-    if (wall_flx)
+    if (close_to_wall)
     {          
-      if (marker(i,j,k,0))  // solid cell on the right is solid, use i-2,i-1,i(GP)
+
+      const bool wall_right = marker(i,j,k,0) || marker(i+vdir[0],j+vdir[1],k+vdir[2],0); // wall i(IB) or i+1 (EB)
+
+      if (wall_right)       // solid towards the right use i-2,i-1,i(GP/CUT)
       {
         i1[0] = i - 2*vdir[0]; i1[1] = j - 2*vdir[1];i1[2] = k - 2*vdir[2];
         for (int l=0;l<3;l++) {i2[l]=i1[l]+vdir[l];i3[l]=i2[l]+vdir[l];}
       } 
-      else                  // solid cell on the left is solid, use i-1(GP),i,i+1
+      else                  // solid towards the left, use i-1(GP/CUT),i,i+1
       {
         i1[0] = i - vdir[0]; i1[1] = j - vdir[1];i1[2] = k - vdir[2];
         for (int l=0;l<3;l++) {i2[l]=i1[l]+vdir[l];i3[l]=i2[l]+vdir[l];}
@@ -448,8 +464,8 @@ class skew_t {
     }  
 
     // reduce order close to BC by making sensor  = 1   
-    sen = (i < mask_sen(idir,1)) ? 1.0 : sen;  
-    sen = (i > mask_sen(idir,2)) ? 1.0 : sen;  
+    // sen = (i < mask_sen(idir,1)) ? 1.0 : sen;  
+    // sen = (i > mask_sen(idir,2)) ? 1.0 : sen;  
     
     // spectral radius Jacobian matrix (u + c)  
     //Real rr = std::max(lambda(il, jl, kl, 0), lambda(i, j, k, 0));          
@@ -458,7 +474,7 @@ class skew_t {
     Real eps4 = std::max(0.0, Cdamp*rr - eps2);
 
     // shock capturing and damping 
-    if (wall_flx)
+    if (close_to_wall)
     {
       for (int nvar = 0; nvar < cls_t::NCONS; nvar++) { 
         flx(i, j, k, nvar) -=  eps2*( cons(i,j,k,nvar) -  cons(il,jl,kl,nvar)) ;         
@@ -507,8 +523,8 @@ class skew_t {
     }
 
     // reduce order close to BC by making sensor  = 1   
-    sen = (i < mask_sen(idir,1)) ? 1.0 : sen;  
-    sen = (i > mask_sen(idir,2)) ? 1.0 : sen;  
+    // sen = (i < mask_sen(idir,1)) ? 1.0 : sen;  
+    // sen = (i > mask_sen(idir,2)) ? 1.0 : sen;  
     
     // spectral radius Jacobian matrix (u + c)
     //Real rr = std::max(lambda(il, jl, kl, 0), lambda(i, j, k, 0));    

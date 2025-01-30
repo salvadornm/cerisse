@@ -154,6 +154,11 @@ public:
 
     for (MFIter mfi(mfab, false); mfi.isValid(); ++mfi) {
       const Box& bx = mfi.tilebox();
+
+    
+      // make box bigger to include GHOST
+      const Box& bxg = mfi.growntilebox(cls_t::NGHOST);
+
       const auto& ebMarkers = mfab.array(mfi); // boolean array
      
       Array4<const Real> vf = (*volmf_a[lev]).const_array(mfi);      
@@ -161,7 +166,7 @@ public:
       const auto& flag_arr = (*ebflags_a[lev]).const_array(mfi);
 
       amrex::ParallelFor(
-        bx, [=] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {                       
+        bxg, [=] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {       //snm                
 
         ebMarkers(i, j, k, 0) = flag_arr(i,j,k).isCovered();  
         ebMarkers(i, j, k, 1) = flag_arr(i,j,k).isSingleValued();  

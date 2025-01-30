@@ -213,16 +213,28 @@ class weno_t {
   ~weno_t() {}
 
 #ifdef AMREX_USE_GPIBM
+  // void inline eflux_ibm(const amrex::Geometry& geom, const amrex::MFIter& mfi,
+  //                       const amrex::Array4<const amrex::Real>& prims_in,
+  //                       const amrex::Array4<amrex::Real>& flx,
+  //                       const amrex::Array4<amrex::Real>& rhs, const cls_t* cls,
+  //                       const amrex::Array4<const bool>& ibMarkers)
+
   void inline eflux_ibm(const amrex::Geometry& geom, const amrex::MFIter& mfi,
                         const amrex::Array4<const amrex::Real>& prims_in,
-                        const amrex::Array4<amrex::Real>& flx,
+                        std::array<FArrayBox*, AMREX_SPACEDIM> const &flxt,
                         const amrex::Array4<amrex::Real>& rhs, const cls_t* cls,
                         const amrex::Array4<const bool>& ibMarkers)
+
+
 #else
+  // void inline eflux(const amrex::Geometry& geom, const amrex::MFIter& mfi,
+  //                   const amrex::Array4<const amrex::Real>& prims,
+  //                   const amrex::Array4<amrex::Real>& flx,
+  //                   const amrex::Array4<amrex::Real>& rhs, const cls_t* cls)
   void inline eflux(const amrex::Geometry& geom, const amrex::MFIter& mfi,
                     const amrex::Array4<const amrex::Real>& prims,
-                    const amrex::Array4<amrex::Real>& flx,
-                    const amrex::Array4<amrex::Real>& rhs, const cls_t* cls)
+                    std::array<FArrayBox*, AMREX_SPACEDIM> const &flxt,
+                    const amrex::Array4<amrex::Real>& rhs, const cls_t* cls)                    
 #endif
   {
     using amrex::Array4, amrex::Box, amrex::Dim3, amrex::IntVect, amrex::Real;
@@ -238,6 +250,8 @@ class weno_t {
     // for each direction
     for (int dir = 0; dir < amrex::SpaceDim; ++dir) {
       const Box& flxbx = amrex::surroundingNodes(bx, dir);
+
+      auto const& flx = flxt[dir]->array(); // snm
 
       ParallelFor(flxbx, [=] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {
         IntVect iv(AMREX_D_DECL(i, j, k));

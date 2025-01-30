@@ -79,7 +79,7 @@ class rusanov_t {
       // compute interface fluxes at i-1/2, j-1/2, k-1/2
       ParallelFor(bxgnodal,
                   [=,*this] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {
-                    this->flux_dir(i, j, k, vdir, cons, cell_fluxes, lambda_max, flx, cls);
+                    this->flux_dir(i, j, k, vdir, cons, cell_fluxes, lambda_max, flx, cls);      
                   });
 
       // add flux derivative to rhs = -(fi+1 - fi)/dx = (fi - fi+1)/dx

@@ -350,6 +350,7 @@ void CNS::compute_rhs(MultiFab& statemf, Real dt, FluxRegister* fr_as_crse, Flux
     geoMarkers(i,j,k,n) = ebMarkers(i,j,k,n);
     });
 #endif
+
   
     // Euler/Diff Fluxes including boundary/discontinuity corrections
     // Note: we are over-writing state (cons) with flux derivative

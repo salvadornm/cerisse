@@ -24,9 +24,17 @@ class riemann_t {
   AMREX_GPU_HOST_DEVICE
   ~riemann_t() {}
 
+#if (AMREX_USE_GPIBM || CNS_USE_EB )  
+ void inline eflux_ibm(const Geometry& geom, const MFIter& mfi,
+                    const Array4<Real>& prims, std::array<FArrayBox*, AMREX_SPACEDIM> const &flxt,
+                    const Array4<Real>& rhs, const cls_t* cls,const Array4<bool>& ibMarkers) {
+
+#else
   void inline eflux(const Geometry& geom, const MFIter& mfi,
-                    const Array4<Real>& prims, const Array4<Real>& flx,
+                    const Array4<Real>& prims, std::array<FArrayBox*, AMREX_SPACEDIM> const &flxt,
                     const Array4<Real>& rhs, const cls_t* cls) {
+#endif
+  
     const GpuArray<Real, AMREX_SPACEDIM> dxinv = geom.InvCellSizeArray();
     const Box& bx = mfi.tilebox();
     // const Box& bxg = mfi.growntilebox(cls_t::NGHOST);
@@ -42,6 +50,10 @@ class riemann_t {
 
     // x-direction
     int cdir = 0;
+    auto const& flx1 = flxt[cdir]->array(); 
+  
+
+
     const Box& xslpbx = amrex::grow(bx, cdir, 1);
     amrex::ParallelFor(
         xslpbx, [=, *this] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {
@@ -50,18 +62,20 @@ class riemann_t {
     const Box& xflxbx = amrex::surroundingNodes(bx, cdir);
     amrex::ParallelFor(
         xflxbx, [=, *this] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {
-          this->cns_riemann_x(i, j, k, flx, slope, prims, *cls);
+          this->cns_riemann_x(i, j, k, flx1, slope, prims, *cls);
         });
     // add x flux derivative to rhs = -(fi+1 - fi)/dx = (fi - fi+1)/dx
     ParallelFor(bx, cls_t::NCONS,
                 [=] AMREX_GPU_DEVICE(int i, int j, int k, int n) noexcept {
                   rhs(i, j, k, n) =
-                      dxinv[cdir] * (flx(i, j, k, n) - flx(i + 1, j, k, n));
+                      dxinv[cdir] * (flx1(i, j, k, n) - flx1(i + 1, j, k, n));
                 });
 
 #if AMREX_SPACEDIM >= 2
     // y-direction
     cdir = 1;
+    auto const& flx2 = flxt[cdir]->array(); 
+  
     const Box& yslpbx = amrex::grow(bx, cdir, 1);
     amrex::ParallelFor(
         yslpbx, [=, *this] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {
@@ -69,23 +83,22 @@ class riemann_t {
         });
     const Box& yflxbx = amrex::surroundingNodes(bx, cdir);
     amrex::ParallelFor(
-        yflxbx, [=, *this] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {
-          for (int n = 0; n < cls_t::NCONS; n++) {
-            flx(i, j, k, n) = 0.0;
-          };
-          this->cns_riemann_y(i, j, k, flx, slope, prims, *cls);
+        yflxbx, [=, *this] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {          
+          this->cns_riemann_y(i, j, k, flx2, slope, prims, *cls);
         });
     // add y flux derivative to rhs = -(fi+1 - fi)/dy = (fi - fi+1)/dy
     ParallelFor(bx, cls_t::NCONS,
                 [=] AMREX_GPU_DEVICE(int i, int j, int k, int n) noexcept {
                   rhs(i, j, k, n) +=
-                      dxinv[cdir] * (flx(i, j, k, n) - flx(i, j + 1, k, n));
+                      dxinv[cdir] * (flx2(i, j, k, n) - flx2(i, j + 1, k, n));
                 });
 #endif
 
 #if AMREX_SPACEDIM == 3
     // z-direction
     cdir = 2;
+    auto const& flx3 = flxt[cdir]->array(); 
+  
     const Box& zslpbx = amrex::grow(bx, cdir, 1);
     amrex::ParallelFor(
         zslpbx, [=, *this] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {
@@ -94,16 +107,13 @@ class riemann_t {
     const Box& zflxbx = amrex::surroundingNodes(bx, cdir);
     amrex::ParallelFor(
         zflxbx, [=, *this] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {
-          for (int n = 0; n < cls_t::NCONS; n++) {
-            flx(i, j, k, n) = 0.0;
-          };
-          this->cns_riemann_z(i, j, k, flx, slope, prims, *cls);
+          this->cns_riemann_z(i, j, k, flx3, slope, prims, *cls);
         });
     // add z flux derivative to rhs = -(fi+1 - fi)/dz = (fi - fi+1)/dz
     ParallelFor(bx, cls_t::NCONS,
                 [=] AMREX_GPU_DEVICE(int i, int j, int k, int n) noexcept {
                   rhs(i, j, k, n) +=
-                      dxinv[cdir] * (flx(i, j, k, n) - flx(i, j, k + 1, n));
+                      dxinv[cdir] * (flx3(i, j, k, n) - flx3(i, j, k + 1, n));
                 });
 #endif
   };
