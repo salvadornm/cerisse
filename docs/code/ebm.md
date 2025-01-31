@@ -1,7 +1,8 @@
 # EBM 
 
+This page explains how the EB method is implemented in Cerisse and the flux 
+calculation is affected
 
-The link to theory
 
 ## Fluxes in EB
 
@@ -13,7 +14,6 @@ void inline ebflux(const Geometry& geom, const MFIter& mfi,
                      const Array4<Real>& prims, const Array4<Real>& flx,
                      const Array4<Real>& rhs, const cls_t* cls, int lev) {
 ```
-
 
 ### Extracting arrays
 

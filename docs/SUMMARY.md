@@ -31,7 +31,7 @@
   * [LES](theory/equations/les.md)
   * [Turbulent Combustion](theory/equations/turbcomb.md)
   * [Numerical Methods](theory/equations/numerical-methods.md)
-  * [Solid boundaries](theory/ibmeb.md)
+  * [Solid Boundaries](theory/ibmeb.md)
 
 ## CODE
 
@@ -39,3 +39,5 @@
   * [Variables](indexvar.md)
   * [Euler Solver](fluxsolver.md)
   * [Thermo Solver](thermosolver.md)
+  * [Advance Step](code/advance.md)
+  * [EBM Solver](code/ebm.md)
