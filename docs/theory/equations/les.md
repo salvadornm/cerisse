@@ -14,7 +14,7 @@ $$
 
 where $$\Delta$$ is the characteristic filter width in each respective direction and $$\overline{\phi}$$is the filtered quantity.
 
-The actual form of the filter is usually _implicit_ and not needed while soling the LES equations. Is common to use a box/top-hat filter of the form below where the cut-off scale/filter width is usually taken proportional not the mesh size $$\Delta \propto h$$
+The actual form of the filter is usually _implicit_ and is not needed while solving the LES equations. Is common to use a _box/top-hat filter_ of the form below, where the cut-off scale/filter width is taken proportional to the mesh size $$\Delta \propto h$$
 
 $$
 G(\mathbf{x}-\mathbf{x}',\Delta) =
@@ -26,7 +26,8 @@ G(\mathbf{x}-\mathbf{x}',\Delta) =
 \right.
 $$
 
-Where other filter kernels are possible (see Pope's book). In the finite volume method, when the filter width matches the local cell size , i.e., $$\Delta= h$$and the filter used is the box filter (as described above), the cell-averaged value of a variable is equivalent to its filtered value.
+Other filter kernels are possible (see [Pope's book](https://www.cambridge.org/highereducation/books/turbulent-flows/C58EFF59AF9B81AE6CFAC9ED16486B3A#overview) for more detail on LES filters). \
+In the finite volume method, when the filter width matches the local cell size , _i.e._, $$\Delta= h$$ and the filter used is the box filter; the _cell-averaged_ value of a variable is equivalent to its _filtered_ value.
 
 For variable density flows it is convenient to introduce the mass-weighted Favre filtering operation :
 
@@ -34,13 +35,13 @@ $$
 \widetilde{\phi } = \frac{\overline{\rho \phi} }{\bar{\rho}}
 $$
 
-It is commonb to assume assumption of commutability of the filtering and derivative operators, that is to say
+It is common to assume _commutability_ of the filtering and derivative operators, that is to say
 
 $$
 \overline{ \frac{\partial \phi }{\partial x_j} } = \frac{\partial \overline{\phi}}{\partial x_j}
 $$
 
-This relation is only true under several assumptions, including the restrictive condition of constant filter width throughout the domain. Is common to neglect this error and assume the effects are incorporated into the SGS models.
+This relation is only true under several assumptions, including the restrictive condition of constant filter width throughout the domain. Is common to neglect this error and assume the effects are incorporated into sub-grid  models.
 
 #### Continuity
 
@@ -92,20 +93,26 @@ $$
 
 ## Sub-grid Closures
 
-The filtered momentum equation requires modelling for the SGS stress tensor.
+The filtered momentum equation requires modelling of the following terms
 
 $$
-\tau_{ij}^{SGS}= \overline{\rho u_i u_j} =\bar{\rho} \widetilde{u_i u_j}
+\overline{\rho u_i u_j} =\bar{\rho} \widetilde{u_i u_j}  = \bar{\rho} \tilde{u}_i \tilde{u}_j  - \tau^{sgs}_{ij}
 $$
 
-A common strategy found in many LES studies is the use of an eddy viscosity-like assumption founded on Boussinesq’s hypthothesis
+where a sub-gris stress tensor is introduced that need modelling
+
+$$
+\tau^{sgs}_{ij} =   \bar{\rho} \tilde{u}_i \tilde{u}_j  - \bar{\rho} \widetilde{u_i u_j}
+$$
+
+A common strategy found in many LES studies is the use of an eddy viscosity-like assumption founded on _Boussinesq’s hypthothesis_
 
 $$
 \tau_{ij}^{sgs} - \frac{1}{3} \tau_{kk} = \mu_{sgs} 
 \left( \tilde{S}_{ij} - \frac{1}{3} \tilde{S}_{kk} \right)
 $$
 
-Where a sub-grid viscosity is introduced.
+A  sub-grid viscosity is introduced, similar to turbulent viscosity in RANS-type models that requires modelling. Implemenetd models include
 
 #### Smagorinsky
 
@@ -113,11 +120,13 @@ $$
 \mu_{sgs}  = \bar{\rho} (C_S \Delta) ^2 || \tilde{S}_{ij} ||
 $$
 
-with $$\tilde{S}_{ij}$$represents the filtered strain tensor and $$C_S$$the Smagorinsky constant, with values between 0.1-0.2. $$||\tilde{S}_{ij}|| = \sqrt{2 \tilde{S}{ij} \tilde{S}_{ij} }$$ is the Frobenius norm of the filtered strain tensor. The length scale $$l_{sgs}= C_S \Delta$$ is a sub-grid lengths scale, which can be consider proportional to the integral lenght-scale $$\ell$$.
+with $$\tilde{S}_{ij}$$represents the filtered strain tensor and $$C_S$$ the Smagorinsky constant, with values between 0.1-0.2. $$||\tilde{S}_{ij}|| = \sqrt{2 \tilde{S}_{ij} \tilde{S}_{ij} }$$ is the Frobenius norm of the filtered strain tensor.&#x20;
+
+The length scale $$l_{sgs}= C_S \Delta$$ is a sub-grid length scale, which can be consider proportional to the integral lenght-scale $$\ell$$.
 
 #### WALE
 
-The eddy viscosity in the WALE model is computed
+The eddy viscosity in the WALE model \[1] is computed&#x20;
 
 $$
 \mu_{sgs}  = \bar{\rho} (C_w \Delta) ^2  
@@ -154,6 +163,8 @@ $$
 \overline{q}_j \approx - \lambda (\tilde{T}) \frac{\partial \tilde{T}}{\partial x_j}
 $$
 
-Molecular fluxes scale with $$Re^{-1}$$, making them relatively small in turbulent flows. Consequently, errors associated with molecular transport properties often have a minimal impact.
+Molecular fluxes scale with $$Re^{-1}$$, making them relatively small in turbulent flows. Consequently, errors associated with molecular transport properties often (but not always)  have a small  impact in the solution.
 
 #### References
+
+\[1] Nicoud, F., Ducros, F. Subgrid-Scale Stress Modelling Based on the Square of the Velocity Gradient Tensor. [_Flow, Turbulence and Combustion_ 62, 183–200 (1999). ](https://doi.org/10.1023/A:1009995426001)

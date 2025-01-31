@@ -86,6 +86,6 @@ $$
 
 ### References
 
-\[1]: Omer Rathore, "Numerical Simulation of Combustion Instability" _PhD Thesis_, Imperial College London (2022)&#x20;
+\[1] Omer Rathore, "Numerical Simulation of Combustion Instability" _PhD Thesis_, Imperial College London (2022)&#x20;
 
-\[2]: Yuri Almeida "Large Eddy Simulation of Supersonic Combustion using a Probability Density Function method" _PhD Thesis_, Imperial College London (2019)
+\[2] Yuri Almeida "Large Eddy Simulation of Supersonic Combustion using a Probability Density Function method" _PhD Thesis_, Imperial College London (2019)
