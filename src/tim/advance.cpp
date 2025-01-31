@@ -234,14 +234,7 @@ Real CNS::advance(Real time, Real dt, int /*iteration*/, int /*ncycle*/) {
         for (int n = 0; n < cls_h.NCONS; n++) {
           state(i, j, k, n) = cons[n];
         }
-        // state(i, j, k, cls_d->UMX) = prims(i, j, k, cls_d->QRHO) * prims(i, j, k, cls_d->QU);
-        // state(i, j, k, cls_d->UMY) = prims(i, j, k, cls_d->QRHO) * prims(i, j, k, cls_d->QV);
-        // state(i, j, k, cls_d->UMZ) = prims(i, j, k, cls_d->QRHO) * prims(i, j, k, cls_d->QW);
-        // state(i, j, k, cls_d->UET) = prims(i, j, k, cls_d->QPRES) / (cls_d->gamma - 1.0) +
-        //     0.5 * (prims(i, j, k, cls_d->QU) * prims(i, j, k, cls_d->QU) +
-        //            prims(i, j, k, cls_d->QV) * prims(i, j, k, cls_d->QV) +
-        //            prims(i, j, k, cls_d->QW) * prims(i, j, k, cls_d->QW));
-        // state(i, j, k, cls_d->URHO) = prims(i, j, k, cls_d->QRHO);
+
       }
     });
   }
@@ -356,7 +349,7 @@ void CNS::compute_rhs(MultiFab& statemf, Real dt, FluxRegister* fr_as_crse, Flux
     // Note: we are over-writing state (cons) with flux derivative
 #if (AMREX_USE_GPIBM || CNS_USE_EB )      
     prob_rhs.eflux_ibm(geom, mfi, prims, {AMREX_D_DECL(&fluxt[0], &fluxt[1], &fluxt[2])},state, cls_d, geoMarkers);    
-    //prob_rhs.dflux_ibm(geom, mfi, prims, {AMREX_D_DECL(&fluxt[0], &fluxt[1], &fluxt[2])}, state, cls_d, geoMarkers);
+    prob_rhs.dflux_ibm(geom, mfi, prims, {AMREX_D_DECL(&fluxt[0], &fluxt[1], &fluxt[2])}, state, cls_d, geoMarkers);
 #else
     prob_rhs.eflux(geom, mfi, prims, {AMREX_D_DECL(&fluxt[0], &fluxt[1], &fluxt[2])}, state, cls_d);
     prob_rhs.dflux(geom, mfi, prims, {AMREX_D_DECL(&fluxt[0], &fluxt[1], &fluxt[2])}, state, cls_d);

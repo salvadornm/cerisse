@@ -23,11 +23,11 @@ class viscous_t {
 
 #if (AMREX_USE_GPIBM || CNS_USE_EB )  
   void inline dflux_ibm(const Geometry& geom, const MFIter& mfi,
-            const Array4<Real>& prims, const Array4<Real>& flx,
+            const Array4<Real>& prims, std::array<FArrayBox*, AMREX_SPACEDIM> const &flxt,            
             const Array4<Real>& rhs, const cls_t* cls,const Array4<bool>& ibMarkers) {
 #else
   void inline dflux(const Geometry& geom, const MFIter& mfi,
-            const Array4<Real>& prims, const Array4<Real>& flx,
+            const Array4<Real>& prims, std::array<FArrayBox*, AMREX_SPACEDIM> const &flxt, 
             const Array4<Real>& rhs, const cls_t* cls) {
 #endif
 
@@ -46,7 +46,6 @@ class viscous_t {
       rhs(i, j, k, n) = 0.0;
       });
     }
-
 
     // allocate arrays for transport properties  SNM CHECK HERE....
     FArrayBox coeffs(bxg, cls_t::NCOEF, The_Async_Arena());
@@ -86,7 +85,8 @@ class viscous_t {
     // loop over directions -----------------------------------------------
     for (int dir = 0; dir < AMREX_SPACEDIM; dir++) {
       GpuArray<int, 3> vdir = {int(dir == 0), int(dir == 1), int(dir == 2)};
-
+      auto const& flx = flxt[dir]->array(); 
+  
       // compute diffusion fluxes
 #if (AMREX_USE_GPIBM || CNS_USE_EB )   
       amrex::Abort(" IBM +diffusion only No ready yet");

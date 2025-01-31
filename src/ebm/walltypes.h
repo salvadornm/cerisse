@@ -42,7 +42,7 @@ class test_wall_t
         // change of coordinates x,y,z  --> n,t1,t2
         Real vel[AMREX_SPACEDIM]; Real velxyz[AMREX_SPACEDIM];        
         vel[0] = 0.0;
-       vel[1] = prims[cls_t::QU]*tan1[0] + prims[cls_t::QV]*tan1[1];
+        vel[1] = prims[cls_t::QU]*tan1[0] + prims[cls_t::QV]*tan1[1];
 #if AMREX_SPACEDIM==3  
         vel[2] = prims[cls_t::QU]*tan2[0] + prims[cls_t::QV]*tan2[1] + prims[cls_t::QW]*tan2[2] ;                
 #endif

@@ -212,32 +212,21 @@ class weno_t {
   AMREX_GPU_HOST_DEVICE
   ~weno_t() {}
 
-#ifdef AMREX_USE_GPIBM
-  // void inline eflux_ibm(const amrex::Geometry& geom, const amrex::MFIter& mfi,
-  //                       const amrex::Array4<const amrex::Real>& prims_in,
-  //                       const amrex::Array4<amrex::Real>& flx,
-  //                       const amrex::Array4<amrex::Real>& rhs, const cls_t* cls,
-  //                       const amrex::Array4<const bool>& ibMarkers)
-
+#if (AMREX_USE_GPIBM || CNS_USE_EB )
   void inline eflux_ibm(const amrex::Geometry& geom, const amrex::MFIter& mfi,
                         const amrex::Array4<const amrex::Real>& prims_in,
                         std::array<FArrayBox*, AMREX_SPACEDIM> const &flxt,
                         const amrex::Array4<amrex::Real>& rhs, const cls_t* cls,
                         const amrex::Array4<const bool>& ibMarkers)
-
-
 #else
-  // void inline eflux(const amrex::Geometry& geom, const amrex::MFIter& mfi,
-  //                   const amrex::Array4<const amrex::Real>& prims,
-  //                   const amrex::Array4<amrex::Real>& flx,
-  //                   const amrex::Array4<amrex::Real>& rhs, const cls_t* cls)
   void inline eflux(const amrex::Geometry& geom, const amrex::MFIter& mfi,
                     const amrex::Array4<const amrex::Real>& prims,
                     std::array<FArrayBox*, AMREX_SPACEDIM> const &flxt,
-                    const amrex::Array4<amrex::Real>& rhs, const cls_t* cls)                    
+                    const amrex::Array4<amrex::Real>& rhs, const cls_t* cls)
 #endif
   {
     using amrex::Array4, amrex::Box, amrex::Dim3, amrex::IntVect, amrex::Real;
+
     const Box& bx = mfi.tilebox();
     const auto dxinv = geom.InvCellSizeArray();
 
@@ -249,6 +238,7 @@ class weno_t {
 
     // for each direction
     for (int dir = 0; dir < amrex::SpaceDim; ++dir) {
+
       const Box& flxbx = amrex::surroundingNodes(bx, dir);
 
       auto const& flx = flxt[dir]->array(); // snm
@@ -257,7 +247,7 @@ class weno_t {
         IntVect iv(AMREX_D_DECL(i, j, k));
         IntVect ivd(IntVect::TheDimensionVector(dir));
 
-#if AMREX_USE_GPIBM
+#if (AMREX_USE_GPIBM || CNS_USE_EB )
         Real prims_ptr[2 * ng * cls_t::NPRIM];
         Dim3 prims_begin = (iv - ng * ivd).dim3();
         Dim3 prims_end = (iv + (ng - 1) * ivd + amrex::IntVect(1)).dim3();
@@ -316,7 +306,7 @@ class weno_t {
     }  // end of for each direction
   }
 
-#ifdef AMREX_USE_GPIBM
+#if (AMREX_USE_GPIBM || CNS_USE_EB )
   AMREX_GPU_DEVICE AMREX_FORCE_INLINE bool fill_solid_prims(
       amrex::IntVect iv, amrex::IntVect ivd, int cdir,
       amrex::Array4<const amrex::Real> const &prims_in,
@@ -325,14 +315,17 @@ class weno_t {
     // Find the first solid point, which will be the ghost point
     int gl = ng, gr = ng;  // ghost point position on left and right
     for (int m = 0; m < ng; ++m) {
-      if (ib_mask(iv + m * ivd)) {
+      if (ib_mask(iv + m * ivd,0)) {  // snm
         gr = std::min(gr, m);
       }
-      if (ib_mask(iv - (m + 1) * ivd)) {
+      if (ib_mask(iv - (m + 1) * ivd,0)) { //snm
         gl = std::min(gl, m);
       }
     }
     if (gl == 0 && gr == 0) return false;  // skip solid cells
+
+
+     printf("  gl gr = %d %d \n ",gl,gr);
 
     // // Option1: use first order recon up to ng cells away from GP
     // int glr = std::min(gl, gr);
@@ -383,12 +376,21 @@ class weno_t {
 
     // 3. fill using 1st order BC (adiabatic no-slip)
     for (int m = 0; m < 2 * ng; ++m) {
-      for (int n = 0; n < cls_t::NPRIM; ++n) {
+
+       printf("  line 390 m = %d ng=%d \n ",m,ng);
+       printf("iv = %d %d %d \n ",iv);
+       printf("ivd = %d %d %d \n ",ivd);
+       printf("iv - (m -ng)*ivd = %d %d %d \n ",iv - (m -ng)*ivd);
+
+      // prims  <--- prims_in   at iv (i + h,j,k)    why looping?  
+      for (int n = 0; n < cls_t::NPRIM; ++n) {        
         prims(iv + (m - ng) * ivd, n) = prims_in(iv + (m - ng) * ivd, n);
       }
     }
 
+
     for (int m = 0; m < ng; ++m) {
+   
       if (m >= gl) {
         for (int n = 0; n < cls_t::NPRIM; ++n) {
           prims(iv - (m + 1) * ivd, n) = prims(iv - (2 * gl - m) * ivd, n);

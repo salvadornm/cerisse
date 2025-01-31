@@ -6,15 +6,6 @@
 
 ///
 /// \brief Template class for Riemann solvers
-///
-/// \param iOption Flux vector splitting (0 - Global lax-friedrichs)
-///
-/// ```
-/// {rst}
-///
-/// :math:`f_{i+1/2}= `
-/// ```
-///
 template <bool iOption, typename cls_t>
 class riemann_t {
  public:
@@ -36,14 +27,14 @@ class riemann_t {
 #endif
   
     const GpuArray<Real, AMREX_SPACEDIM> dxinv = geom.InvCellSizeArray();
-    const Box& bx = mfi.tilebox();
-    // const Box& bxg = mfi.growntilebox(cls_t::NGHOST);
+    const Box& bx  = mfi.tilebox();
+    const Box& bxg = mfi.growntilebox(cls_t::NGHOST);
 
     // zero rhs
-    // ParallelFor(bxg, cls_t::NCONS,
-    //             [=] AMREX_GPU_DEVICE(int i, int j, int k, int n) noexcept {
-    //               rhs(i, j, k, n) = 0.0;
-    //             });
+    ParallelFor(bxg, cls_t::NCONS,
+                [=] AMREX_GPU_DEVICE(int i, int j, int k, int n) noexcept {
+                  rhs(i, j, k, n) = 0.0;
+                });
     const Box& bxg1 = amrex::grow(bx, 1);
     FArrayBox slopef(bxg1, cls_t::NCONS+1, The_Async_Arena()); // +1 because of the density
     const Array4<Real>& slope = slopef.array();
@@ -53,12 +44,20 @@ class riemann_t {
     auto const& flx1 = flxt[cdir]->array(); 
   
 
-
     const Box& xslpbx = amrex::grow(bx, cdir, 1);
+
+
     amrex::ParallelFor(
         xslpbx, [=, *this] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {
+#ifdef CNS_USE_EB 
+          this->cns_slope_x(i, j, k, slope, prims, *cls, ibMarkers); 
+#else          
           this->cns_slope_x(i, j, k, slope, prims, *cls);
+#endif          
+
         });
+
+
     const Box& xflxbx = amrex::surroundingNodes(bx, cdir);
     amrex::ParallelFor(
         xflxbx, [=, *this] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {
@@ -78,8 +77,13 @@ class riemann_t {
   
     const Box& yslpbx = amrex::grow(bx, cdir, 1);
     amrex::ParallelFor(
-        yslpbx, [=, *this] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {
+        yslpbx, [=, *this] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {        
+#ifdef CNS_USE_EB 
+          this->cns_slope_y(i, j, k, slope, prims, *cls, ibMarkers); 
+#else          
           this->cns_slope_y(i, j, k, slope, prims, *cls);
+#endif  
+
         });
     const Box& yflxbx = amrex::surroundingNodes(bx, cdir);
     amrex::ParallelFor(
@@ -102,7 +106,13 @@ class riemann_t {
     const Box& zslpbx = amrex::grow(bx, cdir, 1);
     amrex::ParallelFor(
         zslpbx, [=, *this] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {
+#ifdef CNS_USE_EB 
+          this->cns_slope_z(i, j, k, slope, prims, *cls, ibMarkers); 
+#else          
           this->cns_slope_z(i, j, k, slope, prims, *cls);
+#endif 
+
+
         });
     const Box& zflxbx = amrex::surroundingNodes(bx, cdir);
     amrex::ParallelFor(
@@ -199,9 +209,25 @@ class riemann_t {
     }
   }
 
+#ifdef CNS_USE_EB 
+  AMREX_GPU_DEVICE AMREX_FORCE_INLINE void cns_slope_x(
+      int i, int j, int k, const Array4<Real>& dq, const Array4<Real>& q,
+      const cls_t& cls, const Array4<bool>& marker) const {
+#else
   AMREX_GPU_DEVICE AMREX_FORCE_INLINE void cns_slope_x(
       int i, int j, int k, const Array4<Real>& dq, const Array4<Real>& q,
       const cls_t& cls) const {
+#endif
+
+
+
+
+#ifdef CNS_USE_EB 
+    // const bool wall_left  = marker(i-1,j,k,0);  
+    // const bool wall_right = marker(i+1,j,k,0);  
+    const bool close_to_wall = marker(i,j,k,1);
+#endif
+
     Real cspeed = q(i, j, k, cls.QC) + 1.e-40;
     Real dlft = Real(0.5) *
                     (q(i, j, k, cls.QPRES) - q(i - 1, j, k, cls.QPRES)) /
@@ -213,6 +239,7 @@ class riemann_t {
                     cspeed -
                 Real(0.5) * q(i, j, k, cls.QRHO) *
                     (q(i + 1, j, k, cls.QU) - q(i, j, k, cls.QU));
+
     Real d0 = limiter(dlft, drgt);
 
     Real cs2 = cspeed * cspeed;
@@ -251,11 +278,35 @@ class riemann_t {
       drgt = q(i + 1, j, k, cls.QFS + n) - q(i, j, k, cls.QFS + n);
       dq(i, j, k, 5 + n) = limiter(dlft, drgt);
     }
-  }
 
+#ifdef CNS_USE_EB
+    if (close_to_wall) 
+    {
+      for (int n = 0; n < cls.NCONS; ++n) { dq(i,j,k,n) = 0.0;}
+    }    
+#endif    
+
+  }
+ 
+#ifdef CNS_USE_EB 
   AMREX_GPU_DEVICE AMREX_FORCE_INLINE void cns_slope_y(
-      int i, int j, int k, Array4<Real> const& dq, Array4<Real const> const& q,
-      cls_t const& cls) const {
+      int i, int j, int k, const Array4<Real>& dq, const Array4<Real>& q,
+      const cls_t& cls, const Array4<bool>& marker) const {
+#else
+  AMREX_GPU_DEVICE AMREX_FORCE_INLINE void cns_slope_y(
+      int i, int j, int k, const Array4<Real>& dq, const Array4<Real>& q,
+      const cls_t& cls) const {
+#endif
+
+
+
+#ifdef CNS_USE_EB 
+    // const bool wall_left  = marker(i,j-1,k,0);  
+    // const bool wall_right = marker(i,j+1,k,0); 
+    const bool close_to_wall = marker(i,j,k,1); 
+#endif
+
+
     Real cspeed = q(i, j, k, cls.QC) + 1.e-40;
     Real dlft = Real(0.5) *
                     (q(i, j, k, cls.QPRES) - q(i, j - 1, k, cls.QPRES)) /
@@ -305,11 +356,33 @@ class riemann_t {
       drgt = q(i, j + 1, k, cls.QFS + n) - q(i, j, k, cls.QFS + n);
       dq(i, j, k, 5 + n) = limiter(dlft, drgt);
     }
+
+#ifdef CNS_USE_EB
+    if (close_to_wall) 
+    {
+      for (int n = 0; n < cls.NCONS; ++n) { dq(i,j,k,n) = 0.0;}
+    }    
+#endif    
+ 
+
   }
 
+#ifdef CNS_USE_EB 
   AMREX_GPU_DEVICE AMREX_FORCE_INLINE void cns_slope_z(
-      int i, int j, int k, Array4<Real> const& dq, Array4<Real const> const& q,
-      cls_t const& cls) const {
+      int i, int j, int k, const Array4<Real>& dq, const Array4<Real>& q,
+      const cls_t& cls, const Array4<bool>& marker) const {
+#else
+  AMREX_GPU_DEVICE AMREX_FORCE_INLINE void cns_slope_z(
+      int i, int j, int k, const Array4<Real>& dq, const Array4<Real>& q,
+      const cls_t& cls) const {
+#endif
+  
+#ifdef CNS_USE_EB 
+    // const bool wall_left  = marker(i,j-1,k,0);  
+    // const bool wall_right = marker(i,j+1,k,0); 
+    const bool close_to_wall = marker(i,j,k,1); 
+#endif
+
     Real cspeed = q(i, j, k, cls.QC) + 1.e-40;
     Real dlft = Real(0.5) *
                     (q(i, j, k, cls.QPRES) - q(i, j, k - 1, cls.QPRES)) /
@@ -359,6 +432,14 @@ class riemann_t {
       drgt = q(i, j, k + 1, cls.QFS + n) - q(i, j, k, cls.QFS + n);
       dq(i, j, k, 5 + n) = limiter(dlft, drgt);
     }
+
+#ifdef CNS_USE_EB
+    if (close_to_wall) 
+    {
+      for (int n = 0; n < cls.NCONS; ++n) { dq(i,j,k,n) = 0.0;}
+    }    
+#endif   
+
   }
 
   AMREX_GPU_DEVICE AMREX_FORCE_INLINE void cns_riemann_x(
