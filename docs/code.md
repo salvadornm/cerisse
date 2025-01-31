@@ -1,20 +1,15 @@
 # Code Structure
 
+These pages are intended for users interested in exploring and customizing the numerical solvers and code structures to develop new thermodynamic models or numerical methods.
+While a deep understanding of the AMReX framework is not strictly required, it is highly recommended to familiarize yourself with how AMReX manages data structures and operations.
+
+The code makes extensive use of templates, often employing them in unconventional ways.
+At its core, a basic template is used to define the number of scalar variables to be solved and their respective locations in the storage array. This template specifies numerous indicators for the position of each variable and is encapsulated in the **indicies_t** structure.
+
+This foundational template is then combined with additional templates for thermodynamics, transport properties, and turbulence models (if applicable), which collectively form the **closures_dt** template.
 
 
-These pages are for users who want to tinker with the numerical solvers and the code structures to create
-new thermodynamics, numerical methiods.
-
-Although a deep understanding of the AMReX structure is not necessary, it is recommended to familiarize yourself with how AMReX handles data in general. 
-
-The code extensively utilizes templates, sometimes in unconventional ways. 
-
-Initially, there is a basic template that defines, how many scalars are to be solved and
-where are located in the storage array. It defines a lot of indicators of where each variable is. 
-This is done in **indicies_t**.
-
-This template is combiend with templates for the thermodynamics, transport properties and turbulence models (if present) define the **closures_dt** template. This is done in `prob.h`, where we define a
-**ProbClosures** 
+This is done in `prob.h`, where we define a **ProbClosures** 
 
 ```cpp
 typedef closures_dt<indicies_t, visc_suth_t, cond_suth_t,

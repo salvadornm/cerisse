@@ -43,7 +43,7 @@ USE_PELEPHYSICS = TRUE      # PelePhysics is used for chemistry/thermodynamics/t
 
 
 {% hint style="info" %}
-Embedded Boundaries are **AMReX-native**, whiel Immersed Boundaries are **Cerisse**. Both are incompatible (check Boundary Conditions)
+Embedded Boundaries are **AMReX** native, while Immersed Boundaries are **Cerisse**. Both are have pros and cons (check Boundary Conditions).
 {% endhint %}
 
 ## PelePhysics

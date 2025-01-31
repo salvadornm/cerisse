@@ -75,7 +75,7 @@ The results and comparison with theory can be seen by
 $ python plot.py
 ```
 
-.All the results are presented after  **five** flow through times
+All the results are presented after  **five** flow through times
 
 <figure><img src=".gitbook/assets/covo.png" alt=""><figcaption><p>Vertical velocity, HLLC Riemann Solver with 2nd order reconstruction</p></figcaption></figure>
 
@@ -89,7 +89,7 @@ The distribution of vertical velocity can be seeen&#x20;
 
 ## Shock Reflection
 
-This test ins a Mach 10 shock wave incident at 30 degrees (with adiabatic ratio of 1.4). The initial conditions are given in [Berger & Colella (1989)](https://doi.org/10.1016/0021-9991\(89\)90035-1). The top boundary condition varies with time to follow the shock following the unshocked speed. This test uses a tilted domain without EB.
+This test ins a Mach 10 shock wave incident at 30 degrees (with adiabatic ratio of 1.4). The initial conditions are given in [Berger & Colella (1989)](https://doi.org/10.1016/0021-9991(89)90035-1). The top boundary condition varies with time to follow the shock following the unshocked speed. This test uses a tilted domain without EB.
 
 | Tested   |         grid        |                           comment |
 | -------- | :-----------------: | --------------------------------: |
@@ -172,3 +172,24 @@ At t=0.02 and with 2 AMR levels, refining on density fluctuations&#x20;
 The Temperature distribution at x=0, using `$ python ./plot.py`
 
 <figure><img src=".gitbook/assets/exm_diff_T.png" alt=""><figcaption><p>Temperature evolution after t=0.02</p></figcaption></figure>
+
+
+## Supersonic flow Forward Step
+
+This example examines the behaviour of EBM in simple canonical case (located in `exm/forward_step`)
+The test consists of a supersonic flow in a channel at Mach 3 , with facing a step of height 0.2 h,
+where h is the channel height. The flow configuration is the same used by 
+[Woodward and Collela (1984)](https://www.sciencedirect.com/science/article/abs/pii/0021999184901426)
+and the main parameters are summarised below (using non-dimensional units)
+
+| parameter                                      | value           |
+| ---------------------------------------------- | --------------- |
+| p0                                             | 1       |
+| rho0                                           | 1.4 |
+| U0                                             | 3          |
+
+where a perfect gas with gamma = 1.4 is used. The simulation runs until time equals 4.
+The case is simulated with Skew, Rusanov and WENO schemes at different meshes.
+A constant time step is used,based on an  initial Courant Number (CFL) of 0.32.
+Figure of density iso-contours (30 contours, linearly spaced between 0.46 and 6.8)
+

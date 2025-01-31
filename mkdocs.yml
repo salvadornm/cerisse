@@ -31,6 +31,8 @@ nav:
       - index: indexvar.md
       - solver: fluxsolver.md
       - thermo: thermosolver.md
+      - advance: code/advance.md
+      - ebm: code/ebm.md
 extra_javascript:
   - https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.4/MathJax.js?config=TeX-AMS-MML_HTMLorMML
 markdown_extensions:

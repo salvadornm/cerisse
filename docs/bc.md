@@ -39,7 +39,7 @@ bcnormal(const Real x[AMREX_SPACEDIM], Real dratio, const Real s_int[5],
          }
 ```
 
-This function is called for each face on the boundary. It defines the array `s_ext[5]`, which specifies the values at the ghost points required to build teh flux across domain boundaries.
+This function is called for each face on the boundary. It defines the array `s_ext[5]`, which specifies the values at the ghost points required to build the flux across domain boundaries.
 
 | Option      | Type         | Dimensions | Description                             |
 | ----------- | ------------ | :--------: | --------------------------------------- |
@@ -65,7 +65,9 @@ For example, a slip wall in the bottom wall (y-direction) would be defined as
     }
 ```
 
-If the boundary is not defined, the code will use the one specified in the input for that particular face. NOTE: Boundary conditions are specified for the _conserved_ variables so appropiate conservations may be required.
+If the boundary is not defined, the code will use the one specified in the input for that particular face.
+
+NOTE: Boundary conditions are specified for the _conserved_ variables so appropiate conservations may be required.
 
 ## Immersed Boundaries
 
@@ -99,11 +101,13 @@ ib.filename = sphere_fine_20k.stl
 
 ### prob.h
 
-A IBM header needs to be included
+A IBM header needs to be included i nthe file.
 
 ```cpp
 #include <eib.h>
 ```
+
+Together with the required template of IBM
 
 ```cpp
 typedef std::ratio<5,5> d_image;
@@ -127,7 +131,7 @@ where `iorder_tparm` is the interpolation order, in the above example the order 
 
 `cim_tparm` is the interpolation distance factor relative to mesh diagonal, in the above example to 5/5=1 and therefore the distance is the diagonal $$\sqrt{2} h$$ in 2D.  See [theory](theory/ibmeb.md)
 
-All information required for the IBM is stored in the class **ProbIB** in `CNS.h`
+All information required for the IBM is stored in the class **ProbIB** in `CNS.h`.
 
 #### markers
 
