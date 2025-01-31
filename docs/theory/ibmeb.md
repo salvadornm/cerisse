@@ -1,3 +1,7 @@
+---
+icon: block-brick
+---
+
 # Solid boundaries
 
 Embedded/Immersed boundary methods enable the representation of complex geometries on structured grids. Unlike body-fitted approaches, which require intricate coordinate transformations, these methods involve minimal modifications to the flux derivative calculations. Additionally, they are better suited for fluid-structure interaction problems compared to body-fitted methods. Embedded boundary methods are generally categorized into two main types: cut-cell methods (EBM) and ghost-point methods (IBM). Similar to other numerical techniques, each approach has its own advantages and disadvantages.
@@ -26,13 +30,13 @@ $$
 The volume of the cells is $$V= \phi h^3$$ (assuming isotropic mesh), where $$\phi$$ is the "filled" fraction of the cell. Using that the area of the face is proportional to the mesh size\
 $$A_k = f_k h^2$$. Where $$f_k$$ is the ratio of obunsutcred area with the maximum. It will be 1 if the area is unobstructed.
 
-Reaplacing
+Replacing
 
 $$
 \nabla \cdot F = \sum_{k=1}^{6} \frac{F_k f _k}{ \phi h} + \frac{F_{wall}}{\phi h}
 $$
 
-where the flux at the wall would be defined based on BC type.
+where the flux at the wall would be defined based on the boundary condition type.
 
 ### References
 
