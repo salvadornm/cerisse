@@ -325,7 +325,7 @@ class weno_t {
     if (gl == 0 && gr == 0) return false;  // skip solid cells
 
 
-     printf("  gl gr = %d %d \n ",gl,gr);
+     //printf("  gl gr = %d %d \n ",gl,gr);
 
     // // Option1: use first order recon up to ng cells away from GP
     // int glr = std::min(gl, gr);
@@ -377,10 +377,10 @@ class weno_t {
     // 3. fill using 1st order BC (adiabatic no-slip)
     for (int m = 0; m < 2 * ng; ++m) {
 
-       printf("  line 390 m = %d ng=%d \n ",m,ng);
-       printf("iv = %d %d %d \n ",iv);
-       printf("ivd = %d %d %d \n ",ivd);
-       printf("iv - (m -ng)*ivd = %d %d %d \n ",iv - (m -ng)*ivd);
+      //  printf("  line 390 m = %d ng=%d \n ",m,ng);
+      //  printf("iv = %d %d %d \n ",iv);
+      //  printf("ivd = %d %d %d \n ",ivd);
+      //  printf("iv - (m -ng)*ivd = %d %d %d \n ",iv - (m -ng)*ivd);
 
       // prims  <--- prims_in   at iv (i + h,j,k)    why looping?  
       for (int n = 0; n < cls_t::NPRIM; ++n) {        
