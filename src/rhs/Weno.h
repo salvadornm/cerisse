@@ -250,7 +250,10 @@ class weno_t {
 #if (AMREX_USE_GPIBM || CNS_USE_EB )
         Real prims_ptr[2 * ng * cls_t::NPRIM];
         Dim3 prims_begin = (iv - ng * ivd).dim3();
-        Dim3 prims_end = (iv + (ng - 1) * ivd + amrex::IntVect(1)).dim3();
+        Dim3 prims_end = (iv + (ng - 1) * ivd).dim3();
+        prims_end.x += 1;
+        prims_end.y += 1;
+        prims_end.z += 1;
         Array4<Real> prims(prims_ptr, prims_begin, prims_end, cls_t::NPRIM);
         if (!fill_solid_prims(iv, ivd, dir, prims_in, prims, ibMarkers)) {
           return;  // skip solid cells
@@ -396,14 +399,14 @@ class weno_t {
           prims(iv - (m + 1) * ivd, n) = prims(iv - (2 * gl - m) * ivd, n);
         }
         prims(iv - (m + 1) * ivd, cls_t::QU + cdir) =
-            -prims(iv - (2 * gl - m) * ivd, cls_t::QU + cdir);
+            -prims(iv - (2 * gl - m) * ivd, cls_t::QU + cdir); // this is no-slip
       }
       if (m >= gr) {
         for (int n = 0; n < cls_t::NPRIM; ++n) {
           prims(iv + m * ivd, n) = prims(iv + (2 * gr - m - 1) * ivd, n);
         }
         prims(iv + m * ivd, cls_t::QU + cdir) =
-            -prims(iv + (2 * gr - m - 1) * ivd, cls_t::QU + cdir);
+            -prims(iv + (2 * gr - m - 1) * ivd, cls_t::QU + cdir); // this is no-slip
       }
     }
 
