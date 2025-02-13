@@ -9,23 +9,25 @@
 #include <ebm.h>
 #include <walltypes.h>
 
-// Hypersonic flow over a 2D Cylinder
+// Viscous flow over a 2D square Cylinder It will create large Von-Karman vortex
 // created by S Navarro-Martinez (2025)
 
 using namespace amrex;
 
 namespace PROB {
 
-static constexpr Real Mw   = 28.96e-3;  // Molecular weight
-static constexpr Real gam  = 1.4;       // Adiabatic coefficient
-static constexpr Real Mach = 0.3;       // Mach Number
+static constexpr Real Mw   = 28.96e-3;    // Molecular weight
+static constexpr Real gam  = 1.4;         // Adiabatic coefficient
+static constexpr Real Mach = 0.5;         // Mach Number
+static constexpr Real Reynolds = 1000.0;  // Reynolds number
+
 
 // problem parameters 
 
 struct ProbParm {  
   // freestream state
-  Real p_oo    = 5000.0; //[Pa] free-stream pressure (at 10 km altitude)  
-  Real T_oo    = 223.0;  //[K]  free-stream temperature 
+  Real p_oo    = 153.0; //[Pa] free-stream pressure (at 10 km altitude)  
+  Real T_oo    = 57.8;  //[K]  free-stream temperature 
   Real rho_oo  = p_oo*Mw/(gas_constant*T_oo);
   Real c_oo    = sqrt(gam*p_oo/rho_oo);  
   Real u_oo    = c_oo*Mach;   
@@ -33,41 +35,54 @@ struct ProbParm {
   Real eint_oo = p_oo/ (gam - Real(1.0));  
 
   // right state
-  Real p_r     = 5000.0; //[Pa] free-stream pressure (at 10 km altitude)  
-  Real T_r     = 223.0;  //[K]  free-stream temperature 
+  Real p_r     = p_oo; //[Pa] free-stream pressure (at 10 km altitude)  
+  Real T_r     = T_oo;  //[K]  free-stream temperature 
   Real rho_r   = p_r*Mw/(gas_constant*T_r);
   Real u_r     = 0.0;   
   Real v_r     = 0.0;
   Real eint_r  = p_r/ (gam - Real(1.0));  
 
-  // centre of cylinder
-  Real x0 = 1;
-  Real y0 = 2;
+  // centre of object
+  Real x0 = 10;
+  Real y0 = 10;
+  // Initial sepration between  flow and no-flow
+  Real xsep = 70;
 };
 
 
 // numerical method parameters
-struct methodparm_t {
+struct num_method_param {
 
   public:
 
   static constexpr bool dissipation = true;         // no dissipation
   static constexpr int  order = 4;                  // order numerical scheme   
-  static constexpr Real C2skew=1.5,C4skew=0.0016;   // Skew symmetric default
+  static constexpr Real C2skew=0.5,C4skew=0.016;   // Skew symmetric default
 
 };
+
+// viscoisty arameters
+struct visc_model_param {
+
+  public:
+
+  static constexpr int  order = 4;                   // order numerical scheme viscous
+  static constexpr Real conductivity = 0.03;         // conductivity (constant)
+  static constexpr Real viscosity    = 1.0/Reynolds; // viscosity    (constant)
+  static constexpr bool solve_viscterms_only = false;
+
+};
+
 
 inline Vector<std::string> cons_vars_names={"Xmom","Ymom","Zmom","Energy","Density"};
 inline Vector<int> cons_vars_type={1,2,3,0,0};
 
-typedef closures_dt<indicies_t, visc_suth_t, cond_suth_t,
-                    calorifically_perfect_gas_t<indicies_t>> ProbClosures;
+// define thermodynamic closure
+typedef closures_dt<indicies_t, transport_const_t<visc_model_param>, calorifically_perfect_gas_t<indicies_t> > ProbClosures;
 
-// define nuemrical scheme comment/uncomment to set up 
-//typedef rhs_dt<rusanov_t<ProbClosures>, no_diffusive_t, no_source_t > ProbRHS;
-//typedef rhs_dt<riemann_t<false, ProbClosures>, no_diffusive_t, no_source_t > ProbRHS;
-typedef rhs_dt<skew_t<methodparm_t, ProbClosures>, viscous_t< defaultparm_t, ProbClosures>, no_source_t > ProbRHS;
-//typedef rhs_dt<weno_t<ReconScheme::Teno5, ProbClosures>, no_diffusive_t, no_source_t > ProbRHS;
+// define numerical scheme  
+typedef rhs_dt<skew_t<num_method_param, ProbClosures>, viscous_t<visc_model_param, ProbClosures>, no_source_t > ProbRHS;
+//typedef rhs_dt<skew_t<num_method_param, ProbClosures>, no_diffusive_t, no_source_t > ProbRHS;
 
 
 // define type of wall and EBM class
@@ -99,7 +114,7 @@ prob_initdata(int i, int j, int k, Array4<Real> const &state,
   Real rhot,eint,u[2];
 
   // final state
-  if (x < 0.5) {
+  if (x < prob_parm.xsep) {
     rhot =  prob_parm.rho_oo;
     u[0] =  prob_parm.u_oo; u[1] =  prob_parm.v_oo;
     eint =  prob_parm.eint_oo;
@@ -110,9 +125,6 @@ prob_initdata(int i, int j, int k, Array4<Real> const &state,
     eint =  prob_parm.eint_r;
   }
 
-
-
-  
   state(i, j, k, cls.URHO) = rhot;
   state(i, j, k, cls.UMX)  = rhot * u[0];
   state(i, j, k, cls.UMY)  = rhot * u[1];
@@ -184,7 +196,7 @@ user_tagging(int i, int j, int k, int nt_level, auto &tagfab,
 
   Real gradrho= sqrt(drhox*drhox+drhoy*drhoy);        
 
-  Real Rmax = 0.3;
+  Real Rmax = 1.5;
 
   //if (nt_level > 0)
  // {

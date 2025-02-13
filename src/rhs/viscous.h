@@ -39,7 +39,7 @@ class viscous_t {
     const Box& bxg = mfi.growntilebox(cls->NGHOST);     // to handle high-order 
     const Box& bxgnodal = mfi.grownnodaltilebox(-1, 0); // to handle fluxes
 
-    // clear rhs 
+    // clear rhs (OBSOLETE)
     if (param::solve_viscterms_only)
     {      
       ParallelFor(bxg, cls_t::NCONS, [=] AMREX_GPU_DEVICE(int i, int j, int k, int n) noexcept {
@@ -89,28 +89,32 @@ class viscous_t {
   
       // compute diffusion fluxes
 #if (AMREX_USE_GPIBM || CNS_USE_EB )   
-      amrex::Abort(" IBM +diffusion only No ready yet");
-    
+      amrex::ParallelFor(bxgnodal,
+                  [=,*this] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {
+                   // for (int n = 0; n < cls_t::NCONS; n++) flx(i, j, k, n) = 0.0;
+                    this->cns_diff_ibm(i, j, k,dir, prims,flx,coeftrans, dxinv, cls,ibMarkers);
+                  });                      
 #else    
       amrex::ParallelFor(bxgnodal,
                   [=,*this] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {
-                    for (int n = 0; n < cls_t::NCONS; n++) flx(i, j, k, n) = 0.0;
+                   // for (int n = 0; n < cls_t::NCONS; n++) flx(i, j, k, n) = 0.0;
                     this->cns_diff(i, j, k,dir, prims,flx,coeftrans, dxinv, cls);
                   });                  
 #endif
   
-      // add flux derivative to rhs, i.e.  rhs + = (flx[i] - flx[i+1])/dx
-      amrex::ParallelFor(bx, cls_t::NCONS,
-                  [=] AMREX_GPU_DEVICE(int i, int j, int k, int n) noexcept {
-                    rhs(i, j, k, n) +=
-                        dxinv[dir] * (flx(i, j, k, n) - flx(i+vdir[0], j+vdir[1], k+vdir[2], n));
-                  });
+      // add flux derivative to rhs, i.e.  rhs + = (flx[i] - flx[i+1])/dx   (this will go)
+      // amrex::ParallelFor(bx, cls_t::NCONS,
+      //             [=] AMREX_GPU_DEVICE(int i, int j, int k, int n) noexcept {
+      //               rhs(i, j, k, n) +=
+      //                   dxinv[dir] * (flx(i, j, k, n) - flx(i+vdir[0], j+vdir[1], k+vdir[2], n));
+      //             });
 
     }  
     // end loop  ------------------------------------------------------
   } 
 
-  
+ 
+  // ----------------------------------------------------------------------------------------------  
   /**
   * @brief Compute diffusion fluxes.
   *
@@ -141,25 +145,25 @@ class viscous_t {
     AMREX_D_TERM(const int UM1 = cls_t::UMX + d1;, const int UM2 = cls_t::UMX + d2;
                , const int UM3 = cls_t::UMX + d3;)
 
-    constexpr int order = 2;
+    //constexpr int order  = 2; 
 
     // Aij = dA_i/dx_j
-    const Real dTdn = normal_diff<order>(iv, d1, cls_t::QT, q, dxinv);
-    const Real u11  = normal_diff<order>(iv, d1, QU1, q, dxinv);
+    const Real dTdn = normal_diff<param::order>(iv, d1, cls_t::QT, q, dxinv);
+    const Real u11  = normal_diff<param::order>(iv, d1, QU1, q, dxinv);
 #if (AMREX_SPACEDIM >= 2)
-    const Real u21  = normal_diff<order>(iv, d1, QU2, q, dxinv);
-    const Real u12  = tangent_diff<order>(iv, d1, d2, QU1, q, dxinv);
-    const Real u22  = tangent_diff<order>(iv, d1, d2, QU2, q, dxinv);
+    const Real u21  = normal_diff<param::order>(iv, d1, QU2, q, dxinv);
+    const Real u12  = tangent_diff<param::order>(iv, d1, d2, QU1, q, dxinv);
+    const Real u22  = tangent_diff<param::order>(iv, d1, d2, QU2, q, dxinv);
 #endif
 #if (AMREX_SPACEDIM == 3)
-    const Real u31  = normal_diff<order>(iv, d1, QU3, q, dxinv);
-    const Real u13  = tangent_diff<order>(iv, d1, d3, QU1, q, dxinv);
-    const Real u33  = tangent_diff<order>(iv, d1, d3, QU3, q, dxinv);
+    const Real u31  = normal_diff<param::order>(iv, d1, QU3, q, dxinv);
+    const Real u13  = tangent_diff<param::order>(iv, d1, d3, QU1, q, dxinv);
+    const Real u33  = tangent_diff<param::order>(iv, d1, d3, QU3, q, dxinv);
 #endif
     const Real divu   = AMREX_D_TERM(u11, +u22, +u33);
     
-    const Real muf    = interp<order>(iv, d1, cls_t::CMU, coeffs);
-    const Real xif    = interp<order>(iv, d1, cls_t::CXI, coeffs);
+    const Real muf    = interp<param::order>(iv, d1, cls_t::CMU, coeffs);
+    const Real xif    = interp<param::order>(iv, d1, cls_t::CXI, coeffs);
     
     AMREX_D_TERM(Real tau11 = muf * (2.0 * u11 - (2.0 / 3.0) * divu) + xif * divu;
                , Real tau12 = muf * (u12 + u21);, Real tau13 = muf * (u13 + u31);)
@@ -168,15 +172,114 @@ class viscous_t {
     AMREX_D_TERM(flx(iv, UM1) -= tau11;, flx(iv, UM2) -= tau12;, flx(iv, UM3) -= tau13;)
    
     // energy
-    const Real lamf = interp<order>(iv, d1, cls_t::CLAM, coeffs);
+    const Real lamf = interp<param::order>(iv, d1, cls_t::CLAM, coeffs);
     flx(iv, cls_t::UET) -= 0.5 * (AMREX_D_TERM((q(iv, QU1) + q(ivm, QU1)) * tau11,
                                               +(q(iv, QU2) + q(ivm, QU2)) * tau12,
                                               +(q(iv, QU3) + q(ivm, QU3)) * tau13)) +
                                               + lamf* dTdn;
 
-    // Species transport  (COMMENTS FOR NOW)
+    // Species transport  (commented FOR NOW)
     //cns_diff_species(iv, d1, q, coeffs, dxinv, flx);
     }
+  // ---------------------------------------------------------------------------------------------  
+  /**
+  * @brief Compute diffusion fluxes in IB/EB.
+  *
+  * @param i,j,k  x, y, z index.cls_t::CLAM
+  * @param dir    direction, 0:x, 1:y, 2:z.
+  * @param q      primitive variables.
+  * @param[out] flx  output diffusion fluxes.
+  * @param coeffs transport coefficients.
+  * @param dxinv  1/dx
+  * @param cls_t  ProbClosures 
+  * @param marker  geometry markers  (sld and cutcells) 
+  */
+  AMREX_GPU_DEVICE AMREX_FORCE_INLINE void cns_diff_ibm(
+      const int i, const int j, const int k, const int d1,
+      amrex::Array4<const amrex::Real> const& q,
+      amrex::Array4<amrex::Real> const& flx,
+      amrex::Array4<const amrex::Real> const& coeffs,
+      amrex::GpuArray<amrex::Real, AMREX_SPACEDIM> const& dxinv,
+      const cls_t* cls, const Array4<bool>& marker) const {
+    
+    using amrex::Real;
+    const amrex::IntVect iv{AMREX_D_DECL(i, j, k)};
+    const amrex::IntVect ivm = iv - amrex::IntVect::TheDimensionVector(d1);
+
+    const int d2 = d1 == 0 ? 1 : 0;
+    const int d3 = d1 == 2 ? 1 : 2;
+    AMREX_D_TERM(const int QU1 = cls_t::QU + d1;, const int QU2 = cls_t::QU + d2;
+               , const int QU3 = cls_t::QU + d3;)
+    AMREX_D_TERM(const int UM1 = cls_t::UMX + d1;, const int UM2 = cls_t::UMX + d2;
+               , const int UM3 = cls_t::UMX + d3;)
+
+    // ivm  is iv -1 
+    const bool close_to_wall  = marker(iv,1) || marker(ivm,1);      //  flux close to a GP (IBM) or a cut-cell (EB)
+    const bool intersolid_flx = marker(iv,0) &&  marker(ivm,0);    // inter-flux
+
+    if (intersolid_flx) return;  // flux =0  inside solid   
+
+    Real u11,dTdn,u21,u12,u22,u31,u13,u33,muf,xif,lamf;
+    
+    // reduce to second order close to walls
+    if (close_to_wall) {        
+      constexpr int order = 2;
+      dTdn = normal_diff<order>(iv, d1, cls_t::QT, q, dxinv);
+      u11  = normal_diff<order>(iv, d1, QU1, q, dxinv);
+#if (AMREX_SPACEDIM >= 2)
+      u21  = normal_diff<order>(iv, d1, QU2, q, dxinv);
+      u12  = tangent_diff<order>(iv, d1, d2, QU1, q, dxinv);
+      u22  = tangent_diff<order>(iv, d1, d2, QU2, q, dxinv);
+#endif
+#if (AMREX_SPACEDIM == 3)
+      Real u31  = normal_diff<order>(iv, d1, QU3, q, dxinv);
+      Real u13  = tangent_diff<order>(iv, d1, d3, QU1, q, dxinv);
+      Real u33  = tangent_diff<order>(iv, d1, d3, QU3, q, dxinv);
+#endif  
+      // properties
+      muf  = interp<order>(iv, d1, cls_t::CMU, coeffs);
+      xif  = interp<order>(iv, d1, cls_t::CXI, coeffs);
+      lamf = interp<order>(iv, d1, cls_t::CLAM, coeffs);
+    }
+    else
+    {
+      dTdn = normal_diff<param::order>(iv, d1, cls_t::QT, q, dxinv);
+      u11  = normal_diff<param::order>(iv, d1, QU1, q, dxinv);
+#if (AMREX_SPACEDIM >= 2)
+      u21  = normal_diff<param::order>(iv, d1, QU2, q, dxinv);
+      u12  = tangent_diff<param::order>(iv, d1, d2, QU1, q, dxinv);
+      u22  = tangent_diff<param::order>(iv, d1, d2, QU2, q, dxinv);
+#endif
+#if (AMREX_SPACEDIM == 3)
+      u31  = normal_diff<param::order>(iv, d1, QU3, q, dxinv);
+      u13  = tangent_diff<param::order>(iv, d1, d3, QU1, q, dxinv);
+      u33  = tangent_diff<param::order>(iv, d1, d3, QU3, q, dxinv);
+#endif  
+      // properties
+      muf  = interp<param::order>(iv, d1, cls_t::CMU, coeffs);
+      xif  = interp<param::order>(iv, d1, cls_t::CXI, coeffs);
+      lamf = interp<param::order>(iv, d1, cls_t::CLAM, coeffs);
+    }
+
+    const Real divu   = AMREX_D_TERM(u11, +u22, +u33);
+    
+    AMREX_D_TERM(Real tau11 = muf * (2.0 * u11 - (2.0 / 3.0) * divu) + xif * divu;
+               , Real tau12 = muf * (u12 + u21);, Real tau13 = muf * (u13 + u31);)
+
+    // momentum
+    AMREX_D_TERM(flx(iv, UM1) -= tau11;, flx(iv, UM2) -= tau12;, flx(iv, UM3) -= tau13;)
+   
+    // energy
+    flx(iv, cls_t::UET) -= 0.5 * (AMREX_D_TERM((q(iv, QU1) + q(ivm, QU1)) * tau11,
+                                              +(q(iv, QU2) + q(ivm, QU2)) * tau12,
+                                              +(q(iv, QU3) + q(ivm, QU3)) * tau13)) +
+                                              + lamf* dTdn;
+
+    // Species transport  (commented FOR NOW)
+    //cns_diff_species(iv, d1, q, coeffs, dxinv, flx);
+    }
+   // ---------------------------------------------------------------------------------------------
+
 
   }; 
 

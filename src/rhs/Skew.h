@@ -266,11 +266,11 @@ class skew_t {
 
       }
       // add flux derivative to rhs, i.e.  rhs + = (flx[i] - flx[i+1])/dx (THIS WILL GO)
-      ParallelFor(bx, cls_t::NCONS,
-                  [=] AMREX_GPU_DEVICE(int i, int j, int k, int n) noexcept {
-                    rhs(i, j, k, n) +=
-                        dxinv[dir] * (flx(i, j, k, n) - flx(i+vdir[0], j+vdir[1], k+vdir[2], n));
-                  });
+      // ParallelFor(bx, cls_t::NCONS,
+      //             [=] AMREX_GPU_DEVICE(int i, int j, int k, int n) noexcept {
+      //               rhs(i, j, k, n) +=
+      //                   dxinv[dir] * (flx(i, j, k, n) - flx(i+vdir[0], j+vdir[1], k+vdir[2], n));
+      //             });
 
     }
 

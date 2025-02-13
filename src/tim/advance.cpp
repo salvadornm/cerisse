@@ -279,6 +279,7 @@ void CNS::compute_rhs(MultiFab& statemf, Real dt, FluxRegister* fr_as_crse, Flux
   for (MFIter mfi(statemf, false); mfi.isValid(); ++mfi) {
     Array4<Real> const& state = statemf.array(mfi);
 
+    const Box& bx  = mfi.growntilebox(0);
     const Box& bxg = mfi.growntilebox(cls_h.NGHOST);
 
     // primitives and fluxes arrays
@@ -297,7 +298,6 @@ void CNS::compute_rhs(MultiFab& statemf, Real dt, FluxRegister* fr_as_crse, Flux
       fluxt[dir].setVal<RunOn::Device>(0.);
     }
     // ...................................
-
     
     // We want to minimise function calls. So, we call prims2cons, flux and
     // source term evaluations once per fab from CPU, to be run on GPU.
@@ -348,7 +348,7 @@ void CNS::compute_rhs(MultiFab& statemf, Real dt, FluxRegister* fr_as_crse, Flux
     // Euler/Diff Fluxes including boundary/discontinuity corrections
     // Note: we are over-writing state (cons) with flux derivative
 #if (AMREX_USE_GPIBM || CNS_USE_EB )      
-    prob_rhs.eflux_ibm(geom, mfi, prims, {AMREX_D_DECL(&fluxt[0], &fluxt[1], &fluxt[2])},state, cls_d, geoMarkers);    
+    prob_rhs.eflux_ibm(geom, mfi, prims, {AMREX_D_DECL(&fluxt[0], &fluxt[1], &fluxt[2])}, state, cls_d, geoMarkers);    
     prob_rhs.dflux_ibm(geom, mfi, prims, {AMREX_D_DECL(&fluxt[0], &fluxt[1], &fluxt[2])}, state, cls_d, geoMarkers);
 #else
     prob_rhs.eflux(geom, mfi, prims, {AMREX_D_DECL(&fluxt[0], &fluxt[1], &fluxt[2])}, state, cls_d);
@@ -356,15 +356,16 @@ void CNS::compute_rhs(MultiFab& statemf, Real dt, FluxRegister* fr_as_crse, Flux
 #endif
 
     // add flux derivative to rhs, i.e.  rhs + = (flx[i] - flx[i+1])/dx
-    // for (int dir = 0; dir < AMREX_SPACEDIM; dir++) {
-    //     GpuArray<int, 3> vdir = {int(dir == 0), int(dir == 1), int(dir == 2)};
-    //     auto const& flx = flxt[dir]->array();  // change
-    //     ParallelFor(bx, cls_t::NCONS,
-    //               [=] AMREX_GPU_DEVICE(int i, int j, int k, int n) noexcept {
-    //                 state(i, j, k, n) +=
-    //                     dxinv[dir] * (flx(i, j, k, n) - flx(i+vdir[0], j+vdir[1], k+vdir[2], n));
-    //               });
-    //   }                  
+    const GpuArray<Real, AMREX_SPACEDIM> dxinv = geom.InvCellSizeArray();
+    for (int dir = 0; dir < AMREX_SPACEDIM; dir++) {
+        GpuArray<int, 3> vdir = {int(dir == 0), int(dir == 1), int(dir == 2)};
+        auto const& flx = fluxt[dir].array();  
+        ParallelFor(bx, cls_h.NCONS,
+                  [=] AMREX_GPU_DEVICE(int i, int j, int k, int n) noexcept {
+                    state(i, j, k, n) +=
+                        dxinv[dir] * (flx(i, j, k, n) - flx(i+vdir[0], j+vdir[1], k+vdir[2], n));
+                  });
+    }                  
 
                         
 
@@ -390,7 +391,6 @@ void CNS::compute_rhs(MultiFab& statemf, Real dt, FluxRegister* fr_as_crse, Flux
 
     // Set solid point RHS to 0  (state hold RHS at this point)
 #if AMREX_USE_GPIBM || CNS_USE_EB
-    const Box& bx   = mfi.tilebox();
     amrex::ParallelFor(bx, cls_h.NCONS,
     [=] AMREX_GPU_DEVICE (int i, int j, int k, int n) noexcept
     {
