@@ -398,15 +398,17 @@ class weno_t {
         for (int n = 0; n < cls_t::NPRIM; ++n) {
           prims(iv - (m + 1) * ivd, n) = prims(iv - (2 * gl - m) * ivd, n);
         }
-        prims(iv - (m + 1) * ivd, cls_t::QU + cdir) =
-            -prims(iv - (2 * gl - m) * ivd, cls_t::QU + cdir); // this is no-slip
+        // prims(iv - (m + 1) * ivd, cls_t::QU + cdir) *= -1; // this is non-permeable
+        for (int c = 0; c < amrex::SpaceDim; ++c) 
+	    prims(iv - (m + 1) * ivd, cls_t::QU + c) *= -1; // this is no-slip non-permeable
       }
       if (m >= gr) {
         for (int n = 0; n < cls_t::NPRIM; ++n) {
           prims(iv + m * ivd, n) = prims(iv + (2 * gr - m - 1) * ivd, n);
         }
-        prims(iv + m * ivd, cls_t::QU + cdir) =
-            -prims(iv + (2 * gr - m - 1) * ivd, cls_t::QU + cdir); // this is no-slip
+        // prims(iv + m * ivd, cls_t::QU + cdir) *= -1; // this is non-permeable
+	for (int c = 0; c < amrex::SpaceDim; ++c)
+            prims(iv + m * ivd, cls_t::QU + c) *= -1; // this is no-slip non-permeable
       }
     }
 
