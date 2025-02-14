@@ -83,11 +83,11 @@ class rusanov_t {
                   });
 
       // add flux derivative to rhs = -(fi+1 - fi)/dx = (fi - fi+1)/dx
-      ParallelFor(bx, cls_t::NCONS,
-                  [=] AMREX_GPU_DEVICE(int i, int j, int k, int n) noexcept {
-                    rhs(i, j, k, n) +=
-                        dxinv[dir] * (flx(i, j, k, n) - flx(i+vdir[0], j+vdir[1], k+vdir[2], n));
-                  });
+      // ParallelFor(bx, cls_t::NCONS,
+      //             [=] AMREX_GPU_DEVICE(int i, int j, int k, int n) noexcept {
+      //               rhs(i, j, k, n) +=
+      //                   dxinv[dir] * (flx(i, j, k, n) - flx(i+vdir[0], j+vdir[1], k+vdir[2], n));
+      //             });
     }
   }
 

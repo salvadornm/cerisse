@@ -64,11 +64,11 @@ class riemann_t {
           this->cns_riemann_x(i, j, k, flx1, slope, prims, *cls);
         });
     // add x flux derivative to rhs = -(fi+1 - fi)/dx = (fi - fi+1)/dx
-    ParallelFor(bx, cls_t::NCONS,
-                [=] AMREX_GPU_DEVICE(int i, int j, int k, int n) noexcept {
-                  rhs(i, j, k, n) =
-                      dxinv[cdir] * (flx1(i, j, k, n) - flx1(i + 1, j, k, n));
-                });
+    // ParallelFor(bx, cls_t::NCONS,
+    //             [=] AMREX_GPU_DEVICE(int i, int j, int k, int n) noexcept {
+    //               rhs(i, j, k, n) =
+    //                   dxinv[cdir] * (flx1(i, j, k, n) - flx1(i + 1, j, k, n));
+    //             });
 
 #if AMREX_SPACEDIM >= 2
     // y-direction
@@ -91,11 +91,11 @@ class riemann_t {
           this->cns_riemann_y(i, j, k, flx2, slope, prims, *cls);
         });
     // add y flux derivative to rhs = -(fi+1 - fi)/dy = (fi - fi+1)/dy
-    ParallelFor(bx, cls_t::NCONS,
-                [=] AMREX_GPU_DEVICE(int i, int j, int k, int n) noexcept {
-                  rhs(i, j, k, n) +=
-                      dxinv[cdir] * (flx2(i, j, k, n) - flx2(i, j + 1, k, n));
-                });
+    // ParallelFor(bx, cls_t::NCONS,
+    //             [=] AMREX_GPU_DEVICE(int i, int j, int k, int n) noexcept {
+    //               rhs(i, j, k, n) +=
+    //                   dxinv[cdir] * (flx2(i, j, k, n) - flx2(i, j + 1, k, n));
+    //             });
 #endif
 
 #if AMREX_SPACEDIM == 3
@@ -119,12 +119,12 @@ class riemann_t {
         zflxbx, [=, *this] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {
           this->cns_riemann_z(i, j, k, flx3, slope, prims, *cls);
         });
-    // add z flux derivative to rhs = -(fi+1 - fi)/dz = (fi - fi+1)/dz
-    ParallelFor(bx, cls_t::NCONS,
-                [=] AMREX_GPU_DEVICE(int i, int j, int k, int n) noexcept {
-                  rhs(i, j, k, n) +=
-                      dxinv[cdir] * (flx3(i, j, k, n) - flx3(i, j, k + 1, n));
-                });
+    // // add z flux derivative to rhs = -(fi+1 - fi)/dz = (fi - fi+1)/dz
+    // ParallelFor(bx, cls_t::NCONS,
+    //             [=] AMREX_GPU_DEVICE(int i, int j, int k, int n) noexcept {
+    //               rhs(i, j, k, n) +=
+    //                   dxinv[cdir] * (flx3(i, j, k, n) - flx3(i, j, k + 1, n));
+    //             });
 #endif
   };
 
