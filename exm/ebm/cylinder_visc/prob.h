@@ -83,6 +83,11 @@ typedef closures_dt<indicies_t, transport_const_t<visc_model_param>, calorifical
 // define numerical scheme  
 typedef rhs_dt<skew_t<num_method_param, ProbClosures>, viscous_t<visc_model_param, ProbClosures>, no_source_t > ProbRHS;
 //typedef rhs_dt<skew_t<num_method_param, ProbClosures>, no_diffusive_t, no_source_t > ProbRHS;
+//
+
+
+//typedef rhs_dt<weno_t<ReconScheme::Teno5, ProbClosures>, viscous_t<visc_model_param, ProbClosures>, no_source_t > ProbRHS;
+
 
 
 // define type of wall and EBM class

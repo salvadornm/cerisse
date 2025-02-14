@@ -215,7 +215,7 @@ public:
     // printf("---- EBM after fluxes -----\n");
 
     // temp
-    const int is = 19; int js= 5;
+   // const int is = 19; int js= 5;
 
 
     amrex::ParallelFor(

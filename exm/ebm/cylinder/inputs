@@ -1,9 +1,11 @@
 # Simulation time
 max_step  =  5000
 stop_time =  4.0
-cfl = 0.02
+cfl = 0.005
 #time_step = 5e-7
 
+cns.order_rk  = -2 # original
+cns.stages_rk = 2
 
 # Geometry 
 geometry.is_periodic = 0 0
@@ -14,6 +16,8 @@ geometry.prob_hi     = 2.0   4.0
 # BC
 cns.lo_bc = 1 4
 cns.hi_bc = 2 4
+
+
 
 # output screen
 cns.screen_output = 0 # 0=quiet, 1=verbose

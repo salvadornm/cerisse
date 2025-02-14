@@ -72,10 +72,10 @@ typedef ebm_t<TypeWall,ProbClosures> ProbEB;
 
 
 void inline inputs() {
-  ParmParse pp;
+  // ParmParse pp;
 
-  pp.add("cns.order_rk", 3);   // -2, 1, 2 or 3"
-  pp.add("cns.stages_rk", 3);  // 1, 2 or 3
+  // pp.add("cns.order_rk", -2);   // -2, 1, 2 or 3"  (was 3)
+  // pp.add("cns.stages_rk", 3);  // 1, 2 or 3
 }
 
 // initial condition

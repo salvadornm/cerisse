@@ -1,7 +1,7 @@
 # Simulation time
-max_step  =  20000
-stop_time =  4.0
-cfl = 0.2
+max_step  =  40000
+stop_time =  8.0
+cfl = 0.1
 #time_step = 5e-7
 
 
@@ -18,7 +18,7 @@ cns.hi_bc = 2 2
 # output screen
 cns.screen_output = 0 # 0=quiet, 1=verbose
 cns.verbose = 0       # 0=quiet, 1=verbose
-amr.v               = 1 # quiet
+amr.v               = 0 # quiet
 
 # Refinement and regridding 
 amr.n_cell            = 400 200   # orign 80 x 160 with 1 lev

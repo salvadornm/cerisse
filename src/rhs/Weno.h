@@ -243,7 +243,7 @@ class weno_t {
 
       auto const& flx = flxt[dir]->array(); // snm
 
-      ParallelFor(flxbx, [=] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {
+      ParallelFor(flxbx, [=,this] AMREX_GPU_DEVICE(int i, int j, int k) noexcept { // it was [=]
         IntVect iv(AMREX_D_DECL(i, j, k));
         IntVect ivd(IntVect::TheDimensionVector(dir));
 
@@ -300,12 +300,12 @@ class weno_t {
       });
 
       // add flux derivative to rhs
-      ParallelFor(bx, cls_t::NCONS,
-                  [=] AMREX_GPU_DEVICE(int i, int j, int k, int n) noexcept {
-                    IntVect iv(AMREX_D_DECL(i, j, k));
-                    IntVect ivp = iv + IntVect::TheDimensionVector(dir);
-                    rhs(i, j, k, n) += dxinv[dir] * (flx(iv, n) - flx(ivp, n));
-                  });
+      // ParallelFor(bx, cls_t::NCONS,
+      //             [=] AMREX_GPU_DEVICE(int i, int j, int k, int n) noexcept {
+      //               IntVect iv(AMREX_D_DECL(i, j, k));
+      //               IntVect ivp = iv + IntVect::TheDimensionVector(dir);
+      //               rhs(i, j, k, n) += dxinv[dir] * (flx(iv, n) - flx(ivp, n));
+      //             });
     }  // end of for each direction
   }
 
