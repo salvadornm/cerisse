@@ -74,7 +74,7 @@ class diffusiveheat_t {
   int halfsten = param::order / 2;
 
 
-#ifdef AMREX_USE_GPIBM   
+#if (AMREX_USE_GPIBM || CNS_USE_EB )    
   void inline dflux_ibm(const Geometry& geom, const MFIter& mfi,
             const Array4<Real>& prims, const Array4<Real>& flx,
             const Array4<Real>& rhs, const cls_t* cls,const Array4<bool>& ibMarkers) {

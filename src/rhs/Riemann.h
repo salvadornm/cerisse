@@ -6,15 +6,6 @@
 
 ///
 /// \brief Template class for Riemann solvers
-///
-/// \param iOption Flux vector splitting (0 - Global lax-friedrichs)
-///
-/// ```
-/// {rst}
-///
-/// :math:`f_{i+1/2}= `
-/// ```
-///
 template <bool iOption, typename cls_t>
 class riemann_t {
  public:
@@ -24,87 +15,116 @@ class riemann_t {
   AMREX_GPU_HOST_DEVICE
   ~riemann_t() {}
 
+#if (AMREX_USE_GPIBM || CNS_USE_EB )  
+ void inline eflux_ibm(const Geometry& geom, const MFIter& mfi,
+                    const Array4<Real>& prims, std::array<FArrayBox*, AMREX_SPACEDIM> const &flxt,
+                    const Array4<Real>& rhs, const cls_t* cls,const Array4<bool>& ibMarkers) {
+
+#else
   void inline eflux(const Geometry& geom, const MFIter& mfi,
-                    const Array4<Real>& prims, const Array4<Real>& flx,
+                    const Array4<Real>& prims, std::array<FArrayBox*, AMREX_SPACEDIM> const &flxt,
                     const Array4<Real>& rhs, const cls_t* cls) {
+#endif
+  
     const GpuArray<Real, AMREX_SPACEDIM> dxinv = geom.InvCellSizeArray();
-    const Box& bx = mfi.tilebox();
-    // const Box& bxg = mfi.growntilebox(cls_t::NGHOST);
+    const Box& bx  = mfi.tilebox();
+    const Box& bxg = mfi.growntilebox(cls_t::NGHOST);
 
     // zero rhs
-    // ParallelFor(bxg, cls_t::NCONS,
-    //             [=] AMREX_GPU_DEVICE(int i, int j, int k, int n) noexcept {
-    //               rhs(i, j, k, n) = 0.0;
-    //             });
+    ParallelFor(bxg, cls_t::NCONS,
+                [=] AMREX_GPU_DEVICE(int i, int j, int k, int n) noexcept {
+                  rhs(i, j, k, n) = 0.0;
+                });
     const Box& bxg1 = amrex::grow(bx, 1);
     FArrayBox slopef(bxg1, cls_t::NCONS+1, The_Async_Arena()); // +1 because of the density
     const Array4<Real>& slope = slopef.array();
 
     // x-direction
     int cdir = 0;
+    auto const& flx1 = flxt[cdir]->array(); 
+  
+
     const Box& xslpbx = amrex::grow(bx, cdir, 1);
+
+
     amrex::ParallelFor(
         xslpbx, [=, *this] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {
+#ifdef CNS_USE_EB 
+          this->cns_slope_x(i, j, k, slope, prims, *cls, ibMarkers); 
+#else          
           this->cns_slope_x(i, j, k, slope, prims, *cls);
+#endif          
+
         });
+
+
     const Box& xflxbx = amrex::surroundingNodes(bx, cdir);
     amrex::ParallelFor(
         xflxbx, [=, *this] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {
-          this->cns_riemann_x(i, j, k, flx, slope, prims, *cls);
+          this->cns_riemann_x(i, j, k, flx1, slope, prims, *cls);
         });
     // add x flux derivative to rhs = -(fi+1 - fi)/dx = (fi - fi+1)/dx
-    ParallelFor(bx, cls_t::NCONS,
-                [=] AMREX_GPU_DEVICE(int i, int j, int k, int n) noexcept {
-                  rhs(i, j, k, n) =
-                      dxinv[cdir] * (flx(i, j, k, n) - flx(i + 1, j, k, n));
-                });
+    // ParallelFor(bx, cls_t::NCONS,
+    //             [=] AMREX_GPU_DEVICE(int i, int j, int k, int n) noexcept {
+    //               rhs(i, j, k, n) =
+    //                   dxinv[cdir] * (flx1(i, j, k, n) - flx1(i + 1, j, k, n));
+    //             });
 
 #if AMREX_SPACEDIM >= 2
     // y-direction
     cdir = 1;
+    auto const& flx2 = flxt[cdir]->array(); 
+  
     const Box& yslpbx = amrex::grow(bx, cdir, 1);
     amrex::ParallelFor(
-        yslpbx, [=, *this] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {
+        yslpbx, [=, *this] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {        
+#ifdef CNS_USE_EB 
+          this->cns_slope_y(i, j, k, slope, prims, *cls, ibMarkers); 
+#else          
           this->cns_slope_y(i, j, k, slope, prims, *cls);
+#endif  
+
         });
     const Box& yflxbx = amrex::surroundingNodes(bx, cdir);
     amrex::ParallelFor(
-        yflxbx, [=, *this] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {
-          for (int n = 0; n < cls_t::NCONS; n++) {
-            flx(i, j, k, n) = 0.0;
-          };
-          this->cns_riemann_y(i, j, k, flx, slope, prims, *cls);
+        yflxbx, [=, *this] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {          
+          this->cns_riemann_y(i, j, k, flx2, slope, prims, *cls);
         });
     // add y flux derivative to rhs = -(fi+1 - fi)/dy = (fi - fi+1)/dy
-    ParallelFor(bx, cls_t::NCONS,
-                [=] AMREX_GPU_DEVICE(int i, int j, int k, int n) noexcept {
-                  rhs(i, j, k, n) +=
-                      dxinv[cdir] * (flx(i, j, k, n) - flx(i, j + 1, k, n));
-                });
+    // ParallelFor(bx, cls_t::NCONS,
+    //             [=] AMREX_GPU_DEVICE(int i, int j, int k, int n) noexcept {
+    //               rhs(i, j, k, n) +=
+    //                   dxinv[cdir] * (flx2(i, j, k, n) - flx2(i, j + 1, k, n));
+    //             });
 #endif
 
 #if AMREX_SPACEDIM == 3
     // z-direction
     cdir = 2;
+    auto const& flx3 = flxt[cdir]->array(); 
+  
     const Box& zslpbx = amrex::grow(bx, cdir, 1);
     amrex::ParallelFor(
         zslpbx, [=, *this] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {
+#ifdef CNS_USE_EB 
+          this->cns_slope_z(i, j, k, slope, prims, *cls, ibMarkers); 
+#else          
           this->cns_slope_z(i, j, k, slope, prims, *cls);
+#endif 
+
+
         });
     const Box& zflxbx = amrex::surroundingNodes(bx, cdir);
     amrex::ParallelFor(
         zflxbx, [=, *this] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {
-          for (int n = 0; n < cls_t::NCONS; n++) {
-            flx(i, j, k, n) = 0.0;
-          };
-          this->cns_riemann_z(i, j, k, flx, slope, prims, *cls);
+          this->cns_riemann_z(i, j, k, flx3, slope, prims, *cls);
         });
-    // add z flux derivative to rhs = -(fi+1 - fi)/dz = (fi - fi+1)/dz
-    ParallelFor(bx, cls_t::NCONS,
-                [=] AMREX_GPU_DEVICE(int i, int j, int k, int n) noexcept {
-                  rhs(i, j, k, n) +=
-                      dxinv[cdir] * (flx(i, j, k, n) - flx(i, j, k + 1, n));
-                });
+    // // add z flux derivative to rhs = -(fi+1 - fi)/dz = (fi - fi+1)/dz
+    // ParallelFor(bx, cls_t::NCONS,
+    //             [=] AMREX_GPU_DEVICE(int i, int j, int k, int n) noexcept {
+    //               rhs(i, j, k, n) +=
+    //                   dxinv[cdir] * (flx3(i, j, k, n) - flx3(i, j, k + 1, n));
+    //             });
 #endif
   };
 
@@ -189,149 +209,25 @@ class riemann_t {
     }
   }
 
-  // unused
-  // AMREX_GPU_DEVICE AMREX_FORCE_INLINE void riemann_prob(
-  //     const Real gamma, const Real smallp, const Real /*smallr*/, const Real rl,
-  //     const Real ul, const Real pl, const Real ut1l, const Real ut2l,
-  //     const Real Yl[NUM_SPECIES], const Real rr, const Real ur, const Real pr,
-  //     const Real ut1r, const Real ut2r, const Real Yr[NUM_SPECIES], Real& flxu,
-  //     Real& flxut, Real& flxutt, Real& flxe, Real flxrY[NUM_SPECIES]) const {
-  //   constexpr Real weakwv = Real(1.e-3);
-  //   constexpr Real small = Real(1.e-6);
-
-  //   Real clsql = gamma * pl * rl;
-  //   Real clsqr = gamma * pr * rr;
-  //   Real wl = std::sqrt(clsql);
-  //   Real wr = std::sqrt(clsqr);
-  //   Real cleft = wl / rl;
-  //   Real cright = wr / rr;
-  //   Real ccsmall = small * (cleft + cright);
-
-  //   Real pstar = (wl * pr + wr * pl - wr * wl * (ur - ul)) / (wl + wr);
-  //   pstar = max(pstar, smallp);
-  //   Real pstnm1 = pstar;
-
-  //   Real wlsq = (Real(0.5) * (gamma - Real(1.)) * (pstar + pl) + pstar) * rl;
-  //   Real wrsq = (Real(0.5) * (gamma - Real(1.)) * (pstar + pr) + pstar) * rr;
-
-  //   wl = std::sqrt(wlsq);
-  //   wr = std::sqrt(wrsq);
-  //   Real ustarp = ul - (pstar - pl) / wl;
-  //   Real ustarm = ur + (pstar - pr) / wr;
-
-  //   pstar = (wl * pr + wr * pl - wr * wl * (ur - ul)) / (wl + wr);
-  //   pstar = max(pstar, smallp);
-
-  //   Real ustar;
-  //   for (int iter = 0; iter < 3; ++iter) {
-  //     wlsq = (Real(0.5) * (gamma - Real(1.)) * (pstar + pl) + pstar) * rl;
-  //     wrsq = (Real(0.5) * (gamma - Real(1.)) * (pstar + pr) + pstar) * rr;
-
-  //     wl = Real(1.) / std::sqrt(wlsq);
-  //     wr = Real(1.) / std::sqrt(wrsq);
-
-  //     Real ustnm1 = ustarm;
-  //     Real ustnp1 = ustarp;
-
-  //     ustarm = ur - (pr - pstar) * wr;
-  //     ustarp = ul + (pl - pstar) * wl;
-
-  //     Real dpditer = Math::abs(pstnm1 - pstar);
-  //     Real zp = Math::abs(ustarp - ustnp1);
-  //     if (zp - weakwv * cleft < Real(0.0)) {
-  //       zp = dpditer * wl;
-  //     }
-  //     Real zm = Math::abs(ustarm - ustnm1);
-  //     if (zm - weakwv * cright < Real(0.0)) {
-  //       zm = dpditer * wr;
-  //     }
-
-  //     Real zz = zp + zm;
-  //     Real denom = dpditer / max(zz, ccsmall);
-  //     pstnm1 = pstar;
-  //     pstar = pstar - denom * (ustarm - ustarp);
-  //     pstar = max(pstar, smallp);
-  //     ustar = Real(0.5) * (ustarm + ustarp);
-  //   }
-
-  //   Real ro, uo, po, sgnm, utrans1, utrans2, Y[NUM_SPECIES];
-  //   if (ustar > Real(0.)) {
-  //     ro = rl;
-  //     uo = ul;
-  //     po = pl;
-  //     sgnm = Real(1.);
-  //     utrans1 = ut1l;
-  //     utrans2 = ut2l;
-  //     for (int n = 0; n < NUM_SPECIES; n++) {
-  //       Y[n] = Yl[n];
-  //     }
-  //   } else if (ustar < Real(0.)) {
-  //     ro = rr;
-  //     uo = ur;
-  //     po = pr;
-  //     sgnm = Real(-1.);
-  //     utrans1 = ut1r;
-  //     utrans2 = ut2r;
-  //     for (int n = 0; n < NUM_SPECIES; n++) {
-  //       Y[n] = Yr[n];
-  //     }
-  //   } else {
-  //     uo = Real(0.5) * (ur + ul);
-  //     po = Real(0.5) * (pr + pl);
-  //     ro = Real(2.) * (rl * rr) / (rl + rr);
-  //     sgnm = Real(1.);
-  //     utrans1 = Real(0.5) * (ut1l + ut1r);
-  //     utrans2 = Real(0.5) * (ut2l + ut2r);
-  //     for (int n = 0; n < NUM_SPECIES; n++) {
-  //       Y[n] = Real(0.5) * (Yl[n] + Yr[n]);
-  //     }
-  //   }
-  //   Real wosq = (Real(0.5) * (gamma - Real(1.)) * (pstar + po) + pstar) * ro;
-  //   Real co = std::sqrt(gamma * po / ro);
-  //   Real wo = std::sqrt(wosq);
-  //   Real dpjmp = pstar - po;
-  //   Real rstar = ro / (Real(1.) - ro * dpjmp / wosq);
-  //   Real cstar = std::sqrt(gamma * pstar / rstar);
-  //   Real spout = co - sgnm * uo;
-  //   Real spin = cstar - sgnm * uo;
-  //   if (pstar >= po) {
-  //     spin = wo / ro - sgnm * uo;
-  //     spout = spin;
-  //   }
-  //   Real ss = max(spout - spin, spout + spin);
-  //   Real frac = Real(0.5) * (Real(1.) + (spin + spout) / max(ss, ccsmall));
-
-  //   Real rgdnv, ugdnv, pgdnv;
-  //   if (spout < Real(0.)) {
-  //     rgdnv = ro;
-  //     ugdnv = uo;
-  //     pgdnv = po;
-  //   } else if (spin >= Real(0.)) {
-  //     rgdnv = rstar;
-  //     ugdnv = ustar;
-  //     pgdnv = pstar;
-  //   } else {
-  //     rgdnv = frac * rstar + (Real(1.) - frac) * ro;
-  //     ugdnv = frac * ustar + (Real(1.) - frac) * uo;
-  //     pgdnv = frac * pstar + (Real(1.) - frac) * po;
-  //   }
-
-  //   // flxrho = rgdnv * ugdnv;
-  //   flxu = rgdnv * ugdnv * ugdnv + pgdnv;
-  //   flxut = rgdnv * ugdnv * utrans1;
-  //   flxutt = rgdnv * ugdnv * utrans2;
-  //   flxe =
-  //       ugdnv * (Real(0.5) * rgdnv *
-  //                    (ugdnv * ugdnv + utrans1 * utrans1 + utrans2 * utrans2) +
-  //                pgdnv / (gamma - Real(1.)) + pgdnv);
-  //   for (int n = 0; n < NUM_SPECIES; n++) {
-  //     flxrY[n] = rgdnv * ugdnv * Y[n];
-  //   }
-  // }
-
+#ifdef CNS_USE_EB 
+  AMREX_GPU_DEVICE AMREX_FORCE_INLINE void cns_slope_x(
+      int i, int j, int k, const Array4<Real>& dq, const Array4<Real>& q,
+      const cls_t& cls, const Array4<bool>& marker) const {
+#else
   AMREX_GPU_DEVICE AMREX_FORCE_INLINE void cns_slope_x(
       int i, int j, int k, const Array4<Real>& dq, const Array4<Real>& q,
       const cls_t& cls) const {
+#endif
+
+
+
+
+#ifdef CNS_USE_EB 
+    // const bool wall_left  = marker(i-1,j,k,0);  
+    // const bool wall_right = marker(i+1,j,k,0);  
+    const bool close_to_wall = marker(i,j,k,1);
+#endif
+
     Real cspeed = q(i, j, k, cls.QC) + 1.e-40;
     Real dlft = Real(0.5) *
                     (q(i, j, k, cls.QPRES) - q(i - 1, j, k, cls.QPRES)) /
@@ -343,6 +239,7 @@ class riemann_t {
                     cspeed -
                 Real(0.5) * q(i, j, k, cls.QRHO) *
                     (q(i + 1, j, k, cls.QU) - q(i, j, k, cls.QU));
+
     Real d0 = limiter(dlft, drgt);
 
     Real cs2 = cspeed * cspeed;
@@ -381,11 +278,35 @@ class riemann_t {
       drgt = q(i + 1, j, k, cls.QFS + n) - q(i, j, k, cls.QFS + n);
       dq(i, j, k, 5 + n) = limiter(dlft, drgt);
     }
-  }
 
+#ifdef CNS_USE_EB
+    if (close_to_wall) 
+    {
+      for (int n = 0; n < cls.NCONS; ++n) { dq(i,j,k,n) = 0.0;}
+    }    
+#endif    
+
+  }
+ 
+#ifdef CNS_USE_EB 
   AMREX_GPU_DEVICE AMREX_FORCE_INLINE void cns_slope_y(
-      int i, int j, int k, Array4<Real> const& dq, Array4<Real const> const& q,
-      cls_t const& cls) const {
+      int i, int j, int k, const Array4<Real>& dq, const Array4<Real>& q,
+      const cls_t& cls, const Array4<bool>& marker) const {
+#else
+  AMREX_GPU_DEVICE AMREX_FORCE_INLINE void cns_slope_y(
+      int i, int j, int k, const Array4<Real>& dq, const Array4<Real>& q,
+      const cls_t& cls) const {
+#endif
+
+
+
+#ifdef CNS_USE_EB 
+    // const bool wall_left  = marker(i,j-1,k,0);  
+    // const bool wall_right = marker(i,j+1,k,0); 
+    const bool close_to_wall = marker(i,j,k,1); 
+#endif
+
+
     Real cspeed = q(i, j, k, cls.QC) + 1.e-40;
     Real dlft = Real(0.5) *
                     (q(i, j, k, cls.QPRES) - q(i, j - 1, k, cls.QPRES)) /
@@ -435,11 +356,33 @@ class riemann_t {
       drgt = q(i, j + 1, k, cls.QFS + n) - q(i, j, k, cls.QFS + n);
       dq(i, j, k, 5 + n) = limiter(dlft, drgt);
     }
+
+#ifdef CNS_USE_EB
+    if (close_to_wall) 
+    {
+      for (int n = 0; n < cls.NCONS; ++n) { dq(i,j,k,n) = 0.0;}
+    }    
+#endif    
+ 
+
   }
 
+#ifdef CNS_USE_EB 
   AMREX_GPU_DEVICE AMREX_FORCE_INLINE void cns_slope_z(
-      int i, int j, int k, Array4<Real> const& dq, Array4<Real const> const& q,
-      cls_t const& cls) const {
+      int i, int j, int k, const Array4<Real>& dq, const Array4<Real>& q,
+      const cls_t& cls, const Array4<bool>& marker) const {
+#else
+  AMREX_GPU_DEVICE AMREX_FORCE_INLINE void cns_slope_z(
+      int i, int j, int k, const Array4<Real>& dq, const Array4<Real>& q,
+      const cls_t& cls) const {
+#endif
+  
+#ifdef CNS_USE_EB 
+    // const bool wall_left  = marker(i,j-1,k,0);  
+    // const bool wall_right = marker(i,j+1,k,0); 
+    const bool close_to_wall = marker(i,j,k,1); 
+#endif
+
     Real cspeed = q(i, j, k, cls.QC) + 1.e-40;
     Real dlft = Real(0.5) *
                     (q(i, j, k, cls.QPRES) - q(i, j, k - 1, cls.QPRES)) /
@@ -489,6 +432,14 @@ class riemann_t {
       drgt = q(i, j, k + 1, cls.QFS + n) - q(i, j, k, cls.QFS + n);
       dq(i, j, k, 5 + n) = limiter(dlft, drgt);
     }
+
+#ifdef CNS_USE_EB
+    if (close_to_wall) 
+    {
+      for (int n = 0; n < cls.NCONS; ++n) { dq(i,j,k,n) = 0.0;}
+    }    
+#endif   
+
   }
 
   AMREX_GPU_DEVICE AMREX_FORCE_INLINE void cns_riemann_x(

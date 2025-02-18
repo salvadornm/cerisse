@@ -2,6 +2,7 @@
 #define RHS_H_
 
 //#include <Index.h>
+#include <CNS.h>
 
 // Euler numerical methods
 #include <Weno.h>
@@ -31,7 +32,7 @@ class no_euler_t
 {
 public:
   template<typename... Args>
-#ifdef AMREX_USE_GPIBM  
+#if (AMREX_USE_GPIBM || CNS_USE_EB )  
   void eflux_ibm(Args&&... args){}
 #else  
   void eflux(Args&&... args){}
@@ -43,8 +44,12 @@ class no_diffusive_t
 {
 public:
   template<typename... Args>
-#ifdef AMREX_USE_GPIBM  
-  void dflux_ibm(Args&&... args) {}
+#if (AMREX_USE_GPIBM || CNS_USE_EB )   
+  //void dflux_ibm(Args&&... args) {}
+  void dflux_ibm(const Geometry& geom, const MFIter& mfi,
+            const Array4<Real>& prims, std::array<FArrayBox*, AMREX_SPACEDIM> const &flxt,            
+            const Array4<Real>& rhs, Args&&... args) { }
+
 #else
   void dflux(Args&&... args) {}  
 #endif  

@@ -226,14 +226,15 @@ Real CNS::advance(Real time, Real dt, int /*iteration*/, int /*ncycle*/) {
 
     ParallelFor(bx, [=] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {
       if (ibMarkers(i, j, k, 1)) {
-        state(i, j, k, cls_d->UMX) = prims(i, j, k, cls_d->QRHO) * prims(i, j, k, cls_d->QU);
-        state(i, j, k, cls_d->UMY) = prims(i, j, k, cls_d->QRHO) * prims(i, j, k, cls_d->QV);
-        state(i, j, k, cls_d->UMZ) = prims(i, j, k, cls_d->QRHO) * prims(i, j, k, cls_d->QW);
-        state(i, j, k, cls_d->UET) = prims(i, j, k, cls_d->QPRES) / (cls_d->gamma - 1.0) +
-            0.5 * (prims(i, j, k, cls_d->QU) * prims(i, j, k, cls_d->QU) +
-                   prims(i, j, k, cls_d->QV) * prims(i, j, k, cls_d->QV) +
-                   prims(i, j, k, cls_d->QW) * prims(i, j, k, cls_d->QW));
-        state(i, j, k, cls_d->URHO) = prims(i, j, k, cls_d->QRHO);
+
+        IntVect iv(AMREX_D_DECL(i, j, k)); 
+        Real cons[cls_h.NCONS];
+        // Real* cons = &state(i,j,k,cls_t::NCONS - 1); (prims2cosn shoudl accept a pointer)
+        cls_h.prims2cons(iv,prims,cons);        
+        for (int n = 0; n < cls_h.NCONS; n++) {
+          state(i, j, k, n) = cons[n];
+        }
+
       }
     });
   }
@@ -274,54 +275,138 @@ void CNS::compute_rhs(MultiFab& statemf, Real dt, FluxRegister* fr_as_crse, Flux
   const PROB::ProbClosures* cls_d = CNS::d_prob_closures;
   const PROB::ProbClosures& cls_h = *CNS::h_prob_closures;
   // const PROB::ProbParm& parms = *d_prob_parm;
-#ifdef AMREX_USE_GPIBM
-  auto& ib_mf = *IBM::ib.bmf_a[level];
-#endif
 
   for (MFIter mfi(statemf, false); mfi.isValid(); ++mfi) {
     Array4<Real> const& state = statemf.array(mfi);
 
-    // const Box& bxgnodal = mfi.grownnodaltilebox(-1, 1);  // extent is 0,N_cell+1
+    const Box& bx  = mfi.growntilebox(0);
     const Box& bxg = mfi.growntilebox(cls_h.NGHOST);
 
+    // primitives and fluxes arrays
     FArrayBox primf(bxg, cls_h.NPRIM, The_Async_Arena());
-    FArrayBox tempf(bxg, cls_h.NCONS, The_Async_Arena());
-    Array4<Real> const& temp = tempf.array();
     Array4<Real> const& prims= primf.array();
 
+    // .................................
+    //FArrayBox tempf(bxg, cls_h.NCONS, The_Async_Arena());
+    //Array4<Real> const& fluxt = tempf.array();  // >- original
+
+  
+    std::array<FArrayBox ,AMREX_SPACEDIM> fluxt;
+    for (int dir=0; dir < AMREX_SPACEDIM; ++dir)
+    {
+      fluxt[dir].resize(amrex::surroundingNodes(bxg, dir),cls_h.NCONS, The_Async_Arena() );
+      fluxt[dir].setVal<RunOn::Device>(0.);
+    }
+    // ...................................
+    
     // We want to minimise function calls. So, we call prims2cons, flux and
     // source term evaluations once per fab from CPU, to be run on GPU.
     cls_h.cons2prims(mfi, state, prims);
 
-
+    // combine arrays if IBM & EBM are used together 
+#if (AMREX_USE_GPIBM || CNS_USE_EB )   
+    //create auxiliary aray
+    BaseFab<bool> fab(bxg,2);
+    Array4<bool> const& geoMarkers = fab.array();    
+#endif
+    // extract markers
 #ifdef AMREX_USE_GPIBM
+    auto& ib_mf = *IBM::ib.bmf_a[level];
     IBM::ib.computeGPs(mfi, state, prims, cls_d, level);
     const auto& ibMarkers = ib_mf.array(mfi);
 #endif
+#ifdef CNS_USE_EB   
+    // no need to update markers here
+    auto& eb_mf = *EBM::eb.bmf_a[level];
+    const auto& ebMarkers = eb_mf.array(mfi);
+#endif
 
+    // combine markers into one  (CAN BE DONE BETTER)
+#if (AMREX_USE_GPIBM && CNS_USE_EB)    
+    amrex::ParallelFor(bxg, 2,
+    [=] AMREX_GPU_DEVICE (int i, int j, int k, int n) noexcept
+    {
+    geoMarkers(i,j,k,n) = ebMarkers(i,j,k,n) && ibMarkers(i,j,k,n);
+    });
+#endif    
+#if (AMREX_USE_GPIBM && !CNS_USE_EB)
+    amrex::ParallelFor(bxg, 2,
+    [=] AMREX_GPU_DEVICE (int i, int j, int k, int n) noexcept
+    {
+    geoMarkers(i,j,k,n) = ibMarkers(i,j,k,n);
+    });       
+#endif    
+#if (CNS_USE_EB && !AMREX_USE_GPIBM)
+    amrex::ParallelFor(bxg, 2,
+    [=] AMREX_GPU_DEVICE (int i, int j, int k, int n) noexcept
+    {
+    geoMarkers(i,j,k,n) = ebMarkers(i,j,k,n);
+    });
+#endif
+
+  
     // Euler/Diff Fluxes including boundary/discontinuity corrections
     // Note: we are over-writing state (cons) with flux derivative
-#ifdef AMREX_USE_GPIBM    
-    prob_rhs.eflux_ibm(geom, mfi, prims, temp, state, cls_d, ibMarkers);
-    prob_rhs.dflux_ibm(geom, mfi, prims, temp, state, cls_d, ibMarkers);
+#if (AMREX_USE_GPIBM || CNS_USE_EB )      
+    prob_rhs.eflux_ibm(geom, mfi, prims, {AMREX_D_DECL(&fluxt[0], &fluxt[1], &fluxt[2])}, state, cls_d, geoMarkers);    
+    prob_rhs.dflux_ibm(geom, mfi, prims, {AMREX_D_DECL(&fluxt[0], &fluxt[1], &fluxt[2])}, state, cls_d, geoMarkers);
 #else
-    prob_rhs.eflux(geom, mfi, prims, temp, state, cls_d);
-    prob_rhs.dflux(geom, mfi, prims, temp, state, cls_d);
+    prob_rhs.eflux(geom, mfi, prims, {AMREX_D_DECL(&fluxt[0], &fluxt[1], &fluxt[2])}, state, cls_d);
+    prob_rhs.dflux(geom, mfi, prims, {AMREX_D_DECL(&fluxt[0], &fluxt[1], &fluxt[2])}, state, cls_d);
+#endif
+
+    // add flux derivative to rhs, i.e.  rhs + = (flx[i] - flx[i+1])/dx
+    const GpuArray<Real, AMREX_SPACEDIM> dxinv = geom.InvCellSizeArray();
+    for (int dir = 0; dir < AMREX_SPACEDIM; dir++) {
+        GpuArray<int, 3> vdir = {int(dir == 0), int(dir == 1), int(dir == 2)};
+        auto const& flx = fluxt[dir].array();  
+        ParallelFor(bx, cls_h.NCONS,
+                  [=] AMREX_GPU_DEVICE(int i, int j, int k, int n) noexcept {
+                    state(i, j, k, n) +=
+                        dxinv[dir] * (flx(i, j, k, n) - flx(i+vdir[0], j+vdir[1], k+vdir[2], n));
+                  });
+    }                  
+
+                        
+
+  
+
+
+#if CNS_USE_EB    
+    // internal geometry fluxes
+    const Box&  ebbox  = mfi.growntilebox(0);  // box without ghost points 
+    const auto& flag = (*EBM::eb.ebflags_a[level])[mfi];
+    FabType t = flag.getType(ebbox);
+    if (FabType::singlevalued == t){
+      EBM::eb.ebflux(geom,mfi, prims, {AMREX_D_DECL(&fluxt[0], &fluxt[1], &fluxt[2])},state, cls_d,level);
+    }
+  
+
+    // Redistribution ** printf("---- EBM 313  -----\n");**********
+    
 #endif
 
     // Source terms, including update mask (e.g inside IB)
     prob_rhs.src(mfi, prims, state, cls_d, dt);
 
-    // Set solid point RHS to 0
-    // TODO: IBM::set_solid_state(mfi,state,cls_d)
-#if AMREX_USE_GPIBM
-    const Box& bx   = mfi.tilebox();
+    // Set solid point RHS to 0  (state hold RHS at this point)
+#if AMREX_USE_GPIBM || CNS_USE_EB
     amrex::ParallelFor(bx, cls_h.NCONS,
     [=] AMREX_GPU_DEVICE (int i, int j, int k, int n) noexcept
     {
-    state(i,j,k,n) = state(i,j,k,n)*(1 - int(ibMarkers(i,j,k,0)));
+      state(i,j,k,n) = state(i,j,k,n)*(1 - int(geoMarkers(i,j,k,0)));
     });
 #endif
+    // TODO: IBM::set_solid_state(mfi,state,cls_d)
+
+
+
+
+
+
+
+
+
 
     // // Flux register
     // if (do_reflux) {
