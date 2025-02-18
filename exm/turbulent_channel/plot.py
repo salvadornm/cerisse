@@ -11,6 +11,10 @@ xc = 0.5*Lx
 yc = 0.5*Lx
 zc = 0.5*Lz
 
+Re = 3000
+visc = 1/Re
+rho  = 1.0
+
 
 #####################
 def compute_wall_units(y, u, tau_w, rho, mu):
@@ -21,6 +25,18 @@ def compute_wall_units(y, u, tau_w, rho, mu):
   u_plus = u / u_tau
 
   return y_plus, u_plus
+####################  (classical log --law)
+def wall_law(yp):
+  
+  A = 1.0/0.41
+  B = 5.0
+  
+  if yp > 10:
+    u_plus = A*np.log(yp) + B 
+  else:
+    u_plus = yp
+     
+  return u_plus
 ##################
 def ExtractLineoutY(datasets, xc,zc):
   y_out = []
@@ -58,33 +74,45 @@ datasets = [latest_file]
 
 y, v  = ExtractLineoutY(datasets, xc, zc)
 
-
 for (ys, vs) in zip(y, v): 
+
+  # Compute stress
+  h = ys[0]
+  tau = visc*vs[0]/h
+
+  print(" h  tau =", h,tau)
+
+  yp,vp = compute_wall_units(ys, vs, tau, rho, visc)
+
+  y0 = 0
+  y1 = 3
+  npoints =100
+  yexact = np.logspace(y0,y1,npoints)  
+
+  vwall=[]
+  for ypp in yexact:
+    vwall.append( wall_law(ypp) )
   
   # Exact  solution
   #plt.plot(ve,ys,'o',label='Analytical',mfc='none',markersize=3)
 
   # cerisse
-  plt.plot(vs, ys, label='cerisse')
-  plt.ylabel(' y ')
-  plt.xlabel(' v ', horizontalalignment='center')#####################
-def ExactSolution(y):
-  yoh = y/L
-  u = 1.5*Vbulk*(4*(1 - yoh)*yoh)  
-  return u
+  plt.plot(yexact, vwall, label='log-law')
+
+  plt.plot(vp, yp, 'o', label='cerisse')
+
+  plt.xscale('log')
+  plt.ylim(0,100)
+  
+  
+  plt.ylabel(' u+ ')
+  plt.xlabel(' y+ ', horizontalalignment='center')
+  #####################
 
   plt.legend()
   plt.show()
 
 # Save the line plot into a file
 #plot.save()
-
-
-print(' .... DONE')
-
-
-
-
-
 
 print(' .... DONE')
