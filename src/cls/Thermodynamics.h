@@ -285,6 +285,7 @@ class calorifically_perfect_gas_nasg_liquid_t {
 
   Real inline energy(Real p, Real rho) {
     Real eint = 0;
+    eint = p/rho; // temp just to avoid warnings
     return eint;
   }
 
@@ -297,7 +298,7 @@ class calorifically_perfect_gas_nasg_liquid_t {
 // Wrapper for PelePhysics EoS. No other places of the code should call pele::physics::PhysicsType::eos().
 ////////////////////////////////////////////////////////////////////////////////////////
 template <typename idx_t>
-class multispecies_perfect_gas_t {
+class multispecies_pele_gas_t {
  protected:
   idx_t idx;
 
@@ -425,7 +426,7 @@ class multispecies_perfect_gas_t {
     for (int n = 1; n < idx_t::NWAVES - 1; ++n) {
       eigenvals[n] = u;
     }
-    eigenvals[idx_t::NWAVES] = u + cs;
+    eigenvals[idx_t::NWAVES-1] = u + cs;
     return eigenvals;
   }
 

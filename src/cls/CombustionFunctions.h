@@ -39,10 +39,8 @@ namespace combustion_functions {
 
   inline Y_Mixture mol2Y_H2Air(Moles_Mixture mix)
   {
-    const Real Nmol=mix.H2+ mix.N2 + mix.O2;
     Real MMW = mix.H2*molarMassH2 +mix.O2*molarMassO2 + mix.N2*molarMassN2;  
     return{mix.H2*molarMassH2/MMW,mix.N2*molarMassN2/MMW,mix.O2*molarMassO2/MMW};
-
   } 
 
 }

@@ -2,7 +2,7 @@
 #define Skew_H_
 
 #include <AMReX_FArrayBox.H>
-#include <CNS.h>
+
 
 //-------------------
 // discontinuity sensor function

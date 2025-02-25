@@ -4,9 +4,12 @@
 #include <AMReX_CONSTANTS.H>
 #include <AMReX_FArrayBox.H>
 
+//#include <peleCNS.h>
+#include <Constants.h>
+#include <TransPele.h>
+
+
 #include "diff_ops.H"
-
-
 template <typename param, typename cls_t>
 class viscous_t {
 
@@ -35,27 +38,21 @@ class viscous_t {
     const GpuArray<Real, AMREX_SPACEDIM> dxinv = geom.InvCellSizeArray();
 
     // grid
-    const Box& bx = mfi.tilebox();    
+    const Box& bx = mfi.tilebox();        
     const Box& bxg = mfi.growntilebox(cls->NGHOST);     // to handle high-order 
-    const Box& bxgnodal = mfi.grownnodaltilebox(-1, 0); // to handle fluxes
+    const Box& bxgnodal = mfi.grownnodaltilebox(-1, 0); // to handle fluxes    
 
-    // clear rhs (OBSOLETE)
-    if (param::solve_viscterms_only)
-    {      
-      ParallelFor(bxg, cls_t::NCONS, [=] AMREX_GPU_DEVICE(int i, int j, int k, int n) noexcept {
-      rhs(i, j, k, n) = 0.0;
-      });
-    }
-
-    // allocate arrays for transport properties  SNM CHECK HERE....
+    // allocate arrays for transport properties  
     FArrayBox coeffs(bxg, cls_t::NCOEF, The_Async_Arena());
-    const int CMU  = cls_t::CMU;
-    const int CLAM = cls_t::CLAM;
-    const int CXI  = cls_t::CXI;
-    const auto& mu_arr   = coeffs.array(cls_t::CMU);
-    const auto& lam_arr  = coeffs.array(cls_t::CLAM);
-    const auto& xi_arr   = coeffs.array(cls_t::CXI);
-
+    const int CMU    = cls_t::CMU;
+    const int CLAM   = cls_t::CLAM;
+    const int CXI    = cls_t::CXI;
+    const int CRHOD  = cls_t::CRHOD;
+        
+    const auto& mu_arr   = coeffs.array(CMU);     // dynamic viscosity
+    const auto& lam_arr  = coeffs.array(CLAM);    // thermal conductivity 
+    const auto& xi_arr   = coeffs.array(CXI);     // bulk viscosity
+    const auto& rhoD_arr = coeffs.array(CRHOD);   // species diffusivity (times rho)
 
     // pointer to array of transport coefficients    
     const amrex::Array4<const amrex::Real>& coeftrans = coeffs.array();
@@ -63,8 +60,43 @@ class viscous_t {
     // calculate all transport properties and store in array (up to ghost points)
 #ifdef USE_PELEPHYSICS
 
-    // PELEPHYSICS TRANSPORT CALL  
+    FArrayBox qfab(bxg, cls_t::NPRIM, The_Async_Arena());     // prep space q-arrays
+    auto const& q = qfab.array();
+    // fill it with prims data
+    amrex::ParallelFor( bxg, [=, *this] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {        
+      for (int n=0;n<cls_t::NPRIM; n++){ q(i,j,k,n) = prims(i,j,k,n);}   
+    });  
+    auto const& q_y   = qfab.const_array(cls_t::QFS);  // array: species mass fraction
+    auto const& q_T   = qfab.const_array(cls_t::QT);   // array: temperature 
+    auto const& q_rho = qfab.const_array(cls_t::QRHO); // array: density
+     
+    BL_PROFILE("PelePhysics::get_transport_coeffs()");
+    Array4<Real> chi; // dummy Soret effect coef
+    
+    // temp snm
+    //pele::physics::transport::TransportParams< pele::physics::PhysicsType::transport_type> trans_parms;
+    trans_parms.allocate(); 
 
+    auto const* ltransparm = trans_parms.device_trans_parm();
+    
+    amrex::launch(bxg, [=] AMREX_GPU_DEVICE(Box const& tbx) {
+
+            auto trans = pele::physics::PhysicsType::transport();
+                      
+            trans.get_transport_coeffs(tbx, q_y, q_T, q_rho, 
+                rhoD_arr, chi, mu_arr,xi_arr, lam_arr, ltransparm);
+          });
+
+    // change units
+    amrex::ParallelFor(
+        bxg, [=, *this] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {        
+        mu_arr(i,j,k)  = mu_arr(i,j,k) *visc_cgs2si;
+        lam_arr(i,j,k) = lam_arr(i,j,k)*cond_cgs2si;    
+        for (int n=0;n<NUM_SPECIES; n++){        
+          rhoD_arr(i,j,k,n) = rhoD_arr(i,j,k,n)*rhodiff_cgs2si;
+        }   
+        xi_arr(i,j,k)  = xi_arr(i,j,k)*visc_cgs2si;
+        });
 
 #else
     amrex::ParallelFor(
@@ -74,6 +106,26 @@ class viscous_t {
         xi_arr(i,j,k)  = 0.0;
         });
 #endif     
+
+    // TEST properties    
+    // amrex::ParallelFor( bxg, [=, *this] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {              
+    //   printf(" i = %d j=%d k= %d \n");
+    //   const Real rho= prims(i,j,k,cls_t::QRHO);
+    //   std::cout << " T " << prims(i,j,k,cls_t::QT) << std::endl;
+    //   std::cout << " rho " << rho << std::endl;      
+    //   for (int n=0;n<NUM_SPECIES; n++){
+    //     std::cout << " spec= " << n << " Y " << prims(i,j,k,cls_t::QFS +n) << std::endl;
+    //   }
+    //   std::cout << " visc " << mu_arr(i,j,k) << std::endl;
+    //   std::cout << " cond " << lam_arr(i,j,k) << std::endl;
+    //   std::cout << " xi   " << xi_arr(i,j,k) << std::endl;
+    //   for (int n=0;n<NUM_SPECIES; n++){        
+    //     printf(" spec= %d rhoD= %f D= %f \n",n,rhoD_arr(i,j,k,n),rhoD_arr(i,j,k,n)/rho );
+    //   }      
+    // });    
+    //
+
+
 
     // if (LES)   Pseudo-code for LES
     // {

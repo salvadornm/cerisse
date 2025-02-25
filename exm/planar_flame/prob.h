@@ -96,9 +96,20 @@ struct ProbParm {
 
 };
 
-using ProbClosures = closures_dt< indicies_t, visc_suth_t, cond_suth_t, multispecies_perfect_gas_t<indicies_t> >;
+// numerical method parameters
+struct methodparm_t {
+
+  public:
+
+  static constexpr int  order = 2;        
+
+};
+
+
+
+using ProbClosures = closures_dt< indicies_t, transport_Pele_t, multispecies_pele_gas_t<indicies_t> >;
 //using ProbRHS = rhs_dt< weno_t<ReconScheme::Teno5, ProbClosures>, no_diffusive_t, reactor_t<ProbClosures> >;
-using ProbRHS = rhs_dt< riemann_t<false, ProbClosures>, no_diffusive_t, reactor_t<ProbClosures> >;
+using ProbRHS = rhs_dt< riemann_t<false, ProbClosures>, viscous_t<methodparm_t, ProbClosures>, reactor_t<ProbClosures> >;
 
 
 void inline inputs() {
@@ -108,34 +119,6 @@ void inline inputs() {
   amrex::Print() << " Nspecies = " << NUM_SPECIES << std::endl;
   amrex::Print() << " H2 O2 H2O H O OH HO2 H2O2 N2 " << std::endl;
   amrex::Print() << " ******           *******" << std::endl;
-
-  ProbParm const prob_parm;
-  const Real *Yt;
-  
-  amrex::Print() << " composition unburn " << std::endl;
-  amrex::Print() << " ------------------ " << std::endl;
-
-  Yt = prob_parm.Y_u.data();
-  amrex::Real sumY =0.0;
-  for (int n = 0; n < NUM_SPECIES; ++n) {    
-    amrex::Print() << "n= " <<  n << " Y= "<< Yt[n]<< std::endl;
-    sumY += Yt[n];
-  }
-  amrex::Print() << " ------------------ " << std::endl;
-  amrex::Print() << " sum Y=  " << sumY << std::endl;
-  
-  amrex::Print() << " composition burn " << std::endl;
-  amrex::Print() << " ------------------ " << std::endl;
-  
-  Yt = prob_parm.Y_b.data();
-  amrex::Real sumY2 =0.0;
-  for (int n = 0; n < NUM_SPECIES; ++n) {    
-    amrex::Print() << "n= " <<  n << " Y= "<< Yt[n]<< std::endl;
-    sumY2 += Yt[n];
-  }
-  amrex::Print() << " ------------------ " << std::endl;
-  amrex::Print() << " sum Y=  " << sumY2 << std::endl;
-
 }
 
 // initial condition
