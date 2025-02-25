@@ -387,6 +387,20 @@ class multispecies_pele_gas_t {
 #endif
   }
 
+  //-------------------------------------------------------------------------------------
+  // @brief Compute mole fraction array from mass fraction species array
+  AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE void Y2X(const Real Y[NUM_SPECIES],Real* &X) {
+    auto eos = pele::physics::PhysicsType::eos();
+    eos.Y2X(Y,X);
+  }
+  // @brief Compute enthalpy species array from mass fraction species array, T and rho
+  AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE void RTY2Hi(const Real rho, const Real T,const Real Y[NUM_SPECIES],
+    Real* &hk) {
+    auto eos = pele::physics::PhysicsType::eos();
+    eos.RTY2Hi(rho, T, Y, hk);
+  } 
+
+  //-------------------------------------------------------------------------------------
   AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE GpuArray<Real, idx_t::NWAVES>
   cons2eigenvals(const int i, const int j, const int k,
                  const Array4<Real>& cons, const GpuArray<int, 3>& vdir) const {

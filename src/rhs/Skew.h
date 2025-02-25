@@ -295,16 +295,10 @@ class skew_t {
     int il= i-halfsten*vdir[0]; int jl= j-halfsten*vdir[1]; int kl= k-halfsten*vdir[2];   
 
     for (int l = 0; l < order; l++) {  
-      V[l] = prims(il,jl,kl,Qdir); 
-      // this can be done general to include species?? to test
-      // for (int nvar = 0; nvar < cls_t::NCONS; nvar++) {U[l][nvar] = cons(il,jl,kl,nvar);}
-      U[l][cls_t::URHO] = prims(il,jl,kl,cls_t::QRHO);
-      U[l][cls_t::UMX]  = cons(il,jl,kl,cls_t::UMX);
-      U[l][cls_t::UMY]  = cons(il,jl,kl,cls_t::UMY);
-      U[l][cls_t::UMZ]  = cons(il,jl,kl,cls_t::UMZ);      
-      P[l] = prims(il,jl,kl,cls_t::QPRES);
-      U[l][cls_t::UET] = cons(il,jl,kl,cls_t::UET)  + P[l];
-
+      V[l] = prims(il,jl,kl,Qdir);       
+      for (int nvar = 0; nvar < cls_t::NCONS; nvar++) {U[l][nvar] = cons(il,jl,kl,nvar);}
+      P[l] = prims(il,jl,kl,cls_t::QPRES);      
+      U[l][cls_t::UET] += P[l];
       il +=  vdir[0];jl +=  vdir[1];kl +=  vdir[2];
     }
 
@@ -354,7 +348,7 @@ class skew_t {
         V[l] = prims(il,jl,kl,Qdir); 
         for (int nvar = 0; nvar < cls_t::NCONS; nvar++) {U[l][nvar] = cons(il,jl,kl,nvar);}
         P[l] = prims(il,jl,kl,cls_t::QPRES);
-        U[l][cls_t::UET] = cons(il,jl,kl,cls_t::UET)  + P[l];
+        U[l][cls_t::UET] += P[l];
         il +=  vdir[0];jl +=  vdir[1];kl +=  vdir[2];
       }
       // fluxes
@@ -371,7 +365,7 @@ class skew_t {
         V[l] = prims(il,jl,kl,Qdir); 
         for (int nvar = 0; nvar < cls_t::NCONS; nvar++) {U[l][nvar] = cons(il,jl,kl,nvar);}
         P[l] = prims(il,jl,kl,cls_t::QPRES);
-        U[l][cls_t::UET] = cons(il,jl,kl,cls_t::UET)  + P[l];
+        U[l][cls_t::UET] += P[l];
         il +=  vdir[0];jl +=  vdir[1];kl +=  vdir[2];
       } 
       // fluxes      
