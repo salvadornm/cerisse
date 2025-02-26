@@ -76,7 +76,8 @@ struct ProbParm {
   Real e_u   = 2.5575e+05;         // internal energy [J/kg]  
  
   combustion_functions::Y_Mixture massfr = combustion_functions::mol2Y_H2Air(mix);  // unburn mass fractions
-  GpuArray<Real, NUM_SPECIES> Y_u = { massfr.H2, massfr.O2, 0.,0., 0., 0., 0.,0., massfr.N2};  // mass fractions [-] 
+  //GpuArray<Real, NUM_SPECIES> Y_u = { massfr.H2, massfr.O2, 0.,0., 0., 0., 0.,0., massfr.N2};  // mass fractions [-] 
+  GpuArray<Real, NUM_SPECIES> Y_u = { 0.014468, 0.22963 , 0.,0., 0., 0., 0.,0., 0.7559};  // mass fractions [-] 
 
   // burn gases
   Real rho_b = 0.81467;                 // density  [kg/m^3]
@@ -90,7 +91,7 @@ struct ProbParm {
 
   // geometrical parameters                                     
   Real Yflame = 0.05;
-  Real lf = 507e-6; // flame thicklness  (507 microns)
+  Real lf = 507e-6; // estimated flame thickness  (507 microns)
   Real Ly = 0.025;  // width domain
 
 
@@ -108,8 +109,11 @@ struct methodparm_t {
 
 
 using ProbClosures = closures_dt< indicies_t, transport_Pele_t, multispecies_pele_gas_t<indicies_t> >;
+
 //using ProbRHS = rhs_dt< weno_t<ReconScheme::Teno5, ProbClosures>, no_diffusive_t, reactor_t<ProbClosures> >;
-using ProbRHS = rhs_dt< riemann_t<false, ProbClosures>, viscous_t<methodparm_t, ProbClosures>, reactor_t<ProbClosures> >;
+//using ProbRHS = rhs_dt< riemann_t<false, ProbClosures>, viscous_t<methodparm_t, ProbClosures>, reactor_t<ProbClosures> >;
+using ProbRHS = rhs_dt< riemann_t<false, ProbClosures>, viscous_t<methodparm_t, ProbClosures>, no_source_t>;
+
 
 
 void inline inputs() {
@@ -133,30 +137,38 @@ AMREX_GPU_DEVICE AMREX_FORCE_INLINE void prob_initdata(
   Real x = prob_lo[0] + (i + Real(0.5)) * dx[0];
   Real y = prob_lo[1] + (j + Real(0.5)) * dx[1];
   
-  Real rhot, vxt,et;
-  const Real *Yt;
+  Real rhot, vxt,et,Tt,Pt;
+  Real Yt[NUM_SPECIES];const Real *Yu;const Real *Yb;
 
   Real wavelength = prob_parm.Ly;
   Real wave= 2.0*std::numbers::pi/wavelength;
-  // pertubastion and frequency
-  const Real ypertur = 0.005;//4*dx[1]; 
+  // pertubation and frequency
+  const Real ypertur = 0.000001;//4*dx[1]; 
   const Real Nwaves = 1;
 
   Real yinterf =  prob_parm.Yflame  + ypertur*cos(Nwaves*wave*x);
   
-  // compute 
+  // smooth profile over lf 
+  const Real smooth=0.2;
+  Real H = (y-yinterf)/prob_parm.lf;
+  Real fburn = 0.5*tanh(smooth*H) + 0.5; // fburn   0:unburn  1:burn
 
-  if (y < yinterf) {   // unburn mixture at the bottom    
-    rhot = prob_parm.rho_u;
-    vxt  = prob_parm.u_u;
-    Yt   = prob_parm.Y_u.data();
-    et   = prob_parm.e_u;
-  } else {            // burn mixture at the top    
-    rhot = prob_parm.rho_b;
-    vxt  = prob_parm.u_b;
-    Yt   = prob_parm.Y_b.data();
-    et   = prob_parm.e_b;
+  Yu  = prob_parm.Y_u.data();
+  Yb  = prob_parm.Y_b.data();
+  // compute 
+  vxt  = prob_parm.u_u*(1.0-fburn)   + fburn*prob_parm.u_b;
+  for (int n = 0; n < NUM_SPECIES; ++n) {
+    Yt[n]   = Yu[n]*(1.0-fburn) + fburn*Yb[n];
   }
+  Tt = prob_parm.T_u*(1.0-fburn)   + fburn*prob_parm.T_b;
+  Pt = prob_parm.p_u; 
+
+  // compute density  
+  cls.PYT2R(Pt,Yt,Tt,rhot);
+  
+  // compute energy  
+  cls.RYP2E(rhot, Yt, Pt, et);
+
   
   state(i, j, k, cls.UMX) = Real(0.0);
   state(i, j, k, cls.UMY) = rhot* vxt;
@@ -203,8 +215,8 @@ bcnormal(const Real x[AMREX_SPACEDIM], Real dratio, const Real s_int[ProbClosure
       s_ext[UMZ]  = 0.0;    
       s_ext[UET]  = rhot * et + Real(0.5) * rhot * vxt * vxt;  
       for (int n = 0; n < NUM_SPECIES; ++n) {
-         s_ext[UFS+n] = rhot * Yt[n];
-      }             
+        s_ext[UFS+n] = rhot * Yt[n];
+      }        
       break;
     case  1:  // WEST      
       break;

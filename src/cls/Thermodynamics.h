@@ -303,6 +303,13 @@ class multispecies_pele_gas_t {
   idx_t idx;
 
  public:
+  
+  /**
+  *  @brief compute internal energy from density, pressure and mass fraction
+  *  @param R density  (kg/m3)
+  *  @param P pressure (Pa)
+  *  @param Y array of mass fractions of chemical species
+  */
   AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE void RYP2E(const Real R,
                                                       const Real Y[NUM_SPECIES],
                                                       const Real P,
@@ -318,6 +325,13 @@ class multispecies_pele_gas_t {
     E = e_cgs * specenergy_cgs2si;
   }
 
+  /**
+  *  @brief compute temperature and pressure from density, internal energy and mass fraction
+  *  @param R density (kg/m3)
+  *  @param E mass specific internal energy  (J/kg)
+  *  @param Y array of mass fractions of chemical species
+  *  @return P and T
+  */
   AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE void RYE2TP(
       const Real R, const Real Y[NUM_SPECIES], const Real E, Real& T,
       Real& P) const {
@@ -340,6 +354,12 @@ class multispecies_pele_gas_t {
 #endif
   }
 
+  /**
+  *  @brief compute speed of sound from density, internal energy and mass fraction
+  *  @param R density (kg/m3)
+  *  @param E mass specific internal energy  (J/kg)
+  *  @param Y array of mass fractions of chemical species
+  */
   AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE void RYE2Cs(
       const Real R, const Real Y[NUM_SPECIES], const Real E, Real& cs) const {
     // SI -> CGS
@@ -387,6 +407,19 @@ class multispecies_pele_gas_t {
 #endif
   }
 
+  /**
+  *  @brief compute density from pressure,temperature and mass fractions
+  *  @param P pressure (kg/m3)
+  *  @param T Temperature  (K)
+  *  @param Y array of mass fractions of chemical species
+  */
+  AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE void PYT2R(
+      const Real P, const Real Y[NUM_SPECIES], const Real T, Real& R) const {
+ 
+      auto eos = pele::physics::PhysicsType::eos();                   
+      eos.PYT2R(P*pres_si2cgs, Y, T, R); R = R*rho_cgs2si;
+  }            
+
   //-------------------------------------------------------------------------------------
   // @brief Compute mole fraction array from mass fraction species array
   AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE void Y2X(const Real Y[NUM_SPECIES],Real* &X) {
@@ -399,7 +432,6 @@ class multispecies_pele_gas_t {
     auto eos = pele::physics::PhysicsType::eos();
     eos.RTY2Hi(rho, T, Y, hk);
   } 
-
   //-------------------------------------------------------------------------------------
   AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE GpuArray<Real, idx_t::NWAVES>
   cons2eigenvals(const int i, const int j, const int k,

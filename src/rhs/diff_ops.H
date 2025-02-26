@@ -4,12 +4,14 @@
 #include <AMReX_Array4.H>
 #include <AMReX_REAL.H>
 
-/// @brief calculate interpolation and central derivative coefficients  
-/// i-2 i-1  i  i+1  i+2 i+3
-///  0    1  2   3    4    5
-/// return coefficients for derivatives at i+1/2 in an array
-/// based on 2/4/6 order
-// TODO
+/**
+*  @brief calculate interpolation and central derivative coefficients 2/4/6 order at faces
+*  @param INTcoef array of central interpolation coefficients
+*  @param CDcoef  array of central derivatives coefficients
+*/
+/// i-2    i-1    i   |  i+1  i+2   i+3
+///  0       1    2   |  3     4     5
+///  -2.5h-1.5h -0.5h | 0.5h  1.5h  2.5h
 
 template <int order>
 AMREX_GPU_DEVICE AMREX_FORCE_INLINE void calc_CDcoeffs(  
@@ -22,20 +24,20 @@ AMREX_GPU_DEVICE AMREX_FORCE_INLINE void calc_CDcoeffs(
       INTcoef(0) =  Real(0.5);
       INTcoef(1) =  Real(0.5);
       // derivatives coefficients
-      CDcoef(0)   = -Real(1.0/2.0);
-      CDcoef(1)   = Real(1.0/2.0);      
+      CDcoef(0)  = -Real(1.0);
+      CDcoef(1)  = Real(1.0);      
       break;
     case 4:
-      // interpolation
-      INTcoef(0) = -Real(1.0/16.0); // corerction SNM (where 1/12)
+      // interpolation (correct coefficents Feb 2025)
+      INTcoef(0) = -Real(1.0/16.0); 
       INTcoef(1) =  Real(9.0/16.0);
       INTcoef(2) =  Real(9.0/16.0);
       INTcoef(3) = -Real(1.0/16.0);   
       // derivatives coefficients
-      CDcoef(0)   =   Real(1.0/12);
-      CDcoef(1)   = - Real(8.0/12);      
-      CDcoef(2)   = + Real(8.0/12);      
-      CDcoef(3)   = - Real(1.0/12);      
+      CDcoef(0)  =   Real(1.0/24);
+      CDcoef(1)  = - Real(9.0/8.0);      
+      CDcoef(2)  = + Real(9.0/8.0);      
+      CDcoef(3)  = - Real(1.0/24.0);      
       break;
     case 6: 
       // interpolation 
@@ -45,7 +47,7 @@ AMREX_GPU_DEVICE AMREX_FORCE_INLINE void calc_CDcoeffs(
       INTcoef(3) = Real(45.0/60.0);        
       INTcoef(4) = -Real(3.0/20.0);
       INTcoef(5) = Real(1.0/60.0);
-      // derivatives coefficients
+      // derivatives coefficients  (needs CHECK)
       CDcoef(0)   =   Real(1.0/60);
       CDcoef(1)   = - Real(9.0/60);      
       CDcoef(2)   = + Real(45.0/60);      
@@ -60,15 +62,11 @@ AMREX_GPU_DEVICE AMREX_FORCE_INLINE void calc_CDcoeffs(
       break;
     }
     
-    // the derivatives are in the faces, so coefficients are doubled (h = dx/2)
-    for(int l=0;l<order;l++) {CDcoef(l)=2.0_rt*CDcoef(l);}
-
-
     return;
   }
 
 
-//// Normal derivative with variable order using central difference. ////
+// //// Normal derivative with variable order using central difference. ////
 
 template <int order>
 AMREX_GPU_DEVICE AMREX_FORCE_INLINE amrex::Real normal_diff(

@@ -15,7 +15,56 @@ class viscous_t {
   
   AMREX_GPU_HOST_DEVICE
   viscous_t() {
-    calc_CDcoeffs<param::order>(INTcoef,CDcoef);
+
+    //calc_CDcoeffs<param::order>(INTcoef,CDcoef);
+    switch (param::order)
+    {
+    case 2:
+      // interpolation
+      INTcoef(0) =  Real(0.5);
+      INTcoef(1) =  Real(0.5);
+      // derivatives coefficients
+      CDcoef(0)   = -Real(1.0/2.0);
+      CDcoef(1)   = Real(1.0/2.0);      
+      break;
+    case 4:
+      // interpolation
+      INTcoef(0) = -Real(1.0/16.0); // corerction SNM (where 1/12)
+      INTcoef(1) =  Real(9.0/16.0);
+      INTcoef(2) =  Real(9.0/16.0);
+      INTcoef(3) = -Real(1.0/16.0);   
+      // derivatives coefficients
+      CDcoef(0)   =   Real(1.0/12);
+      CDcoef(1)   = - Real(8.0/12);      
+      CDcoef(2)   = + Real(8.0/12);      
+      CDcoef(3)   = - Real(1.0/12);      
+      break;
+    case 6: 
+      // interpolation 
+      INTcoef(0) = Real(1.0/60.0); // correction
+      INTcoef(1) = -Real(3.0/20.0);
+      INTcoef(2) = Real(45.0/60.0);
+      INTcoef(3) = Real(45.0/60.0);        
+      INTcoef(4) = -Real(3.0/20.0);
+      INTcoef(5) = Real(1.0/60.0);
+      // derivatives coefficients
+      CDcoef(0)   =   Real(1.0/60);
+      CDcoef(1)   = - Real(9.0/60);      
+      CDcoef(2)   = + Real(45.0/60);      
+      CDcoef(3)   = - Real(45.0/60); 
+      CDcoef(4)   = + Real(9.0/60); 
+      CDcoef(5)   = - Real(1.0/60);                  
+      break;
+    default: // crash
+    
+      amrex::Abort("Diffusive order available 2/4/6 MUST specify one of those ");      
+
+      break;
+    }
+    
+    // the derivatives are in the faces, so coefficients are doubled (h = dx/2)
+    for(int l=0;l<param::order;l++) {CDcoef(l)=2.0_rt*CDcoef(l);}
+
   }
 
   AMREX_GPU_HOST_DEVICE
@@ -138,20 +187,29 @@ class viscous_t {
     // }
     
     // loop over directions -----------------------------------------------
+
     for (int dir = 0; dir < AMREX_SPACEDIM; dir++) {
-     // GpuArray<int, 3> vdir = {int(dir == 0), int(dir == 1), int(dir == 2)};
       auto const& flx = flxt[dir]->array(); 
   
-      // compute diffusion fluxes
 #if (AMREX_USE_GPIBM || CNS_USE_EB )   
       amrex::ParallelFor(bxgnodal,
-                  [=,*this] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {                                       
-                    this->cns_diff_ibm(i, j, k,dir, prims,flx,coeftrans, dxinv, cls,ibMarkers);
+                  [=,*this] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {     
+                    const amrex::IntVect iv{AMREX_D_DECL(i, j, k)};                                  
+                    this->visc_heat_ibm(iv,dir, prims,flx,coeftrans, dxinv, cls,ibMarkers);
+#if NUM_SPECIES >1
+  // TODO
+#endif
+
                   });                      
 #else    
       amrex::ParallelFor(bxgnodal,
-                  [=,*this] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {                   
-                    this->cns_diff(i, j, k,dir, prims,flx,coeftrans, dxinv, cls);
+                  [=,*this] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {     
+                    const amrex::IntVect iv{AMREX_D_DECL(i, j, k)};
+                    this->visc_heat(iv,dir, prims,flx,coeftrans, dxinv, cls);
+#if NUM_SPECIES >1                       
+//                    this->diff_species(iv, dir, prims, flx, coeftrans, dxinv, cls);
+#endif                      
+
                   });                  
 #endif
         
@@ -159,21 +217,21 @@ class viscous_t {
     // end loop  ------------------------------------------------------
   } 
 
- 
+
   // ----------------------------------------------------------------------------------------------  
   /**
-  * @brief Compute diffusion fluxes (viscosity + heat + diffusion).
+  * @brief Compute diffusion fluxes.
   *
-  * @param i,j,k  x, y, z index.cls_t::CLAM
-  * @param d1    direction, 0:x, 1:y, 2:z (dir)
+  * @param iv      x, y, z index
+  * @param dir    direction, 0:x, 1:y, 2:z.
   * @param q      primitive variables.
   * @param[out] flx  output diffusion fluxes.
   * @param coeffs transport coefficients.
   * @param dxinv  1/dx
   * @param cls_t  ProbClosures 
   */
-  AMREX_GPU_DEVICE AMREX_FORCE_INLINE void cns_diff(
-      const int i, const int j, const int k, const int d1,
+  AMREX_GPU_DEVICE AMREX_FORCE_INLINE void visc_heat(
+      amrex::IntVect const& iv, const int d1,
       amrex::Array4<const amrex::Real> const& q,
       amrex::Array4<amrex::Real> const& flx,
       amrex::Array4<const amrex::Real> const& coeffs,
@@ -181,12 +239,11 @@ class viscous_t {
       const cls_t* cls) const {
     
     using amrex::Real;
-    const amrex::IntVect iv{AMREX_D_DECL(i, j, k)};
     const amrex::IntVect ivm = iv - amrex::IntVect::TheDimensionVector(d1);
 
     const int d2 = d1 == 0 ? 1 : 0;
     const int d3 = d1 == 2 ? 1 : 2;
-    AMREX_D_TERM(const int QU1 = cls_t::QU + d1;,  const int QU2 = cls_t::QU + d2;
+    AMREX_D_TERM(const int QU1 = cls_t::QU + d1;, const int QU2 = cls_t::QU + d2;
                , const int QU3 = cls_t::QU + d3;)
     AMREX_D_TERM(const int UM1 = cls_t::UMX + d1;, const int UM2 = cls_t::UMX + d2;
                , const int UM3 = cls_t::UMX + d3;)
@@ -221,55 +278,13 @@ class viscous_t {
                                               +(q(iv, QU2) + q(ivm, QU2)) * tau12,
                                               +(q(iv, QU3) + q(ivm, QU3)) * tau13)) +
                                               + lamf* dTdn;
-#if NSPECIES > 1    
-    // --------------------------------------------------------------------------
-    // diffusion species  
-    Real ymass[order_sch][NUM_SPECIES],xmole[order_sch][NUM_SPECIES];
-    Real hi[order_sch][NUM_SPECIES];
-    
-    amrex::IntVect ivp(iv -halfsten*amrex::IntVect::TheDimensionVector(d1));
-    for (int l = 0; l < order_sch; l++) {
-      ivp +=  amrex::IntVect::TheDimensionVector(d1);
-      for (int n = 0; n < NUM_SPECIES; ++n) { ymass[l][n] = q(ivp,  cls_t::QFS + n); }
-      cls->Y2X(ymass[l], xmole[l])    
-      cls-> RTY2Hi(q(ivp,  cls_t::QRHO), q(ivp,   cls_t::QT), ymass[l], hi[l]);
-    }
-    
-    const Real dpdx  = normal_diff<param::order>(iv, d1, cls_t::QPRES, q, dxinv); 
-    const Real pface = interp<param::order>(iv, d1, cls_t::QPRES, q);
-    const Real dlnp = dpdx/pface;
-     
-    Real Vc = 0.0;
-    for (int n = 0; n < NUM_SPECIES; n++) {
-      Real Xface = 0.0,Yface= 0.0,hface=0.0,dXdx=0.0;
-      for (int l = 0; l < param::order; l++) {
-        Xface += xmole[l][n]*INTcoef(l);
-        Yface += ymass[l][n]*INTcoef(l);
-        hface += hi[l][n]*INTcoef(l);
-        dXdx  += xmole[l][n]*CDcoef(l);
-      }      
-      dXdx  /= dxinv[d1];
-      const Real rhoD_f = interp<param::order>(iv, d1, cls_t::CRHOD + n, coeffs); 
-
-      const Real Vd = -rhoD_f * (dXdx + (Xface - Yface) * dlnp);
-      Vc += Vd;
-      flx(iv, cls_t::UFS + n) += Vd; 
-      flx(iv, cls_t::UET)     += Vd * hface;
-    }
-    // Add correction velocity to fluxes so sum(Vd) = 0
-    for (int n = 0; n < NUM_SPECIES; ++n) {
-      flx(iv, cls_t::UFS + n)-= Yface * Vc;
-      flx(iv, cls_t::UET)    -= Yface * hface * Vc;
-    }
-    // --------------------------------------------------------------------------
-#endif                                           
-  
+   
     }
   // ---------------------------------------------------------------------------------------------  
   /**
   * @brief Compute diffusion fluxes in IB/EB.
   *
-  * @param i,j,k  x, y, z index.cls_t::CLAM
+  * @param iv      x, y, z index
   * @param dir    direction, 0:x, 1:y, 2:z.
   * @param q      primitive variables.
   * @param[out] flx  output diffusion fluxes.
@@ -278,8 +293,8 @@ class viscous_t {
   * @param cls_t  ProbClosures 
   * @param marker  geometry markers  (sld and cutcells) 
   */
-  AMREX_GPU_DEVICE AMREX_FORCE_INLINE void cns_diff_ibm(
-      const int i, const int j, const int k, const int d1,
+  AMREX_GPU_DEVICE AMREX_FORCE_INLINE void visc_heat_ibm(
+      amrex::IntVect const& iv, const int d1,
       amrex::Array4<const amrex::Real> const& q,
       amrex::Array4<amrex::Real> const& flx,
       amrex::Array4<const amrex::Real> const& coeffs,
@@ -287,7 +302,6 @@ class viscous_t {
       const cls_t* cls, const Array4<bool>& marker) const {
     
     using amrex::Real;
-    const amrex::IntVect iv{AMREX_D_DECL(i, j, k)};
     const amrex::IntVect ivm = iv - amrex::IntVect::TheDimensionVector(d1);
 
     const int d2 = d1 == 0 ? 1 : 0;
@@ -361,6 +375,121 @@ class viscous_t {
 
   }
   // ---------------------------------------------------------------------------------------------
+  /**
+  * @brief Compute diffusion fluxes for species and enthalpy.
+  *
+  * @param iv      x, y, z index
+  * @param dir    direction, 0:x, 1:y, 2:z.
+  * @param q      primitive variables.
+  * @param[out] flx  output diffusion fluxes.
+  * @param coeffs transport coefficients.
+  * @param dxinv  1/dx
+  * @param cls_t  ProbClosures 
+  */
+  AMREX_GPU_DEVICE AMREX_FORCE_INLINE void
+    diff_species(amrex::IntVect const& iv, const int idir,
+      amrex::Array4<const amrex::Real> const& q,
+      amrex::Array4<amrex::Real> const& flx,
+      amrex::Array4<const amrex::Real> const& coeffs,
+      amrex::GpuArray<amrex::Real, AMREX_SPACEDIM> const& dxinv,
+      const cls_t* cls) const {
+    
+  {
+    using amrex::Real;
+
+    const amrex::IntVect ivm(iv - amrex::IntVect::TheDimensionVector(idir));
+
+    // Get massfrac, molefrac, and spec. enthalpy auxiliar arrays
+    Real mass1[NUM_SPECIES], mass2[NUM_SPECIES], mole1[NUM_SPECIES], mole2[NUM_SPECIES];
+    Real hi1[NUM_SPECIES], hi2[NUM_SPECIES];
+    for (int n = 0; n < NUM_SPECIES; ++n) {
+      mass1[n] = q(iv,  cls_t::QFS + n);
+      mass2[n] = q(ivm, cls_t::QFS + n);          
+    }
+
+    
+    // new snm --------------------------------------------------------------------------
+    // Real ymass[order_sch][NUM_SPECIES],xmole[order_sch][NUM_SPECIES];
+    // Real hi[order_sch][NUM_SPECIES];
+    
+    // amrex::IntVect ivp(iv -halfsten*amrex::IntVect::TheDimensionVector(idir));
+    // for (int l = 0; l < order_sch; l++) {
+    //   ivp +=  amrex::IntVect::TheDimensionVector(idir);
+    //   for (int n = 0; n < NUM_SPECIES; ++n) {
+    //     ymass[l][n] = = q(ivp,  cls_t::QFS + n);
+    //   }
+    //   cls->Y2X(ymass[l], xmole[l])    
+    //   cls-> RTY2Hi(q(ivp,  cls_t::QRHO), q(ivp,   cls_t::QT), ymass[l], hi[l]);
+    //   }
+    // }
+
+    // const Real dpdx  = normal_diff<param::order>(iv, idir, cls_t::QPRES, q, dxinv); 
+    // const Real pface = interp<param::order>(iv, idir, cls_t::QPRES, q);
+    // const Real dlnp = dpdx/pface;
+     
+    // Real Vc = 0.0;
+    // for (int n = 0; n < NUM_SPECIES; ++n) {
+    //   Real Xface = 0.0,Yface= 0.0,hface=0.0,dXdx=0.0;
+    //   for (int l = 0; l < param::order; l++) {
+    //     Xface += xmole[l][n]*INTcoef(l);
+    //     Yface += ymass[l][n]*INTcoef(l);
+    //     hface += hi[l][n]*INTcoef(l);
+    //     dXdx  += xmole[l][n]*CDcoef(l);
+    //   }      
+    //   dXdx  /= dxinv[dir];
+    //   const Real Vd = -rhoD_face * (dXdx + (Xface - Yface) * dlnp);
+    //   Vc += Vd;
+    //   flx[cls_t::UFS + n] += Vd; 
+    //   flx[cls_t::UET]     += Vd * hface;
+    // }
+    // --------------------------------------------------------------------------
+
+
+    // auto eos = pele::physics::PhysicsType::eos();
+    // eos.Y2X(mass1, mole1); eos.Y2X(mass2, mole2);
+
+    cls->Y2X(mass1, mole1);cls->Y2X(mass2, mole2);
+    
+    // Compute species and enthalpy fluxes for ideal EOS
+    // Get species/enthalpy diffusion, compute correction vel
+    //eos.RTY2Hi(q(iv,  cls_t::QRHO), q(iv,  cls_t::QT), mass1, hi1);
+    //eos.RTY2Hi(q(ivm, cls_t::QRHO), q(ivm, cls_t::QT), mass2, hi2);
+
+    cls-> RTY2Hi(q(iv,  cls_t::QRHO), q(iv,   cls_t::QT), mass1, hi1);
+    cls-> RTY2Hi(q(ivm, cls_t::QRHO), q(ivm,  cls_t::QT), mass2, hi2);
+
+    // calculate correction velocity
+    Real Vc = 0.0;
+ 
+    const Real dpdx  = normal_diff<param::order>(iv, idir, cls_t::QPRES, q, dxinv); 
+    const Real pface = interp<param::order>(iv, idir, cls_t::QPRES, q);
+    const Real dlnp = dpdx/pface;
+
+    // At present second order only 
+    for (int n = 0; n < NUM_SPECIES; ++n) {      
+      // 2nd order 
+      const Real Xface = 0.5 * (mole1[n] + mole2[n]);
+      const Real Yface = 0.5 * (mass1[n] + mass2[n]);
+      const Real hface = 0.5 * (hi1[n] + hi2[n]);
+      const Real dXdx = (mole1[n] - mole2[n]) * dxinv[idir];       
+      // interpolation Diffusivity on the face
+      const Real rhoD_face = interp<param::order>(iv, idir, cls_t::CRHOD+n, coeffs);
+      // diffusion velocity
+      const Real Vd = -rhoD_face * (dXdx + (Xface - Yface) * dlnp);
+      Vc += Vd;
+      flx[cls_t::UFS + n] += Vd; 
+      flx[cls_t::UET] += Vd * hface;
+    }
+
+    // Add correction velocity to fluxes so sum(Vd) = 0
+    for (int n = 0; n < NUM_SPECIES; ++n) {
+      // 2nd order
+      const Real Yface = 0.5 * (mass1[n] + mass2[n]);    
+      const Real hface = 0.5 * (hi1[n] + hi2[n]);
+      flx[cls_t::UFS + n] -= Yface * Vc;
+      flx[cls_t::UET] -= Yface * hface * Vc;
+    }
+  }
 
 
   }; 
