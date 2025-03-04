@@ -179,16 +179,15 @@ class skew_t {
   Real Cdamp  = param::C4skew; 
 
 
-#ifdef AMREX_USE_GPIBM  
-  void inline eflux_ibm(const Geometry& geom, const MFIter& mfi,
-                    const Array4<Real>& prims, const Array4<Real>& flx,
-                    const Array4<Real>& rhs,
-                     const cls_t* cls,const Array4<bool>& ibMarkers) {
+#if (AMREX_USE_GPIBM || CNS_USE_EB )  
+ void inline eflux_ibm(const Geometry& geom, const MFIter& mfi,
+                    const Array4<Real>& prims, std::array<FArrayBox*, AMREX_SPACEDIM> const &flxt,
+                    const Array4<Real>& rhs, const cls_t* cls,const Array4<bool>& ibMarkers) {
+
 #else
   void inline eflux(const Geometry& geom, const MFIter& mfi,
-                    const Array4<Real>& prims, const Array4<Real>& flx,
-                    const Array4<Real>& rhs,
-                     const cls_t* cls) {
+                    const Array4<Real>& prims, std::array<FArrayBox*, AMREX_SPACEDIM> const &flxt,
+                    const Array4<Real>& rhs, const cls_t* cls) {
 #endif
 
 
@@ -209,7 +208,7 @@ class skew_t {
     // copy conservative variables from rhs to cons and clear rhs
     ParallelFor(bxg, cls_t::NCONS, [=] AMREX_GPU_DEVICE(int i, int j, int k, int n) noexcept {
       cons(i,j,k,n) = rhs(i,j,k,n);
-      rhs(i, j, k, n)=0.0;
+      rhs(i, j, k, n)=0.0;              
       });
 
     int imask = 3; // reduce order 
@@ -232,7 +231,10 @@ class skew_t {
 
       int Qdir =  cls_t::QRHO + dir + 1; 
 
-#ifdef AMREX_USE_GPIBM  
+      auto const& flx = flxt[dir]->array(); 
+  
+
+#if (AMREX_USE_GPIBM || CNS_USE_EB )  
       ParallelFor(bxgnodal,
                   [=,*this] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {
                     this->flux_dir_ibm(i, j, k,Qdir, vdir, cons, prims, lambda_max, flx, cls,ibMarkers);
@@ -243,9 +245,13 @@ class skew_t {
                     this->flux_dir(i, j, k,Qdir, vdir, cons, prims, lambda_max, flx, cls);
                   });                  
 #endif
+
+      
       // dissipative fluxes 
       if constexpr (param::dissipation) {
-#ifdef AMREX_USE_GPIBM               
+
+#if (AMREX_USE_GPIBM || CNS_USE_EB )  
+
         ParallelFor(bxgnodal,
                   [=,*this] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {
                     this->fluxdissip_dir_ibm(i, j, k,Qdir, vdir, cons, prims, lambda_max, flx, cls, ibMarkers);
@@ -256,14 +262,20 @@ class skew_t {
                     this->fluxdissip_dir(i, j, k,Qdir, vdir, cons, prims, lambda_max, flx, cls);
                   });  
 #endif
+        
+
       }
-      // add flux derivative to rhs, i.e.  rhs + = (flx[i] - flx[i+1])/dx
-      ParallelFor(bx, cls_t::NCONS,
-                  [=] AMREX_GPU_DEVICE(int i, int j, int k, int n) noexcept {
-                    rhs(i, j, k, n) +=
-                        dxinv[dir] * (flx(i, j, k, n) - flx(i+vdir[0], j+vdir[1], k+vdir[2], n));
-                  });
+      // add flux derivative to rhs, i.e.  rhs + = (flx[i] - flx[i+1])/dx (THIS WILL GO)
+      // ParallelFor(bx, cls_t::NCONS,
+      //             [=] AMREX_GPU_DEVICE(int i, int j, int k, int n) noexcept {
+      //               rhs(i, j, k, n) +=
+      //                   dxinv[dir] * (flx(i, j, k, n) - flx(i+vdir[0], j+vdir[1], k+vdir[2], n));
+      //             });
+
     }
+
+  
+
   }
 
   // ............................................................. 
@@ -321,15 +333,23 @@ class skew_t {
     Real U[order][cls_t::NCONS];
 
     int il= i-vdir[0]; int jl= j-vdir[1]; int kl= k-vdir[2];
-    const bool wall_flx = marker(i,j,k,1) || marker(il,jl,kl,1);           // is a flux close to a GP
+    const bool close_to_wall = marker(i,j,k,1) || marker(il,jl,kl,1);           // //  flux close to a GP (IBM) or a cut-cell (EB)
     const bool intersolid_flx = marker(i,j,k,0) &&  marker(il,jl,kl,0);    // inter-flux
 
     if (intersolid_flx) return;  // flux =0  inside solid 
       
-    // reduce to second order order scheme based on marker
-    if (wall_flx)
+
+#ifdef CNS_USE_EB   
+    // in EBM wall flux will be computed afterwards
+    const bool next_to_wall = marker(i,j,k,0) || marker(il,jl,kl,0);
+    if (next_to_wall) return;  
+#endif
+
+
+    // reduce to second order scheme close to wall
+    if (close_to_wall)
     {   
-      il= i-vdir[0]; jl= j-vdir[1]; kl= k-vdir[2];
+      //il= i-vdir[0]; jl= j-vdir[1]; kl= k-vdir[2];
       for (int l = 0; l < 2; l++) {  
         V[l] = prims(il,jl,kl,Qdir); 
         for (int nvar = 0; nvar < cls_t::NCONS; nvar++) {U[l][nvar] = cons(il,jl,kl,nvar);}
@@ -346,6 +366,7 @@ class skew_t {
     else
     {
       il= i-halfsten*vdir[0]; jl= j-halfsten*vdir[1]; kl= k-halfsten*vdir[2];
+
       for (int l = 0; l < order; l++) {  
         V[l] = prims(il,jl,kl,Qdir); 
         for (int nvar = 0; nvar < cls_t::NCONS; nvar++) {U[l][nvar] = cons(il,jl,kl,nvar);}
@@ -353,14 +374,14 @@ class skew_t {
         U[l][cls_t::UET] = cons(il,jl,kl,cls_t::UET)  + P[l];
         il +=  vdir[0];jl +=  vdir[1];kl +=  vdir[2];
       } 
-      // fluxes
-      for (int nvar = 0; nvar < cls_t::NCONS; nvar++)  {
-        flx(i, j, k, nvar) =  0.0_rt;     
+      // fluxes      
+      for (int nvar = 0; nvar < cls_t::NCONS; nvar++)  {        
+        flx(i, j, k, nvar) =  0.0_rt;             
         for (int l = 0; l < order; l++) { 
           for (int m = 0; m < order; m++) { 
             flx(i, j, k, nvar) += coefskew(l,m)*U[l][nvar]*V[m];  
           } 
-        }
+        }        
       }  
       // pressure flux (symmetric interpolation)    
       for (int l = 0; l < order; l++) { 
@@ -375,11 +396,17 @@ class skew_t {
     const cls_t* cls,const Array4<bool>& marker) const {
 
     int il= i-vdir[0]; int jl= j-vdir[1]; int kl= k-vdir[2];
-    const bool wall_flx = marker(i,j,k,1) || marker(il,jl,kl,1);          
+    const bool close_to_wall  = marker(i,j,k,1) || marker(il,jl,kl,1);          //  flux close to a GP (IBM) or a cut-cell (EB)
     const bool intersolid_flx = marker(i,j,k,0) &&  marker(il,jl,kl,0);  
 
-    if (intersolid_flx) return;  // flux =0  inside solid 
-    
+    if (intersolid_flx) return;  // flux =0  inside solid
+
+#ifdef CNS_USE_EB   
+    // in EBM wall flux will be computed afterwards
+    const bool next_to_wall = marker(i,j,k,0) || marker(il,jl,kl,0);
+    if (next_to_wall) return;  
+#endif
+
     int i0[3],i1[3],i2[3],i3[3];
  
     const int idir = Qdir -1;
@@ -390,14 +417,17 @@ class skew_t {
     // loop over sensor variables
     int nv = 0;
     Real sen = Real(0.0);
-    if (wall_flx)
+    if (close_to_wall)
     {          
-      if (marker(i,j,k,0))  // solid cell on the right is solid, use i-2,i-1,i(GP)
+
+      const bool wall_right = marker(i,j,k,0) || marker(i+vdir[0],j+vdir[1],k+vdir[2],0); // wall i(IB) or i+1 (EB)
+
+      if (wall_right)       // solid towards the right use i-2,i-1,i(GP/CUT)
       {
         i1[0] = i - 2*vdir[0]; i1[1] = j - 2*vdir[1];i1[2] = k - 2*vdir[2];
         for (int l=0;l<3;l++) {i2[l]=i1[l]+vdir[l];i3[l]=i2[l]+vdir[l];}
       } 
-      else                  // solid cell on the left is solid, use i-1(GP),i,i+1
+      else                  // solid towards the left, use i-1(GP/CUT),i,i+1
       {
         i1[0] = i - vdir[0]; i1[1] = j - vdir[1];i1[2] = k - vdir[2];
         for (int l=0;l<3;l++) {i2[l]=i1[l]+vdir[l];i3[l]=i2[l]+vdir[l];}
@@ -434,8 +464,8 @@ class skew_t {
     }  
 
     // reduce order close to BC by making sensor  = 1   
-    sen = (i < mask_sen(idir,1)) ? 1.0 : sen;  
-    sen = (i > mask_sen(idir,2)) ? 1.0 : sen;  
+    // sen = (i < mask_sen(idir,1)) ? 1.0 : sen;  
+    // sen = (i > mask_sen(idir,2)) ? 1.0 : sen;  
     
     // spectral radius Jacobian matrix (u + c)  
     //Real rr = std::max(lambda(il, jl, kl, 0), lambda(i, j, k, 0));          
@@ -444,7 +474,7 @@ class skew_t {
     Real eps4 = std::max(0.0, Cdamp*rr - eps2);
 
     // shock capturing and damping 
-    if (wall_flx)
+    if (close_to_wall)
     {
       for (int nvar = 0; nvar < cls_t::NCONS; nvar++) { 
         flx(i, j, k, nvar) -=  eps2*( cons(i,j,k,nvar) -  cons(il,jl,kl,nvar)) ;         
@@ -493,8 +523,8 @@ class skew_t {
     }
 
     // reduce order close to BC by making sensor  = 1   
-    sen = (i < mask_sen(idir,1)) ? 1.0 : sen;  
-    sen = (i > mask_sen(idir,2)) ? 1.0 : sen;  
+    // sen = (i < mask_sen(idir,1)) ? 1.0 : sen;  
+    // sen = (i > mask_sen(idir,2)) ? 1.0 : sen;  
     
     // spectral radius Jacobian matrix (u + c)
     //Real rr = std::max(lambda(il, jl, kl, 0), lambda(i, j, k, 0));    

@@ -1,5 +1,5 @@
 DIM ?= 3
-USE_EB := FALSE
+USE_EB ?= FALSE
 LAZY := TRUE
 BL_NO_FORT = TRUE
 ifeq ($(USE_PELEPHYSICS),TRUE)
@@ -35,6 +35,7 @@ include $(AMR_SOLVER)/src/cls/Make.package
 INCLUDE_LOCATIONS += $(AMR_SOLVER)/src/cls/
 VPATH_LOCATIONS   += $(AMR_SOLVER)/src/cls/
 
+# ---------   IBM  -------------------- 
 ifeq ($(USE_GPIBM),TRUE)
   INCLUDE_LOCATIONS += $(AMR_SOLVER)/lib/install/boost/include
   LIBRARY_LOCATIONS += $(AMR_SOLVER)/lib/install/boost/lib
@@ -48,6 +49,21 @@ ifeq ($(USE_GPIBM),TRUE)
   VPATH_LOCATIONS   += $(AMR_SOLVER)/src/ibm/
   DEFINES           += -DAMREX_USE_GPIBM 
 endif
+
+# ---------   EB  -------------------- 
+ifeq ($(USE_EB), TRUE)
+  DEFINES += -DCNS_USE_EB=1
+else
+  USE_EB := FALSE
+endif
+
+ifeq ($(USE_EB), TRUE)
+  include $(AMREX_HOME)/Src/EB/Make.package
+  INCLUDE_LOCATIONS += $(AMR_SOLVER)/src/ebm
+  VPATH_LOCATIONS   += $(AMR_SOLVER)/src/ebm/
+  include $(AMR_SOLVER)/src/ebm/Make.package
+endif
+
 
 ifeq ($(USE_PELEPHYSICS),TRUE)
   CHEM_HOME = Support/Mechanism/Models/$(CHEMISTRY_MODEL)

@@ -50,6 +50,10 @@ CNS::CNS(Amr &papa, int lev, const Geometry &level_geom, const BoxArray &bl,
   IBM::ib.build_mf(grids, dmap, level);
 #endif
 
+#ifdef CNS_USE_EB
+  EBM::eb.build_mf(grids, dmap, level);
+#endif
+
   buildMetrics();
 
   // prob_rhs.init();
@@ -187,12 +191,13 @@ void CNS::initData() {
 
 void CNS::buildMetrics() {
 
-  // amrex::Print() << " oo CNS::buildMetrics  " << std::endl;
+  //amrex::Print() << " oo CNS::buildMetrics  " << std::endl;
 
   // print mesh sizes
   const Real *dx = geom.CellSize();
   amrex::Print() << "Mesh size (dx,dy,dz) = ";
   amrex::Print() << AMREX_D_TERM(dx[0], << "  " << dx[1], << "  " << dx[2]) << "  \n";
+
 }
 
 void CNS::post_init(Real stop_time) {
@@ -501,7 +506,7 @@ void CNS::postCoarseTimeStep(Real time) {
 // Called for each level from 0,1...nlevs-1
 void CNS::post_regrid(int lbase, int new_finest) {
 
-  // amrex::Print() << " oo CNS::post_regrid " << std::endl;
+  //amrex::Print() << " oo CNS::post_regrid " << std::endl;
   
 
 #ifdef AMREX_USE_GPIBM
@@ -510,6 +515,29 @@ void CNS::post_regrid(int lbase, int new_finest) {
   IBM::ib.computeMarkers(level);
   IBM::ib.initialiseGPs(level);
 #endif
+
+#ifdef CNS_USE_EB
+  EBM::eb.destroy_mf(level);
+  EBM::eb.build_mf(grids, dmap, level);
+
+  // update volfrac and EB data
+  const auto& ebfactory = dynamic_cast<EBFArrayBoxFactory const&>(Factory());
+
+  EBM::eb.volmf_a[level]  = &(ebfactory.getVolFrac()); 
+  EBM::eb.normmcf_a[level] = &(ebfactory.getBndryNormal());
+  EBM::eb.areamcf_a[level] = ebfactory.getAreaFrac();  
+  EBM::eb.ebflags_a[level] = &(ebfactory.getMultiEBCellFlagFab());
+  EBM::eb.bcareamcf_a[level] = &(ebfactory.getBndryArea());
+    
+  
+  // EBM::eb.bndrycent = &(ebfactory.getBndryCent());
+  // EBM::eb.facecent  = ebfactory.getFaceCent();
+
+  
+  EBM::eb.computeMarkers(level);
+
+#endif
+
 }
 
 void CNS::errorEst(TagBoxArray &tags, int /*clearval*/, int /*tagval*/,
@@ -565,12 +593,18 @@ void CNS::errorEst(TagBoxArray &tags, int /*clearval*/, int /*tagval*/,
 }
 
 void CNS::post_restart() {
+
+// recreate markers
+
 #ifdef AMREX_USE_GPIBM
   IBM::ib.destroy_mf(level);
   IBM::ib.build_mf(grids, dmap, level);
   IBM::ib.computeMarkers(level);
   IBM::ib.initialiseGPs(level);
 #endif
+
+
+
 }
 
 // 
@@ -664,6 +698,11 @@ void CNS::writePlotFile(const std::string &dir, std::ostream &os,
 #ifdef AMREX_USE_GPIBM
   n_data_items += 2;
 #endif
+#ifdef CNS_USE_EB
+  n_data_items += 1;
+#endif
+
+
   //------------------------------------------------------------------------------
 
   // get the time from the first State_Type
@@ -703,6 +742,10 @@ void CNS::writePlotFile(const std::string &dir, std::ostream &os,
     os << "sld\n";
     os << "ghs\n";
 #endif
+#ifdef CNS_USE_EB
+    os << "vfrac\n";
+#endif
+
     //------------------------------------------------------------------------------
 
     os << AMREX_SPACEDIM << '\n';
@@ -774,19 +817,6 @@ void CNS::writePlotFile(const std::string &dir, std::ostream &os,
       PathNameInHeader += BaseName;
       os << PathNameInHeader << '\n';
     }
-
-    //----------------------------------------------------------------------modified
-    // #ifdef AMREX_USE_EB
-    // if (EB2::TopIndexSpaceIfPresent()) {
-    //     volfrac threshold for amrvis
-    //     if (level == parent->finestLevel()) {
-    //         for (int lev = 0; lev <= parent->finestLevel(); ++lev) {
-    //             os << "1.0e-6\n";
-    //         }
-    //     }
-    // }
-    // #endif
-    //------------------------------------------------------------------------------
   }
   //
   // We combine all of the multifabs -- state, derived, etc -- into one
@@ -811,14 +841,26 @@ void CNS::writePlotFile(const std::string &dir, std::ostream &os,
     for (auto const &dname : derive_names) {
       derive(dname, cur_time, plotMF, cnt);
       cnt += derive_lst.get(dname)->numDerive();
-    }
+    }  //exit(1);
   }
 
-//----------------------------------------------------------------------modified
+  //------------------------------------------------------------------------------
+  // additional plotting ...
+  //------------------------------------------------------------------------------
+  
 #ifdef AMREX_USE_GPIBM
   plotMF.setVal(0.0_rt, cnt, 2, nGrow);
   IBM::ib.bmf_a[level]->copytoRealMF(plotMF, 0, cnt);
 #endif
+
+#ifdef CNS_USE_EB
+  //printf(" cnt= %d level=%d n_data_items=%d   \n",cnt,level,n_data_items);
+  plotMF.setVal(0.0_rt, cnt, 0, nGrow); 
+  EBM::eb.bmf_a[level]->copytoRealMF(plotMF, 0, cnt);
+
+ // EBM::eb.copytoRealMF(plotMF, 0, cnt);   // CHECK NEED TO PASS LEVEL
+#endif
+
   //------------------------------------------------------------------------------
 
   //
