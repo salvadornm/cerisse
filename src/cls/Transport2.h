@@ -1,5 +1,5 @@
-#ifndef Transport2_H_
-#define Transport2_H_
+#ifndef TRANSPORT2_H_
+#define TRANSPORT2_H_
 
 ////////////////////////////////TRANSPORT/////////////////////////////////
 template <typename param>
@@ -49,4 +49,4 @@ class transport_suth_t {
 
 ////////////////////////////////////////////////////////////////////////////////
 
-#endif
+#endif // TRANSPORT2_H_

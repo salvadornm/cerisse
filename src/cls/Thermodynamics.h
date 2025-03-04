@@ -436,18 +436,16 @@ class multispecies_pele_gas_t {
   AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE GpuArray<Real, idx_t::NWAVES>
   cons2eigenvals(const int i, const int j, const int k,
                  const Array4<Real>& cons, const GpuArray<int, 3>& vdir) const {
-    auto eos = pele::physics::PhysicsType::eos();
+   // auto eos = pele::physics::PhysicsType::eos();
 
     // 1. Compute density
     Real rho = 0.0;
     for (int n = 0; n < NUM_SPECIES; ++n) {
       rho += cons(i, j, k, idx_t::UFS + n);
     }
-    // CGS-> SI
-    Real rho_cgs = rho * rho_si2cgs;
 
     // 2. Compute sound speed
-    // Get composition (Y), energy (e_cgs), temperature (T), pressure (p_cgs), gamma (G)
+    // Get composition (Y), energy (ei), temperature (T), pressure (p), gamma (G)
     Real rhoinv = Real(1.0) / rho;
     Real Y[NUM_SPECIES];
     for (int n = 0; n < NUM_SPECIES; ++n) {

@@ -35,7 +35,10 @@ public:
 #if (AMREX_USE_GPIBM || CNS_USE_EB )  
   void eflux_ibm(Args&&... args){}
 #else  
-  void eflux(Args&&... args){}
+  //void eflux(Args&&... args){}
+  void eflux(const Geometry& geom, const MFIter& mfi,
+    const Array4<Real>& prims, std::array<FArrayBox*, AMREX_SPACEDIM> const &flxt,            
+    const Array4<Real>& rhs, Args&&... args) { }
 #endif  
 };
 

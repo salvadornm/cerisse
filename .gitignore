@@ -15,6 +15,9 @@
 **/results
 **/*.visit
 build/
+# probe data
+**/probe.csv
+
 # mac files
 .DS_Store
 

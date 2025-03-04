@@ -1,5 +1,5 @@
-#ifndef TransportPele_H_
-#define TransportPele_H_
+#ifndef TRANSPORTPELE_H_
+#define TRANSPORTPELE_H_
 
 #ifdef USE_PELEPHYSICS
 #include <PelePhysics.H>
@@ -26,15 +26,15 @@ class transport_Pele_t {
 
   // These are dummy calls, Cerisse not expected to call these functions directly using PelePhsyics
   AMREX_GPU_DEVICE AMREX_FORCE_INLINE Real visc(const Real& T) const {
-    return -99;
+    return (T);
   }
 
   AMREX_GPU_DEVICE AMREX_FORCE_INLINE Real cond(Real& T) const {
-    return -99;
+    return (T);
   }
 
   AMREX_GPU_DEVICE AMREX_FORCE_INLINE Real xi(Real& T) const {
-    return -99;
+    return (T);
   }
 
 #ifdef USE_PELEPHYSICS
@@ -48,4 +48,4 @@ class transport_Pele_t {
 
 ////////////////////////////////////////////////////////////////////////////////
 
-#endif
+#endif  // TRANSPORTPELE_H_

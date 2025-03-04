@@ -228,7 +228,6 @@ class weno_t {
     using amrex::Array4, amrex::Box, amrex::Dim3, amrex::IntVect, amrex::Real;
 
     const Box& bx = mfi.tilebox();
-    const auto dxinv = geom.InvCellSizeArray();
 
     // clear rhs
     ParallelFor(bx, cls_t::NCONS,
@@ -298,14 +297,6 @@ class weno_t {
           flx(iv, n) = alpha * (fpL[n] - fmR[n]);
         }
       });
-
-      // add flux derivative to rhs
-      // ParallelFor(bx, cls_t::NCONS,
-      //             [=] AMREX_GPU_DEVICE(int i, int j, int k, int n) noexcept {
-      //               IntVect iv(AMREX_D_DECL(i, j, k));
-      //               IntVect ivp = iv + IntVect::TheDimensionVector(dir);
-      //               rhs(i, j, k, n) += dxinv[dir] * (flx(iv, n) - flx(ivp, n));
-      //             });
     }  // end of for each direction
   }
 
