@@ -1,4 +1,5 @@
 #include "nscbc.H"
+#include <assert.h>
 
 #include "CNS.H"
 

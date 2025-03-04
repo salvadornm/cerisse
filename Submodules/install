@@ -1,4 +1,4 @@
-AMREXVERSION=23.11
+AMREXVERSION=25.03
 PELEPVERSION=23.03
 case  $1 in
 	git )
@@ -8,10 +8,10 @@ case  $1 in
 	safe )
         rm -rf amrex
 	echo " installing AMREX release version .." $AMREXVERSION
-	wget https://github.com/AMReX-Codes/amrex/archive/refs/tags/23.11.zip
-	unzip 23.11.zip
-        mv amrex-23.11 amrex
-	rm 23.11.zip
+	wget https://github.com/AMReX-Codes/amrex/archive/refs/tags/$AMREXVERSION.zip
+	unzip $AMREXVERSION.zip
+        mv amrex-$AMREXVERSION amrex
+	rm $AMREXVERSION.zip
         rm -rf PelePhysics
         echo " installing PelePhysics release version .." $PELEPVERSION
         wget https://github.com/AMReX-Combustion/PelePhysics/archive/refs/tags/v$PELEPVERSION.zip

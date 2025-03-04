@@ -1,0 +1,88 @@
+max_step = 1
+stop_time = 0.2
+
+geometry.is_periodic = 0 0 0
+geometry.coord_sys   = 0  # 0 => cart, 1 => RZ  2=>spherical
+geometry.prob_lo     = 0    0     0
+geometry.prob_hi     = 4.4   4.4    10
+amr.n_cell           = 44    44     100
+
+
+# >>>>>>>>>>>>> BC FLAGS <<<<<<<<<<<<<<<<
+# 0 = Interior            3 = Symmetry
+# 1 = Inflow              4 = SlipWall
+# 2 = Outflow (FOExtrap)  5 = NoSlipWall
+# >>>>>>>>>>>>> BC FLAGS <<<<<<<<<<<<<<<<
+cns.lo_bc       =  5 5 1 
+cns.hi_bc       =  5 5 2 
+
+cns.do_visc  = 1
+
+cns.do_react = 0
+cns.chem_integrator = Reactor_Null
+
+# ==================== WHAT NUMERICS =================== #
+cns.cfl = 0.05
+cns.dt_cutoff = 5.e-20
+cns.recon_scheme = 6   # 1: Godunov,  2: MUSCL,   3: WENO-Z3, 
+                       # 4: WENO-JS5, 5: WENO-Z5, 6: TENO-5
+cns.clip_temp    = 0   # clip minimum temperature [K]
+# cns.eb_weights_type = 3
+
+cns.v = 2
+amr.v = 1
+
+# LOAD BALANCE
+amr.loadbalance_with_workestimates = 1
+#amr.loadbalance_level0_int = 100
+
+# REFINEMENT / REGRIDDING
+amr.max_level       = 1       # maximum level number allowed
+amr.ref_ratio       = 2 2 2 2 # refinement ratio
+amr.regrid_int      = 10      # how often to regrid
+amr.blocking_factor = 1
+amr.max_grid_size   = 32
+amr.n_error_buf     = 0       # number of buffer cells in error est
+amr.grid_eff        = 0.8
+
+#cns.refine_magvort = 3e5
+#cns.refine_magvort_max_lev = 3
+
+# CHECKPOINT FILES
+amr.checkpoint_files_output = 1
+amr.check_file      = test_bb5/chk #root name of checkpoint file
+amr.check_int       = 100        # number of timesteps between checkpoints
+
+# PLOTFILES
+amr.plot_files_output = 1
+amr.plot_file         = test_bb5/plt   # root name of plotfile
+amr.plot_int          = 10       # number of timesteps between plotfiles
+amr.derive_plot_vars  = temp pressure x_velocity y_velocity z_velocity MachNumber divrho divu magvort
+cns.plot_massfrac = 1
+
+#this is for the JBB combustor
+eb2.geom_type = test_bb
+#cns.eb_no_slip = 1
+#cns.eb_isothermal = 0
+
+#Far wall location in x
+combustor.far_wall_loc = 3
+
+#Ramp construct
+# Plane 1: horizontal
+# Plane 2: slope
+# plane 3: vertical
+combustor.ramp_plane1_point = 1.25 3.75
+combustor.ramp_plane2_point = 1.25 3.75
+combustor.ramp_plane2_normal = 3.45 -0.95
+combustor.ramp_plane3_point = 0.5 0.
+
+#pipe construct
+combustor.pipe_lo = 0.3 -5.0
+combustor.pipe_hi = 0.5 2.5
+
+prob.inflow_mach = 0.8
+
+#amr.restart = chk00100
+#amr.plotfile_on_restart = 1
+#cns.do_restart_fields = 1
