@@ -43,15 +43,15 @@ Aromatic_KrNara LuDME               decane_3sp          heptane_lu_88sk
 BurkeDryer      LuEthylene          dodecane_lu         heptane_lu_qss
 C1-C2-NO        LuEthylene_qss      dodecane_lu_qss     isooctane_lu
 C1-C2-NO_qss    Make.package        dodecane_wang       list_mech
-CH4_lean        NUIGalway	    dodmethair_4sp      list_qss_mech
-CH4_lean_qss    Null		    drm19		methaneIons_diRenzo
-Davis           PPHYS_CONSTANTS.H.  ethylene_af		ndodecane_35
-FFCM1_Red       SootReaction	    grimech12		nitrogens
-HP_DME          air		    grimech30		propane_fc
-IonizedAir      alzeta		    grimech30-noArN	sCO2
-JL4	        chem-CH4-2step	    header
-Kolla           chem-H		    heptane_3sp
-LiDryer         converter.sh	    heptane_fc
+CH4_lean        NUIGalway           dodmethair_4sp      list_qss_mech
+CH4_lean_qss    Null                drm19               methaneIons_diRenzo
+Davis           PPHYS_CONSTANTS.H.  ethylene_af         ndodecane_35
+FFCM1_Red       SootReaction        grimech12           nitrogens
+HP_DME          air                 grimech30           propane_fc
+IonizedAir      alzeta              grimech30-noArN     sCO2
+JL4             chem-CH4-2step      header
+Kolla           chem-H              heptane_3sp
+LiDryer         converter.sh        heptane_fc
 ```
 
 All of them are in _yaml_ fromat used in [Cantera](https://cantera.org). The list of chemical mechanisms directlly available can be obtained direclty by  `$cat PelePhysics/Support/Mechanism/Models/list_mech` with a few more that use QSSA (see `list_qss_mech` file). Opening the `mechanism.yaml` file within a directory, will give an indication of the species involved and chemical reactions
@@ -120,3 +120,12 @@ Using PelePhysics there are three EOS models:
 * A simple GammaLaw model for a single component perfect gas. This can also be used directly without PelePhysics (see PROB)
 * An multi-component ideal gas labelled **Fuego** Used for multi-component (reacting or not) calculations.
 * The Soave-Redlich-Kwong cubic equation of state for a general mixture of species
+
+
+## Chemistry Set-up and Options
+
+### Input
+
+Reactor type
+
+Options

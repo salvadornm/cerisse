@@ -33,11 +33,11 @@ nav:
       - thermo: thermosolver.md
       - advance: code/advance.md
       - ebm: code/ebm.md
+      - diffusion: code/viscous.md
 extra_javascript:
   - https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.4/MathJax.js?config=TeX-AMS-MML_HTMLorMML
 markdown_extensions:
   - mdx_math
-  - callouts
   - footnotes
   - pymdownx.magiclink
   - pymdownx.snippets:

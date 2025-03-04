@@ -183,3 +183,21 @@ where a perfect gas with gamma = 1.4 is used. The simulation runs until time equ
 
 <figure><img src=".gitbook/assets/stepfig2.png" alt=""><figcaption><p>Three different methods with a mesh 480 x 160. Skew 4th order, Rusanov first order and the HLLC Riemann Solver with 2n order reconstruction</p></figcaption></figure>
 
+## Planar Flame
+
+The set-up (located in `exm/planar_flame`)
+It corresponds to a  freely propagating two-dimensional hydrogen/aire premixed lames at 0.5 equivalence ratio.
+
+The parameters are (1 atm at 298 K, Case I):
+
+| parameter | value           |
+| --------- | --------------- |
+| p0        | 101300 Pa       |
+| Tu        | 298 K           |
+| u         | 0.686 m/s       |
+| lf        | 0.423 mm        |
+
+The domain is approximately 200 x 200 flame thickness (85 x 85 mm). 
+At this conditions thelaminar burning velocity is 0.49 m/s.
+With N=256, mesh size is lf = 1.27 x dx 
+

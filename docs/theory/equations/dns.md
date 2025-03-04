@@ -56,7 +56,12 @@ $$
 q_j = -\lambda \frac{\partial T }{\partial x_j}
 $$
 
-where $$\lambda$$ is the conductivity. The **diffusion flux** follows Fickian transport, which based in mole fraction is:
+where $$\lambda$$ is the conductivity. 
+
+
+In the **diffusion flux**  is common to 
+use the Hirschfelder-Curtiss approximation that simplifies the Maxwell-Stefan equation by introducing an effective diffusion coefficient of specie-k in a mixture of gases. 
+The molar flux is (neglecting pressure and temperature gradients)
 
 $$
 \overline{J}_j^k = - D_k \frac{\partial X_k }{\partial x_j}
@@ -69,7 +74,15 @@ J_j^k = \rho \frac{M_k}{M} \overline{J}_j^k =
 - \rho \frac{M_k}{M} D_k \frac{\partial X_k }{\partial x_j}
 $$
 
-The diffusion coefficients on the mixture are defined as
+If the mean molecular weight does not vary greatly in space, this simplifies to
+*Ficks law* :
+
+$$
+J_j^k = - \rho D_k \frac{\partial Y_k }{\partial x_j}
+$$
+
+
+The diffusion coefficient of specie-k in the mixture is
 
 $$
 D_k = \frac{1 - Y_k}{\sum_j X_j/\mathcal{D}_{jk}}
