@@ -67,3 +67,49 @@ Results with some numerical schemes are below
 
 <figure><img src=".gitbook/assets/num_shu_skew2.png" alt=""><figcaption><p>Skew-symmetric 4th order scheme with shock capturing and damping (constants C2=0.1 and C4=0.016) with <strong>512</strong> cells</p></figcaption></figure>
 
+## Constant Volume reactor
+
+This problem represents a homogeneous zero-dimensional reactor and serves as a benchmark for comparison with Cantera. It simulates a hydrogen/air mixture at an equivalence ratio of 0.5, with an initial temperature of 1000 K and atmospheric pressure.
+
+Since the volume remains constant, the density does as well. As the temperature increases, the pressure rises accordingly.
+
+The results are compared with Cantera using the class cantera.Reactor. The Cantera results are generated using `tools/combustion/autoignition.py`.
+
+To compile, run:
+`make TPL`
+followed by
+`make`
+
+
+The GNUMakefile options are
+
+```
+# PelePhysics
+EOS_MODEL := FUEGO
+TRANSPORT_MODEL := SIMPLE
+CHEMISTRY_MODEL := LiDryer
+USE_PELEPHYSICS = TRUE
+```
+and the [Li and Dryer](https://doi.org/10.1002/kin.20026) hydrogen mechanism is used. Additional options  the input file are
+
+```
+cns.reactor_type = "ReactorCvode"
+cvode.solve_type =  "fixed_point" #denseAJ_direct not available on GPU
+ode.clean_init_massfrac = 1
+```
+
+which indicates that CVODE is used
+
+```bash
+$ ./main1d.gnu.MPI.ex inputs
+```
+
+Results can be seen using 
+
+```bash
+$ python plot.py
+```
+
+which generates the image
+
+ 

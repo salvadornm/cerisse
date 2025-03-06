@@ -167,6 +167,25 @@ The Temperature distribution at x=0, using `$ python ./plot.py`
 
 <figure><img src=".gitbook/assets/exm_diff_T.png" alt=""><figcaption><p>Temperature evolution after t=0.02</p></figcaption></figure>
 
+
+## Periodic channel laminar flow
+
+The test is located in  `exm/viscwall` and is used to validate the implementation of the 
+viscous terms and follows (approximately) HAMISH validation(https://www.ukctrf.com/index.php/benchmarking-of-the-new-software/)
+A pressure drop is imposed given a volumetric flow rate and Reynolds number
+
+$$
+\frac{\partial p}{\partial x} = 12 \frac{Q^2}{L^3 \mbox{Re}}
+$$
+
+The implementation is
+
+```cpp
+typedef rhs_dt<no_euler_t, viscous_t<methodparm_t, ProbClosures>, user_source_t<ProbClosures> > ProbRHS;
+```
+
+The results are compared to the analytical solution for a bulk Reynolds number of 50, a volumetric flow rate of 1 cubic meter per second, and a channel width of 1. This example also demonstrates the use of non-dimensional units by relating viscosity to the Reynolds number
+
 ## Supersonic flow Forward Step
 
 This example examines the behaviour of EBM in simple canonical case (located in `exm/forward_step`) The test consists of a supersonic flow in a channel at Mach 3 , with facing a step of height 0.2 h, where h is the channel height. The flow configuration is the same used by [Woodward and Collela (1984)](https://www.sciencedirect.com/science/article/abs/pii/0021999184901426) and the main parameters are summarised below (using non-dimensional units)

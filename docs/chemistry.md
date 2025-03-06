@@ -113,19 +113,47 @@ See details of yaml format in [YAML](https://cantera.org/tutorials/yaml/defining
 
 For all the available mechanisms, a Cantera yaml format is provided. If CHEMKIN files are present Pelephysics rely on Cantera’s _**ck2yaml**_ utility to convert CHEMKIN files to the Cantera yaml format. They are converter scripts to faciliatte this process. Check [PelePhysics Tutorial](https://pelephysics.readthedocs.io/en/latest/EOS.html)
 
-## Equation of State
+## Equations of State
 
-Using PelePhysics there are three EOS models:
+Using PelePhysics there are three Equations of State (EOS) models:
 
 * A simple GammaLaw model for a single component perfect gas. This can also be used directly without PelePhysics (see PROB)
 * An multi-component ideal gas labelled **Fuego** Used for multi-component (reacting or not) calculations.
 * The Soave-Redlich-Kwong cubic equation of state for a general mixture of species
 
+## Chemistry Integration
 
-## Chemistry Set-up and Options
+PelePhysics has different options to integrate the chemistrym using implicit ODE solvers:
+CVODE an DVODE. 
+CVODE is part of a software family called sundials for 
+SUite of Nonlinear and DIfferential / ALgebraic equation Solver 
+[SUNDIALS](https://dl.acm.org/doi/10.1145/1089014.1089020).
+ which should be installed (see Quickinstall)
+The methods implemented in CVODE are variable-order, variable-step multistep methods, based on formulas broadly following
 
-### Input
+$$
+\alpha_n y_k + \beta_n h_n \dot{y}_k = 0 
+$$
 
-Reactor type
+And need a linear solver, PelePhysics has difefrent options, see [PelePhsyics doc](https://amrex-combustion.github.io/PelePhysics/IntroductionToCvode.html)
 
-Options
+to activate CVODE, in the GNUMakefile
+
+```
+USE_SUNDIALS_PP = TRUE
+```
+
+### input options
+ 
+The input file consists of specific blocks containing keywords that apply to different aspects of the problem's integration. Each block is associated with a suffix that helps determine which keywords are required, depending on the options set in the `GNUmakefile`. For example, if CVODE is enabled via the `GNUmakefile`, keywords starting with `cvode.*` are relevant. The general `ode.*` keywords are shared across all ODE integrators and are also applicable to CVODE.  
+
+### Key Parameters and Options  
+
+| Keyword                | Description |
+|------------------------|-------------|
+| `ode.reactor_type`     | Switches between a **CV reactor** and a **CVH reactor**. |
+| `cvode.solve_type`     | Controls the CVODE linear integration method:<br> **1** = Dense direct linear solver<br> **5** = Sparse direct linear solver (requires KLU library)<br> **99** = Krylov iterative solver |
+| `ode.analytical_jacobian` | Determines the Jacobian solver method, with different behaviors based on `cvode.solve_type`: <ul><li>**If `cvode.solve_type = 1`** → Setting `ode.analytical_jacobian = 1` enables the **Analytical Jacobian**.</li><li>**If `cvode.solve_type = 99`** → Setting `ode.analytical_jacobian = 1` activates the **preconditioned GMRES solver**, while setting `ode.analytical_jacobian = 0` enables the **non-preconditioned GMRES solver**.</li><li>**If `cvode.solve_type = 99`** and the **KLU library is linked**, then the preconditioned solver operates in a **sparse format**.</li><li>**If `cvode.solve_type = 5`**, the only valid option is `ode.analytical_jacobian = 1`.</li></ul> |
+
+This structure allows users to configure the solver behavior efficiently based on their requirements.  
+
