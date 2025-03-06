@@ -86,6 +86,6 @@ $$
 
 ### References
 
-\[1] Omer Rathore, "Numerical Simulation of Combustion Instability" _PhD Thesis_, Imperial College London (2022)&#x20;
-
-\[2] Yuri Almeida "Large Eddy Simulation of Supersonic Combustion using a Probability Density Function method" _PhD Thesis_, Imperial College London (2019)
+1. Omer Rathore, "Numerical Simulation of Combustion Instability" _PhD Thesis_, Imperial College London (2022)&#x20;
+2. Yuri Almeida "Large Eddy Simulation of Supersonic Combustion using a Probability Density Function method" _PhD Thesis_, Imperial College London (2019)
+3. Tin-Hang Un and Salvador Navarro-Martinez, “Stochastic fields with adaptive mesh refinement for high-speed turbulent combustion”, [_Comb. Flame_, 272, 113897 (2025)](https://doi.org/10.1016/j.combustflame.2024.113897)

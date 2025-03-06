@@ -5,7 +5,7 @@ cover: >-
 coverY: 0
 ---
 
-# Equations
+# DNS
 
 ### Continuity
 
@@ -43,11 +43,10 @@ where $$E_t = \rho e + \rho k$$ is the total energy plus kinetic energy.
 
 ### Transport fluxes
 
-The main closures assume Newtonian flows, Fourier heat transfer and Fickian diffusion and also (optionally) Soret diffusion.
-The **shear stress** is given by
+The main closures assume Newtonian flows, Fourier heat transfer and Fickian diffusion and also (optionally) Soret diffusion. The **shear stress** is given by
 
 $$
-\tau_{ij} = 2 \mu S_{ij} + (\mu_b - \frac{2}{3} \mu)\nabla \cdot \vec{v} \delta_{ij}
+\tau_{ij} = 2 \mu S_{ij} + (\mu_b - \frac{2}{3} \mu)\nabla \cdot \vec{v} \; \delta_{ij}
 $$
 
 where $$\mu$$ and $$\mu_b$$ are the dynamic viscosity (or coefficient of shear viscoisty) and coefficient of bulk viscosity respectively. The **heat flux** follows Fourier's law
@@ -56,12 +55,9 @@ $$
 q_j = -\lambda \frac{\partial T }{\partial x_j}
 $$
 
-where $$\lambda$$ is the conductivity. 
+where $$\lambda$$ is the conductivity.
 
-
-In the **diffusion flux**  is common to 
-use the Hirschfelder-Curtiss approximation that simplifies the Maxwell-Stefan equation by introducing an effective diffusion coefficient of specie-k in a mixture of gases. 
-The molar flux is (neglecting pressure and temperature gradients)
+In the **diffusion flux** is common to use the Hirschfelder-Curtiss approximation that simplifies the Maxwell-Stefan equation by introducing an effective diffusion coefficient of specie-k in a mixture of gases. The molar flux is (neglecting pressure and temperature gradients)
 
 $$
 \overline{J}_j^k = - D_k \frac{\partial X_k }{\partial x_j}
@@ -74,13 +70,11 @@ J_j^k = \rho \frac{M_k}{M} \overline{J}_j^k =
 - \rho \frac{M_k}{M} D_k \frac{\partial X_k }{\partial x_j}
 $$
 
-If the mean molecular weight does not vary greatly in space, this simplifies to
-*Ficks law* :
+If the mean molecular weight does not vary greatly in space, this simplifies to _Ficks law_ :
 
 $$
 J_j^k = - \rho D_k \frac{\partial Y_k }{\partial x_j}
 $$
-
 
 The diffusion coefficient of specie-k in the mixture is
 
@@ -99,6 +93,7 @@ p = f(\rho,T,Y_k) \; \mbox{ and } \; e_i = f(\rho,T,Y_k)
 $$
 
 ### Ideal gas
+
 For a mixture of ideal gases
 
 $$
@@ -111,5 +106,4 @@ $$
 h = h_k^0 Y_k + \int_{T^0}^T C_p dT
 $$
 
-and the specific  internal energy can be directly obtained by $$e = h - p/\rho$$.
-The current implementations include perfect gas, ideal gas and Soave-Redlich-Kwong (through PelePhysics), including mixtures.
+and the specific internal energy can be directly obtained by $$e = h - p/\rho$$. The current implementations include perfect gas, ideal gas and Soave-Redlich-Kwong (through PelePhysics), including mixtures.

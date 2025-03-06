@@ -7,7 +7,7 @@ cover: >-
 coverY: 0
 ---
 
-# one dimension
+# 1-D
 
 ## Sod's Shock Tube
 
@@ -29,9 +29,9 @@ $ python plot.py
 
 Results with some numerical schemes are below, all results with 96 cells:
 
-<figure><img src=".gitbook/assets/num_rie_skew_damp.png" alt=""><figcaption><p>Skew-symmetric 4th order scheme with shock capturing and damping (constants <strong>C2=0.1</strong> and <strong>C4=0.016</strong>) </p></figcaption></figure>
+<figure><img src=".gitbook/assets/num_rie_skew_damp.png" alt=""><figcaption><p>Skew-symmetric 4th order scheme with shock capturing and damping (constants <strong>C2=0.1</strong> and <strong>C4=0.016</strong>)</p></figcaption></figure>
 
-<figure><img src=".gitbook/assets/num_rie_skew_damp2.png" alt=""><figcaption><p>Skew-symmetric 4th order scheme with shock capturing and damping (constants <strong>C2=0.5</strong> and <strong>C4=0.016</strong>) </p></figcaption></figure>
+<figure><img src=".gitbook/assets/num_rie_skew_damp2.png" alt=""><figcaption><p>Skew-symmetric 4th order scheme with shock capturing and damping (constants <strong>C2=0.5</strong> and <strong>C4=0.016</strong>)</p></figcaption></figure>
 
 <figure><img src=".gitbook/assets/num_rie_muscl.png" alt=""><figcaption><p>Riemann solver with a 2nd order MUSCL-type reconstruction</p></figcaption></figure>
 
@@ -75,11 +75,7 @@ Since the volume remains constant, the density does as well. As the temperature 
 
 The results are compared with Cantera using the class cantera.Reactor. The Cantera results are generated using `tools/combustion/autoignition.py`.
 
-To compile, run:
-`make TPL`
-followed by
-`make`
-
+To compile, run: `make TPL` followed by `make`
 
 The GNUMakefile options are
 
@@ -90,21 +86,22 @@ TRANSPORT_MODEL := SIMPLE
 CHEMISTRY_MODEL := LiDryer
 USE_PELEPHYSICS = TRUE
 ```
-and the [Li and Dryer](https://doi.org/10.1002/kin.20026) hydrogen mechanism is used. Additional options  the input file are
+
+and the [Li and Dryer](https://doi.org/10.1002/kin.20026) hydrogen mechanism is used. Additional options the input file are
 
 ```
 cns.reactor_type = "ReactorCvode"
-cvode.solve_type =  "fixed_point" #denseAJ_direct not available on GPU
+cvode.solve_type =  "fixed_point"
 ode.clean_init_massfrac = 1
 ```
 
-which indicates that CVODE is used
+which indicates that CVODE (see  [Chemistry Set-up](chemistry.md#chemistry-integration) for details) is used
 
 ```bash
 $ ./main1d.gnu.MPI.ex inputs
 ```
 
-Results can be seen using 
+Results can be seen using
 
 ```bash
 $ python plot.py
@@ -112,4 +109,5 @@ $ python plot.py
 
 which generates the image
 
- 
+<figure><img src=".gitbook/assets/autoignition.png" alt=""><figcaption><p>Autoignition of a hydrogen/air mixture using the Li and Dryer mechanism. Cerisse uses a  constant time step of <strong>dt=1e-7</strong></p></figcaption></figure>
+

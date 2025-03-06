@@ -7,7 +7,7 @@ coverY: 0
 
 # Chemistry
 
-Complex chemistry in the code is handled through the [PelePhysics](https://pelephysics.readthedocs.io/en/latest/index.html) library. To install PelePhysics, type`$ ./install.sh pelephys` in the `lib` directory. It may be alrady installed, if the code was installed using _safe_ (check  [QuickStart](quickstart.md))
+Complex chemistry in the code is handled through the [PelePhysics](https://pelephysics.readthedocs.io/en/latest/index.html) library. To install PelePhysics, type`$ ./install.sh pelephys` in the `lib` directory. It may be alrady installed, if the code was installed using _safe_ (check [QuickStart](quickstart.md))
 
 ## set-up
 
@@ -54,7 +54,7 @@ Kolla           chem-H              heptane_3sp
 LiDryer         converter.sh        heptane_fc
 ```
 
-All of them are in _yaml_ fromat used in [Cantera](https://cantera.org). The list of chemical mechanisms directlly available can be obtained direclty by  `$cat PelePhysics/Support/Mechanism/Models/list_mech` with a few more that use QSSA (see `list_qss_mech` file). Opening the `mechanism.yaml` file within a directory, will give an indication of the species involved and chemical reactions
+All of them are in _yaml_ fromat used in [Cantera](https://cantera.org). The list of chemical mechanisms directlly available can be obtained direclty by `$cat PelePhysics/Support/Mechanism/Models/list_mech` with a few more that use QSSA (see `list_qss_mech` file). Opening the `mechanism.yaml` file within a directory, will give an indication of the species involved and chemical reactions
 
 For example, in the Jones and Lindstedt mechanism (a 4-step process for hydrocarbon combustion), seven species are used. The label **phases** indicates which chemical components will be included.
 
@@ -123,16 +123,10 @@ Using PelePhysics there are three Equations of State (EOS) models:
 
 ## Chemistry Integration
 
-PelePhysics has different options to integrate the chemistrym using implicit ODE solvers:
-CVODE an DVODE. 
-CVODE is part of a software family called sundials for 
-SUite of Nonlinear and DIfferential / ALgebraic equation Solver 
-[SUNDIALS](https://dl.acm.org/doi/10.1145/1089014.1089020).
- which should be installed (see Quickinstall)
-The methods implemented in CVODE are variable-order, variable-step multistep methods, based on formulas broadly following
+PelePhysics has different options to integrate the chemistrym using implicit ODE solvers: CVODE an DVODE. CVODE is part of a software family called sundials for SUite of Nonlinear and DIfferential / ALgebraic equation Solver [SUNDIALS](https://dl.acm.org/doi/10.1145/1089014.1089020). which should be installed (see [install SUNDIALS](quickstart.md#installation-sundials)) The methods implemented in CVODE are _variable-order_, _variable-step_ multistep methods, based on formulas broadly following
 
 $$
-\alpha_n y_k + \beta_n h_n \dot{y}_k = 0 
+\alpha_n y_k + \beta_n h_n \dot{y}_k = 0
 $$
 
 And need a linear solver, PelePhysics has difefrent options, see [PelePhsyics doc](https://amrex-combustion.github.io/PelePhysics/IntroductionToCvode.html)
@@ -144,16 +138,15 @@ USE_SUNDIALS_PP = TRUE
 ```
 
 ### input options
- 
-The input file consists of specific blocks containing keywords that apply to different aspects of the problem's integration. Each block is associated with a suffix that helps determine which keywords are required, depending on the options set in the `GNUmakefile`. For example, if CVODE is enabled via the `GNUmakefile`, keywords starting with `cvode.*` are relevant. The general `ode.*` keywords are shared across all ODE integrators and are also applicable to CVODE.  
 
-### Key Parameters and Options  
+The input file consists of specific blocks containing keywords that apply to different aspects of the problem's integration. Each block is associated with a suffix that helps determine which keywords are required, depending on the options set in the `GNUmakefile`. For example, if CVODE is enabled via the `GNUmakefile`, keywords starting with `cvode.*` are relevant. The general `ode.*` keywords are shared across all ODE integrators and are also applicable to CVODE.
 
-| Keyword                | Description |
-|------------------------|-------------|
-| `ode.reactor_type`     | Switches between a **CV reactor** and a **CVH reactor**. |
-| `cvode.solve_type`     | Controls the CVODE linear integration method:<br> **1** = Dense direct linear solver<br> **5** = Sparse direct linear solver (requires KLU library)<br> **99** = Krylov iterative solver |
-| `ode.analytical_jacobian` | Determines the Jacobian solver method, with different behaviors based on `cvode.solve_type`: <ul><li>**If `cvode.solve_type = 1`** → Setting `ode.analytical_jacobian = 1` enables the **Analytical Jacobian**.</li><li>**If `cvode.solve_type = 99`** → Setting `ode.analytical_jacobian = 1` activates the **preconditioned GMRES solver**, while setting `ode.analytical_jacobian = 0` enables the **non-preconditioned GMRES solver**.</li><li>**If `cvode.solve_type = 99`** and the **KLU library is linked**, then the preconditioned solver operates in a **sparse format**.</li><li>**If `cvode.solve_type = 5`**, the only valid option is `ode.analytical_jacobian = 1`.</li></ul> |
+### Key Parameters and Options
 
-This structure allows users to configure the solver behavior efficiently based on their requirements.  
+| Keyword                   | Description                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
+| ------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `ode.reactor_type`        | Switches between a **CV reactor** and a **CVH reactor**.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| `cvode.solve_type`        | <p>Controls the CVODE linear integration method:<br><strong>1</strong> = Dense direct linear solver<br><strong>5</strong> = Sparse direct linear solver (requires KLU library)<br><strong>99</strong> = Krylov iterative solver</p>                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| `ode.analytical_jacobian` | <p>Determines the Jacobian solver method, with different behaviors based on <code>cvode.solve_type</code>:</p><ul><li><strong>If <code>cvode.solve_type = 1</code></strong>   <code>ode.analytical_jacobian = 1</code> enables the <strong>Analytical Jacobian</strong>.</li><li><strong>If <code>cvode.solve_type = 99</code></strong>  <code>ode.analytical_jacobian = 1</code> activates the <strong>preconditioned GMRES solver</strong>, while setting <code>ode.analytical_jacobian = 0</code> enables the <strong>non-preconditioned GMRES solver</strong>.</li><li><strong>If <code>cvode.solve_type = 99</code></strong> and the <strong>KLU library is linked</strong>, then the preconditioned solver operates in a <strong>sparse format</strong>.</li><li><strong>If <code>cvode.solve_type = 5</code></strong>, the only valid option is <code>ode.analytical_jacobian = 1</code>.</li></ul> |
 
+This structure allows users to configure the solver behavior efficiently based on their requirements.

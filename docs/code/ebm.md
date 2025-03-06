@@ -78,7 +78,7 @@ $$
 
 _**Isothermal Wall**_
 
-Similar at the adibatic wall, plus additional terms in the energy equation due to heat flux, neglecting temperature derivatives in tangential direction.
+Similar at the adiabatic wall, plus additional terms in the energy equation due to heat flux, neglecting temperature derivatives in tangential direction.
 
 $$
 q_x = - \kappa n_y  \frac{\partial T }{\partial \eta}

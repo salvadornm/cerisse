@@ -1,11 +1,8 @@
-# Viscous and Diffusion solver
+# Viscous Solver
 
-This page explains how viscosity and diffusion are implemented in Cerisse 
-in the ```viscous_t``` class, defined in  the```viscous.h``` file
+This page explains how viscosity and diffusion are implemented in Cerisse in the `viscous_t` class, defined in the`viscous.h` file
 
-The main objective of this class is to provide
-the function `dflux()` (or `dflux_ibm()` for immersed boundary methods) to
-calculates **diffusive fluxes** that are added to the flux array.
+The main objective of this class is to provide the function `dflux()` (or `dflux_ibm()` for immersed boundary methods) to calculates **diffusive fluxes** that are added to the flux array.
 
 ```cpp
   void inline dflux(const Geometry& geom, const MFIter& mfi,
@@ -16,69 +13,74 @@ calculates **diffusive fluxes** that are added to the flux array.
 ## Summary
 
 ### **1. Class Template and Initialization**
-- The class is templated on `param` and `cls_t`, allowing flexibility for different numerical orders and physics closures.
-- It initializes numerical coefficients (`CDcoef`, `INTcoef`) for discretization schemes.
-- The constructor `viscous_t()` calls `calc_CDcoeffs<param::order>()` to compute these coefficients.
+
+* The class is templated on `param` and `cls_t`, allowing flexibility for different numerical orders and physics closures.
+* It initializes numerical coefficients (`CDcoef`, `INTcoef`) for discretization schemes.
+* The constructor `viscous_t()` calls `calc_CDcoeffs<param::order>()` to compute these coefficients.
 
 ### **2. Transport Property Calculation**
-- It determines transport properties such as:
-  - **Dynamic viscosity** (`mu_arr`)
-  - **Thermal conductivity** (`lam_arr`)
-  - **Bulk viscosity** (`xi_arr`)
-  - **Species diffusivity** (`rhoD_arr`)
-- If `PelePhysics` is enabled, transport coefficients are obtained using **PelePhysics Transport Models**; otherwise, they are computed using `cls->visc()` and `cls->cond()`.
+
+* It determines transport properties such as:
+  * **Dynamic viscosity** (`mu_arr`)
+  * **Thermal conductivity** (`lam_arr`)
+  * **Bulk viscosity** (`xi_arr`)
+  * **Species diffusivity** (`rhoD_arr`)
+* If `PelePhysics` is enabled, transport coefficients are obtained using **PelePhysics Transport Models**; otherwise, they are computed using `cls->visc()` and `cls->cond()`.
 
 ### **3. Diffusion Flux Computation**
-- `cns_diff()` computes **viscous, heat, and mass diffusion fluxes** using:
-  - Finite difference approximations (`normal_diff`, `tangent_diff`).
-  - Interpolation functions (`interp<param::order>()`).
-  - Divergence of velocity (`divu`) and viscous stress components (`tau11`, `tau12`, etc.).
-  - Energy flux contributions from species diffusion.
-- If immersed boundaries (`IBM`) or embedded boundaries (`EB`) are present, `cns_diff_ibm()` modifies the approach by reducing accuracy near boundaries to maintain numerical stability.
+
+* `cns_diff()` computes **viscous, heat, and mass diffusion fluxes** using:
+  * Finite difference approximations (`normal_diff`, `tangent_diff`).
+  * Interpolation functions (`interp<param::order>()`).
+  * Divergence of velocity (`divu`) and viscous stress components (`tau11`, `tau12`, etc.).
+  * Energy flux contributions from species diffusion.
+* If immersed boundaries (`IBM`) or embedded boundaries (`EB`) are present, `cns_diff_ibm()` modifies the approach by reducing accuracy near boundaries to maintain numerical stability.
 
 ## Diffusion flux implementation
 
 The diffusion flux follows
 
 $$
-\vec{J}_k = \rho Y_k \vec{V}_k 
+\vec{J}_k = \rho Y_k \vec{V}_k
 $$
 
-where
+where the velocity (see defintion of equations in [Theory)](../theory/equations/dns.md#transport-fluxes)
 
 $$
 \vec{V}_k = D_k \left[ \vec{\nabla} X_k +  \left(X_k - Y_k \right) \vec{\nabla}  \ln p \right]
 $$
 
-The implementation of Transport properties in [PelePhsyics](https://pelephysics.readthedocs.io/en/latest/Transport.html) is based on 
-[ERG](https://doi.org/10.1006/jcph.1995.1151) to compute mixture-averaged diffusivities for each species. All this is handled by PelePhysics through FUEGO model defined at compile time.
-There is no species tarnsport if only one species present.
-
+The implementation of Transport properties in [PelePhysics](https://pelephysics.readthedocs.io/en/latest/Transport.html) is based on [ERG](https://doi.org/10.1006/jcph.1995.1151) to compute mixture-averaged diffusivities for each species. All this is handled by PelePhysics through FUEGO model defined at compile time. There is no species tarnsport if only one species present.
 
 ### Correction to maintain mass
 
-By mass conservation, the sum of mass fluxes must be 0 
-$$
-\sum_k  \vec{J}_k = 0 
-$$
-
-However, there is no guarantee of this. Following [PeleC](https://amrex-combustion.github.io/PeleC/Algorithms.html#diffusion)  arbitrary correction flux is added to all species
+By mass conservation, the sum of mass fluxes must be 0
 
 $$
-\vec{V}_c = \sum_k Y_k \vec{V}_k 
+\sum_k  \vec{J}_k = 0
 $$
-The new *corrected* flux operates with a modified velocity
+
+However, there is no guarantee of this. Following [PeleC](https://amrex-combustion.github.io/PeleC/Algorithms.html#diffusion), a correction flux is added to all species, like
+
+$$
+\vec{V}_c = \sum_k Y_k \vec{V}_k
+$$
+
+The new _corrected_ flux operates with a modified velocity
+
 $$
 \vec{J}^{corr}_k = \vec{J}_k -\rho Y_k \vec{V}_c  = \rho Y_k \vec{V}_k  - \rho Y_k V_c
 $$
-and
+
+and ensures mass conservation &#x20;
+
 $$
 \sum_k \vec{J}^{corr}_k = \rho \underbrace{ \sum_k  Y_k \vec{V}_k}_{V_c} - \rho V_c \underbrace{\sum_k Y_k}_{1} = 0
 $$
 
-The energy flux is also affected by energy transport due to mass transport (due to chemical species enthalpy)
+The energy flux is also affected by energy transport due to mass transport from the chemical species enthalpy)
 
-The actual code lines are (mole, mass and enthakopy arrays computed before)
+The actual code lines are (mole, mass and enthalpy arrays computed before)
 
 ```cpp
     const Real dpdx  = normal_diff<param::order>(iv, d1, cls_t::QPRES, q, dxinv); 

@@ -12,7 +12,7 @@ $$
 \overline{\phi} = \int_V  \phi(\mathbf{x}',t)  G(\mathbf{x}-\mathbf{x}',\Delta) dV'
 $$
 
-where $$\Delta$$ is the characteristic filter width in each respective direction and $$\overline{\phi}$$is the filtered quantity.
+where $$\Delta$$ is the characteristic filter width in each respective direction and $$\overline{\phi}$$ is the filtered quantity.
 
 The actual form of the filter is usually _implicit_ and is not needed while solving the LES equations. Is common to use a _box/top-hat filter_ of the form below, where the cut-off scale/filter width is taken proportional to the mesh size $$\Delta \propto h$$
 
@@ -26,8 +26,7 @@ G(\mathbf{x}-\mathbf{x}',\Delta) =
 \right.
 $$
 
-Other filter kernels are possible (see [Pope's book](https://www.cambridge.org/highereducation/books/turbulent-flows/C58EFF59AF9B81AE6CFAC9ED16486B3A#overview) for more detail on LES filters). \
-In the finite volume method, when the filter width matches the local cell size , _i.e._, $$\Delta= h$$ and the filter used is the box filter; the _cell-averaged_ value of a variable is equivalent to its _filtered_ value.
+Other filter kernels are possible (see [Pope's book](https://www.cambridge.org/highereducation/books/turbulent-flows/C58EFF59AF9B81AE6CFAC9ED16486B3A#overview) for more detail on LES filters).  In the finite volume method, when the filter width matches the local cell size , _i.e._, $$\Delta= h$$ and the filter used is the box filter; the _cell-averaged_ value of a variable is equivalent to its _filtered_ value.
 
 For variable density flows it is convenient to introduce the mass-weighted Favre filtering operation :
 
@@ -41,7 +40,7 @@ $$
 \overline{ \frac{\partial \phi }{\partial x_j} } = \frac{\partial \overline{\phi}}{\partial x_j}
 $$
 
-This relation is only true under several assumptions, including the restrictive condition of constant filter width throughout the domain. Is common to neglect this error and assume the effects are incorporated into sub-grid  models.
+This relation is only true under several assumptions, including the restrictive condition of constant filter width throughout the domain. Is common to neglect this error and assume the effects are incorporated into the sub-grid model.
 
 #### Continuity
 

@@ -95,26 +95,24 @@ A STL file name needs to be defined in the input
 ib.filename = sphere_fine_20k.stl
 ```
 
-
-
 <figure><img src=".gitbook/assets/plane.png" alt=""><figcaption><p>Example of STL file</p></figcaption></figure>
 
 ### prob.h
 
-A IBM header needs to be included i nthe file.
+A IBM header needs to be included in the file.
 
 ```cpp
 #include <eib.h>
 ```
 
-Together with the required template of IBM
+Together with the required IBM template&#x20;
 
 ```cpp
 typedef std::ratio<5,5> d_image;
 typedef eib_t<2,1,d_image,ProbClosures> ProbIB;
 ```
 
-The `std::ratio<5,5> d_image;` defines a rational number 5/5 (with numerator 5 and denominator 5) which is equivalent in modern C++ to:
+The `std::ratio<5,5> d_image;` defines a rational number 5/5 (with numerator 5 and denominator 5) which in modern C++ is equivalent to:
 
 ```cpp
 using d_image = std::ratio<5, 5>;
@@ -126,10 +124,10 @@ The template class **eib\_t** is defined as
 template <int iorder_tparm, int eorder_tparm, typename cim_tparm, typename cls_t>
 ```
 
-where `iorder_tparm` is the interpolation order, in the above example the order is 2.\
-`eorder_tparm` is the extrapolation order (one in the example)&#x20;
+where `iorder_tparm` is the interpolation order, in the above example  2.\
+`eorder_tparm` is the extrapolation order (one in the example)
 
-`cim_tparm` is the interpolation distance factor relative to mesh diagonal, in the above example to 5/5=1 and therefore the distance is the diagonal $$\sqrt{2} h$$ in 2D.  See [theory](theory/ibmeb.md)
+`cim_tparm` is the interpolation distance factor relative to mesh diagonal, in the above example to 5/5=1 and therefore the distance is the diagonal $$\sqrt{2} h$$ in 2D, see [IBM theory](theory/ibmeb.md#immersed-boundaries).
 
 All information required for the IBM is stored in the class **ProbIB** in `CNS.h`.
 
@@ -160,7 +158,7 @@ The field variable ibfab (is a boolean) has two values `ibfab(i,j,k,0)` is the *
 
 ## Embedded Boundaries
 
-The Embedded Boundaries (EB) is native for AMReX see [documentation](https://amrex-codes.github.io/amrex/docs_html/EB_Chapter.html) As a quick summary, the underlying mesh is uniform and block-structured, but the boundary of the irregular-shaped computational domain cuts through this mesh (see theory).
+The Embedded Boundaries (EB) is native for AMReX see [documentation](https://amrex-codes.github.io/amrex/docs_html/EB_Chapter.html) As a quick summary, the underlying mesh is uniform and block-structured, but the boundary of the irregular-shaped computational domain cuts through the mesh (see[ EBM theory](theory/ibmeb.md#embedded-boundaries)).
 
 To set-up de EB, `GNUMakefile`, `input` and `prob` files have to be modified.
 

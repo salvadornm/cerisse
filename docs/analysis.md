@@ -76,6 +76,6 @@ PressurePoint.box_lo = 3.14159 3.14159 3.14159
 PressurePoint.box_hi = 3.19068 3.19068 3.19068
 ```
 
-The example belos, defines a file to store data `time_probe.log`, where 4 quanties will be stored. Tw derived ones: energy and ennstrophy and denisty and presuire. The first onmes are averaged over a box (0,6.28) in size, while teh last one corerspond to a much smaller box.
+In the example above, a file named `time_probe.log` is defined to store data, including four quantities: two derived ones—energy and enstrophy—and two direct ones—density and pressure. The first two are averaged over a box of size (0, 6.28), while the latter correspond to a much smaller box (a "point")
 
-The `cns.record_probe = 1`
+The `cns.record_probe = 1` is needed to store the data. An example can be found in the [constant volume reactor ](onedim.md#constant-volume-reactor)where temperature is tracked over time
