@@ -19,8 +19,8 @@ import csv
 # Edit these parameters to change the initial temperature, the pressure, and
 # the phases in the mixture.
 
-T = 700.0
-P = 5*101325.0
+T = 298.0
+P = 101325.0
 phi = 0.5
 print(" --------------------- ")
 print(" Initial Conditions  Mixture")

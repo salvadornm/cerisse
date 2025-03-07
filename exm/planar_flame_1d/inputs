@@ -1,30 +1,30 @@
 # Simulation time
 # start time is assumed to be 0, unless re-starting
-max_step  = 50000
-stop_time = 1.0
-cfl = 0.1
-#time_step =5e-8
+max_step  = 100
+stop_time = 0.1
+#cfl = 0.1
+time_step =1e-7
 
 # Geometry 
-geometry.is_periodic = 1 0 
+geometry.is_periodic = 0  
 geometry.coord_sys   = 0  # 0 => cart, 1 => RZ  2=>spherical
-geometry.prob_lo     = -0.0425  0.0 
-geometry.prob_hi     =  0.0425  0.085
+geometry.prob_lo     =  0.0 
+geometry.prob_hi     =  0.085
 
 # -1 = N/A (Incase of periodic)
 # 0 = Interior           3 = Symmetry
 # 1 = Inflow             4 = SlipWall
 # 2 = Outflow            5 = NoSlipWall
 # 6 = user defined
-cns.lo_bc = -1  1 
-cns.hi_bc = -1  2 
+cns.lo_bc = 1 
+cns.hi_bc = 2 
 cns.screen_output = 1 # 0=quiet, 1=verbose
 cns.verbose =1       # 0=quiet, 1=verbose
 
 # Refinement and regridding 
-amr.n_cell          = 512 512 
+amr.n_cell          = 256
 amr.max_level       = 0     # maximum level number allowed
-amr.ref_ratio       = 2 2   # refinement ratio per level
+amr.ref_ratio       = 2   # refinement ratio per level
 amr.regrid_int      = 10     # how often to regrid per level
 amr.blocking_factor_x = 8   # blocking factor in x per level
 amr.blocking_factor_y = 8   # blocking factor in y per level
@@ -41,13 +41,16 @@ amr.check_int               = 10000    # number of timesteps between checkpoints
 amr.plot_files_output = 1
 amr.plot_file         = plot/plt # root name of plotfile
 amr.derive_plot_vars  = pressure velocity temperature
-amr.plot_int          = 100           # number of timesteps between plotfiles
+amr.plot_int          = 10           # number of timesteps between plotfiles
 
-cns.order_rk  = -2 # original
-cns.stages_rk = 2
-
+cns.order_rk = 3
+cns.stages_rk = 3
 
 # Chemical Options
 cns.reactor_type = "ReactorCvode"
-cvode.solve_type =  "dense_direct"
+cvode.solve_type =  "fixed_point"
+#ode.rtol = 1e-5
+#ode.atol = 1e-5
+#ode.ndt  = 1000 
+#ode.analytical_jacobian = 1
 ode.clean_init_massfrac = 1
