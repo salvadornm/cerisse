@@ -1,5 +1,5 @@
 # AMReX
-DIM = 2
+DIM = 1
 COMP = gnu
 CXXSTD    = c++20
 PRECISION = DOUBLE
@@ -14,7 +14,7 @@ USE_OMP = FALSE
 # CUDA_ARCH= 8.0
 
 # Debugging
-DEBUG = FALSE
+DEBUG = TRUE
 
 # PelePhysics
 EOS_MODEL := FUEGO

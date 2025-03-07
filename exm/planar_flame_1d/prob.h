@@ -76,7 +76,7 @@ struct ProbParm {
   // unburn gases
   Real rho_u = 0.98933;               // density  [kg/m^3]
   Real T_u   = 298;                   // temperature [K] 
-  Real u_u   = 0.686;                 // velocity [m/s]
+  Real u_u   = 0.0;//0.686;                 // velocity [m/s]
   Real p_u   = 1.0132e+05;            // pressure [Pa]  (5 atm)
   Real e_u   = -1.0255e+05;           // internal energy [J/kg]  
  
@@ -99,11 +99,9 @@ struct ProbParm {
   Real lf     =   423e-6; // estimated flame thickness  (507 microns)
   Real Lx     =   0.0425;  // half-width domain
 
-  Real u_b   = (Sf*(rho_b- rho_u) + rho_u*u_u)/rho_b;                 // velocity [m/s]  (RH)
-  Real dp    = Sf*Sf*(rho_b- rho_u) - rho_b*u_b*u_b + rho_u*u_u*u_u;  // pressure difference
+  Real u_b   = rho_u*u_u/rho_b;       // velocity [m/s]  (mas)
+  Real p_b = p_u;                     // pressure
  
-  Real p_b   = p_u + dp;                     // pressure [Pa]  (1 atm)    
-
 };
 
 // numerical method parameters
@@ -119,9 +117,14 @@ struct methodparm_t {
 
 using ProbClosures = closures_dt< indicies_t, transport_Pele_t, multispecies_pele_gas_t<indicies_t> >;
 
-//using ProbRHS = rhs_dt< weno_t<ReconScheme::Teno5, ProbClosures>, viscous_t<methodparm_t, ProbClosures>, reactor_t<ProbClosures> >;
-using ProbRHS = rhs_dt< riemann_t<false, ProbClosures>, viscous_t<methodparm_t, ProbClosures>, reactor_t<ProbClosures> >;
-//using ProbRHS = rhs_dt< riemann_t<false, ProbClosures>, viscous_t<methodparm_t, ProbClosures>, no_source_t>;
+//using ProbRHS =
+//  rhs_dt<weno_t<ReconScheme::Teno5, ProbClosures>, no_diffusive_t, reactor_t<ProbClosures>>;
+// using ProbRHS =
+//   rhs_dt<weno_t<ReconScheme::Teno5, ProbClosures>, viscous_t<methodparm_t, ProbClosures>, no_source_t>;
+
+//using ProbRHS = rhs_dt< riemann_t<false, ProbClosures>, no_diffusive_t, reactor_t<ProbClosures> >;
+//using ProbRHS = rhs_dt< riemann_t<false, ProbClosures>, viscous_t<methodparm_t, ProbClosures>, reactor_t<ProbClosures> >;
+using ProbRHS = rhs_dt< riemann_t<false, ProbClosures>, no_diffusive_t, no_source_t>;
 
 
 
@@ -144,22 +147,15 @@ AMREX_GPU_DEVICE AMREX_FORCE_INLINE void prob_initdata(
   const Real *dx = geomdata.CellSize();
 
   Real x = prob_lo[0] + (i + Real(0.5)) * dx[0];
-  Real y = prob_lo[1] + (j + Real(0.5)) * dx[1];
   
   Real rhot, vxt,et,Tt,Pt;
   Real Yt[NUM_SPECIES];const Real *Yu;const Real *Yb;
 
-  Real wavelength = prob_parm.Lx;
-  Real wave= 2.0*std::numbers::pi/wavelength;
-  // pertubation and frequency
-  const Real ypertur = 4*dx[1]; 
-  const Real Nwaves = 2;
-
-  Real yinterf =  prob_parm.Yflame  + ypertur*cos(Nwaves*wave*x);
+  Real xinterf =  prob_parm.Yflame;
   
   // smooth profile over lf 
   const Real smooth=0.2;
-  Real H = (y-yinterf)/prob_parm.lf;
+  Real H = 0.3*(x-xinterf)/prob_parm.lf;
   Real fburn = 0.5*tanh(smooth*H) + 0.5; // fburn   0:unburn  1:burn
 
   Yu  = prob_parm.Y_u.data();
@@ -182,9 +178,8 @@ AMREX_GPU_DEVICE AMREX_FORCE_INLINE void prob_initdata(
   // compute energy  
   cls.RYP2E(rhot, Yt, Pt, et);
 
-  
-  state(i, j, k, cls.UMX) = Real(0.0);
-  state(i, j, k, cls.UMY) = rhot* vxt;
+  state(i, j, k, cls.UMX) = rhot* vxt;
+  state(i, j, k, cls.UMY) = Real(0.0);
   state(i, j, k, cls.UMZ) = Real(0.0);
   state(i, j, k, cls.UET) = rhot * et + Real(0.5) * rhot * vxt * vxt;
   for (int n = 0; n < NUM_SPECIES; ++n) {
@@ -205,7 +200,6 @@ bcnormal(const Real x[AMREX_SPACEDIM], Real dratio, const Real s_int[ProbClosure
   const int UMZ  = ProbClosures::UMZ;
   const int UET  = ProbClosures::UET;
   const int UFS  = ProbClosures::UFS;
-
   
   Real rhot, vxt,et;
   const Real *Yt;
@@ -223,9 +217,9 @@ bcnormal(const Real x[AMREX_SPACEDIM], Real dratio, const Real s_int[ProbClosure
       //Pt   = prob_parm.p_u;
       //closures.RYP2E(rhot, Yt, Pt, et);
 
-      s_ext[URHO] = rhot;
-      s_ext[UMX]  = 0.0;
-      s_ext[UMY]  = rhot* vxt;
+      s_ext[URHO] = rhot;      
+      s_ext[UMX]  = rhot* vxt;
+      s_ext[UMY]  = 0.0;
       s_ext[UMZ]  = 0.0;    
       s_ext[UET]  = rhot * et + Real(0.5) * rhot * vxt * vxt;  
       for (int n = 0; n < NUM_SPECIES; ++n) {
@@ -258,33 +252,23 @@ AMREX_GPU_DEVICE AMREX_FORCE_INLINE void user_tagging(
   
     constexpr Real threshold = 0.1;
 
-    const Real *prob_lo = geomdata.ProbLo();
-    const Real *prob_hi = geomdata.ProbHi();
-    const Real *dx = geomdata.CellSize();
-    Real x = prob_lo[0] + (i + Real(0.5)) * dx[0];
-    Real y = prob_lo[1] + (j + Real(0.5)) * dx[1];
-   
-
-    // tag cells based on gradients of rho*H2O2 (change here)
-    const int QG = ProbClosures::UFS+5;
+    // tag cells based on gradients of rho*O2 (change here)
+    const int QG = ProbClosures::UFS+1;
     
     Real Y = sdatafab(i,j,k,QG) + max(1e-5*sdatafab(i,j,k,QG),1e-7);
-    Real dYx = Real(0.5)*Math::abs( sdatafab(i+1,j,k,QG)- sdatafab(i-1,j,k,QG)   )/Y;
-    Real dYy = Real(0.5)*Math::abs( sdatafab(i,j+1,k,QG)- sdatafab(i,j-1,k,QG) )/Y;
+    Real dYx = Math::abs( sdatafab(i+1,j,k,QG)- sdatafab(i,j,k,QG)   )/Y;
+    Real dYy = Math::abs( sdatafab(i,j+1,k,QG)- sdatafab(i,j-1,k,QG) )/Y;
     Real gradY = sqrt(dYx*dYx + dYy*dYy);
 
     switch (level)
     {
       case 0:
-        //tagfab(i,j,k) = (gradY > threshold);
-
-        tagfab(i,j,k) = Math::abs(y- 0.04) < 0.2*0.04;
-
+        tagfab(i,j,k) = (gradY > threshold);
         break;
       case 1:
         tagfab(i,j,k) = (gradY > threshold);
         break;
-      default: 
+      default:
         tagfab(i,j,k) = (gradY > threshold);
         break;
     }
