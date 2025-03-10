@@ -167,9 +167,15 @@ AMREX_GPU_DEVICE AMREX_FORCE_INLINE void prob_initdata(
   // compute 
   vxt  = prob_parm.u_u*(1.0-fburn)   + fburn*prob_parm.u_b;
   //vxt = 0.0; // initially at rest
+  Real sumrhoY = 0.0;
   for (int n = 0; n < NUM_SPECIES; ++n) {
-    Yt[n]   = Yu[n]*(1.0-fburn) + fburn*Yb[n];
+    Yt[n]   = Yu[n]*(1.0-fburn) + fburn*Yb[n];    
+    sumrhoY += Yt[n];
   }
+  // ensure sumY =1
+  for (int n = 0; n < NUM_SPECIES; ++n) { Yt[n]   /=  sumrhoY;}
+  
+ 
   Tt = prob_parm.T_u*(1.0-fburn)   + fburn*prob_parm.T_b;
 
   Pt = prob_parm.p_u*(1.0-fburn)   + fburn*prob_parm.p_b ;
@@ -182,7 +188,7 @@ AMREX_GPU_DEVICE AMREX_FORCE_INLINE void prob_initdata(
   // compute energy  
   cls.RYP2E(rhot, Yt, Pt, et);
 
-  
+  //
   state(i, j, k, cls.UMX) = Real(0.0);
   state(i, j, k, cls.UMY) = rhot* vxt;
   state(i, j, k, cls.UMZ) = Real(0.0);
@@ -223,6 +229,10 @@ bcnormal(const Real x[AMREX_SPACEDIM], Real dratio, const Real s_int[ProbClosure
       //Pt   = prob_parm.p_u;
       //closures.RYP2E(rhot, Yt, Pt, et);
 
+     // Maybe allow the Pressure fluctuate  dP/dy = 0   T and Y FIX
+     // calculate rhobc=f(Pinside,Tbc)  fs mflow   so ubc= mflow/rhobc
+
+
       s_ext[URHO] = rhot;
       s_ext[UMX]  = 0.0;
       s_ext[UMY]  = rhot* vxt;
@@ -256,7 +266,9 @@ AMREX_GPU_DEVICE AMREX_FORCE_INLINE void user_tagging(
     int i, int j, int k, int nt_level, auto &tagfab, const auto &sdatafab,
     const auto &geomdata, const ProbParm &prob_parm, int level) {
   
-    constexpr Real threshold = 0.1;
+    constexpr Real thresholdRHO  = 0.2;
+    constexpr Real thresholdSPEC = 0.2;
+    
 
     const Real *prob_lo = geomdata.ProbLo();
     const Real *prob_hi = geomdata.ProbHi();
@@ -265,29 +277,44 @@ AMREX_GPU_DEVICE AMREX_FORCE_INLINE void user_tagging(
     Real y = prob_lo[1] + (j + Real(0.5)) * dx[1];
    
 
-    // tag cells based on gradients of rho*H2O2 (change here)
-    const int QG = ProbClosures::UFS+5;
-    
-    Real Y = sdatafab(i,j,k,QG) + max(1e-5*sdatafab(i,j,k,QG),1e-7);
-    Real dYx = Real(0.5)*Math::abs( sdatafab(i+1,j,k,QG)- sdatafab(i-1,j,k,QG)   )/Y;
-    Real dYy = Real(0.5)*Math::abs( sdatafab(i,j+1,k,QG)- sdatafab(i,j-1,k,QG) )/Y;
-    Real gradY = sqrt(dYx*dYx + dYy*dYy);
+    // SPECIES  (Li and Dryer mechanism)
+    //              H2 O2 H2O H O OH HO2 H2O2 N2
+    // index  UFS+  0   1  2  3 4  5  6   7   8
+ 
+    // tag cells based on gradients of N2 (change here)
+    const int QG = ProbClosures::URHO ;
+    Real Y = sdatafab(i,j,k,QG) + min(1e-6*sdatafab(i,j,k,QG),1e-8);
+    Real dYx = Math::abs( sdatafab(i+1,j,k,QG)- sdatafab(i-1,j,k,QG));
+    Real dYy = Math::abs( sdatafab(i,j+1,k,QG)- sdatafab(i,j-1,k,QG));
+    Real gradY = 0.5*sqrt(dYx*dYx + dYy*dYy)/Y;
+
+    bool region_of_interest =  Math::abs(y- 0.04) < 0.01;
+    bool refine_flame = (gradY > thresholdRHO);
+
+    // grad of small species of H2O2
+    const int QG2 = ProbClosures::UFS + 7 ;
+    Y = sdatafab(i,j,k,QG2) + min(1e-6*sdatafab(i,j,k,QG2),1e-12);
+    dYx = Math::abs( sdatafab(i+1,j,k,QG2)- sdatafab(i-1,j,k,QG2));
+    dYy = Math::abs( sdatafab(i,j+1,k,QG2)- sdatafab(i,j-1,k,QG2));
+    gradY = 0.5*sqrt(dYx*dYx + dYy*dYy)/Y;
+  
+    bool refine_spec = (gradY > thresholdSPEC);
+
 
     switch (level)
     {
-      case 0:
-        //tagfab(i,j,k) = (gradY > threshold);
-
-        tagfab(i,j,k) = Math::abs(y- 0.04) < 0.2*0.04;
-
+      case 0:        
+        tagfab(i,j,k) = region_of_interest ||  refine_flame;
         break;
       case 1:
-        tagfab(i,j,k) = (gradY > threshold);
+        tagfab(i,j,k) = refine_flame || refine_spec ;
         break;
       default: 
-        tagfab(i,j,k) = (gradY > threshold);
+        tagfab(i,j,k) = refine_flame || refine_spec;
         break;
     }
+
+    if (y < 0.02) tagfab(i,j,k) = false;
 
 }
 ////////////////////////////////////////////////////////////////////////////////
