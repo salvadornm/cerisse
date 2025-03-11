@@ -377,21 +377,6 @@ void CNS::post_restart()
   // ifine_mask.define(grids, dmap, 1, 0, MFInfo());
   // fillFineMask();
 
-  // Initialize reactor
-  if (do_react) {
-    if (chem_integrator == "ReactorNull") {
-      amrex::Print() << "WARNING: turning on reactions while using ReactorNull. "
-                        "Make sure this is intended.\n";
-    }
-
-    reactor = pele::physics::reactions::ReactorBase::create(chem_integrator);
-    reactor->init(1, 1);
-
-    if (use_typical_vals_chem) { set_typical_values_chem(); }
-
-    react_state(parent->cumTime(), parent->dtLevel(level), true);
-  }
-
   MultiFab& S_new = get_new_data(State_Type);
 
 #if (NUM_FIELD > 0)
@@ -403,7 +388,7 @@ void CNS::post_restart()
   WienerProcess.init(AMREX_SPACEDIM, level, ref_ratio);
 
   // Populate fields (when restarting from a different number of fields)
-  if ((NUM_FIELD > 0) && do_restart_fields) {
+  if (do_restart_fields) {
     Print() << " >> Resetting stochastic fields state data ..." << std::endl;
 
     // Move aux variables
@@ -426,6 +411,21 @@ void CNS::post_restart()
     }
   }
 #endif
+
+  // Initialize reactor
+  if (do_react) {
+    if (chem_integrator == "ReactorNull") {
+      amrex::Print() << "WARNING: turning on reactions while using ReactorNull. "
+                        "Make sure this is intended.\n";
+    }
+
+    reactor = pele::physics::reactions::ReactorBase::create(chem_integrator);
+    reactor->init(1, 1);
+
+    if (use_typical_vals_chem) { set_typical_values_chem(); }
+
+    react_state(parent->cumTime(), parent->dtLevel(level), true);
+  }
 
   // Initialise LES model
   if (do_les || do_pasr) {

@@ -109,13 +109,12 @@ void CNS::read_params()
   }
 
   pp.query("eb_no_slip", eb_no_slip);
+  pp.query("eb_recon_mode", eb_recon_mode); // 0: fill stencil, 1: return to PLM
+#endif
   pp.query("eb_isothermal", eb_isothermal);
   if (eb_isothermal) { pp.get("eb_wall_temp", eb_wall_temp); }
-  pp.query("eb_recon_mode", eb_recon_mode); // 0: fill stencil, 1: return to PLM
-
   pp.query("eb_wall_model", eb_wall_model);
-#endif
-
+  
   pp.query("recon_char_var", recon_char_var);
   pp.query("char_sys", char_sys);
   if (char_sys != 0 && char_sys != 1) {
@@ -717,6 +716,10 @@ void CNS::variableSetUp()
   derive_lst.add("reynolds_stress", IndexType::TheCellType(), AMREX_D_PICK(1, 3, 6),
                  rs_names, cns_dervaru, DeriveRec::TheSameBox);
   derive_lst.addComponent("reynolds_stress", desc_lst, State_Type, 0, LEN_STATE);
+
+  derive_lst.add("k_sgs", IndexType::TheCellType(), 1, cns_dertke,
+                 DeriveRec::TheSameBox);
+  derive_lst.addComponent("k_sgs", desc_lst, State_Type, 0, LEN_STATE);
 
   amrex::Vector<std::string> vary_names(NUM_SPECIES);
   for (int i = 0; i < NUM_SPECIES; i++) { vary_names[i] = "var_Y_" + spec_names[i]; }

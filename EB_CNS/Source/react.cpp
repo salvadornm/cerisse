@@ -208,10 +208,11 @@ void CNS::react_state(Real time, Real dt, bool init_react)
               // Monitor problem cell
               bool any_rY_unbounded = false;
               for (int n = 0; n < NUM_SPECIES; ++n) {
-                any_rY_unbounded |=
-                  (rY(i, j, k, n) < -1e-5 || rY(i, j, k, n) > 1.0 + 1e-5 ||
-                   std::isnan(rY(i, j, k, n)));
+                any_rY_unbounded |= std::isnan(rY(i, j, k, n));
+                  // (rY(i, j, k, n) < -1e-5 || rY(i, j, k, n) > 1.0 + 1e-5 ||
+                  //  std::isnan(rY(i, j, k, n)));
               }
+              bool T_unbounded = T(i, j, k) < clip_temp || T(i, j, k) > 4000.0;
 #ifndef AMREX_USE_GPU
               if (any_rY_unbounded) {
                 std::cout << "Reaction causing rY=[ ";
@@ -219,29 +220,39 @@ void CNS::react_state(Real time, Real dt, bool init_react)
                   std::cout << rY(i, j, k, n) << " ";
                 std::cout << "] @ " << i << "," << j << "," << k << '\n';
               }
-              if (T(i, j, k) < clip_temp) {
+              if (T_unbounded) {
                 std::cout << "Reaction causing T=" << snew_arr(i, j, k, UTEMP)
                           << "->" << T(i, j, k) << " @ " << i << "," << j << "," << k
                           << '\n';
               }
-#endif
-              // update drY/dt in I_R
-              Real new_rho = 0.0;
-              if (do_pasr) {
-                // Modify rY if PaSR is on
-                unpack_pasr(i, j, k, new_rho, sold_arr, rY, rYsrc, qarr, muarr,
-                            dxinv, dt);
-              } else {
+#endif        
+              Real new_rho;
+              if (any_rY_unbounded || T_unbounded) {
+                // set drY/dt = 0
+                new_rho = snew_arr(i, j, k, URHO);
                 for (int n = 0; n < NUM_SPECIES; ++n) {
-                  rY(i, j, k, n) = std::max(0.0, rY(i, j, k, n));
-                  new_rho += rY(i, j, k, n);
+                  rY(i, j, k, n) = snew_arr(i, j, k, UFS + n);
+                  I_R_arr(i, j, k, n) = 0.0;
                 }
-              }
+              } else {
+                // update drY/dt in I_R
+                new_rho = 0.0;
+                if (do_pasr) {
+                  // Modify rY if PaSR is on
+                  unpack_pasr(i, j, k, new_rho, sold_arr, rY, rYsrc, qarr, muarr,
+                              dxinv, dt);
+                } else {
+                  for (int n = 0; n < NUM_SPECIES; ++n) {
+                    rY(i, j, k, n) = std::max(0.0, rY(i, j, k, n));
+                    new_rho += rY(i, j, k, n);
+                  }
+                }
 
-              for (int n = 0; n < NUM_SPECIES; ++n) {
-                I_R_arr(i, j, k, n) =
-                  (rY(i, j, k, n) - sold_arr(i, j, k, UFS + n)) / dt -
-                  rYsrc(i, j, k, n);
+                for (int n = 0; n < NUM_SPECIES; ++n) {
+                  I_R_arr(i, j, k, n) =
+                    (rY(i, j, k, n) - sold_arr(i, j, k, UFS + n)) / dt -
+                    rYsrc(i, j, k, n);
+                }
               }
 
               // update heat release rate (this is not used, just to plot)

@@ -105,6 +105,13 @@ public:
               raw_data(s, d, NUM_FIELD - 1) = raw_data(s, d, swap_id);
               raw_data(s, d, swap_id) = 0.0;
             }
+            // shuffle
+            for (int nf = 0; nf < NUM_FIELD / 2; ++nf) {
+              int swap_id = amrex::Random_int(NUM_FIELD - 1);
+              amrex::Real tmp = raw_data(s, d, nf);
+              raw_data(s, d, nf) = raw_data(s, d, swap_id);
+              raw_data(s, d, swap_id) = tmp;
+            }
           }
         }
       } else if (rand_mode == 3) {
