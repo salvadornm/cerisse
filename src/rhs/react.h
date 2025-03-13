@@ -3,6 +3,8 @@
 
 #include <PelePhysics.H>
 #include <ReactorBase.H>
+#include <Constants.h>
+#include <CNSconstants.h>
 
 // template <int reactor_type, typename cls_t>
 template <typename cls_t>
@@ -76,10 +78,9 @@ class reactor_t {
     auto const& rY = tempf.array(0);
     auto const& rEi = tempf.array(NUM_SPECIES);
     auto const& T = tempf.array(NUM_SPECIES + 1);
-    auto const& rYsrc = tempf.array(NUM_SPECIES + 2);
+    auto const& rYsrc  = tempf.array(NUM_SPECIES + 2);
     auto const& rEisrc = tempf.array(2 * NUM_SPECIES + 2);
-    auto const& fc =
-        tempf.array(2 * NUM_SPECIES + 3);  // number of RHS eval (not used)
+    auto const& fc     = tempf.array(2 * NUM_SPECIES + 3);  // number of RHS eval (not used)
     IArrayBox maskf(bx, 1, The_Async_Arena());
     maskf.setVal<RunOn::Gpu>(1);
     auto const& mask = maskf.array();  // 1: do reaction, -1: skip reaction
@@ -87,20 +88,17 @@ class reactor_t {
     amrex::ParallelFor(bx, [=] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {
       const auto& cls = *cls_d;
 
-      // [rY, rEi, T, rYsrc, rEisrc] Remember to convert to CGS!!
-      for (int ns = 0; ns < NUM_SPECIES; ++ns) {
-        rY(i, j, k, ns) =
-          prims(i, j, k, cls.QRHO) * prims(i, j, k, cls.QFS + ns) * 1.0e-3;
-        rYsrc(i, j, k, ns) = rhs(i, j, k, cls.UFS + ns) * 1.0e-3;
-      }
-
-      rEi(i, j, k) =
-          prims(i, j, k, cls.QRHO) * prims(i, j, k, cls.QEINT) * 10.0;
-
-      T(i, j, k) = prims(i, j, k, cls.QT);
-      AMREX_ALWAYS_ASSERT(T(i, j, k) > 0.0);
+      // [rY, rEi, T, rYsrc, rEisrc] convert to CGS!!
 
       Real rho = prims(i, j, k, cls.QRHO);
+      for (int ns = 0; ns < NUM_SPECIES; ++ns) {
+        rY(i, j, k, ns)    =   rho* prims(i, j, k, cls.QFS + ns) * rho_si2cgs;
+        rYsrc(i, j, k, ns) =   rhs(i, j, k, cls.UFS + ns) * rho_si2cgs;
+      }
+      rEi(i, j, k) = rho * prims(i, j, k, cls.QEINT) * rhoenergy_si2cgs;
+
+      T(i, j, k) = prims(i, j, k, cls.QT);
+      
       Real mx = rho * prims(i, j, k, cls.QU);
       Real my = rho * prims(i, j, k, cls.QV);
       Real mz = rho * prims(i, j, k, cls.QW);
@@ -112,10 +110,15 @@ class reactor_t {
       my += rhs(i, j, k, cls.UMY) * dt;
       mz += rhs(i, j, k, cls.UMZ) * dt;
       Real rke_new = Real(0.5) * (mx * mx + my * my + mz * mz) / rho;
-      rEisrc(i, j, k) = (rhs(i, j, k, cls.UET) - (rke_new - rke) / dt) * 10.0;
+      rEisrc(i, j, k) = (rhs(i, j, k, cls.UET) - (rke_new - rke) / dt) * rhoenergy_si2cgs;
 
-      // TODO: fill mask
-      // mask(i, j, k) = (T(i, j, k) > min_react_temp) ? 1 : -1;
+
+      // Temperature ..
+      // AMREX_ALWAYS_ASSERT(T(i, j, k) > 0.0);
+
+      // fill mask      
+      mask(i, j, k) = (T(i, j, k) > CNSConstants::min_react_temp) ? 1 : -1; // temp snm 
+
     });
 
     // Not necessary to start a stream here, however pelePhysics function only takes a stream. Practically, launch and execution overhead determines  efficiency effect -- https://stackoverflow.com/questions/27038162/how-bad-is-it-to-launch-many-small-kernels-in-cuda#:~:text=Launch%20overhead%3A%20The%20overhead%20of,as%20the%20kernel%20in%20question. Seems unlikely this kernel launch cost will outweigh execution costs.
@@ -141,8 +144,11 @@ class reactor_t {
     //////////////////////// Unpack data ////////////////////////
     amrex::ParallelFor(bx, [=] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {
       const auto& cls = *cls_d;
+
+
       if (mask(i, j, k) != -1) {
-        // Monitor problem cell, do not add reaction source
+        // Monitor problem cell, do not add reaction source  // CHECK
+
         bool any_rY_unbounded = false;
         bool temp_leq_zero = (T(i, j, k) <= 0.0);
         for (int ns = 0; ns < NUM_SPECIES; ++ns) {
@@ -151,9 +157,7 @@ class reactor_t {
                std::isnan(rY(i, j, k, ns)));
         }
 
-
-            
-
+          
         if (any_rY_unbounded || temp_leq_zero) {
           // printf("Post-reaction rY=[ ");
           // for (int ns = 0; ns < NUM_SPECIES; ++ns)
@@ -162,14 +166,10 @@ class reactor_t {
         } else {
           // Update species source terms
           for (int ns = 0; ns < NUM_SPECIES; ++ns) {
-            // rY is overwritten by rY + rYsrc * dt + chem_src * dt = rY +
-            // new_rhs * dt Remember to convert from CGS back to SI!!
-            Real rY_init =
-                prims(i, j, k, cls.QRHO) * prims(i, j, k, cls.QFS + ns);
-            rhs(i, j, k, cls.UFS + ns) =
-                (rY(i, j, k, ns) * 1.0e3 - rY_init) / dt;
-          }
-          // rE is unchanged because it includes chemical energy
+            // rY is overwritten by rY + rYsrc * dt + chem_src * dt = rY +            
+            Real rY_init =  prims(i, j, k, cls.QRHO) * prims(i, j, k, cls.QFS + ns);
+            rhs(i, j, k, cls.UFS + ns) = (rY(i, j, k, ns) * rho_cgs2si - rY_init) / dt;
+          }          
         }
       }
     });

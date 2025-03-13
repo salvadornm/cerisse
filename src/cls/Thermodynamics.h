@@ -68,15 +68,6 @@ class calorifically_perfect_gas_t {
     return eigenvals;
   }
 
-  // Real sos(Real& T){return std::sqrt(this->gamma * this->Rspec * T);}
-  // void prims2cons(i,j,k,){};
-
-  // void prims2chars(int i, int j, int k, const Array4<Real>& prims, Array4<Real>& chars, const GpuArray<int, AMREX_SPACEDIM>& vdir){
-
-  // };
-
-  // void chars2prims() {}
-
   AMREX_GPU_DEVICE AMREX_FORCE_INLINE void prims2fluxes(
       int i, int j, int k, const Array4<Real>& prims,
       const Array4<Real>& fluxes, const GpuArray<int, 3>& vdir) const {
@@ -270,7 +261,32 @@ class calorifically_perfect_gas_t {
 
     for (int n = 0; n < idx_t::NCONS; ++n) f[n] = tmp[n];
   }
+
+  /*
+  * @brief compute primitive from conservative (local)
+  * @param array of conservative vars
+  * @param array of primitive variables 
+  */
+  AMREX_GPU_DEVICE AMREX_FORCE_INLINE void cons2prims_point(
+    Real U[idx_t::NCONS], Real* &Q) const {
+
+    Real rho = U[idx_t::URHO];Real one_over_rho = 1.0/rho;
+    Q[idx_t::QRHO] = rho;
+    Real ux   = one_over_rho*U[idx_t::UMX];
+    Real uy   = one_over_rho*U[idx_t::UMY];
+    Real uz   = one_over_rho*U[idx_t::UMZ];
+    // T and P
+    Real rhoke = Real(0.5) * rho * (ux * ux+ uy* uy + uz * uz);
+    Real rhoei = U[idx_t::UET] - rhoke;
+    Real p = (this->gamma - Real(1.0)) * rhoei;
+    Q[idx_t::QT] = p / (rho * this->Rspec);
+    Q[idx_t::QPRES] = p;
+  }
+
 };
+
+
+  
 
 ////////////////////////////////////////////////////////////////////////////////////////
 // TODO 
@@ -422,13 +438,13 @@ class multispecies_pele_gas_t {
 
   //-------------------------------------------------------------------------------------
   // @brief Compute mole fraction array from mass fraction species array
-  AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE void Y2X(const Real Y[NUM_SPECIES],Real* &X) {
+  AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE void Y2X(const Real Y[NUM_SPECIES], Real (&X)[NUM_SPECIES]){
     auto eos = pele::physics::PhysicsType::eos();
     eos.Y2X(Y,X);
   }
   // @brief Compute enthalpy species array from mass fraction species array, T and rho
   AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE void RTY2Hi(const Real rho, const Real T,const Real Y[NUM_SPECIES],
-    Real* &hk) {
+    Real (&hk)[NUM_SPECIES]) {
     auto eos = pele::physics::PhysicsType::eos();
     eos.RTY2Hi(rho, T, Y, hk);
   } 
@@ -526,12 +542,6 @@ class multispecies_pele_gas_t {
       Real Y[NUM_SPECIES];
       for (int n = 0; n < NUM_SPECIES; ++n) {
         Y[n] = cons(i, j, k, idx.UFS + n) * rhoinv;
-        // if (Y[n] < 0.0) {
-        //   std::cout << "Y[" << n << "](" << i << ", " << j << ", " << k
-        //             << ") = " << Y[n] << std::endl;
-        //   std::cout << cons(i, j, k, idx.UFS + n) << " " << cons(i, j, k,
-        //   idx.URHO) << std::endl;
-        // }
       }
       Real T, p, cs, gamma;
       this->RYE2TPCsG(rho, Y, ei, T, p, cs, gamma);
@@ -549,7 +559,6 @@ class multispecies_pele_gas_t {
         prims(i, j, k, idx.QFS + n) = Y[n];
       }
 #ifdef DEBUG_PP_EOS
-      // AMREX_DEVICE_PRINTF(static_cast<const char*>("cons2prims: %d %d %d\n"), i, j, k);
       AMREX_ALWAYS_ASSERT(prims(i, j, k, idx.QPRES) > 0.0 && isnan(prims(i, j, k, idx.QPRES)) == 0);
       AMREX_ALWAYS_ASSERT(prims(i, j, k, idx.QRHO) > 0.0 && isnan(prims(i, j, k, idx.QRHO)) == 0);
       AMREX_ALWAYS_ASSERT(prims(i, j, k, idx.QT) > 0.0 && !isnan(prims(i, j, k, idx.QT)));
@@ -557,10 +566,48 @@ class multispecies_pele_gas_t {
       AMREX_ALWAYS_ASSERT(prims(i, j, k, idx.QG) > 0.0 && isnan(prims(i, j, k, idx.QG)) == 0);
       AMREX_ALWAYS_ASSERT(prims(i, j, k, idx.QFS) >= 0.0 && isnan(prims(i, j, k, idx.QFS)) == 0);
       AMREX_ALWAYS_ASSERT(prims(i, j, k, idx.QFS + NUM_SPECIES - 1) >= 0.0 && isnan(prims(i, j, k, idx.QFS + NUM_SPECIES - 1)) == 0);
-      // if (i == -3) AMREX_DEVICE_PRINTF(static_cast<const char*>("T = %f: %i %i %i\n"), prims(i, j, k, idx.QT), i, j, k);
 #endif
     });
   }
+
+  /*
+  * @brief compute primitive from conservative (local)
+  * @param array of conservative vars   [NCONS]
+  * @param array of primitive variables [NPRIM]
+  */
+  AMREX_GPU_DEVICE AMREX_FORCE_INLINE void cons2prims_point(
+    Real U[idx_t::NCONS], Real (&Q)[idx_t::NPRIM] ) {
+
+    Real rho=0.0;
+    for (int n = 0; n < NUM_SPECIES; ++n){
+      rho += U[idx.UFS + n ];
+    }
+    Real rhoinv = Real(1.0) / rho;    
+    Real ux = U[idx.UMX] * rhoinv;
+    Real uy = U[idx.UMY] * rhoinv;
+    Real uz = U[idx.UMZ] * rhoinv;
+    Real rhoke = Real(0.5) * rho * (ux * ux + uy * uy + uz * uz);
+    Real ei = (U[idx.UET] - rhoke) * rhoinv;
+    Real Y[NUM_SPECIES];
+    for (int n = 0; n < NUM_SPECIES; ++n) {
+      Y[n] = U[idx.UFS + n] * rhoinv;
+    }
+    Real T, p, cs, gamma;
+    this->RYE2TPCsG(rho, Y, ei, T, p, cs, gamma);
+    Q[idx.QRHO] = rho;
+    Q[idx.QU] = ux;
+    Q[idx.QV] = uy;
+    Q[idx.QW] = uz;
+    Q[idx.QPRES] = p;
+    Q[idx.QT] = T;
+    Q[idx.QC] = cs;
+    Q[idx.QG] = gamma; // why this is needed?
+    Q[idx.QEINT] = ei;
+    for (int n = 0; n < NUM_SPECIES; ++n) {
+      Q[idx.QFS + n] = Y[n];
+    }  
+  }
+  
 
   // belows are for high-order reconstruction
 

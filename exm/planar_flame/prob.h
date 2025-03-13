@@ -76,7 +76,6 @@ struct ProbParm {
   // unburn gases
   Real rho_u = 0.98933;               // density  [kg/m^3]
   Real T_u   = 298;                   // temperature [K] 
-  Real u_u   = 0.686;                 // velocity [m/s]
   Real p_u   = 1.0132e+05;            // pressure [Pa]  (5 atm)
   Real e_u   = -1.0255e+05;           // internal energy [J/kg]  
  
@@ -87,22 +86,26 @@ struct ProbParm {
   // burn gases
   Real rho_b = 0.19626;                 // density  [kg/m^3]
   Real T_b   = 1644.8;                  // temperature [K]  
- // Real p_b   = p_u;                     // pressure [Pa]  (1 atm)   
+  Real p_b   = p_u;                     // pressure [Pa]  (1 atm)   
   Real e_b   = -5.1641e+05 ;            // internal energy [J/kg]
+  Real drho = rho_b - rho_u;
+
  
   // butn mass fractions
   GpuArray<Real, NUM_SPECIES> Y_b = {5.1557e-07,0.11471,0.12917,8.5022e-09,4.5034e-06,0.00021046,4.7965e-07,3.3189e-08,0.7559};
 
   // geometrical parameters                                     
-  Real Yflame = 0.0425;
-  Real Sf     =  -0.49; // estimated burning velocity
-  Real lf     =   423e-6; // estimated flame thickness  (507 microns)
-  Real Lx     =   0.0425;  // half-width domain
+  Real Lx     =   0.04;  // half-width domain
+  Real Ly     =   0.06;
+  Real Yflame =   0.5*Ly;
 
-  Real u_b   = (Sf*(rho_b- rho_u) + rho_u*u_u)/rho_b;                 // velocity [m/s]  (RH)
-  Real dp    = Sf*Sf*(rho_b- rho_u) - rho_b*u_b*u_b + rho_u*u_u*u_u;  // pressure difference
- 
-  Real p_b   = p_u + dp;                     // pressure [Pa]  (1 atm)    
+  Real SL     =  0.49; // estimated burning velocity
+  Real lf     =  423e-6; // estimated flame thickness  (423 microns)
+  // velocity
+  Real u_u   = 1.4*SL;                        // velocity [m/s]
+  Real u_b   = (SL*drho + rho_u*u_u)/rho_b;   // velocity [m/s]  (RH)
+  
+  Real mflow =  rho_u*u_u;  // flow rate (per area)
 
 };
 
@@ -119,9 +122,9 @@ struct methodparm_t {
 
 using ProbClosures = closures_dt< indicies_t, transport_Pele_t, multispecies_pele_gas_t<indicies_t> >;
 
-//using ProbRHS = rhs_dt< weno_t<ReconScheme::Teno5, ProbClosures>, viscous_t<methodparm_t, ProbClosures>, reactor_t<ProbClosures> >;
 using ProbRHS = rhs_dt< riemann_t<false, ProbClosures>, viscous_t<methodparm_t, ProbClosures>, reactor_t<ProbClosures> >;
 //using ProbRHS = rhs_dt< riemann_t<false, ProbClosures>, viscous_t<methodparm_t, ProbClosures>, no_source_t>;
+//using ProbRHS = rhs_dt< riemann_t<false, ProbClosures>, no_diffusive_t, reactor_t<ProbClosures> >;
 
 
 
@@ -151,16 +154,21 @@ AMREX_GPU_DEVICE AMREX_FORCE_INLINE void prob_initdata(
 
   Real wavelength = prob_parm.Lx;
   Real wave= 2.0*std::numbers::pi/wavelength;
-  // pertubation and frequency
-  const Real ypertur = 4*dx[1]; 
-  const Real Nwaves = 2;
+  // pertubation and frequency 
+  const Real ypertur = 2*prob_parm.lf; // same of flame thickness (orig 0.04)
+  const Real Nwaves = 1;
 
-  Real yinterf =  prob_parm.Yflame  + ypertur*cos(Nwaves*wave*x);
+  Real yinterf =  prob_parm.Yflame + ypertur*cos(Nwaves*wave*x);
+  // for (int n=1; n <= Nwaves; ++n){
+  //   yinterf += ypertur/n*cos(Nwaves*wave*x*n);
+  // }
   
   // smooth profile over lf 
-  const Real smooth=0.2;
+  const Real smooth=2; // the smaller the wider the spread (smooth 5, spread over -lf:lf)
   Real H = (y-yinterf)/prob_parm.lf;
   Real fburn = 0.5*tanh(smooth*H) + 0.5; // fburn   0:unburn  1:burn
+
+  fburn= 0; //switch off flame (for spark)
 
   Yu  = prob_parm.Y_u.data();
   Yb  = prob_parm.Y_b.data();
@@ -174,13 +182,20 @@ AMREX_GPU_DEVICE AMREX_FORCE_INLINE void prob_initdata(
   }
   // ensure sumY =1
   for (int n = 0; n < NUM_SPECIES; ++n) { Yt[n]   /=  sumrhoY;}
-  
- 
+  // set T and P
   Tt = prob_parm.T_u*(1.0-fburn)   + fburn*prob_parm.T_b;
-
   Pt = prob_parm.p_u*(1.0-fburn)   + fburn*prob_parm.p_b ;
   
-  //Pt = prob_parm.p_u; 
+  // ignition spark
+  Real Rspark = 5.0*prob_parm.lf;
+  Real x0 =0; Real y0= prob_parm.Yflame;
+  Real rad = sqrt((x- x0)*(x-x0) + (y- y0)*(y-y0));
+  H = (rad-Rspark)/prob_parm.lf;
+  const Real smoothspark=2.0;
+  Real fspark = 0.5*tanh(smoothspark*H) + 0.5; // fspark   0:in  1:out
+  Tt=1500.0*(1.0-fspark) + fspark*prob_parm.T_u;
+  
+
 
   // compute density  
   cls.PYT2R(Pt,Yt,Tt,rhot);
@@ -213,7 +228,7 @@ bcnormal(const Real x[AMREX_SPACEDIM], Real dratio, const Real s_int[ProbClosure
   const int UFS  = ProbClosures::UFS;
 
   
-  Real rhot, vxt,et;
+  Real rhot, vxt,et,Tt,Pt;
   const Real *Yt;
    
   const int face = (idir+1)*sgn;
@@ -221,16 +236,22 @@ bcnormal(const Real x[AMREX_SPACEDIM], Real dratio, const Real s_int[ProbClosure
   switch(face)
   {
     case  2:  // SOUTH
-      // inflow  unburn      
+      // inflow  unburn-----------------  
       rhot = prob_parm.rho_u;
-      vxt  =  prob_parm.u_u;
+      vxt  = prob_parm.u_u;
       Yt   = prob_parm.Y_u.data();
       et   = prob_parm.e_u;
-      //Pt   = prob_parm.p_u;
-      //closures.RYP2E(rhot, Yt, Pt, et);
 
-     // Maybe allow the Pressure fluctuate  dP/dy = 0   T and Y FIX
-     // calculate rhobc=f(Pinside,Tbc)  fs mflow   so ubc= mflow/rhobc
+      
+     // Allow Pressure fluctuate  dP/dy = 0   T and Y FIX
+      // rhot  = s_int[URHO]; vxt = s_int[UMY]/rhot;
+      // et    = s_int[UET]/rhot - Real(0.5) * vxt* vxt/rhot;
+      // closures.RYE2TP(rhot,Yt,et,Tt,Pt);   // give as P,T inside
+      // Tt   = prob_parm.T_u;                // T fix
+      // closures.PYT2R(Pt,Yt,Tt,rhot);       // recalculate rho
+      // closures.RYP2E(rhot, Yt, Pt, et);    // recalvulate et
+
+      // vxt = prob_parm.mflow/rhot;       // new vel
 
 
       s_ext[URHO] = rhot;
@@ -265,11 +286,7 @@ AMREX_GPU_DEVICE AMREX_FORCE_INLINE void user_source(
 AMREX_GPU_DEVICE AMREX_FORCE_INLINE void user_tagging(
     int i, int j, int k, int nt_level, auto &tagfab, const auto &sdatafab,
     const auto &geomdata, const ProbParm &prob_parm, int level) {
-  
-    constexpr Real thresholdRHO  = 0.2;
-    constexpr Real thresholdSPEC = 0.2;
-    
-
+      
     const Real *prob_lo = geomdata.ProbLo();
     const Real *prob_hi = geomdata.ProbHi();
     const Real *dx = geomdata.CellSize();
@@ -280,41 +297,37 @@ AMREX_GPU_DEVICE AMREX_FORCE_INLINE void user_tagging(
     // SPECIES  (Li and Dryer mechanism)
     //              H2 O2 H2O H O OH HO2 H2O2 N2
     // index  UFS+  0   1  2  3 4  5  6   7   8
- 
-    // tag cells based on gradients of N2 (change here)
-    const int QG = ProbClosures::URHO ;
-    Real Y = sdatafab(i,j,k,QG) + min(1e-6*sdatafab(i,j,k,QG),1e-8);
-    Real dYx = Math::abs( sdatafab(i+1,j,k,QG)- sdatafab(i-1,j,k,QG));
-    Real dYy = Math::abs( sdatafab(i,j+1,k,QG)- sdatafab(i,j-1,k,QG));
-    Real gradY = 0.5*sqrt(dYx*dYx + dYy*dYy)/Y;
 
-    bool region_of_interest =  Math::abs(y- 0.04) < 0.01;
-    bool refine_flame = (gradY > thresholdRHO);
+    
+    Real Q[ProbClosures::NPRIM],U[ProbClosures::NCONS];
+    for (int n = 0; n < ProbClosures::NCONS; ++n) {
+      U[n] = sdatafab(i,j,k,n);
+    }  
 
-    // grad of small species of H2O2
-    const int QG2 = ProbClosures::UFS + 7 ;
-    Y = sdatafab(i,j,k,QG2) + min(1e-6*sdatafab(i,j,k,QG2),1e-12);
-    dYx = Math::abs( sdatafab(i+1,j,k,QG2)- sdatafab(i-1,j,k,QG2));
-    dYy = Math::abs( sdatafab(i,j+1,k,QG2)- sdatafab(i,j-1,k,QG2));
-    gradY = 0.5*sqrt(dYx*dYx + dYy*dYy)/Y;
-  
-    bool refine_spec = (gradY > thresholdSPEC);
+    auto thermo = ProbClosures::multispecies_pele_gas_t();    
+    thermo.cons2prims_point(U,Q);
 
+    Real rho = 0.0;
+    for (int n = 0; n < NUM_SPECIES; ++n) {
+          rho += sdatafab(i,j,k,ProbClosures::UFS + n);
+    }  
+    Real c =  (Q[ProbClosures::QT]-prob_parm.T_u)/(prob_parm.T_b - prob_parm.T_u);
+
+    constexpr Real Cmax  = 0.95;constexpr Real Cmin  = 0.05;
+    bool refine_flame =   (c < Cmax) && (c > Cmin);
 
     switch (level)
     {
       case 0:        
-        tagfab(i,j,k) = region_of_interest ||  refine_flame;
+        tagfab(i,j,k) = refine_flame;
         break;
       case 1:
-        tagfab(i,j,k) = refine_flame || refine_spec ;
+        tagfab(i,j,k) = refine_flame;
         break;
       default: 
-        tagfab(i,j,k) = refine_flame || refine_spec;
+        tagfab(i,j,k) = refine_flame;
         break;
     }
-
-    if (y < 0.02) tagfab(i,j,k) = false;
 
 }
 ////////////////////////////////////////////////////////////////////////////////

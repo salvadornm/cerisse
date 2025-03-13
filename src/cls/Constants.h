@@ -57,6 +57,10 @@ namespace universal_constants {
     constexpr Real specenergy_cgs2si = 1.0e-4;                  // erg/g->J/kg
     constexpr Real specenergy_si2cgs = 1.0/specenergy_cgs2si;   // J/kg->erg/g 
 
+    // CGS <-> SI (volume specific energy rho e)  
+    constexpr Real rhoenergy_cgs2si = rho_cgs2si*specenergy_cgs2si;  // erg/cm3->J/m3
+    constexpr Real rhoenergy_si2cgs = rho_si2cgs*specenergy_si2cgs;  // J/m3 >erg/cm3 
+
     // CGS <-> SI (dynamic viscosity)  
     constexpr Real visc_cgs2si = 0.1;                     // Poise->Pa.s  
     constexpr Real visc_si2cgs = 1.0/visc_cgs2si;         // Pa.s->Poise 
@@ -66,7 +70,7 @@ namespace universal_constants {
     constexpr Real nuvisc_si2cgs = 1.0/nuvisc_cgs2si;     // m2/s->Stokes 
 
     // CGS <-> SI (thermal conductivity)  
-    constexpr Real cond_cgs2si = 1.0e-2;                  // erg/cm K->W/m K
+    constexpr Real cond_cgs2si = 1.0e-6;                  // erg/cm K->W/m K
     constexpr Real cond_si2cgs = 1.0/cond_cgs2si;         // W/m K-> erg/cm K
 
     // CGS <-> SI (mass diffussivity)  

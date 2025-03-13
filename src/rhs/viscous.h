@@ -84,8 +84,7 @@ class viscous_t {
     
     amrex::launch(bxg, [=] AMREX_GPU_DEVICE(Box const& tbx) {
 
-            auto trans = pele::physics::PhysicsType::transport();
-                      
+            auto trans = pele::physics::PhysicsType::transport();                      
             trans.get_transport_coeffs(tbx, q_y, q_T, q_rho, 
                 rhoD_arr, chi, mu_arr,xi_arr, lam_arr, ltransparm);
           });
@@ -208,6 +207,7 @@ class viscous_t {
     
     const Real muf    = interp<param::order>(iv, d1, cls_t::CMU, coeffs);
     const Real xif    = interp<param::order>(iv, d1, cls_t::CXI, coeffs);
+    const Real lamf   = interp<param::order>(iv, d1, cls_t::CLAM, coeffs);
     
     AMREX_D_TERM(Real tau11 = muf * (2.0 * u11 - (2.0 / 3.0) * divu) + xif * divu;
                , Real tau12 = muf * (u12 + u21);, Real tau13 = muf * (u13 + u31);)
@@ -216,32 +216,53 @@ class viscous_t {
     AMREX_D_TERM(flx(iv, UM1) -= tau11;, flx(iv, UM2) -= tau12;, flx(iv, UM3) -= tau13;)
    
     // energy
-    const Real lamf = interp<param::order>(iv, d1, cls_t::CLAM, coeffs);
+  
     flx(iv, cls_t::UET) -= 0.5 * (AMREX_D_TERM((q(iv, QU1) + q(ivm, QU1)) * tau11,
                                               +(q(iv, QU2) + q(ivm, QU2)) * tau12,
-                                              +(q(iv, QU3) + q(ivm, QU3)) * tau13)) +
+                                              +(q(iv, QU3) + q(ivm, QU3)) * tau13))
                                               + lamf* dTdn;
-#if NSPECIES > 1    
+    //flx(iv, cls_t::UET) -= lamf* dTdn; // temp snm
+    
+
+#if NUM_SPECIES > 1    
     // --------------------------------------------------------------------------
     // diffusion species  
     Real ymass[order_sch][NUM_SPECIES],xmole[order_sch][NUM_SPECIES];
     Real hi[order_sch][NUM_SPECIES];
+    Real yaux[NUM_SPECIES],xaux[NUM_SPECIES],haux[NUM_SPECIES];
+
+    auto thermo = typename cls_t::multispecies_pele_gas_t();
     
     amrex::IntVect ivp(iv -halfsten*amrex::IntVect::TheDimensionVector(d1));
     for (int l = 0; l < order_sch; l++) {
       ivp +=  amrex::IntVect::TheDimensionVector(d1);
-      for (int n = 0; n < NUM_SPECIES; ++n) { ymass[l][n] = q(ivp,  cls_t::QFS + n); }
-      cls->Y2X(ymass[l], xmole[l])    
-      cls-> RTY2Hi(q(ivp,  cls_t::QRHO), q(ivp,   cls_t::QT), ymass[l], hi[l]);
+      for (int n = 0; n < NUM_SPECIES; ++n) { 
+        yaux[n] = q(ivp,  cls_t::QFS + n); 
+      }
+      // calculate xmol and specific enthalpies
+      thermo.Y2X(yaux, xaux);    
+      thermo.RTY2Hi(q(ivp,  cls_t::QRHO), q(ivp,   cls_t::QT), yaux, haux);
+
+      // store in temp array 
+      for (int n = 0; n < NUM_SPECIES; ++n) { 
+        xmole[l][n] = xaux[n];
+        ymass[l][n] = yaux[n]; 
+        hi[l][n]    = haux[n];
+      }
+     
     }
     
-    const Real dpdx  = normal_diff<param::order>(iv, d1, cls_t::QPRES, q, dxinv); 
-    const Real pface = interp<param::order>(iv, d1, cls_t::QPRES, q);
-    const Real dlnp = dpdx/pface;
+    // const Real dpdx  = normal_diff<param::order>(iv, d1, cls_t::QPRES, q, dxinv); 
+    // const Real pface = interp<param::order>(iv, d1, cls_t::QPRES, q);
+    // //const Real dlnp = dpdx/pface;
+    Real dlnp = 0.0;  
+
      
     Real Vc = 0.0;
+    Real Xface,Yface,hface,dXdx;
+    Real Yf[NUM_SPECIES],hf[NUM_SPECIES];
     for (int n = 0; n < NUM_SPECIES; n++) {
-      Real Xface = 0.0,Yface= 0.0,hface=0.0,dXdx=0.0;
+      Xface=0.0;Yface= 0.0;hface=0.0;dXdx=0.0;
       for (int l = 0; l < param::order; l++) {
         Xface += xmole[l][n]*INTcoef(l);
         Yface += ymass[l][n]*INTcoef(l);
@@ -249,20 +270,28 @@ class viscous_t {
         dXdx  += xmole[l][n]*CDcoef(l);
       }      
       dXdx  /= dxinv[d1];
+      Yf[n] = Yface; hf[n] = hface;
+
       const Real rhoD_f = interp<param::order>(iv, d1, cls_t::CRHOD + n, coeffs); 
 
       const Real Vd = -rhoD_f * (dXdx + (Xface - Yface) * dlnp);
       Vc += Vd;
       flx(iv, cls_t::UFS + n) += Vd; 
       flx(iv, cls_t::UET)     += Vd * hface;
-    }
+     }
     // Add correction velocity to fluxes so sum(Vd) = 0
-    for (int n = 0; n < NUM_SPECIES; ++n) {
-      flx(iv, cls_t::UFS + n)-= Yface * Vc;
-      flx(iv, cls_t::UET)    -= Yface * hface * Vc;
+    for (int n = 0; n < NUM_SPECIES; ++n) {       
+      flx(iv, cls_t::UFS + n)-= Yf[n] * Vc;
+      flx(iv, cls_t::UET)    -= Yf[n] * hf[n] * Vc;
     }
+
     // --------------------------------------------------------------------------
 #endif                                           
+
+
+      
+      
+       
   
     }
   // ---------------------------------------------------------------------------------------------  
