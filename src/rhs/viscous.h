@@ -254,15 +254,14 @@ class viscous_t {
     
     // const Real dpdx  = normal_diff<param::order>(iv, d1, cls_t::QPRES, q, dxinv); 
     // const Real pface = interp<param::order>(iv, d1, cls_t::QPRES, q);
-    // //const Real dlnp = dpdx/pface;
+    // const Real dlnp = dpdx/pface;
     Real dlnp = 0.0;  
 
      
-    Real Vc = 0.0;
-    Real Xface,Yface,hface,dXdx;
+    Real Vc = 0.0;    
     Real Yf[NUM_SPECIES],hf[NUM_SPECIES];
     for (int n = 0; n < NUM_SPECIES; n++) {
-      Xface=0.0;Yface= 0.0;hface=0.0;dXdx=0.0;
+      Real Xface = 0.0, Yface = 0.0, hface = 0.0, dXdx = 0.0;
       for (int l = 0; l < param::order; l++) {
         Xface += xmole[l][n]*INTcoef(l);
         Yface += ymass[l][n]*INTcoef(l);

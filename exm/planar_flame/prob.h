@@ -168,7 +168,7 @@ AMREX_GPU_DEVICE AMREX_FORCE_INLINE void prob_initdata(
   Real H = (y-yinterf)/prob_parm.lf;
   Real fburn = 0.5*tanh(smooth*H) + 0.5; // fburn   0:unburn  1:burn
 
-  fburn= 0; //switch off flame (for spark)
+  //fburn= 0; //switch off flame (for spark)
 
   Yu  = prob_parm.Y_u.data();
   Yb  = prob_parm.Y_b.data();
@@ -187,13 +187,13 @@ AMREX_GPU_DEVICE AMREX_FORCE_INLINE void prob_initdata(
   Pt = prob_parm.p_u*(1.0-fburn)   + fburn*prob_parm.p_b ;
   
   // ignition spark
-  Real Rspark = 5.0*prob_parm.lf;
-  Real x0 =0; Real y0= prob_parm.Yflame;
-  Real rad = sqrt((x- x0)*(x-x0) + (y- y0)*(y-y0));
-  H = (rad-Rspark)/prob_parm.lf;
-  const Real smoothspark=2.0;
-  Real fspark = 0.5*tanh(smoothspark*H) + 0.5; // fspark   0:in  1:out
-  Tt=1500.0*(1.0-fspark) + fspark*prob_parm.T_u;
+  // Real Rspark = 5.0*prob_parm.lf;
+  // Real x0 =0; Real y0= prob_parm.Yflame;
+  // Real rad = sqrt((x- x0)*(x-x0) + (y- y0)*(y-y0));
+  // H = (rad-Rspark)/prob_parm.lf;
+  // const Real smoothspark=2.0;
+  // Real fspark = 0.5*tanh(smoothspark*H) + 0.5; // fspark   0:in  1:out
+  // Tt=1500.0*(1.0-fspark) + fspark*prob_parm.T_u;
   
 
 

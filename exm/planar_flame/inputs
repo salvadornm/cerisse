@@ -6,7 +6,7 @@ stop_time = 0.1
 time_step =1e-7
 
 # Geometry 
-geometry.is_periodic = 1 1 
+geometry.is_periodic = 1 0 
 geometry.coord_sys   = 0  # 0 => cart, 1 => RZ  2=>spherical
 geometry.prob_lo     = -0.045  0.0 
 geometry.prob_hi     =  0.045  0.06
@@ -16,8 +16,8 @@ geometry.prob_hi     =  0.045  0.06
 # 1 = Inflow             4 = SlipWall
 # 2 = Outflow            5 = NoSlipWall
 # 6 = user defined
-cns.lo_bc = -1  -1 
-cns.hi_bc = -1  -1 
+cns.lo_bc = -1  1 
+cns.hi_bc = -1  2 
 cns.screen_output = 1 # 0=quiet, 1=verbose
 cns.verbose =0       # 0=quiet, 1=verbose
 
