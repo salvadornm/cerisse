@@ -155,7 +155,7 @@ AMREX_GPU_DEVICE AMREX_FORCE_INLINE void prob_initdata(
   Real wavelength = prob_parm.Lx;
   Real wave= 2.0*std::numbers::pi/wavelength;
   // pertubation and frequency 
-  const Real ypertur = 2*prob_parm.lf; // same of flame thickness (orig 0.04)
+  const Real ypertur = 0.5*prob_parm.lf; // orig 0.04 flame thick.
   const Real Nwaves = 1;
 
   Real yinterf =  prob_parm.Yflame + ypertur*cos(Nwaves*wave*x);
@@ -164,7 +164,7 @@ AMREX_GPU_DEVICE AMREX_FORCE_INLINE void prob_initdata(
   // }
   
   // smooth profile over lf 
-  const Real smooth=2; // the smaller the wider the spread (smooth 5, spread over -lf:lf)
+  const Real smooth=5; // the smaller the wider the spread (smooth 5, spread over -lf:lf)
   Real H = (y-yinterf)/prob_parm.lf;
   Real fburn = 0.5*tanh(smooth*H) + 0.5; // fburn   0:unburn  1:burn
 
@@ -290,8 +290,8 @@ AMREX_GPU_DEVICE AMREX_FORCE_INLINE void user_tagging(
     const Real *prob_lo = geomdata.ProbLo();
     const Real *prob_hi = geomdata.ProbHi();
     const Real *dx = geomdata.CellSize();
-    Real x = prob_lo[0] + (i + Real(0.5)) * dx[0];
-    Real y = prob_lo[1] + (j + Real(0.5)) * dx[1];
+    //Real x = prob_lo[0] + (i + Real(0.5)) * dx[0];
+    //Real y = prob_lo[1] + (j + Real(0.5)) * dx[1];
    
 
     // SPECIES  (Li and Dryer mechanism)

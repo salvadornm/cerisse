@@ -22,7 +22,7 @@ class viscous_t {
   ~viscous_t() {}
 
   // vars accessed by functions 
-  int order_sch=param::order;
+  int order_sch=param::order;  
   typedef Array1D<Real, 0, param::order> arrayNumCoef;
   arrayNumCoef CDcoef,INTcoef;
   int halfsten = param::order / 2;
@@ -216,14 +216,11 @@ class viscous_t {
     AMREX_D_TERM(flx(iv, UM1) -= tau11;, flx(iv, UM2) -= tau12;, flx(iv, UM3) -= tau13;)
    
     // energy
-  
     flx(iv, cls_t::UET) -= 0.5 * (AMREX_D_TERM((q(iv, QU1) + q(ivm, QU1)) * tau11,
                                               +(q(iv, QU2) + q(ivm, QU2)) * tau12,
                                               +(q(iv, QU3) + q(ivm, QU3)) * tau13))
                                               + lamf* dTdn;
-    //flx(iv, cls_t::UET) -= lamf* dTdn; // temp snm
     
-
 #if NUM_SPECIES > 1    
     // --------------------------------------------------------------------------
     // diffusion species  
@@ -256,7 +253,6 @@ class viscous_t {
     // const Real pface = interp<param::order>(iv, d1, cls_t::QPRES, q);
     // const Real dlnp = dpdx/pface;
     Real dlnp = 0.0;  
-
      
     Real Vc = 0.0;    
     Real Yf[NUM_SPECIES],hf[NUM_SPECIES];
@@ -286,13 +282,8 @@ class viscous_t {
 
     // --------------------------------------------------------------------------
 #endif                                           
-
-
       
-      
-       
-  
-    }
+  }
   // ---------------------------------------------------------------------------------------------  
   /**
   * @brief Compute diffusion fluxes in IB/EB.
@@ -332,47 +323,30 @@ class viscous_t {
     if (intersolid_flx) return;  // flux =0  inside solid   
 
     Real u11,dTdn,u21,u12,u22,u31,u13,u33,muf,xif,lamf;
-    
-    // reduce to second order close to walls
-    if (close_to_wall) {        
-      constexpr int order = 2;
-      dTdn = normal_diff<order>(iv, d1, cls_t::QT, q, dxinv);
-      u11  = normal_diff<order>(iv, d1, QU1, q, dxinv);
-#if (AMREX_SPACEDIM >= 2)
-      u21  = normal_diff<order>(iv, d1, QU2, q, dxinv);
-      u12  = tangent_diff<order>(iv, d1, d2, QU1, q, dxinv);
-      u22  = tangent_diff<order>(iv, d1, d2, QU2, q, dxinv);
-#endif
-#if (AMREX_SPACEDIM == 3)
-      Real u31  = normal_diff<order>(iv, d1, QU3, q, dxinv);
-      Real u13  = tangent_diff<order>(iv, d1, d3, QU1, q, dxinv);
-      Real u33  = tangent_diff<order>(iv, d1, d3, QU3, q, dxinv);
-#endif  
-      // properties
-      muf  = interp<order>(iv, d1, cls_t::CMU, coeffs);
-      xif  = interp<order>(iv, d1, cls_t::CXI, coeffs);
-      lamf = interp<order>(iv, d1, cls_t::CLAM, coeffs);
-    }
-    else
-    {
-      dTdn = normal_diff<param::order>(iv, d1, cls_t::QT, q, dxinv);
-      u11  = normal_diff<param::order>(iv, d1, QU1, q, dxinv);
-#if (AMREX_SPACEDIM >= 2)
-      u21  = normal_diff<param::order>(iv, d1, QU2, q, dxinv);
-      u12  = tangent_diff<param::order>(iv, d1, d2, QU1, q, dxinv);
-      u22  = tangent_diff<param::order>(iv, d1, d2, QU2, q, dxinv);
-#endif
-#if (AMREX_SPACEDIM == 3)
-      u31  = normal_diff<param::order>(iv, d1, QU3, q, dxinv);
-      u13  = tangent_diff<param::order>(iv, d1, d3, QU1, q, dxinv);
-      u33  = tangent_diff<param::order>(iv, d1, d3, QU3, q, dxinv);
-#endif  
-      // properties
-      muf  = interp<param::order>(iv, d1, cls_t::CMU, coeffs);
-      xif  = interp<param::order>(iv, d1, cls_t::CXI, coeffs);
-      lamf = interp<param::order>(iv, d1, cls_t::CLAM, coeffs);
-    }
 
+    
+    constexpr int order_default = 2; // reduce to second order close to walls
+    constexpr int order_runtime = (close_to_wall ? order_default : order_sch);
+
+    int order_local = order_runtime;
+        
+    dTdn = normal_diff<order_runtime>(iv, d1, cls_t::QT, q, dxinv);
+    u11  = normal_diff<order_runtime>(iv, d1, QU1, q, dxinv);
+#if (AMREX_SPACEDIM >= 2)
+    u21  = normal_diff<order_runtime>(iv, d1, QU2, q, dxinv);
+    u12  = tangent_diff<order_runtime>(iv, d1, d2, QU1, q, dxinv);
+    u22  = tangent_diff<order_runtime>(iv, d1, d2, QU2, q, dxinv);
+#endif
+#if (AMREX_SPACEDIM == 3)
+    Real u31  = normal_diff<order_runtime>(iv, d1, QU3, q, dxinv);
+    Real u13  = tangent_diff<order_runtime>(iv, d1, d3, QU1, q, dxinv);
+    Real u33  = tangent_diff<order_runtime>(iv, d1, d3, QU3, q, dxinv);
+#endif  
+    // properties
+    muf  = interp<order_runtime>(iv, d1, cls_t::CMU, coeffs);
+    xif  = interp<order_runtime>(iv, d1, cls_t::CXI, coeffs);
+    lamf = interp<order_runtime>(iv, d1, cls_t::CLAM, coeffs);    
+    
     const Real divu   = AMREX_D_TERM(u11, +u22, +u33);
     
     AMREX_D_TERM(Real tau11 = muf * (2.0 * u11 - (2.0 / 3.0) * divu) + xif * divu;
@@ -386,9 +360,70 @@ class viscous_t {
                                               +(q(iv, QU2) + q(ivm, QU2)) * tau12,
                                               +(q(iv, QU3) + q(ivm, QU3)) * tau13)) +
                                               + lamf* dTdn;
+#if NUM_SPECIES > 1    
+    // --------------------------------------------------------------------------
+    // diffusion species  (this array should be order_local)
+    Real ymass[order_sch][NUM_SPECIES],xmole[order_sch][NUM_SPECIES];
+    Real hi[order_sch][NUM_SPECIES];
+    Real yaux[NUM_SPECIES],xaux[NUM_SPECIES],haux[NUM_SPECIES];
 
-  }
-  // ---------------------------------------------------------------------------------------------
+    auto thermo = typename cls_t::multispecies_pele_gas_t();
+
+    amrex::IntVect ivp(iv -halfsten*amrex::IntVect::TheDimensionVector(d1));
+    for (int l = 0; l < order_local; l++) {
+      ivp +=  amrex::IntVect::TheDimensionVector(d1);
+      for (int n = 0; n < NUM_SPECIES; ++n) { 
+        yaux[n] = q(ivp,  cls_t::QFS + n); 
+      }
+      // calculate xmol and specific enthalpies
+      thermo.Y2X(yaux, xaux);    
+      thermo.RTY2Hi(q(ivp,  cls_t::QRHO), q(ivp,   cls_t::QT), yaux, haux);
+
+      // store in temp array 
+      for (int n = 0; n < NUM_SPECIES; ++n) { 
+        xmole[l][n] = xaux[n];
+        ymass[l][n] = yaux[n]; 
+        hi[l][n]    = haux[n];
+      }
+     
+    }
+    // const Real dpdx  = normal_diff<order_runtime>(iv, d1, cls_t::QPRES, q, dxinv); 
+    // const Real pface = interp<order_runtime>(iv, d1, cls_t::QPRES, q);
+    // const Real dlnp = dpdx/pface;
+    Real dlnp = 0.0;  
+     
+    Real Vc = 0.0;    
+    Real Yf[NUM_SPECIES],hf[NUM_SPECIES];
+    for (int n = 0; n < NUM_SPECIES; n++) {
+      Real Xface = 0.0, Yface = 0.0, hface = 0.0, dXdx = 0.0;
+      for (int l = 0; l <order_local; l++) {
+        Xface += xmole[l][n]*INTcoef(l);
+        Yface += ymass[l][n]*INTcoef(l);
+        hface += hi[l][n]*INTcoef(l);
+        dXdx  += xmole[l][n]*CDcoef(l);
+      }      
+      dXdx  /= dxinv[d1];
+      Yf[n] = Yface; hf[n] = hface;
+
+      const Real rhoD_f = interp<order_runtime>(iv, d1, cls_t::CRHOD + n, coeffs); 
+
+      const Real Vd = -rhoD_f * (dXdx + (Xface - Yface) * dlnp);
+      Vc += Vd;
+      flx(iv, cls_t::UFS + n) += Vd; 
+      flx(iv, cls_t::UET)     += Vd * hface;
+     }
+    // Add correction velocity to fluxes so sum(Vd) = 0
+    for (int n = 0; n < NUM_SPECIES; ++n) {       
+      flx(iv, cls_t::UFS + n)-= Yf[n] * Vc;
+      flx(iv, cls_t::UET)    -= Yf[n] * hf[n] * Vc;
+    }
+  // --------------------------------------------------------------------------
+#endif 
+
+
+  }   
+
+
 
 
   }; 
