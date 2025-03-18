@@ -151,8 +151,15 @@ class CNS : public amrex::AmrLevel {
   static int dist_linear;
   static int order_rk;
   static int stages_rk;
+
+  // IBM-specific keywords
   static bool ib_move;
   static bool plot_surf;
+
+  // EB-specific keywords
+  static amrex::Real eb_weight;
+  static bool eb_redistribution;
+  static std::string eb_redistribution_type;
 
  public:
   /*static inline*/ PROB::ProbRHS prob_rhs;

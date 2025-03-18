@@ -286,9 +286,20 @@ void CNS::compute_rhs(MultiFab& statemf, Real dt, FluxRegister* fr_as_crse, Flux
     FArrayBox primf(bxg, cls_h.NPRIM, The_Async_Arena());
     Array4<Real> const& prims= primf.array();
 
+    
+#ifdef CNS_USE_EB     
+    // auxiliar arrays for redistribution 
+    FArrayBox divcfab(bxg, cls_h.NCONS, The_Async_Arena());
+    Array4<Real> const& divc= divcfab.array();    
+    FArrayBox consfab(bxg, cls_h.NCONS, The_Async_Arena());
+    Array4<Real> const& cons= consfab.array();    
+    amrex::ParallelFor(bxg, cls_h.NCONS,
+      [=] AMREX_GPU_DEVICE (int i, int j, int k, int n) noexcept
+      {
+        cons(i,j,k,n) = state(i,j,k,n);
+      });
+#endif
     // .................................
-    //FArrayBox tempf(bxg, cls_h.NCONS, The_Async_Arena());
-    //Array4<Real> const& fluxt = tempf.array();  // >- original
 
   
     std::array<FArrayBox ,AMREX_SPACEDIM> fluxt;
@@ -368,22 +379,33 @@ void CNS::compute_rhs(MultiFab& statemf, Real dt, FluxRegister* fr_as_crse, Flux
     }                  
 
                         
-
-  
-
-
 #if CNS_USE_EB    
     // internal geometry fluxes
     const Box&  ebbox  = mfi.growntilebox(0);  // box without ghost points 
     const auto& flag = (*EBM::eb.ebflags_a[level])[mfi];
     FabType t = flag.getType(ebbox);
-    if (FabType::singlevalued == t){
+
+    const bool fab_with_eb = (FabType::singlevalued == t);
+
+    if (fab_with_eb) {
       EBM::eb.ebflux(geom,mfi, prims, {AMREX_D_DECL(&fluxt[0], &fluxt[1], &fluxt[2])},state, cls_d,level);
     }
   
-
-    // Redistribution ** printf("---- EBM 313  -----\n");**********
+    // redistribution (WARNING at this point state has the rhs, prims has prims)
     
+    // compute divc here
+    amrex::ParallelFor(bxg, cls_h.NCONS,  
+    [=] AMREX_GPU_DEVICE (int i, int j, int k, int n) noexcept
+    {
+      divc(i,j,k,n) = state(i,j,k,n);
+    });  
+
+    // do redistribution only in box with EB
+    if (eb_redistribution && fab_with_eb){
+      EBM::eb.redist(geom,mfi,cons,divc, {AMREX_D_DECL(&fluxt[0], &fluxt[1], &fluxt[2])},
+                    state, cls_d,level,dt,h_phys_bc);
+    }                    
+      
 #endif
 
     // Source terms, including update mask (e.g inside IB)

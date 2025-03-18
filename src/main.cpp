@@ -53,7 +53,7 @@ int main(int argc, char* argv[])
 
   // Setup -------------------------------------------------------------------
   {
-    Real timer_init = amrex::second();
+    timer_init = amrex::second();
     Amr amr(getLevelBld());
 #ifdef AMREX_USE_GPIBM
     amrex::Print() << " Using IBM .. " << std::endl;

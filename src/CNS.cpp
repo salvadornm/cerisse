@@ -11,6 +11,11 @@ bool CNS::record_probe = false;
 bool CNS::dt_dynamic = false;
 bool CNS::ib_move = false;
 bool CNS::plot_surf = false;
+
+Real CNS::eb_weight = 0.0;
+bool CNS::eb_redistribution = false;
+std::string CNS::eb_redistribution_type = "NoRedist";
+
 int CNS::nstep_screen_output = 10;
 int CNS::order_rk = 2;
 int CNS::stages_rk = 2;
@@ -107,6 +112,7 @@ void CNS::read_params() {
   }
 
 #if AMREX_USE_GPIBM
+  // specific keywords for IB boundaries
   ParmParse ppib("ib");
   if (!ppib.query("move", ib_move)) {
     amrex::Abort("ib.move not specified (0=false, 1=true)");
@@ -115,6 +121,22 @@ void CNS::read_params() {
     amrex::Abort("ib.plot_surf not specified (0=false, 1=true)");
   }
 #endif
+  
+#if CNS_USE_EB 
+  // specific keywords for EB boundaries
+  ParmParse ppeb2("eb2");  
+  ppeb2.query("eb_weight",eb_weight); 
+  ppeb2.query("redistribution_type", eb_redistribution_type);
+  if (eb_redistribution_type != "StateRedist" && eb_redistribution_type != "FluxRedist" &&
+      eb_redistribution_type != "NoRedist") {
+    amrex::Abort( " input file: redistribution_type must be StateRedist/FluxRedist/NoRedist");
+  }
+  if (eb_redistribution_type != "NoRedist") eb_redistribution =true;
+  // This communicates to the class (not very elegant)
+  EBM::eb.eb_weight = eb_weight;
+  EBM::eb.redistribution_type = eb_redistribution_type; 
+#endif
+
 
 #if AMREX_USE_GPU
   amrex::Gpu::htod_memcpy(d_prob_closures, h_prob_closures,
@@ -402,7 +424,7 @@ void CNS::computeNewDt(int finest_level, int sub_cycle, Vector<int> &n_cycle,
  [[nodiscard]] GpuArray<Real,AMREX_SPACEDIM> CNS::maxEigen() {
   BL_PROFILE("CNS::maxEigen()");
 
-  const auto dx = geom.CellSizeArray();
+  //const auto dx = geom.CellSizeArray();
   PROB::ProbClosures const *d_cls = d_prob_closures;
 
   // Get multifabs
@@ -520,7 +542,7 @@ void CNS::post_regrid(int lbase, int new_finest) {
   EBM::eb.destroy_mf(level);
   EBM::eb.build_mf(grids, dmap, level);
 
-  // update volfrac and EB data
+  // update volfrac and relevant EB data
   const auto& ebfactory = dynamic_cast<EBFArrayBoxFactory const&>(Factory());
 
   EBM::eb.volmf_a[level]  = &(ebfactory.getVolFrac()); 
@@ -528,12 +550,19 @@ void CNS::post_regrid(int lbase, int new_finest) {
   EBM::eb.areamcf_a[level] = ebfactory.getAreaFrac();  
   EBM::eb.ebflags_a[level] = &(ebfactory.getMultiEBCellFlagFab());
   EBM::eb.bcareamcf_a[level] = &(ebfactory.getBndryArea());
-    
-  
-  // EBM::eb.bndrycent = &(ebfactory.getBndryCent());
+  EBM::eb.bndrycent_a[level] = &(ebfactory.getBndryCent());
+
+  // Level mask for redistribution (stored as object not pointer)
+  EBM::eb.level_mask_a[level].clear();
+  EBM::eb.level_mask_a[level].define(grids, dmap, 1, 3);
+  EBM::eb.level_mask_a[level].BuildMask(
+        geom.Domain(), geom.periodicity(), CNSConstants::level_mask_covered,
+        CNSConstants::level_mask_notcovered, CNSConstants::level_mask_physbnd,
+        CNSConstants::level_mask_interior);
+
   // EBM::eb.facecent  = ebfactory.getFaceCent();
 
-  
+  // Calculate markers  
   EBM::eb.computeMarkers(level);
 
 #endif
@@ -854,7 +883,6 @@ void CNS::writePlotFile(const std::string &dir, std::ostream &os,
 #endif
 
 #ifdef CNS_USE_EB
-  //printf(" cnt= %d level=%d n_data_items=%d   \n",cnt,level,n_data_items);
   plotMF.setVal(0.0_rt, cnt, 0, nGrow); 
   EBM::eb.bmf_a[level]->copytoRealMF(plotMF, 0, cnt);
 
