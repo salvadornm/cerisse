@@ -93,7 +93,7 @@ public:
   std::string redistribution_type;
 
   // aux vars for redistribution
-  const bool use_wts_in_divnc = true; //true
+  const bool use_wts_in_divnc = false; //true
   const int srd_max_order = 2; // 2
   const amrex::Real target_volfrac = 0.5; //0.5
   const amrex::Real fac_for_deltaR = 1.0;
@@ -172,33 +172,28 @@ public:
     if (!bmf_a.empty())   { delete bmf_a.at(lev); }
   }
   ////////////////////////////////////////////////////////////////////////////
+  /**
+  * @brief Update boolean markers solid and partially solid
+  * @param lev current AMR level  
+  **/
   void computeMarkers(int lev)
   {
-    // amrex::Print( ) << " oo computeMarkers  lev=" << lev << std::endl;  
 
     auto& mfab = *bmf_a[lev];
 
     for (MFIter mfi(mfab, false); mfi.isValid(); ++mfi) {
-      const Box& bx = mfi.tilebox();
-
-    
-      // make box bigger to include GHOST
+      
+      // make box including GHOST
       const Box& bxg = mfi.growntilebox(cls_t::NGHOST);
 
-      const auto& ebMarkers = mfab.array(mfi); // boolean array
-     
-      Array4<const Real> vf = (*volmf_a[lev]).const_array(mfi);      
- 
+      const auto& ebMarkers = mfab.array(mfi);           
       const auto& flag_arr = (*ebflags_a[lev]).const_array(mfi);
 
       amrex::ParallelFor(
-        bxg, [=] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {       //snm                
-
+        bxg, [=] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {                       
         ebMarkers(i, j, k, 0) = flag_arr(i,j,k).isCovered();  
-        ebMarkers(i, j, k, 1) = flag_arr(i,j,k).isSingleValued();  
-  
+        ebMarkers(i, j, k, 1) = flag_arr(i,j,k).isSingleValued();    
       });
-
 
     }
   }
@@ -269,6 +264,30 @@ public:
                 dxinv[1] * (apy(i, j + 1, k) * fyp - apy(i, j, k) * fym) );            
 #endif      
 
+                  //
+                  Real T = prims(i,j,k,cls_t::QT);
+                  //if ((i==48) && (j==75)) 
+                   if ((i==48) && (j==84)) 
+                  {
+                    if (n==0){
+                    printf(" [ebflux] i= %d j= %d n=%d \n",i,j,n);
+                    printf(" vfrac = %f  bcarea=%f \n",vfrac(i,j,k),bcarea(i,j,k));                                   
+                    printf(" apx(i)= %f apx(i+1)= %f  \n",apx(i, j, k),apx(i + 1, j, k) );
+                    printf(" apy(j)= %f apy(j+1)= %f  \n",apy(i, j, k),apy(i , j+1, k) );
+                    printf(" rhs= %f  \n",rhs(i,j,k,n));
+                    printf(" nx =%f ny= %f  (towrd liq)\n",-normxyz(i,j,k,0),-normxyz(i,j,k,1));                    
+                    }                      
+                    if (n==0) {
+                      for (int np = 0; np < cls_t::NPRIM; np++) {
+                        printf(" prims(%d)= %f  \n",np,prims(i,j,k,np));
+                      }
+                    }
+                    printf(" n=%d X:  fxp= %f fxm= %f  \n",n,fxp,fxm );
+                    printf("      Y:  fyp= %f fym= %f  \n",fyp,fym );
+                     
+                  }  
+                  //
+
             }
 
             // build wall fluxes
@@ -276,7 +295,7 @@ public:
             // primitive array at surface
             amrex::GpuArray<Real, cls_t::NPRIM> prim_wall = {0.0};
             for (int n = 0; n < cls_t::NPRIM; n++) {
-              prim_wall[n] = prims(i,j,k,n);   // interpolate                       
+              prim_wall[n] = prims(i,j,k,n);   // interpolate   ???????????                    
             }  
             // normal to surface 
             amrex::Real norm_wall [AMREX_SPACEDIM]= {0.0};
@@ -287,9 +306,25 @@ public:
 
             // calculate wall flux and add it to rhs
             wallmodel::wall_flux(geom,i,j,k,norm_wall,prim_wall,flux_wall,cls);             
+
+
+            if ((i==48) && (j==84)) {
+              for (int n = 0; n < cls_t::NCONS; n++) {                
+                printf(" flux_wall(%d)= %f  \n",n,flux_wall[n]);             
+              }  
+            }  
+
             for (int n = 0; n < cls_t::NCONS; n++) {
-              rhs(i,j,k,n) += flux_wall[n]*vfracinv*bcarea(i,j,k,0)*dxinv[0];
+              rhs(i,j,k,n) += flux_wall[n]*vfracinv*bcarea(i,j,k,0)*dxinv[0]; //?????
             }
+
+
+            if ((i==48) && (j==84)) {
+              for (int n = 0; n < cls_t::NCONS; n++) {                
+                printf(" rhs (%d) after wall= %f  \n",n,rhs(i,j,k,n));             
+              }  
+            }
+
                         
           }
          
@@ -349,8 +384,7 @@ public:
     FArrayBox srd_update_scale_fab(bxg, 1);  
     auto const& redistwgt = redistwgt_fab.array();
     auto const& srd_update_scale = srd_update_scale_fab.array();
-
-    // obsolete call below ?? originally [=] 
+     
     amrex::ParallelFor(bxg, [=, this]  AMREX_GPU_DEVICE(int i, int j, int k) noexcept {
       redistwgt(i, j, k) = vfrac(i, j, k);
       srd_update_scale(i, j, k) = eb_weight; 
@@ -358,8 +392,8 @@ public:
 
 
     
-    // create temporary array and fill first with weights
-    FArrayBox tmpfab(bxg, cls_t::NCONS, The_Async_Arena());
+    // create temporary array and fill first with weights (will be used as weights)
+    FArrayBox tmpfab(bxg, 1, The_Async_Arena()); // cls_t::NCONS
     Array4<Real> scratch = tmpfab.array();    
     if (redistribution_type == "FluxRedist") {
       amrex::ParallelFor(bxg, [=] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {

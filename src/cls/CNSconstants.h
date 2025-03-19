@@ -17,6 +17,8 @@ constexpr int level_mask_notcovered = 2;  // ghost cells not covered
 constexpr int level_mask_physbnd = 3;     // outside domain
 
 constexpr amrex::Real min_react_temp = 350.0; // minimum reaction temperature
+constexpr amrex::Real min_euler_temp = 20.0;  // minimum temperature for Euler solvers
+
 
 }; // namespace CNSConstants
 

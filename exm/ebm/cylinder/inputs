@@ -1,8 +1,8 @@
 # Simulation time
-max_step  =  2000
+max_step  =  800
 stop_time =  4.0
-cfl = 0.3
-#time_step = 5e-7
+#cfl = 0.1
+time_step = 1.2e-6
 
 cns.order_rk  = -2 # original
 cns.stages_rk = 2
@@ -25,7 +25,7 @@ cns.verbose = 0       # 0=quiet, 1=verbose
 amr.v               = 1 # quiet
 
 # Refinement and regridding 
-amr.n_cell            = 160 320   # orign 80 x 160 with 1 lev
+amr.n_cell            = 80 160   # orign 80 x 160 with 1 lev
 amr.max_level         = 0      # maximum level number allowed
 amr.ref_ratio         = 2 2    # refinement ratio per level
 amr.regrid_int        = 5      # how often to regrid per level

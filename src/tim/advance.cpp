@@ -401,7 +401,7 @@ void CNS::compute_rhs(MultiFab& statemf, Real dt, FluxRegister* fr_as_crse, Flux
     });  
 
     // do redistribution only in box with EB
-    if (eb_redistribution && fab_with_eb){
+    if (eb_redistribution && fab_with_eb){    
       EBM::eb.redist(geom,mfi,cons,divc, {AMREX_D_DECL(&fluxt[0], &fluxt[1], &fluxt[2])},
                     state, cls_d,level,dt,h_phys_bc);
     }                    

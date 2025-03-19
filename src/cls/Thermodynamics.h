@@ -4,8 +4,11 @@
 using namespace amrex;
 
 #include <Constants.h>
+#include <CNSconstants.h>
+
 
 using namespace universal_constants;
+using namespace CNSConstants;
 
 // Philosophy
 // Keep all thermodynamics functions local, acting on a single point
@@ -15,25 +18,28 @@ template <typename idx_t>
 class calorifically_perfect_gas_t {
  protected:
  public:
-  Real gamma = 1.40;   // ratio of specific heats
+  Real gamma   = 1.40;   // ratio of specific heats
   Real mw = 28.96e-3;  // mean molecular weight air kg/mol
+
+  Real gamma_m1 = gamma - Real(1.0);
   Real Ru = gas_constant;
-  Real cv = Ru / (mw * (gamma - Real(1.0)));
+  Real cv = Ru / (mw * gamma_m1);
   Real cp = gamma * cv;
   Real Rspec = Ru / mw;
+  Real ei_min = Rspec*min_euler_temp/gamma_m1;
 
   AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE void RYP2E(const Real R,
                                                       const Real* /*Y*/,
                                                       const Real P,
                                                       Real& E) const {
-    E = P / (R * (gamma - Real(1.0)));
+    E = P / (R * gamma_m1);
   }
 
   AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE void RYE2TP(const Real R,
                                                        const Real* /*Y*/,
                                                        const Real E, Real& T,
                                                        Real& P) const {
-    P = (gamma - Real(1.0)) * R * E;
+    P = gamma_m1 * R * E;
     T = P / (R * Rspec);
   }
 
@@ -58,6 +64,7 @@ class calorifically_perfect_gas_t {
                            vel[0] * vel[0] + vel[1] * vel[1] + vel[2] * vel[2]);
     ke = Real(0.5) * rho * ke;
     Real eint = (cons(i, j, k, idx_t::UET) - ke) / rho;
+    eint = max(eint,ei_min); //clip energy
     Real T = eint / cv;
 
     Real cs = std::sqrt(gamma * Rspec * T);
@@ -71,6 +78,7 @@ class calorifically_perfect_gas_t {
   AMREX_GPU_DEVICE AMREX_FORCE_INLINE void prims2fluxes(
       int i, int j, int k, const Array4<Real>& prims,
       const Array4<Real>& fluxes, const GpuArray<int, 3>& vdir) const {
+
     Real rho = prims(i, j, k, idx_t::QRHO);
     Real ux = prims(i, j, k, idx_t::QU);
     Real uy = prims(i, j, k, idx_t::QV);
@@ -82,10 +90,10 @@ class calorifically_perfect_gas_t {
     Real rhoet = rho * (cp * prims(i, j, k, idx_t::QT) + ekin);
 
     fluxes(i, j, k, idx_t::URHO) = rho * udir;
-    fluxes(i, j, k, idx_t::UMX) = rho * ux * udir + P * vdir[0];
-    fluxes(i, j, k, idx_t::UMY) = rho * uy * udir + P * vdir[1];
-    fluxes(i, j, k, idx_t::UMZ) = rho * uz * udir + P * vdir[2];
-    fluxes(i, j, k, idx_t::UET) = (rhoet + P) * udir;
+    fluxes(i, j, k, idx_t::UMX)  = rho * ux * udir + P * vdir[0];
+    fluxes(i, j, k, idx_t::UMY)  = rho * uy * udir + P * vdir[1];
+    fluxes(i, j, k, idx_t::UMZ)  = rho * uz * udir + P * vdir[2];
+    fluxes(i, j, k, idx_t::UET)  = (rhoet + P) * udir;
   };
 
   // TODO: remove ParallelFor from here. Keep closures local
@@ -95,15 +103,16 @@ class calorifically_perfect_gas_t {
 
     amrex::ParallelFor(bxg, [=, *this] AMREX_GPU_DEVICE(int i, int j, int k) {
       Real rho = cons(i, j, k, idx_t::URHO);
-      // Print() << "cons2prim"<< i << j << k << rho << std::endl;
-      rho = max(1e-40, rho);
+      rho = max(smallr, rho);
       Real rhoinv = Real(1.0) / rho;
       Real ux = cons(i, j, k, idx_t::UMX) * rhoinv;
       Real uy = cons(i, j, k, idx_t::UMY) * rhoinv;
       Real uz = cons(i, j, k, idx_t::UMZ) * rhoinv;
       Real rhoke = Real(0.5) * rho * (ux * ux + uy * uy + uz * uz);
-      Real rhoei = (cons(i, j, k, idx_t::UET) - rhoke);
-      Real p = (this->gamma - Real(1.0)) * rhoei;
+      Real rhoei = cons(i, j, k, idx_t::UET) - rhoke ;
+      rhoei = max(rhoei,rho*(this->ei_min)); //clip energy
+
+      Real p = (this->gamma_m1) * rhoei;
 
       prims(i, j, k, idx_t::QRHO) = rho;
       prims(i, j, k, idx_t::QU) = ux;
@@ -112,9 +121,23 @@ class calorifically_perfect_gas_t {
       prims(i, j, k, idx_t::QPRES) = p;
       prims(i, j, k, idx_t::QT) = p / (rho * this->Rspec);
       prims(i, j, k, idx_t::QC) = std::sqrt(this->gamma * p * rhoinv);
-      prims(i, j, k, idx_t::QG) = this->gamma; //???
+      prims(i, j, k, idx_t::QG) = this->gamma;
       prims(i, j, k, idx_t::QEINT) = rhoei * rhoinv;
       prims(i, j, k, idx_t::QFS) = 1.0;
+
+      // if ((i==48) && (j==75)) {
+      //   printf(" rho =%f ux=%f  uy=%f uz=%f \n",rho,ux,uy,uz);
+      //   printf(" P =%f T=%f  \n",p, p / (rho * this->Rspec));
+      //   printf("  rhoke =%f  rhoei =%f  \n",rhoke,rhoei);
+
+      //   printf("  c =%f  \n",prims(i, j, k, idx_t::QC));
+                      
+      // }
+
+      
+
+
+
     });
   }
 
@@ -127,7 +150,7 @@ class calorifically_perfect_gas_t {
     cons[idx_t::UMX] = prims(iv, idx_t::QRHO) * prims(iv, idx_t::QU);
     cons[idx_t::UMY] = prims(iv, idx_t::QRHO) * prims(iv, idx_t::QV);
     cons[idx_t::UMZ] = prims(iv, idx_t::QRHO) * prims(iv, idx_t::QW);
-    const Real E = prims(iv, idx_t::QEINT) +
+    const Real E = max(prims(iv, idx_t::QEINT),ei_min) +
                    Real(0.5) * (prims(iv, idx_t::QU) * prims(iv, idx_t::QU) +
                                 prims(iv, idx_t::QV) * prims(iv, idx_t::QV) +
                                 prims(iv, idx_t::QW) * prims(iv, idx_t::QW));
@@ -223,8 +246,8 @@ class calorifically_perfect_gas_t {
     amrex::Real tmp[idx_t::NCONS];
     amrex::Real invh = amrex::Real(1.0) / r.h;
 
-    const int UN = idx_t::UMX + r.CN;
-    const int UT = idx_t::UMX + r.CT;
+    const int UN  = idx_t::UMX + r.CN;
+    const int UT  = idx_t::UMX + r.CT;
     const int UTT = idx_t::UMX + r.CTT;
 
     tmp[0] = f[UT] - r.v * f[idx_t::URHO];
@@ -265,10 +288,10 @@ class calorifically_perfect_gas_t {
   /*
   * @brief compute primitive from conservative (local)
   * @param array of conservative vars
-  * @param array of primitive variables 
+  * @param array of primitive variables (pass-by-pointer)
   */
   AMREX_GPU_DEVICE AMREX_FORCE_INLINE void cons2prims_point(
-    Real U[idx_t::NCONS], Real* &Q) const {
+    Real U[idx_t::NCONS], Real* Q) const {
 
     Real rho = U[idx_t::URHO];Real one_over_rho = 1.0/rho;
     Q[idx_t::QRHO] = rho;
@@ -278,7 +301,8 @@ class calorifically_perfect_gas_t {
     // T and P
     Real rhoke = Real(0.5) * rho * (ux * ux+ uy* uy + uz * uz);
     Real rhoei = U[idx_t::UET] - rhoke;
-    Real p = (this->gamma - Real(1.0)) * rhoei;
+    rhoei = max(rhoei,rho*(this->ei_min)); //clip energy
+    Real p = (this->gamma_m1) * rhoei;
     Q[idx_t::QT] = p / (rho * this->Rspec);
     Q[idx_t::QPRES] = p;
   }
@@ -576,7 +600,7 @@ class multispecies_pele_gas_t {
   * @param array of primitive variables [NPRIM]
   */
   AMREX_GPU_DEVICE AMREX_FORCE_INLINE void cons2prims_point(
-    Real U[idx_t::NCONS], Real (&Q)[idx_t::NPRIM] ) {
+    Real U[idx_t::NCONS], Real* Q ) {
 
     Real rho=0.0;
     for (int n = 0; n < NUM_SPECIES; ++n){
