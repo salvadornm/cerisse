@@ -54,13 +54,14 @@ class calorifically_perfect_gas_t {
   AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE GpuArray<Real, idx_t::NWAVES>
   cons2eigenvals(const int i, const int j, const int k,
                  const Array4<Real>& cons, const GpuArray<int, 3>& vdir) const {
+
     Real rho = cons(i, j, k, idx_t::URHO);
     Real rhoinv = Real(1.0) / rho;
     GpuArray<Real, AMREX_SPACEDIM> vel = {AMREX_D_DECL(
         cons(i, j, k, idx_t::UMX) * rhoinv, cons(i, j, k, idx_t::UMY) * rhoinv,
         cons(i, j, k, idx_t::UMZ) * rhoinv)};
 
-    Real ke = AMREX_D_PICK(vel[0] * vel[0], vel[0] * vel[0] + vel[1] * vel[1],
+    Real ke = AMREX_D_PICK(vel[0] * vel[0],  vel[0] * vel[0] + vel[1] * vel[1],
                            vel[0] * vel[0] + vel[1] * vel[1] + vel[2] * vel[2]);
     ke = Real(0.5) * rho * ke;
     Real eint = (cons(i, j, k, idx_t::UET) - ke) / rho;
@@ -99,8 +100,8 @@ class calorifically_perfect_gas_t {
   // TODO: remove ParallelFor from here. Keep closures local
   void inline cons2prims(const MFIter& mfi, const Array4<Real>& cons,
                          const Array4<Real>& prims) const {
-    const Box& bxg = mfi.growntilebox(idx_t::NGHOST);
 
+    const Box& bxg = mfi.growntilebox(idx_t::NGHOST);
     amrex::ParallelFor(bxg, [=, *this] AMREX_GPU_DEVICE(int i, int j, int k) {
       Real rho = cons(i, j, k, idx_t::URHO);
       rho = max(smallr, rho);
@@ -124,20 +125,6 @@ class calorifically_perfect_gas_t {
       prims(i, j, k, idx_t::QG) = this->gamma;
       prims(i, j, k, idx_t::QEINT) = rhoei * rhoinv;
       prims(i, j, k, idx_t::QFS) = 1.0;
-
-      // if ((i==48) && (j==75)) {
-      //   printf(" rho =%f ux=%f  uy=%f uz=%f \n",rho,ux,uy,uz);
-      //   printf(" P =%f T=%f  \n",p, p / (rho * this->Rspec));
-      //   printf("  rhoke =%f  rhoei =%f  \n",rhoke,rhoei);
-
-      //   printf("  c =%f  \n",prims(i, j, k, idx_t::QC));
-                      
-      // }
-
-      
-
-
-
     });
   }
 

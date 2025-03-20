@@ -89,7 +89,7 @@ void CNS::recordTimeProbe() {
   if (level != time_probe_lev) return;
   if (this->nStep() % time_probe_int != 0) return;
 
-  if (verbose > 1) {
+  if (verbose) {
     amrex::Print() << "... Processing time statistics\n";
   }
 

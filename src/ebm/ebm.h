@@ -28,6 +28,8 @@
 
 #include <CNSconstants.h>
 
+// temp
+#include <FluxRedistribute.h>
 
 template <typename wallmodel,typename cls_t>
 class ebm_t
@@ -263,31 +265,6 @@ public:
                 dxinv[0] * (apx(i + 1, j, k) * fxp - apx(i, j, k) * fxm) +
                 dxinv[1] * (apy(i, j + 1, k) * fyp - apy(i, j, k) * fym) );            
 #endif      
-
-                  //
-                  Real T = prims(i,j,k,cls_t::QT);
-                  //if ((i==48) && (j==75)) 
-                   if ((i==48) && (j==84)) 
-                  {
-                    if (n==0){
-                    printf(" [ebflux] i= %d j= %d n=%d \n",i,j,n);
-                    printf(" vfrac = %f  bcarea=%f \n",vfrac(i,j,k),bcarea(i,j,k));                                   
-                    printf(" apx(i)= %f apx(i+1)= %f  \n",apx(i, j, k),apx(i + 1, j, k) );
-                    printf(" apy(j)= %f apy(j+1)= %f  \n",apy(i, j, k),apy(i , j+1, k) );
-                    printf(" rhs= %f  \n",rhs(i,j,k,n));
-                    printf(" nx =%f ny= %f  (towrd liq)\n",-normxyz(i,j,k,0),-normxyz(i,j,k,1));                    
-                    }                      
-                    if (n==0) {
-                      for (int np = 0; np < cls_t::NPRIM; np++) {
-                        printf(" prims(%d)= %f  \n",np,prims(i,j,k,np));
-                      }
-                    }
-                    printf(" n=%d X:  fxp= %f fxm= %f  \n",n,fxp,fxm );
-                    printf("      Y:  fyp= %f fym= %f  \n",fyp,fym );
-                     
-                  }  
-                  //
-
             }
 
             // build wall fluxes
@@ -295,7 +272,12 @@ public:
             // primitive array at surface
             amrex::GpuArray<Real, cls_t::NPRIM> prim_wall = {0.0};
             for (int n = 0; n < cls_t::NPRIM; n++) {
-              prim_wall[n] = prims(i,j,k,n);   // interpolate   ???????????                    
+              prim_wall[n] = prims(i,j,k,n);   // interpolate   ???????????   
+              
+              // use same tecniques weighted based on distance phi = sum w phi(node)/sum w
+              // w is 1/r (only connected)
+
+
             }  
             // normal to surface 
             amrex::Real norm_wall [AMREX_SPACEDIM]= {0.0};
@@ -307,25 +289,10 @@ public:
             // calculate wall flux and add it to rhs
             wallmodel::wall_flux(geom,i,j,k,norm_wall,prim_wall,flux_wall,cls);             
 
-
-            if ((i==48) && (j==84)) {
-              for (int n = 0; n < cls_t::NCONS; n++) {                
-                printf(" flux_wall(%d)= %f  \n",n,flux_wall[n]);             
-              }  
-            }  
-
             for (int n = 0; n < cls_t::NCONS; n++) {
-              rhs(i,j,k,n) += flux_wall[n]*vfracinv*bcarea(i,j,k,0)*dxinv[0]; //?????
+              rhs(i,j,k,n) += flux_wall[n]*vfracinv*bcarea(i,j,k,0)*dxinv[0]; 
             }
 
-
-            if ((i==48) && (j==84)) {
-              for (int n = 0; n < cls_t::NCONS; n++) {                
-                printf(" rhs (%d) after wall= %f  \n",n,rhs(i,j,k,n));             
-              }  
-            }
-
-                        
           }
          
 
@@ -448,12 +415,17 @@ public:
     auto const& fcz = flxt[2]->array(); 
 #endif
     
-    amrex::ApplyMLRedistribution(
-      ebbox, cls_t::NCONS, rhs, divc, cons, scratch, flag, AMREX_D_DECL(apx, apy, apz), vfrac,
-      AMREX_D_DECL(fcx, fcy, fcz), bcent, phys_bc, geom, dt, redistribution_type,
-      as_crse, p_drho_as_crse->array(), p_rrflag_as_crse->const_array(), as_fine, dm_as_fine.array(), lev_mask,
-      level_mask_not_covered, fac_for_deltaR, use_wts_in_divnc, 0, srd_max_order,
-      target_volfrac, srd_update_scale);
+    // amrex::ApplyMLRedistribution(
+    //   ebbox, cls_t::NCONS, rhs, divc, cons, scratch, flag, AMREX_D_DECL(apx, apy, apz), vfrac,
+    //   AMREX_D_DECL(fcx, fcy, fcz), bcent, phys_bc, geom, dt, redistribution_type,
+    //   as_crse, p_drho_as_crse->array(), p_rrflag_as_crse->const_array(), as_fine, dm_as_fine.array(), lev_mask,
+    //   level_mask_not_covered, fac_for_deltaR, use_wts_in_divnc, 0, srd_max_order,
+    //   target_volfrac, srd_update_scale);
+
+
+    // manual redist
+    cerisse_flux_redistribute( ebbox,rhs, divc, redistwgt, vfrac,flag,geom,cls_t::NCONS,dt);
+
                               
   }  
 
@@ -463,3 +435,14 @@ public:
 
 
 #endif
+
+// intrepolation based on distance
+// temp
+// #if (AMREX_SPACEDIM == 2)
+//         int kk(0);
+// #else
+//         for (int kk = -nb; kk <= nb; kk++) {
+// #endif
+//         for (int jj = -nb; jj <= nb; jj++) {
+//         for (int ii = -nb; ii <= nb; ii++) {
+

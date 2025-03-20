@@ -1,8 +1,8 @@
 # Simulation time
-max_step  =  800
+max_step  =  2000
 stop_time =  4.0
-#cfl = 0.1
-time_step = 1.2e-6
+cfl = 0.4
+#time_step = 1.2e-6
 
 cns.order_rk  = -2 # original
 cns.stages_rk = 2
@@ -42,7 +42,7 @@ amr.check_file              = chk     # root name of checkpoint file
 amr.check_int               = 20000   # number of timesteps betw.  checkpoints
 amr.plot_files_output = 1
 amr.plot_file         = ./plot/plt    # root name of plotfile
-amr.plot_int          = 10           # number of timesteps between plotfiles
+amr.plot_int          = 50           # number of timesteps between plotfiles
 amr.derive_plot_vars  = pressure velocity temperature
 
 # EB settings
