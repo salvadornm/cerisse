@@ -54,7 +54,7 @@ cns_ctoprim(int i, int j, int k, int ns, amrex::Array4<amrex::Real const> const&
   q(i, j, k, QC) = cs;
   q(i, j, k, QG) = gamma;
   q(i, j, k, QEINT) = ei;
-  q(i, j, k, QTEMP) = u(i, j, k, ns + UTEMP);
+  q(i, j, k, QTEMP) = T;// u(i, j, k, ns + UTEMP);
   q(i, j, k, QWBAR) = wbar;
 
 #ifdef MONITOR_PROBLEM_CELL
@@ -69,17 +69,23 @@ cns_ctoprim(int i, int j, int k, int ns, amrex::Array4<amrex::Real const> const&
       break;
     }
   }
-  if ((T <= 0.0) || (T > 5000.0) || (q(i, j, k, QTEMP) <= 0.0) ||
-      (q(i, j, k, QTEMP) > 5000.0) || !std::isgreaterequal(cs, 0.0) || amrex::isnan(ux) ||
+  amrex::Real Tq = q(i, j, k, QTEMP);
+  if ((T <= 0.0) || (T > 5000.0) || (Tq <= 0.0) || (Tq > 5000.0) || 
+      !std::isgreaterequal(cs, 0.0)  || amrex::isnan(ux) || amrex::isnan(uy) || amrex::isnan(uz) ||
       !std::isgreaterequal(rho, 0.0) || !std::isgreaterequal(p, 0.0) || any_Y_lt_0) {
-    ss << "cns_ctoprim @" << i << "," << j << "," << k << "(ns=" << ns
-       << "): rho=" << rho << " T=" << u(i, j, k, ns + UTEMP) << "/" << T
-       << " p=" << p << " cs=" << cs << " gamma=" << gamma << " u=" << ux
-       << " rhoE=" << u(i, j, k, ns + UEDEN) << " ei=" << ei << '\n';
+    ss << "cns_ctoprim @" << i << "," << j << "," << k << "(ns=" << ns << "): " << "\n";
+    ss << "rho=" << rho << " T (from u)=" <<  T  << " T (from q)= " << Tq
+       << "u(i, j, k, ns + UTEMP)=" << u(i, j, k, ns + UTEMP) << "\n";
+    ss << " p=" << p << " cs=" << cs << " gamma=" << gamma << "\n";
+    ss << " u=" << ux << " v=" << uy << " w=" << uz << "\n" ;
+    ss << " rhoE=" << u(i, j, k, ns + UEDEN) << " ei=" << ei << "\n";
     for (int n = 0; n < NUM_SPECIES; ++n) {
       ss << " rhoY" << n << "=" << u(i, j, k, ns + UFS + n);
     }
-    ss << '\n';
+    ss << '\n'; ss << "wbar " << wbar << "\n" ;
+    ss << " Index  "  <<  "\n";
+    ss << " UTEMP " << UTEMP << " QTEMP " << QTEMP <<  "\n";
+
 
     amrex::Abort();
     // BL_BACKTRACE_PUSH(ss.str()); // PUSH takes std::string

@@ -179,6 +179,12 @@ void CNS::compute_dSdt_box_eb(
                                auto captured_eb_recon_mode) {
             cns_recon_eb<captured_recon_scheme, captured_eb_recon_mode>(
               i, j, k, n, dir, w, wl, wr, plm_theta, flag);
+
+              // // SNM
+              // for (int n = 0; n < NVAR; ++n){
+              //   printf(" ql=%f qr=%f \n",wl(i,j,k,n),wr(i,j,k,n));
+              // }
+
           });
         // 3. Solve Riemann problem for fluxes at cell face
         amrex::ParallelFor(flxbx, [=] AMREX_GPU_DEVICE(int i, int j, int k) {
@@ -187,6 +193,16 @@ void CNS::compute_dSdt_box_eb(
                     IntVect::TheDimensionVector(dir))
                  .isCovered()) {
             cns_riemann(i, j, k, dir, flx, q, wl, wr, char_sys, recon_char_var);
+            
+
+            /// SNM
+            for (int n = 0; n < NVAR; ++n) {
+              if (isnan(flx(i, j, k, n))) {
+                std::cout << "flx_" << dir << "(" << i << "," << j << "," << k << "," << n
+                          << ") is nan\n";
+              }
+            }
+            ///  
 
             // bool do_high_order_diff =
             //   (shock_sensor(i, j, k) < 0.95) &&

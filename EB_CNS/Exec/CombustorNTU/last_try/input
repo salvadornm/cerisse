@@ -1,4 +1,4 @@
-max_step = 10
+max_step = 500
 stop_time = 0.2
 
 geometry.is_periodic = 0 0 0
@@ -28,8 +28,8 @@ cns.do_react = 0
 cns.chem_integrator = Reactor_RK64
 
 # ==================== WHAT NUMERICS =================== #
-#cns.cfl = 0.3
-cns.fixed_dt  = 1e-7
+cns.cfl = 0.1
+#cns.fixed_dt  = 1e-7
 cns.dt_cutoff = 5.e-20
 cns.recon_scheme = 1   # 1: Godunov,  2: MUSCL,   3: WENO-Z3, 
                        # 4: WENO-JS5, 5: WENO-Z5, 6: TENO-5
@@ -63,14 +63,14 @@ amr.check_int       = 100        # number of timesteps between checkpoints
 # PLOTFILES
 amr.plot_files_output = 1
 amr.plot_file         = plt   # root name of plotfile
-amr.plot_int          = 1       # number of timesteps between plotfiles
+amr.plot_int          = 10       # number of timesteps between plotfiles
 amr.derive_plot_vars  = temp pressure x_velocity y_velocity z_velocity MachNumber divrho divu magvort
 cns.plot_massfrac = 1
 
 #this is for the JBB combustor
 eb2.geom_type = "Combustor_NTNU"
 cns.eb_no_slip = 1
-cns.redistribution_type="NoRedist"
+#cns.redistribution_type="NoRedist"
 cns.eb_isothermal = 0
 cns.eb_wall_temp = 300
 cns.eb_recon_mode = 0
@@ -94,6 +94,8 @@ combustor.pipe_hi = 0.5 2.5
 #cns.eb_isothermal = 1
 #cns.eb_wall_temp = 300
 
+
+prob.inflow_mach = 0.5
 
 #amr.restart = chk00100
 #amr.plotfile_on_restart = 1

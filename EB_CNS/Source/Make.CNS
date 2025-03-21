@@ -6,6 +6,13 @@ TOP ?= $(CERISSE_HOME)/EB_CNS
 
 EBASE = Cerisse
 
+ifeq ($(EXTRA_DEBUG), TRUE)
+   DEFINES += -DMONITOR_PROBLEM_CELL=1
+else
+   EXTRA_DEBUG := FALSE
+endif
+
+
 ifeq ($(USE_EB), TRUE)
    DEFINES += -DCNS_USE_EB=1
 else
