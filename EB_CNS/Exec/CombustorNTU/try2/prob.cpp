@@ -34,8 +34,6 @@ void amrex_probinit(const int* /*init*/, const int* /*name*/, const int* /*namel
              cs);
   Real v = CNS::h_prob_parm->inflow_mach * cs;
 
-  std::cout << " Velocity Inflow=" << v << std::endl;
-
   inflow_state[URHO] = rho;
   inflow_state[UMX] = 0.0;
   inflow_state[UMY] = 0.0;

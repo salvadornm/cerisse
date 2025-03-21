@@ -10,7 +10,16 @@
 #include "mechanism.H"
 #include "prob_parm.H"
 
-#include "custom_geometry.H"  
+#if CNS_USE_EB
+#include "custom_geometry.H"
+
+class Combustor_modif : public CustomGeometry::Register<Combustor_modif>
+{
+public:
+  static const std::string identifier() { return "Combustor_modif"; }
+
+  void build(const Geometry& geom, const int max_coarsening_level) override;
+};
 
 class Combustor_NTNU : public CustomGeometry::Register<Combustor_NTNU>
 {
@@ -19,6 +28,15 @@ public:
 
   void build(const Geometry& geom, const int max_coarsening_level) override;
 };
+
+class test_bb : public CustomGeometry::Register<test_bb>
+{
+public:
+  static const std::string identifier() { return "test_bb"; }
+
+  void build(const Geometry& geom, const int max_coarsening_level) override;
+};
+#endif
 
 /**
  * \brief Initialise state data.
@@ -43,7 +61,7 @@ prob_initdata(int i, int j, int k, amrex::Array4<amrex::Real> const& state,
   state(i, j, k, UMX) = amrex::Real(0.0);
   state(i, j, k, UMY) = amrex::Real(0.0);
   state(i, j, k, UMZ) = amrex::Real(0.0);
-  state(i, j, k, UEDEN) = rho * eint; 
+  state(i, j, k, UEDEN) = rho * eint;
   for (int n = 0; n < NUM_SPECIES; ++n) {
     state(i, j, k, UFS + n) = state(i, j, k, URHO) * prob_parm.massfrac[n];
   }
@@ -70,7 +88,6 @@ AMREX_GPU_DEVICE AMREX_FORCE_INLINE void bcnormal(
   const int idir, const int sgn, const amrex::Real /*time*/,
   amrex::GeometryData const& /*geomdata*/, ProbParm const& prob_parm)
 {
-  // Z=0  low boundary 
   if (idir == 2 && sgn == 1) {
     for (int nf = 0; nf <= NUM_FIELD; ++nf) {
       for (int nc = 0; nc < NVAR; ++nc) {

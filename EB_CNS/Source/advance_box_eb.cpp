@@ -346,7 +346,7 @@ void CNS::compute_dSdt_box_eb(
 
     // This does the divergence and cut face wall BCs
     const auto problo = geom.ProbLo();
-    amrex::ParallelFor(bxg3, [=] AMREX_GPU_DEVICE(int i, int j, int k) {
+    amrex::ParallelFor(bx, [=] AMREX_GPU_DEVICE(int i, int j, int k) {//bx ??
       const Real x = (i + 0.5) * dx[0] + problo[0];
       eb_compute_div(i, j, k, blo, bhi, q, divc, AMREX_D_DECL(fx_in, fy_in, fz_in),
                      AMREX_D_DECL(fx_out, fy_out, fz_out), flag, vfrac, bcent, coefs,

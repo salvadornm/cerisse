@@ -95,8 +95,6 @@ combustor.pipe_hi = 0.5 2.5
 #cns.eb_wall_temp = 300
 
 
-prob.inflow_mach = 0.0
-
 #amr.restart = chk00100
 #amr.plotfile_on_restart = 1
 #cns.do_restart_fields = 1

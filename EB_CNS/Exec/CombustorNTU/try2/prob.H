@@ -10,7 +10,8 @@
 #include "mechanism.H"
 #include "prob_parm.H"
 
-#include "custom_geometry.H"  
+#if CNS_USE_EB
+#include "custom_geometry.H"
 
 class Combustor_NTNU : public CustomGeometry::Register<Combustor_NTNU>
 {
@@ -70,7 +71,6 @@ AMREX_GPU_DEVICE AMREX_FORCE_INLINE void bcnormal(
   const int idir, const int sgn, const amrex::Real /*time*/,
   amrex::GeometryData const& /*geomdata*/, ProbParm const& prob_parm)
 {
-  // Z=0  low boundary 
   if (idir == 2 && sgn == 1) {
     for (int nf = 0; nf <= NUM_FIELD; ++nf) {
       for (int nc = 0; nc < NVAR; ++nc) {

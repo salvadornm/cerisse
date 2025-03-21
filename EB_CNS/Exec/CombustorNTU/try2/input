@@ -1,4 +1,4 @@
-max_step = 10
+max_step = 500
 stop_time = 0.2
 
 geometry.is_periodic = 0 0 0
@@ -9,9 +9,9 @@ geometry.coord_sys   = 0  # 0 => cart, 1 => RZ  2=>spherical
 #geometry.prob_hi     = 5.4   5.4    12
 #amr.n_cell           = 64    64     120
 
-geometry.prob_lo     = -1.0   -1.0      0
-geometry.prob_hi     = 5.4    5.4      12.8
-amr.n_cell           = 64    64     128
+geometry.prob_lo     = 0     0      0
+geometry.prob_hi     = 5     5      5
+amr.n_cell           = 64    64     64
 
 
 # >>>>>>>>>>>>> BC FLAGS <<<<<<<<<<<<<<<<
@@ -19,21 +19,20 @@ amr.n_cell           = 64    64     128
 # 1 = Inflow              4 = SlipWall
 # 2 = Outflow (FOExtrap)  5 = NoSlipWall
 # >>>>>>>>>>>>> BC FLAGS <<<<<<<<<<<<<<<<
-cns.lo_bc       =  2 2 1 
-cns.hi_bc       =  2 2 2 
+cns.lo_bc       =  5 5 1 
+cns.hi_bc       =  5 5 2 
 
-cns.do_visc  = 0
+cns.do_visc  = 1
 
 cns.do_react = 0
 cns.chem_integrator = Reactor_RK64
 
 # ==================== WHAT NUMERICS =================== #
-#cns.cfl = 0.3
-cns.fixed_dt  = 1e-7
+cns.cfl = 0.3
 cns.dt_cutoff = 5.e-20
-cns.recon_scheme = 1   # 1: Godunov,  2: MUSCL,   3: WENO-Z3, 
+cns.recon_scheme = 6   # 1: Godunov,  2: MUSCL,   3: WENO-Z3, 
                        # 4: WENO-JS5, 5: WENO-Z5, 6: TENO-5
-cns.clip_temp    = 10   # clip minimum temperature [K]
+cns.clip_temp    = 0   # clip minimum temperature [K]
 # cns.eb_weights_type = 3
 
 cns.v = 2
@@ -44,7 +43,7 @@ amr.loadbalance_with_workestimates = 1
 #amr.loadbalance_level0_int = 100
 
 # REFINEMENT / REGRIDDING
-amr.max_level       = 0   # maximum level number allowed
+amr.max_level       = 1   # maximum level number allowed
 amr.ref_ratio       = 2 2 2 # refinement ratio
 amr.regrid_int      = 10      # how often to regrid
 amr.blocking_factor = 8 8 8
@@ -56,24 +55,21 @@ amr.grid_eff        = 0.8
 #cns.refine_magvort_max_lev = 3
 
 # CHECKPOINT FILES
-amr.checkpoint_files_output = 0
+amr.checkpoint_files_output = 1
 amr.check_file      = chk #root name of checkpoint file
 amr.check_int       = 100        # number of timesteps between checkpoints
 
 # PLOTFILES
 amr.plot_files_output = 1
 amr.plot_file         = plt   # root name of plotfile
-amr.plot_int          = 1       # number of timesteps between plotfiles
+amr.plot_int          = 10       # number of timesteps between plotfiles
 amr.derive_plot_vars  = temp pressure x_velocity y_velocity z_velocity MachNumber divrho divu magvort
 cns.plot_massfrac = 1
 
 #this is for the JBB combustor
-eb2.geom_type = "Combustor_NTNU"
+eb2.geom_type = "combustor"
 cns.eb_no_slip = 1
-cns.redistribution_type="NoRedist"
-cns.eb_isothermal = 0
-cns.eb_wall_temp = 300
-cns.eb_recon_mode = 0
+#cns.eb_isothermal = 0
 
 #Far wall location in x
 combustor.far_wall_loc = 3
@@ -94,8 +90,6 @@ combustor.pipe_hi = 0.5 2.5
 #cns.eb_isothermal = 1
 #cns.eb_wall_temp = 300
 
-
-prob.inflow_mach = 0.0
 
 #amr.restart = chk00100
 #amr.plotfile_on_restart = 1
