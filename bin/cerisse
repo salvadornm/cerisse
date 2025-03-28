@@ -31,6 +31,13 @@ case  $1 in
 	ls -1 plot/plt*/Header | tee movie.visit	
 	echo -e "\\033[1;32m  DONE  \\033[0m"
 	;;
+	run )
+	tput setaf 2
+	echo " ...  running cerisse MPI "
+	tput sgr0
+	mpirun --use-hwthread-cpus main2d.gnu.MPI.ex inputs	
+	echo -e "\\033[1;32m  DONE  \\033[0m"
+	;;
 	plot )
 	tput setaf 2
 	echo " ...  quick x-momentum 2d plot"

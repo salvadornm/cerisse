@@ -56,5 +56,7 @@ eb2.geom_type = box
 eb2.box_lo = 9.0  9.0  0.0
 eb2.box_hi = 11.0  11.0  0.0
 eb2.box_has_fluid_inside = 0
+eb2.eb_weight  = 1.0
+eb2.redistribution_type = "FluxRedist
 
 
