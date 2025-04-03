@@ -195,7 +195,8 @@ void CNS::compute_dSdt_box_eb(
             cns_riemann(i, j, k, dir, flx, q, wl, wr, char_sys, recon_char_var);
             
 
-            /// SNM
+            /** 
+            //
             for (int n = 0; n < NVAR; ++n) {
               if (isnan(flx(i, j, k, n))) {
                 std::cout << "flx_" << dir << "(" << i << "," << j << "," << k << "," << n
@@ -203,6 +204,8 @@ void CNS::compute_dSdt_box_eb(
               }
             }
             ///  
+            **/
+
 
             // bool do_high_order_diff =
             //   (shock_sensor(i, j, k) < 0.95) &&

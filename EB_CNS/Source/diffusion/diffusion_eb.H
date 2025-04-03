@@ -800,12 +800,15 @@ AMREX_GPU_DEVICE AMREX_FORCE_INLINE void compute_diff_wallflux(
   // }
 // #endif
 
+  {
+    Real tauxx, tauyy, tauxy, tauzz, tauxz, tauyz; 
+    Real dudn, dvdn, dwdn;
   if (eb_no_slip) {
-    Real dudn =
+    dudn =
       -ddinv * (d2 * d2 * u1 -
                 d1 * d1 * u2); // note that the normal vector points toward the wall
-    Real dvdn = -ddinv * (d2 * d2 * v1 - d1 * d1 * v2);
-    Real dwdn = -ddinv * (d2 * d2 * w1 - d1 * d1 * w2);
+    dvdn = -ddinv * (d2 * d2 * v1 - d1 * d1 * v2);
+    dwdn = -ddinv * (d2 * d2 * w1 - d1 * d1 * w2);
 
     // transform them to d/dx, d/dy and d/dz given transverse derivatives are zero
 
@@ -824,13 +827,13 @@ AMREX_GPU_DEVICE AMREX_FORCE_INLINE void compute_diff_wallflux(
     Real divu = dudx + dvdy + dwdz;
 
     Real tautmp = (xi - (2.0 / 3.0) * mu) * divu;
-    Real tauxx = mu * 2. * dudx + tautmp;
-    Real tauyy = mu * 2. * dvdy + tautmp;
-    Real tauxy = mu * (dudy + dvdx);
+    tauxx = mu * 2. * dudx + tautmp;
+    tauyy = mu * 2. * dvdy + tautmp;
+    tauxy = mu * (dudy + dvdx);
 
-    Real tauzz = mu * 2. * dwdz + tautmp;
-    Real tauxz = mu * (dudz + dwdx);
-    Real tauyz = mu * (dwdy + dvdz);
+    tauzz = mu * 2. * dwdz + tautmp;
+    tauxz = mu * (dudz + dwdx);
+    tauyz = mu * (dwdy + dvdz);
 
     // assumes dx == dy == dz
     viscw[UMX] = (dapx * tauxx + dapy * tauxy + dapz * tauxz);
@@ -846,14 +849,20 @@ AMREX_GPU_DEVICE AMREX_FORCE_INLINE void compute_diff_wallflux(
     viscw[UEDEN] = apnorm * lam * dTdn;
   }
 
-// #ifdef MONITOR_PROBLEM_CELL
-  // if (std::isnan(viscw[UMX]) || std::isnan(viscw[UMY]) || std::isnan(viscw[UMZ]) ||
-  //     std::isnan(viscw[UEDEN])) {
-  //   std::cout << "viscous wall flux: " << viscw[UMX] << ", " << viscw[UMY] << ", "
-  //             << viscw[UMZ] << ", " << viscw[UEDEN] << std::endl;
-  //   // amrex::Abort("Problem with wall flux");
-  // }
-// #endif
+#ifdef MONITOR_PROBLEM_CELL
+ if (std::isnan(viscw[UMX]) || std::isnan(viscw[UMY]) || std::isnan(viscw[UMZ]) ||
+     std::isnan(viscw[UEDEN])) {
+     std::cout << "viscous wall flux: " << viscw[UMX] << ", " << viscw[UMY] << ", "
+             << viscw[UMZ] << ", " << viscw[UEDEN] << std::endl;
+     std::cout << "dapx = " << dapx << "tauxx = " << tauxx << "dapy =" << dapy << "tauxy =" << tauxy
+                  << "dapz = " << dapz << "tauxy = " << tauxy << "tauyy = " << tauyy << "tauyz ="<< tauyz << "tauxz ="
+                  << tauxz << "tauyz " << tauyz << "tauzz " << tauzz << std::endl;
+
+    std::cout << "dudn = " << dudn << " dvdn = " << dvdn << " dwdn = " << dwdn << std::endl; 
+     amrex::Abort("Problem with wall flux");
+  } 
+#endif
+  }
 
   // Modify if using a wall model
   if (do_wall_model) {

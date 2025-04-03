@@ -40,7 +40,8 @@ cns_ctoprim(int i, int j, int k, int ns, amrex::Array4<amrex::Real const> const&
   }
 
   auto eos = pele::physics::PhysicsType::eos();
-  amrex::Real T = u(i, j, k, ns + UTEMP); // Necessary for SRK EOS
+  // amrex::Real T = u(i, j, k, ns + UTEMP); // Necessary for SRK EOS
+  amrex::Real T = 300;
   amrex::Real p, cs, gamma, wbar;
   eos.REY2T(rho, ei, Y, T);
   eos.RTY2P(rho, T, Y, p);
@@ -607,6 +608,8 @@ AMREX_GPU_DEVICE AMREX_FORCE_INLINE void cns_riemann(
 
   for (int n = 0; n < NUM_SPECIES; ++n) { adv_flx(i, j, k, UFS + n) = ry_flx[n]; }
 
+
+  /** 
 #ifdef MONITOR_PROBLEM_CELL
   // Monitor problem cell
   for (int n = 0; n < NVAR; ++n) {
@@ -616,7 +619,9 @@ AMREX_GPU_DEVICE AMREX_FORCE_INLINE void cns_riemann(
     }
   }
 #endif
+**/
 }
+
 
 // Add higher order derivatives correction term to achieve real high order
 // Ref: Alternative finite difference WENO https://doi.org/10.1137/17M115757X

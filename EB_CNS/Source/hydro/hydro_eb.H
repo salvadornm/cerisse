@@ -298,9 +298,6 @@ AMREX_GPU_DEVICE AMREX_FORCE_INLINE void eb_compute_div(
       std::cout << std::endl;
       
       std::cout << "q = ";
-      for (int n = 0; n < NPRIM; ++n) {
-        std::cout << q(i,j,k,n) << " ";
-      }
       std::cout << std::endl;
     }
 #endif
@@ -325,6 +322,19 @@ AMREX_GPU_DEVICE AMREX_FORCE_INLINE void eb_compute_div(
         std::cout << flux_diff_wall[n] << " ";
       }
       std::cout << std::endl;
+      //for (int n = 0; n < NVAR; ++n) {
+      //std::cout << q(i,j,k,n) << std::endl;
+      //}
+      std::cout << "q(" << i <<',' << j << ',' << k <<') =';
+      for (int n = 0; n < NPRIM; ++n) {
+        std::cout << q(i,j,k,n) << " ";
+      }
+      std::cout << std::endl;
+
+      std::cout << "transport coefs = ";
+      for (int n=0; n<NCOEF; n++){
+        std::cout << coefs(i,j,k,n) << std::endl;
+      }
       amrex::Abort();
     }
 #endif

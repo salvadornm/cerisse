@@ -12,13 +12,15 @@
 
 #include "custom_geometry.H"  
 
-class Combustor_NTNU : public CustomGeometry::Register<Combustor_NTNU>
+class NTNU_combustor : public CustomGeometry::Register<NTNU_combustor>
 {
 public:
-  static const std::string identifier() { return "Combustor_NTNU"; }
+  static const std::string identifier() { return "NTNU_combustor"; }
 
   void build(const Geometry& geom, const int max_coarsening_level) override;
 };
+
+
 
 /**
  * \brief Initialise state data.
