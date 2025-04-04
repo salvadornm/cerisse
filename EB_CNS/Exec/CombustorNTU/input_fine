@@ -31,7 +31,7 @@ cns.chem_integrator = Reactor_RK64
 #cns.cfl = 0.05
 cns.fixed_dt  = 1e-7
 cns.dt_cutoff = 5.e-20
-cns.recon_scheme = 1   # 1: Godunov,  2: MUSCL,   3: WENO-Z3, 
+cns.recon_scheme = 2   # 1: Godunov,  2: MUSCL,   3: WENO-Z3, 
                        # 4: WENO-JS5, 5: WENO-Z5, 6: TENO-5
 cns.clip_temp    = 10   # clip minimum temperature [K]
 cns.eb_weight = 1

@@ -92,7 +92,8 @@ void CNS::compute_dSdt_box_eb(
 
     // Prepare primitive variables
     amrex::ParallelFor(bxg6, [=] AMREX_GPU_DEVICE(int i, int j, int k) {
-      if (!flag(i, j, k).isCovered()) { cns_ctoprim(i, j, k, nf * NVAR, sarr, q); }
+    //  if (!flag(i, j, k).isCovered()) { cns_ctoprim(i, j, k, nf * NVAR, sarr, q); }
+      cns_ctoprim(i, j, k, nf * NVAR, sarr, q); 
     });
 
     // Prepare transport coefs
