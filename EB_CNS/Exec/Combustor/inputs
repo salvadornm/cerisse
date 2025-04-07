@@ -28,6 +28,10 @@ cns.recon_scheme = 6   # 1: Godunov,  2: MUSCL,   3: WENO-Z3,
 cns.clip_temp    = 0   # clip minimum temperature [K]
 # cns.eb_weights_type = 3
 
+
+cns.redistribution_type = "NoRedist"
+
+
 cns.v = 2
 amr.v = 1
 

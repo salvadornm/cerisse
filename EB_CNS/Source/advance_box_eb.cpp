@@ -62,7 +62,7 @@ void CNS::compute_dSdt_box_eb(
   // Temporary flux before redistribution
   std::array<FArrayBox, amrex::SpaceDim> flux_tmp;
   for (int dir = 0; dir < amrex::SpaceDim; ++dir) {
-    flux_tmp[dir].resize(amrex::surroundingNodes(bxg3, dir), ncomp,
+    flux_tmp[dir].resize(amrex::surroundingNodes(bxg4, dir), ncomp, // was bxg3
                          The_Async_Arena());
     flux_tmp[dir].setVal<RunOn::Device>(0.);
   }
@@ -91,9 +91,9 @@ void CNS::compute_dSdt_box_eb(
     auto const& coefs = coefsfab.array(nf * NCOEF);
 
     // Prepare primitive variables
-    amrex::ParallelFor(bxg6, [=] AMREX_GPU_DEVICE(int i, int j, int k) {
-    //  if (!flag(i, j, k).isCovered()) { cns_ctoprim(i, j, k, nf * NVAR, sarr, q); }
-      cns_ctoprim(i, j, k, nf * NVAR, sarr, q); 
+    amrex::ParallelFor(bxg6, [=] AMREX_GPU_DEVICE(int i, int j, int k) {    
+    // if (!flag(i, j, k).isCovered()) { cns_ctoprim(i, j, k, nf * NVAR, sarr, q); }    
+     cns_ctoprim(i, j, k, nf * NVAR, sarr, q); 
     });
 
     // Prepare transport coefs
@@ -180,12 +180,6 @@ void CNS::compute_dSdt_box_eb(
                                auto captured_eb_recon_mode) {
             cns_recon_eb<captured_recon_scheme, captured_eb_recon_mode>(
               i, j, k, n, dir, w, wl, wr, plm_theta, flag);
-
-              // // SNM
-              // for (int n = 0; n < NVAR; ++n){
-              //   printf(" ql=%f qr=%f \n",wl(i,j,k,n),wr(i,j,k,n));
-              // }
-
           });
         // 3. Solve Riemann problem for fluxes at cell face
         amrex::ParallelFor(flxbx, [=] AMREX_GPU_DEVICE(int i, int j, int k) {
@@ -196,18 +190,7 @@ void CNS::compute_dSdt_box_eb(
             cns_riemann(i, j, k, dir, flx, q, wl, wr, char_sys, recon_char_var);
             
 
-            /** 
-            //
-            for (int n = 0; n < NVAR; ++n) {
-              if (isnan(flx(i, j, k, n))) {
-                std::cout << "flx_" << dir << "(" << i << "," << j << "," << k << "," << n
-                          << ") is nan\n";
-              }
-            }
-            ///  
-            **/
-
-
+          
             // bool do_high_order_diff =
             //   (shock_sensor(i, j, k) < 0.95) &&
             //   (shock_sensor(IntVect(AMREX_D_DECL(i, j, k)) -
@@ -335,6 +318,7 @@ void CNS::compute_dSdt_box_eb(
     } // for dir
   }
 #endif
+ 
 
   ///////////////// PART DIFFERENT FROM NON-EB VERSION /////////////////
 
@@ -376,6 +360,7 @@ void CNS::compute_dSdt_box_eb(
     });
   } // for fields
 
+
   // Now do redistribution
   {
     BL_PROFILE("Redistribution");
@@ -387,7 +372,9 @@ void CNS::compute_dSdt_box_eb(
       redistwgt(i, j, k) = vfrac(i, j, k);
       srd_update_scale(i, j, k) =
         eb_weight; // = 1.0 more stable for detondiff, = 0.5 for airfoil. Why?
+       
     });
+
 
     bool use_wts_in_divnc = true;
     int srd_max_order = 2;
@@ -397,7 +384,7 @@ void CNS::compute_dSdt_box_eb(
     Array4<Real> scratch = tmpfab.array();
     if (redistribution_type == "FluxRedist") {
       amrex::ParallelFor(bxg3, [=] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {
-        scratch(i, j, k) = redistwgt(i, j, k);
+        scratch(i, j, k) = redistwgt(i, j, k);       
       });
     }
 
@@ -410,6 +397,15 @@ void CNS::compute_dSdt_box_eb(
       as_crse, rr_drho_crse, rr_flag_crse, as_fine, dm_as_fine, lev_mask,
       level_mask_not_covered, fac_for_deltaR, use_wts_in_divnc, 0, srd_max_order,
       target_volfrac, srd_update_scale);
+
+      // std::cout << "AFTER  redistribution ****** " << "\n";
+      // ii=29;jj=28;kk=7;
+      // std::cout << "  advancebox U(rho) = " << sarr(ii,jj,kk,URHO) << " " ; 
+      // std::cout << " advancebox U(MX)  = " << sarr(ii,jj,kk,UMX) << std::endl;  
+      // std::cout << " advancebox dsdt(rho) = " << dsdt(ii,jj,kk,URHO) << " " ; 
+      // std::cout << "  advancebox dsdt(MX)  = " << dsdt(ii,jj,kk,UMX) << std::endl; 
+  
+
   }
 
   //////////////////////// END EB CALCULATIONS ////////////////////////
@@ -526,5 +522,13 @@ void CNS::compute_dSdt_box_eb(
         fill_ext_src(i, j, k, time, geomdata, sarr, dsdt, *lprobparm);
       }
     });
+    
+    /// DSDT=0 in covered cells NEW SNM
+    amrex::ParallelFor(bx, [=] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {
+      if (flag(i, j, k).isCovered()) {
+        for (int n = 0; n < NVAR; n++) {dsdt(i,j,k,n) = 0.0;}
+        }
+    } ); 
+
   }
 }

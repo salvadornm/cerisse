@@ -322,10 +322,8 @@ AMREX_GPU_DEVICE AMREX_FORCE_INLINE void eb_compute_div(
         std::cout << flux_diff_wall[n] << " ";
       }
       std::cout << std::endl;
-      //for (int n = 0; n < NVAR; ++n) {
-      //std::cout << q(i,j,k,n) << std::endl;
       //}
-      std::cout << "q(" << i <<',' << j << ',' << k <<') =';
+      std::cout << "q(" << i <<"," << j << "," << k << ") = ";
       for (int n = 0; n < NPRIM; ++n) {
         std::cout << q(i,j,k,n) << " ";
       }

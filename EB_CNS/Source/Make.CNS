@@ -1,4 +1,5 @@
 CERISSE_HOME ?= $(abspath ../../..)
+#CERISSE_HOME = /Users/snm/codes/cerisse0/cerisse
 AMREX_HOME        ?= $(CERISSE_HOME)/Submodules/amrex
 PELE_PHYSICS_HOME ?= $(CERISSE_HOME)/Submodules/PelePhysics
 SUNDIALS_HOME     ?= $(CERISSE_HOME)/Submodules/sundials
