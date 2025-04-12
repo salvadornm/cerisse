@@ -70,7 +70,6 @@ Real CNS::advance(Real time, Real dt, int iteration, int ncycle)
     FillPatch(*this, Sborder, NUM_GROW, time, State_Type, 0, UFA);
     compute_dSdt(Sborder, dSdt_old, 0.5 * dt, fr_as_crse, fr_as_fine, true);
     MultiFab::LinComb(S_new, 1.0, Sborder, 0, dt, dSdt_old, 0, 0, UFA, 0);
-
     if (rk_order == 2) {
       if (do_react) {
         for (int nf = 0; nf <= NUM_FIELD; ++nf) {

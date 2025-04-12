@@ -60,11 +60,17 @@ void CNS::compute_dSdt_box_eb(
   auto const& wr = wrfab.array();
 
   // Temporary flux before redistribution
+  divcfab.setVal<RunOn::Device>(0.0);
+
   std::array<FArrayBox, amrex::SpaceDim> flux_tmp;
   for (int dir = 0; dir < amrex::SpaceDim; ++dir) {
-    flux_tmp[dir].resize(amrex::surroundingNodes(bxg4, dir), ncomp, // was bxg3
-                         The_Async_Arena());
-    flux_tmp[dir].setVal<RunOn::Device>(0.);
+  //flux_tmp[dir].resize(amrex::surroundingNodes(bxg4, dir), ncomp, // was bxg3
+  //                     The_Async_Arena());
+  flux_tmp[dir].resize(amrex::surroundingNodes(bxg3, dir)
+                           .grow((dir + 1) % amrex::SpaceDim, 1)
+                           .grow((dir + 2) % amrex::SpaceDim, 1),
+                         ncomp, The_Async_Arena());
+  flux_tmp[dir].setVal<RunOn::Device>(0.);
   }
   // Store viscous fluxes separately in V/VSPDF
   std::array<FArrayBox, amrex::SpaceDim> vfluxfab;
@@ -157,21 +163,25 @@ void CNS::compute_dSdt_box_eb(
 
     // Compute fluxes for each space direction
     for (int dir = 0; dir < amrex::SpaceDim; ++dir) {
-      const Box& flxbx = amrex::surroundingNodes(bxg3, dir);
+      //const Box& flxbx = amrex::surroundingNodes(bxg3, dir);
       auto const& flx = flux_tmp[dir].array(nf * NVAR);
+      const Box& flxbx = flux_tmp[dir].box(); // added
+
 
       // Hydro/hyperbolic fluxes
       if (do_hydro) {
         // Shock-capturing scheme
         // 1. Convert primitive to characteristic at cell centre
-        const Box& charbox = amrex::grow(bxg3, dir, 3);
+        // const Box& charbox = amrex::grow(bxg3, dir, 3);
+        const Box& charbox = amrex::growHi(amrex::growLo(flxbx, dir, 3), dir, 2); // added
         amrex::ParallelFor(charbox, [=] AMREX_GPU_DEVICE(int i, int j, int k) {
           if (!flag(i, j, k).isCovered()) {
             cns_ctochar(i, j, k, dir, q, w, char_sys);
           }
         });
         // 2. FD interpolation to cell face
-        const Box& reconbox = amrex::grow(bxg3, dir, 1);
+        //const Box& reconbox = amrex::grow(bxg3, dir, 1);
+        const Box& reconbox = amrex::growLo(flxbx, dir, 1); // added
         amrex::ParallelFor(
           TypeList<CompileTimeOptions<1, 2, 3, 4, 5, 6>, CompileTimeOptions<0, 1>>{},
           {recon_scheme, eb_recon_mode}, reconbox, NCHAR,
