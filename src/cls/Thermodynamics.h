@@ -26,7 +26,11 @@ class calorifically_perfect_gas_t {
   Real cv = Ru / (mw * gamma_m1);
   Real cp = gamma * cv;
   Real Rspec = Ru / mw;
-  Real ei_min = Rspec*min_euler_temp/gamma_m1;
+#if CLIP_TEMPERATURE  
+  Real ei_min = Rspec*min_euler_temp/gamma_m1;    // if physical T used
+#else  
+  Real ei_min = 1.0*min_euler_press/gamma_m1;     // if no physical T used
+#endif  
 
   AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE void RYP2E(const Real R,
                                                       const Real* /*Y*/,
@@ -112,7 +116,6 @@ class calorifically_perfect_gas_t {
       Real rhoke = Real(0.5) * rho * (ux * ux + uy * uy + uz * uz);
       Real rhoei = cons(i, j, k, idx_t::UET) - rhoke ;
       rhoei = max(rhoei,rho*(this->ei_min)); //clip energy
-
       Real p = (this->gamma_m1) * rhoei;
 
       prims(i, j, k, idx_t::QRHO) = rho;

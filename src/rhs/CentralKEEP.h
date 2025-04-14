@@ -74,14 +74,7 @@ class keep_euler_t {
                   [=, *this] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {
                     this->flux_dir(i, j, k, dir, order_coeffs, prims, flx, cls);
                   });
-
-      // add flux derivative to rhs = -(fi+1 - fi)/dx = (fi - fi+1)/dx
-      GpuArray<int, 3> vdir = {int(dir == 0), int(dir == 1), int(dir == 2)};
-      ParallelFor(bx, cls_t::NCONS,
-                  [=] AMREX_GPU_DEVICE(int i, int j, int k, int n) noexcept {
-                    rhs(i, j, k, n) +=
-                        dxinv[dir] * (flx(i, j, k, n) - flx(i+vdir[0], j+vdir[1], k+vdir[2], n));
-                  });
+      
     }
 
     if constexpr (isIB) {

@@ -230,10 +230,10 @@ class weno_t {
     const Box& bx = mfi.tilebox();
 
     // clear rhs
-    ParallelFor(bx, cls_t::NCONS,
-                [=] AMREX_GPU_DEVICE(int i, int j, int k, int n) noexcept {
-                  rhs(i, j, k, n) = 0.0;
-                });
+    // ParallelFor(bx, cls_t::NCONS,
+    //             [=] AMREX_GPU_DEVICE(int i, int j, int k, int n) noexcept {
+    //               rhs(i, j, k, n) = 0.0;
+    //             });
 
     // for each direction
     for (int dir = 0; dir < amrex::SpaceDim; ++dir) {

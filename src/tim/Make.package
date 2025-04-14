@@ -1,1 +1,1 @@
-CEXE_sources += advance.cpp
+CEXE_sources += advance.cpp compute_rhs.cpp

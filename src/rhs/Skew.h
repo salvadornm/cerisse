@@ -182,12 +182,12 @@ class skew_t {
 #if (AMREX_USE_GPIBM || CNS_USE_EB )  
  void inline eflux_ibm(const Geometry& geom, const MFIter& mfi,
                     const Array4<Real>& prims, std::array<FArrayBox*, AMREX_SPACEDIM> const &flxt,
-                    const Array4<Real>& rhs, const cls_t* cls,const Array4<bool>& ibMarkers) {
+                    const Array4<Real>& cons, const cls_t* cls,const Array4<bool>& ibMarkers) {
 
 #else
   void inline eflux(const Geometry& geom, const MFIter& mfi,
                     const Array4<Real>& prims, std::array<FArrayBox*, AMREX_SPACEDIM> const &flxt,
-                    const Array4<Real>& rhs, const cls_t* cls) {
+                    const Array4<Real>& cons, const cls_t* cls) {
 #endif
 
 
@@ -197,18 +197,18 @@ class skew_t {
         -1, 0);  // extent is 0,N_cell+1 in all directions -- -1 means for all
                  // directions. amrex::surroundingNodes(bx) does the same
     
-    FArrayBox consf(bxg, cls_t::NCONS, The_Async_Arena());
+    //FArrayBox consf(bxg, cls_t::NCONS, The_Async_Arena());
     FArrayBox lambda_maxf(bxg, 1, The_Async_Arena());
 
     // create lambda(0) and cons array
-    Array4<Real> cons   = consf.array();
+    // Array4<Real> cons   = consf.array();
     Array4<Real> lambda_max = lambda_maxf.array();
 
     // copy conservative variables from rhs to cons and clear rhs
-    ParallelFor(bxg, cls_t::NCONS, [=] AMREX_GPU_DEVICE(int i, int j, int k, int n) noexcept {
-      cons(i,j,k,n) = rhs(i,j,k,n);
-      rhs(i, j, k, n)=0.0;              
-      });
+    // ParallelFor(bxg, cls_t::NCONS, [=] AMREX_GPU_DEVICE(int i, int j, int k, int n) noexcept {
+    //   cons(i,j,k,n) = rhs(i,j,k,n);
+    //   rhs(i, j, k, n)=0.0;              
+    //   });
 
     int imask = 3; // reduce order 
     // get global index

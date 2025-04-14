@@ -28,23 +28,16 @@ class riemann_t {
   
     const Box& bx  = mfi.tilebox();
     const Box& bxg = mfi.growntilebox(cls_t::NGHOST);
-
-    // zero rhs
-    ParallelFor(bxg, cls_t::NCONS,
-                [=] AMREX_GPU_DEVICE(int i, int j, int k, int n) noexcept {
-                  rhs(i, j, k, n) = 0.0;
-                });
     const Box& bxg1 = amrex::grow(bx, 1);
     FArrayBox slopef(bxg1, cls_t::NCONS+1, The_Async_Arena()); // +1 because of the density
     const Array4<Real>& slope = slopef.array();
+
 
     // x-direction
     int cdir = 0;
     auto const& flx1 = flxt[cdir]->array(); 
   
-
     const Box& xslpbx = amrex::grow(bx, cdir, 1);
-
 
     amrex::ParallelFor(
         xslpbx, [=, *this] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {
@@ -55,8 +48,7 @@ class riemann_t {
 #endif          
 
         });
-
-
+ 
     const Box& xflxbx = amrex::surroundingNodes(bx, cdir);
     amrex::ParallelFor(
         xflxbx, [=, *this] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {
@@ -536,6 +528,10 @@ class riemann_t {
     for (int n = 0; n < NUM_SPECIES; ++n) {
       fy(i, j, k, cls.UFS + n) = flxrY[n];
     }
+
+    
+    
+
   }
 
   AMREX_GPU_DEVICE AMREX_FORCE_INLINE void cns_riemann_z(
