@@ -293,6 +293,24 @@ public:
               rhs(i,j,k,n) += flux_wall[n]*vfracinv*bcarea(i,j,k,0)*dxinv[0]; 
             }
 
+
+          // snm  
+          // if ((i==120) && (j==319))
+          //  {
+          //   printf(" in flux wall \n");
+          //   for (int n = 0; n < cls_t::NCONS; n++) {
+          //     printf(" n=%d flux=%f  \n",n,flux_wall[n]);
+          //   }
+          //   printf(" vfrac=%f bcarea=%f",vfrac(i,j,k),bcarea(i,j,k,0));
+          //   for (int n = 0; n < cls_t::NPRIM; n++)
+          //   {
+          //     printf(" n=%d qwall=%f  \n",n,prim_wall[n]);
+          //   }
+
+          //  }
+           // snm
+
+
           }
          
 
@@ -415,18 +433,20 @@ public:
     auto const& fcz = flxt[2]->array(); 
 #endif
     
-    // amrex::ApplyMLRedistribution(
-    //   ebbox, cls_t::NCONS, rhs, divc, cons, scratch, flag, AMREX_D_DECL(apx, apy, apz), vfrac,
-    //   AMREX_D_DECL(fcx, fcy, fcz), bcent, phys_bc, geom, dt, redistribution_type,
-    //   as_crse, p_drho_as_crse->array(), p_rrflag_as_crse->const_array(), as_fine, dm_as_fine.array(), lev_mask,
-    //   level_mask_not_covered, fac_for_deltaR, use_wts_in_divnc, 0, srd_max_order,
-    //   target_volfrac, srd_update_scale);
-
-
-    // manual redist
-    cerisse_flux_redistribute( ebbox,rhs, divc, redistwgt, vfrac,flag,geom,cls_t::NCONS,dt);
-
-                              
+    // redistribution
+    if (redistribution_type == "NewRedist")
+    {
+      cerisse_flux_redistribute( ebbox,rhs, divc, redistwgt, vfrac,flag,geom,cls_t::NCONS,dt);
+    }
+    else  
+    {
+      amrex::ApplyMLRedistribution(
+      ebbox, cls_t::NCONS, rhs, divc, cons, scratch, flag, AMREX_D_DECL(apx, apy, apz), vfrac,
+      AMREX_D_DECL(fcx, fcy, fcz), bcent, phys_bc, geom, dt, redistribution_type,
+      as_crse, p_drho_as_crse->array(), p_rrflag_as_crse->const_array(), as_fine, dm_as_fine.array(), lev_mask,
+      level_mask_not_covered, fac_for_deltaR, use_wts_in_divnc, 0, srd_max_order,
+      target_volfrac, srd_update_scale);
+    }                                
   }  
 
   ////////////////////////////////////////////////////////////////////////////////////////////////////////////

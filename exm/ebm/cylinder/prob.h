@@ -40,9 +40,9 @@ struct ProbParm {
   Real v_r     = 0.0;
   Real eint_r  = p_r/ (gam - Real(1.0));  
 
-  // centre of cylinder
-  Real x0 = 1;
-  Real y0 = 2;
+  // centre of cylinder (from input file)
+  Real x0 = 1; Real y0 = 2;
+  Real xshock = 0.75;  //[m] initial shock position
 };
 
 
@@ -65,9 +65,9 @@ typedef closures_dt<indicies_t, visc_suth_t, cond_suth_t,
 
 // define nuemrical scheme comment/uncomment to set up 
 //typedef rhs_dt<rusanov_t<ProbClosures>, no_diffusive_t, no_source_t > ProbRHS;
-typedef rhs_dt<riemann_t<false, ProbClosures>, no_diffusive_t, no_source_t > ProbRHS;
+//typedef rhs_dt<riemann_t<false, ProbClosures>, no_diffusive_t, no_source_t > ProbRHS;
 //typedef rhs_dt<skew_t<methodparm_t, ProbClosures>, no_diffusive_t, no_source_t > ProbRHS;
-//typedef rhs_dt<weno_t<ReconScheme::Teno5, ProbClosures>, no_diffusive_t, no_source_t > ProbRHS;
+typedef rhs_dt<weno_t<ReconScheme::Teno5, ProbClosures>, no_diffusive_t, no_source_t > ProbRHS;
 
 
 // define type of wall and EBM class
@@ -96,7 +96,7 @@ prob_initdata(int i, int j, int k, Array4<Real> const &state,
   Real rhot,eint,u[2];
 
   // final state
-  if (x < 0.5) {
+  if (x < prob_parm.xshock) {
     rhot =  prob_parm.rho_oo;
     u[0] =  prob_parm.u_oo; u[1] =  prob_parm.v_oo;
     eint =  prob_parm.eint_oo;

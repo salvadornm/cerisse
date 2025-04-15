@@ -1,10 +1,10 @@
 # Simulation time
-max_step  =  5000
-stop_time =  0.005
-cfl = 0.1
+max_step  =  50000
+stop_time =  0.003
+cfl = 0.01
 #time_step = 1.2e-6
 
-cns.order_rk  = -2 # original
+cns.order_rk  = -2 # original -2 2
 cns.stages_rk = 2
 
 # Geometry 
@@ -26,7 +26,7 @@ amr.v               = 1 # quiet
 
 # Refinement and regridding 
 amr.n_cell            = 80 160   # orign 80 x 160 with 1 lev
-amr.max_level         = 0      # maximum level number allowed
+amr.max_level         = 2      # maximum level number allowed
 amr.ref_ratio         = 2 2    # refinement ratio per level
 amr.regrid_int        = 5      # how often to regrid per level
 amr.blocking_factor_x = 8      # blocking factor in x per level
@@ -42,7 +42,7 @@ amr.check_file              = chk     # root name of checkpoint file
 amr.check_int               = 20000   # number of timesteps betw.  checkpoints
 amr.plot_files_output = 1
 amr.plot_file         = ./plot/plt    # root name of plotfile
-amr.plot_int          = 100           # number of timesteps between plotfiles
+amr.plot_int          = 500           # number of timesteps between plotfiles
 amr.derive_plot_vars  = pressure velocity temperature
 
 # EB settings
@@ -53,4 +53,4 @@ eb2.cylinder_center = 1.0 2.0
 eb2.cylinder_has_fluid_inside = 0
 
 eb2.eb_weight  = 1.0
-eb2.redistribution_type = "FluxRedist"
+eb2.redistribution_type = "NoRedist"

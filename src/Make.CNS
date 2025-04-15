@@ -50,6 +50,14 @@ ifeq ($(USE_GPIBM),TRUE)
   DEFINES           += -DAMREX_USE_GPIBM 
 endif
 
+# ---------  Cerisse Flags  -------------------- 
+ifeq ($(CLIP_MINTEMP), TRUE)
+  DEFINES += -DCLIP_TEMPERATURE_MIN=1
+else
+  CLIP_MINTEMP := FALSE
+endif
+
+
 # ---------   EB  -------------------- 
 ifeq ($(USE_EB), TRUE)
   DEFINES += -DCNS_USE_EB=1

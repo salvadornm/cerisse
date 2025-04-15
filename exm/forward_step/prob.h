@@ -34,7 +34,7 @@ struct ProbParm {
   Real p_r    = p_l;
   Real rho_r  = rho_l;     
   Real c_r    = sqrt(gam*p_r/rho_r); 
-  Real u_r    = 3.0; // temp
+  Real u_r    = u_l; // temp 
   Real v_r    = 0.0;
   Real T_r    = p_r*Mw/(gas_constant*rho_r); ; 
   Real eint_r = p_r/(gam - Real(1.0));;  

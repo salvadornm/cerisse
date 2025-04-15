@@ -128,8 +128,8 @@ void CNS::read_params() {
   ppeb2.query("eb_weight",eb_weight); 
   ppeb2.query("redistribution_type", eb_redistribution_type);
   if (eb_redistribution_type != "StateRedist" && eb_redistribution_type != "FluxRedist" &&
-      eb_redistribution_type != "NoRedist") {
-    amrex::Abort( " input file: redistribution_type must be StateRedist/FluxRedist/NoRedist");
+      eb_redistribution_type != "NoRedist"    && eb_redistribution_type != "NewRedist") {
+    amrex::Abort( " input file: redistribution_type must be StateRedist/FluxRedist/NewRedist/NoRedist");
   }
   if (eb_redistribution_type != "NoRedist") eb_redistribution =true;
   // This communicates to the class (not very elegant)

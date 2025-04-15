@@ -5,6 +5,8 @@
 
 #include "Closures.h"
 
+#include "mandebug.h" //temp snm
+
 #define POWER2(x) ((x) * (x))
 #define POWER6(x) ((x) * (x) * (x) * (x) * (x) * (x))
 
@@ -229,12 +231,6 @@ class weno_t {
 
     const Box& bx = mfi.tilebox();
 
-    // clear rhs
-    // ParallelFor(bx, cls_t::NCONS,
-    //             [=] AMREX_GPU_DEVICE(int i, int j, int k, int n) noexcept {
-    //               rhs(i, j, k, n) = 0.0;
-    //             });
-
     // for each direction
     for (int dir = 0; dir < amrex::SpaceDim; ++dir) {
 
@@ -294,7 +290,25 @@ class weno_t {
         cls->char2cons(roe_avg, fmR);
 
         for (int n = 0; n < cls_t::NCONS; ++n) {
+
+          
+          
+
           flx(iv, n) = alpha * (fpL[n] - fmR[n]);
+
+          // // snm
+          //  if (amrex::isnan( flx(iv, n) ) )
+          //  {
+          //   printf(" DIR=%d i=%d j=%d k=%d n=%d\n",dir,i,j,k,n);
+          //   printf(" flkx=%f \n",flx(iv, n));
+          //   printf(" alpha=%f \n",alpha);
+          //   printf(" fpL=%f  fmR=%f \n",fpL[n],fmR[n]);            
+          //   std::cout << " ibm0= " << ibMarkers(i,j,k,0) << " \n" ;
+          //   std::cout << " ibm1= " << ibMarkers(i,j,k,1) << " \n" ;
+          //   printarray_point(" crash point ",i,j,k,cls_t::NPRIM,prims);            
+          //   amrex::Abort();              
+          //  } 
+
         }
       });
     }  // end of for each direction

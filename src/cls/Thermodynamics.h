@@ -26,7 +26,7 @@ class calorifically_perfect_gas_t {
   Real cv = Ru / (mw * gamma_m1);
   Real cp = gamma * cv;
   Real Rspec = Ru / mw;
-#if CLIP_TEMPERATURE  
+#if CLIP_TEMPERATURE_MIN  
   Real ei_min = Rspec*min_euler_temp/gamma_m1;    // if physical T used
 #else  
   Real ei_min = 1.0*min_euler_press/gamma_m1;     // if no physical T used

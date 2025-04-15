@@ -29,9 +29,9 @@ class riemann_t {
     const Box& bx  = mfi.tilebox();
     const Box& bxg = mfi.growntilebox(cls_t::NGHOST);
     const Box& bxg1 = amrex::grow(bx, 1);
-    FArrayBox slopef(bxg1, cls_t::NCONS+1, The_Async_Arena()); // +1 because of the density
+        
+    FArrayBox slopef(bxg1, cls_t::NSLOPE, The_Async_Arena()); // NSLOPE= NCONS+1
     const Array4<Real>& slope = slopef.array();
-
 
     // x-direction
     int cdir = 0;
@@ -129,6 +129,8 @@ class riemann_t {
     sl = amrex::min(sl, uroe - croe);
     sr = amrex::max(sr, uroe + croe);
 
+    Real frac = 0.0;
+
     if (sl > 0) {
       // flx_l
       flxu = rl * ul * ul + pl;
@@ -155,7 +157,7 @@ class riemann_t {
 
       if (sstar >= 0) {
         // flx_l* = flx_l + sl * (q_l* - q_l)
-        Real frac = (sl - ul) / (sl - sstar) - 1.;
+        frac = (sl - ul) / (sl - sstar) - 1.;
 
         flxu = rl * ul * ul + pl + sl * rl * ((frac + 1.) * sstar - ul);
         flxut = rl * ul * ut1l + sl * rl * frac * ut1l;
@@ -168,7 +170,7 @@ class riemann_t {
 
       } else {
         // flx_r* = flx_r + sr * (q_r* - q_r)
-        Real frac = (sr - ur) / (sr - sstar) - 1.;
+        frac = (sr - ur) / (sr - sstar) - 1.;
 
         flxu = rr * ur * ur + pr + sr * rr * ((frac + 1.) * sstar - ur);
         flxut = rr * ur * ut1r + sr * rr * frac * ut1r;
@@ -179,6 +181,20 @@ class riemann_t {
           flxrhoy[n] = rr * ur * yr[n] + sr * rr * frac * yr[n];
         }
       }
+
+      // if (amrex::isnan(flxrhoy[0]))
+      // {
+      //  printf(" AQUI flx = %f \n",flxrhoy[0]);
+      //  printf(" rr=%f ur =%f  pr=%f Yr=%f\n",rr,ur,pr,yr[0]);
+      //  printf(" rl=%f ul =%f  pl=%f  Yl=%f\n",rl,ul,pl,yl[0]);
+      //  printf(" sr - ur=%f sr-sstar =%f  \n",sr - ur,sr-sstar);
+       
+      //  printf(" sl=%f sr=%f rp=%f\n",sl,sr,rp);
+      //  printf(" uroe= %f croe=%f \n",uroe,croe);
+      //  printf("frac = %f \n ",frac);
+      //  printf("sstar = %f\n ",sstar);      
+      // }
+
     }
   }
 
@@ -192,13 +208,15 @@ class riemann_t {
       const cls_t& cls) const {
 #endif
 
-
-
-
 #ifdef CNS_USE_EB 
     // const bool wall_left  = marker(i-1,j,k,0);  
     // const bool wall_right = marker(i+1,j,k,0);  
     const bool close_to_wall = marker(i,j,k,1);
+    const bool intersolid_flx = marker(i,j,k,0) &&  marker(i-1,j,k,0);
+    if (intersolid_flx) {
+      for (int n = 0; n < cls.NSLOPE; ++n) { dq(i,j,k,n) = 0.0;}
+      return;
+    }  
 #endif
 
     Real cspeed = q(i, j, k, cls.QC) + 1.e-40;
@@ -255,9 +273,12 @@ class riemann_t {
 #ifdef CNS_USE_EB
     if (close_to_wall) 
     {
-      for (int n = 0; n < cls.NCONS; ++n) { dq(i,j,k,n) = 0.0;}
+      for (int n = 0; n < cls.NSLOPE; ++n) { dq(i,j,k,n) = 0.0;}
     }    
 #endif    
+
+
+
 
   }
  
@@ -277,6 +298,11 @@ class riemann_t {
     // const bool wall_left  = marker(i,j-1,k,0);  
     // const bool wall_right = marker(i,j+1,k,0); 
     const bool close_to_wall = marker(i,j,k,1); 
+    const bool intersolid_flx = marker(i,j,k,0) &&  marker(i,j-1,k,0);
+    if (intersolid_flx) {
+      for (int n = 0; n < cls.NSLOPE; ++n) { dq(i,j,k,n) = 0.0;}
+      return;
+    }
 #endif
 
 
@@ -333,10 +359,11 @@ class riemann_t {
 #ifdef CNS_USE_EB
     if (close_to_wall) 
     {
-      for (int n = 0; n < cls.NCONS; ++n) { dq(i,j,k,n) = 0.0;}
+      for (int n = 0; n < cls.NSLOPE; ++n) { dq(i,j,k,n) = 0.0;}
     }    
 #endif    
  
+
 
   }
 
@@ -354,6 +381,11 @@ class riemann_t {
     // const bool wall_left  = marker(i,j-1,k,0);  
     // const bool wall_right = marker(i,j+1,k,0); 
     const bool close_to_wall = marker(i,j,k,1); 
+    const bool intersolid_flx = marker(i,j,k,0) &&  marker(i,j,k-1,0);
+    if (intersolid_flx) {
+      for (int n = 0; n < cls.NSLOPE; ++n) { dq(i,j,k,n) = 0.0;}
+      return;
+    }
 #endif
 
     Real cspeed = q(i, j, k, cls.QC) + 1.e-40;
@@ -409,7 +441,7 @@ class riemann_t {
 #ifdef CNS_USE_EB
     if (close_to_wall) 
     {
-      for (int n = 0; n < cls.NCONS; ++n) { dq(i,j,k,n) = 0.0;}
+      for (int n = 0; n < cls.NSLOPE; ++n) { dq(i,j,k,n) = 0.0;}
     }    
 #endif   
 
@@ -467,10 +499,35 @@ class riemann_t {
       rr, ur, pr, ut1r, ut2r, er, Yr, q(i, j, k, cls.QC), 
       fx(i, j, k, cls.UMX), fx(i, j, k, cls.UMY),
       fx(i, j, k, cls.UMZ), fx(i, j, k, cls.UET), flxrY);
-
+    
+   // density fluxes
     for (int n = 0; n < NUM_SPECIES; ++n) {
       fx(i, j, k, cls.UFS + n) = flxrY[n];
     }
+
+    
+    //...
+    // if (  (i==38)  && (j==71) )
+    // {
+    //   printf(" %d %d %d \n",i,j,k);
+    //   printf(" flux RHO = %f \n ", flxrY[0]);
+    //   printf(" RHO L=%f R=%f \n",rl,rr);
+    //   printf(" U L=%f R=%f \n",ul,ur);
+    //   printf(" P L=%f R=%f \n",pl,pr);
+    //   printf(" E L=%f R=%f \n",el,er);
+    //   printf(" Y L=%f R=%f \n",Yl[0],Yr[0]);
+    //   printf(" cls.QFS L=%f R=%f \n",q(i-1, j, k, cls.QFS),q(i, j, k, cls.QFS));      
+    //   printf(" cls.QC L=%f R=%f \n",q(i-1, j, k, cls.QC),q(i, j, k, cls.QC));
+
+    //   for (int n = 0; n < cls.NSLOPE; ++n) {
+    //     printf(" fx= %f dqx=%f \n",fx(i,j,k,n),dq(i,j,k,n));
+    //   }
+
+    //   amrex::Abort();
+      
+    // }
+    //...
+
   }
 
   AMREX_GPU_DEVICE AMREX_FORCE_INLINE void cns_riemann_y(
@@ -528,8 +585,6 @@ class riemann_t {
     for (int n = 0; n < NUM_SPECIES; ++n) {
       fy(i, j, k, cls.UFS + n) = flxrY[n];
     }
-
-    
     
 
   }

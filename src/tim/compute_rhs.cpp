@@ -31,7 +31,12 @@ void CNS::compute_rhs(MultiFab& statemf, Real dt, FluxRegister* fr_as_crse, Flux
 
     const Box& bx  = mfi.growntilebox(0);
     const Box& bxg = mfi.growntilebox(cls_h.NGHOST);
-
+#ifdef CNS_USE_EB     
+    const Box& bxflux = mfi.growntilebox(cls_h.NGHOST+1); // add 1 cell 
+#else
+    const Box& bxflux = mfi.growntilebox(cls_h.NGHOST); 
+#endif    
+    
     // primitives and fluxes arrays
     FArrayBox primf(bxg, cls_h.NPRIM, The_Async_Arena());
     Array4<Real> const& prims= primf.array();
@@ -50,20 +55,12 @@ void CNS::compute_rhs(MultiFab& statemf, Real dt, FluxRegister* fr_as_crse, Flux
       {
         cons(i,j,k,n) = state(i,j,k,n);
       });
-#else
-    // FArrayBox consfab(bxg, cls_h.NCONS, The_Async_Arena());
-    // Array4<Real> const& cons= consfab.array();    
-    // amrex::ParallelFor(bxg, cls_h.NCONS,
-    //   [=] AMREX_GPU_DEVICE (int i, int j, int k, int n) noexcept
-    //   {
-    //     cons(i,j,k,n) = state(i,j,k,n);
-    //   });          
 #endif
-    // fliux arrays 
+    // flux arrays  
     std::array<FArrayBox ,AMREX_SPACEDIM> fluxt;
     for (int dir=0; dir < AMREX_SPACEDIM; ++dir)
     {
-      fluxt[dir].resize(amrex::surroundingNodes(bxg, dir),cls_h.NCONS, The_Async_Arena() );
+      fluxt[dir].resize(amrex::surroundingNodes(bxflux, dir),cls_h.NCONS, The_Async_Arena() );
       fluxt[dir].setVal<RunOn::Device>(0.);
     }
      
@@ -124,17 +121,23 @@ void CNS::compute_rhs(MultiFab& statemf, Real dt, FluxRegister* fr_as_crse, Flux
 
     // compute rhs as flux derivative, i.e.  rhs + = (flx[i] - flx[i+1])/dx
     // WARNING: state is now the RHS array
+    // set RHS=0 (everywhere including ghost points)
+    ParallelFor(bxg, cls_h.NCONS,[=] AMREX_GPU_DEVICE (int i, int j, int k, int n) noexcept
+      {state(i,j,k,n) = 0.0;});
     const GpuArray<Real, AMREX_SPACEDIM> dxinv = geom.InvCellSizeArray();
     for (int dir = 0; dir < AMREX_SPACEDIM; dir++) {
         GpuArray<int, 3> vdir = {int(dir == 0), int(dir == 1), int(dir == 2)};
         auto const& flx = fluxt[dir].array();  
-        ParallelFor(bx, cls_h.NCONS,
+        ParallelFor(bxg, cls_h.NCONS,
                   [=] AMREX_GPU_DEVICE(int i, int j, int k, int n) noexcept {
-                    state(i, j, k, n) =
+                    state(i, j, k, n) +=
                         dxinv[dir] * (flx(i, j, k, n) - flx(i+vdir[0], j+vdir[1], k+vdir[2], n));
                   });
     }                  
 
+
+  //printinfo_point(" point check 120 320 (aft flux)",mfi, 120,320,0,cls_h.NCONS,cls_h.NPRIM, prims,cons,state);
+  
                         
 #if CNS_USE_EB    
     // internal geometry fluxes
@@ -142,27 +145,34 @@ void CNS::compute_rhs(MultiFab& statemf, Real dt, FluxRegister* fr_as_crse, Flux
     const auto& flag = (*EBM::eb.ebflags_a[level])[mfi];
     FabType t = flag.getType(ebbox);
 
-    const bool fab_with_eb = (FabType::singlevalued == t);
-
+    const bool fab_with_eb = (FabType::singlevalued == t);  
+    // EB flux     
     if (fab_with_eb) {
       EBM::eb.ebflux(geom,mfi, prims, {AMREX_D_DECL(&fluxt[0], &fluxt[1], &fluxt[2])},state, cls_d,level);
     }
-  
-    // redistribution (WARNING at this point state has the rhs, prims has prims)
-    
+
+   // printinfo_point("(aft fluxwall)",mfi, 120,320,0,cls_h.NCONS,cls_h.NPRIM, prims,cons,state);
+
+
+    // redistribution 
+    // WARNING: state is  the RHS array, prims is the prims 
     // compute divc here
     amrex::ParallelFor(bxg, cls_h.NCONS,  
     [=] AMREX_GPU_DEVICE (int i, int j, int k, int n) noexcept
     {
       divc(i,j,k,n) = state(i,j,k,n);
     });  
-
+    
     // do redistribution only in box with EB
-    if (eb_redistribution && fab_with_eb){    
+    if (eb_redistribution && fab_with_eb){      
+
+      // printf(" redisting .. \n");
+
       EBM::eb.redist(geom,mfi,cons,divc, {AMREX_D_DECL(&fluxt[0], &fluxt[1], &fluxt[2])},
                     state, cls_d,level,dt,h_phys_bc);
     }                    
       
+
 #endif 
 
     // Source terms, including update mask (e.g inside IB)
