@@ -14,19 +14,13 @@ layout:
 
 # 🍒 Welcome
 
-<div align="center">
+<div align="center"><img src=".gitbook/assets/Intro.png" alt=""></div>
 
-<img src=".gitbook/assets/Intro.png" alt="">
+[![License](https://img.shields.io/badge/License-BSD_3--Clause-blue.svg)](https://opensource.org/licenses/BSD-3-Clause)
 
-</div>
-
-[![License](https://img.shields.io/badge/License-BSD\_3--Clause-blue.svg)](https://opensource.org/licenses/BSD-3-Clause)
-
-**A research computational solver for Large Eddy Simulation  and Direct Numerical Simulation of high-speed compressible turbulent reactive flows.**
+**A research computational solver for Large Eddy Simulation and Direct Numerical Simulation of high-speed compressible turbulent reactive flows.**
 
 The solver employs high-order finite volume methods with adaptive mesh refinement and embedded/immersed boundary techniques to capture complex geometries.
-
-
 
 {% hint style="danger" %}
 DOCUMENTATION is not complete yet. Work in progress !!
@@ -38,8 +32,7 @@ The solver is designed for studying high-speed, turbulent reactive flows in a ra
 
 #### Philosophy
 
-Cerisse is a research-oriented code, distinct from commercial software like Star-CCM, Fluent, or Converge. Unlike general-purpose solvers such as OpenFOAM, which provide broad support for a wide range of equations, Cerisse is tailored to high-speed turbulent reactive flows. Although it is efficient and fast, it is not exclusively designed for DNS, as a code like 
-[PeleC](https://github.com/AMReX-Combustion/PeleC) would be for similar applications. However, Cerisse can still be effectively used as a highly scalable DNS/LES production code.
+Cerisse is a research-oriented code, distinct from commercial software like Star-CCM, Fluent, or Converge. Unlike general-purpose solvers such as OpenFOAM, which provide broad support for a wide range of equations, Cerisse is tailored to high-speed turbulent reactive flows. Although it is efficient and fast, it is not exclusively designed for DNS, as a code like [PeleC](https://github.com/AMReX-Combustion/PeleC) would be for similar applications. However, Cerisse can still be effectively used as a highly scalable DNS/LES production code.
 
 The primary goal of Cerisse is to streamline the implementation of new numerical methods, turbulence and combustion models, and solution approaches, allowing users to quickly test these developments. Users can define their problem setup and solution methods within just two files, simplifying customization and experimentation.
 
@@ -55,12 +48,9 @@ Cerisse uses AMREX libraries [AMREX](https://amrex-codes.github.io/amrex/), whic
 
 #### Download and Install
 
-The code source can be download  in [Cerisse2](https://github.com/salvadornm/cerisse/tree/cerisse2)
-while the code for the old version in [Cerisse](https://github.com/salvadornm/cerisse)
-Releases will appear  soon in [Downloads](https://github.com/salvadornm/cerisse/releases).
+The code source can be download in [Cerisse2](https://github.com/salvadornm/cerisse/tree/cerisse2) while the code for the old version in [Cerisse](https://github.com/salvadornm/cerisse) Releases will appear soon in [Downloads](https://github.com/salvadornm/cerisse/releases).
 
-NOTE: This documentation is created for Cerisse2, which corresponds to the **cerisse2** branch on GitHub.
-Please note that some features from the original Cerisse (**main** branch) have not yet been ported to this version.
+NOTE: This documentation is created for Cerisse2, which corresponds to the **cerisse2** branch on GitHub. Please note that some features from the original Cerisse (**main** branch) have not yet been ported to this version.
 
 Refer to the [QuickStart Guide](quickstart.md) for instructions on downloading, installing, and running a simple example case.
 
@@ -69,8 +59,6 @@ Refer to the [QuickStart Guide](quickstart.md) for instructions on downloading, 
 This open-source software is distributed under the BSD3 license. If you use it in your work, please cite it as
 
 NOTE: Monal Patel, Enson Un, Salvador Navarro-Martinez 'Cerisse',GitHub (2024)
-
-
 
 Cite as well the **AMReX** [![Citing](http://joss.theoj.org/papers/10.21105/joss.01370/status.svg)](https://doi.org/10.21105/joss.01370)
 
@@ -119,4 +107,3 @@ And if **PelePhysics** is used, please cite
   url = {https://www.sciencedirect.com/science/article/pii/S0010218024004498},
 }
 ```
-

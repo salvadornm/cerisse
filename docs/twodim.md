@@ -193,11 +193,47 @@ This example examines the behaviour of EBM in simple canonical case (located in 
 | $$\rho_0$$  | 1.4   |
 | $$U_0$$     | 3     |
 
-where a perfect gas with $$\gamma=1.4$$  is used. The simulation runs until time equals 4. The case is simulated with Skew, Rusanov and WENO schemes at different meshes. A constant time step is used, based on an initial Courant Number (CFL) of 0.32. Figure of density iso-contours (30 contours, linearly spaced between 0.46 and 6.8)
+where a perfect gas with $$\gamma=1.4$$  is used. The simulation runs until time equals 4. The case is simulated with Skew, Rusanov and WENO schemes at different meshes. A constant time step is used, based on an initial Courant Number (CFL) of 0.32. See Figures 2-3  with density iso-contours (30 contours, linearly spaced between 0.46 and 6.8). A quick png image of the final result  can be extracted using python and yt can be extracted by using (see  Figure 1)
 
-<figure><img src=".gitbook/assets/stepfig1.png" alt=""><figcaption><p>Three different meshes using Skew-symmetrtic 4th order methods with dissipation. Results shown at t=4.</p></figcaption></figure>
+```sh
+$ python ./plot.py
+```
 
-<figure><img src=".gitbook/assets/stepfig2.png" alt=""><figcaption><p>Three different methods with a mesh 480 x 160. Skew 4th order, Rusanov first order and the HLLC Riemann Solver with 2n order reconstruction</p></figcaption></figure>
+<figure><img src=".gitbook/assets/forwardstep.png" alt=""><figcaption><p>Figure 1:  Composite image of four method son the 240 x 80 mesh using the plot.py script. Resukst shown at t=4</p></figcaption></figure>
+
+<figure><img src=".gitbook/assets/stepfig1.png" alt=""><figcaption><p>Figure 2: Three different meshes using Skew-symmetrtic 4th order methods with dissipation. Results shown at t=4.</p></figcaption></figure>
+
+<figure><img src=".gitbook/assets/stepfig2.png" alt=""><figcaption><p>Figure 3: Three different methods with a mesh 480 x 160. Skew 4th order, Rusanov first order and the HLLC Riemann Solver with 2n order reconstruction</p></figcaption></figure>
+
+## Hypersonic flow over a cylinder
+
+&#x20;This setup consists of a perfect gas flowing over a cylinder at Mach 6. The high-speed nature of the flow makes it a strong test case for [Embedded Boundaries](code/ebm.md) and [Flux Redistribution](https://amrex-codes.github.io/amrex/docs_html/EB.html#small-cell-problem-and-redistribution) algorithms.
+
+As mesh refinement increases, cells that are partially covered by the solid boundary contain progressively less fluid volume, leading to a tighter CFL constraint. When using the HLLC/MUSCL Riemann solver _without_ any flux redistribution, the maximum stable CFL number decreases significantly:
+
+* **0.1** for one level of refinement
+* **0.05** for two levels
+* **0.025** for three levels
+
+However, with flux redistribution enabled, the CFL number can be maintained as high as **0.4**, even with multiple levels of refinement.
+
+The main parameters are summarised below&#x20;
+
+| parameter | value   |
+| --------- | ------- |
+| $$p_0$$   | 5000 Pa |
+| $$T_0$$   | 223 K   |
+| Mach      | 6       |
+
+where a perfect gas with $$\gamma=1.4$$   and molecular weight of  28.96 kg/kmol,  is used. The cylinder has 0.5 m in diameter. The simulation runs until time equals **3 ms** . The case is run fixing the CFL number and the total number of steps is around 640 with largest CFL.&#x20;
+
+<figure><img src=".gitbook/assets/cylinderAMR.png" alt=""><figcaption><p>Figure 4: Density distribution around a cylinder in Mach 6 flow, shown with overlaid computational mesh. Base mesh 80 x 160 with 3 levels of refinement next to cylinder and density gradients </p></figcaption></figure>
+
+This test is highly sensitive to the flux redistribution algorithm (see [available options](input.md) in the input file). With two levels of mesh refinement, cells with fluid fractions as low as approximately 0.006 can appear, _i.e_ less than 1% of the cell volume contains fluid.
+
+This implies that, without any form of redistribution, the CFL number may need to be reduced to below **0.006** to maintain stability. The exact threshold is strongly dependent on the numerical scheme being used. High-order schemes—such as TENO—are particularly susceptible to instabilities in the presence of very small fluid volumes.
+
+<figure><img src=".gitbook/assets/cylindernumerics.png" alt=""><figcaption><p>Figure 5: Snaphost using dofferent nuemrical methods. Base mesh 80 x 160 using 2 levels of refinement next to cylinder and density gradients </p></figcaption></figure>
 
 ## Planar Flame
 

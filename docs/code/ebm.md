@@ -1,6 +1,13 @@
 # EBM Solver
 
-This page explains how the [EB method](../theory/ibmeb.md) is implemented in Cerisse and the flux calculation is affected
+This page explains how the [EB method](../theory/ibmeb.md) is implemented in Cerisse and how the flux calculation is modified. Overall Ceirsse uses two boolean arrays (build from AMREX) to modify the numerical solvers
+
+```cpp
+        ebMarkers(i, j, k, 0) = flag_arr(i,j,k).isCovered();  
+        ebMarkers(i, j, k, 1) = flag_arr(i,j,k).isSingleValued();    
+```
+
+The first boolean  `ebMarkers(i, j, k, 0)`  indicates if the cell is solid or not, if **true**, then is a solid cell or internal. The second boolean `ebMarkers(i, j, k, 1)`  if **true**, shows that the cell is partially covered and therefore requires especial treatment of the fluxes.
 
 ## Fluxes in EB
 

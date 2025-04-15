@@ -2,13 +2,13 @@
 icon: block-brick
 ---
 
-# Solid boundaries
+# Solid Boundaries
 
 Embedded/Immersed boundary methods enable the representation of complex geometries on structured grids. Unlike body-fitted approaches, which require intricate coordinate transformations, these methods involve minimal modifications to the flux derivative calculations. Additionally, they are better suited for fluid-structure interaction problems compared to body-fitted methods. Embedded boundary methods are generally categorized into two main types: cut-cell methods (EBM) and ghost-point methods (IBM). Similar to other numerical techniques, each approach has its own advantages and disadvantages.
 
 ## Immersed Boundaries
 
-Immersed Boundaries, or Ghost-Point Immersed Boundary Methods (GPIBM), originate from finite difference discretization and are not inherently designed to ensure discrete conservation at the embedded boundary. These methods approximate the nearest point to the embedded boundary, known as the ghost point/cell, in a way that ensures the correct boundary flux is satisfied.
+Immersed Boundaries, or **Ghost-Point Immersed Boundary Methods** (GPIBM), originate from finite difference discretization and are not inherently designed to ensure discrete conservation at the embedded boundary. These methods approximate the nearest point to the embedded boundary, known as the ghost point/cell, in a way that ensures the correct boundary flux is satisfied.
 
 <figure><img src="../.gitbook/assets/ibm.png" alt=""><figcaption><p>Sketch of IBM methodology. The wall point (WP)  and interpolation points (IP) are used to determine the value at the ghost point (GP). In green f luxes that need to be modify by reducing the order. Shadowed in pink, the  cells that affect the interpolation values to determine GP</p></figcaption></figure>
 
@@ -33,10 +33,20 @@ $$A_k = f_k h^2$$. Where $$f_k$$ is the ratio of obunsutcred area with the maxim
 Replacing
 
 $$
-\nabla \cdot F = \sum_{k=1}^{6} \frac{F_k f _k}{ \phi h} + \frac{F_{wall}}{\phi h}
+\nabla \cdot F = \sum_{k=1}^{2\cdot D} \frac{F_k f _k}{ \phi h} + \frac{F_{wall}}{\phi h}
 $$
 
 where the flux at the wall would be defined based on the boundary condition type.
+
+### Small cell problem and Redistribution
+
+In time-explicit methods for advancing hyperbolic conservation laws, a straightforward time discretization leads to a time step restriction of the form (assuming constant spacing):
+
+$$
+\Delta t_{max} < \frac{h \phi}{|u+c|_{max}}
+$$
+
+which becomes vanishingly small as the volume fraction  in the domain decreases. In EB methods,  small volume fractions are common to capture round or inclined geometries, thus creating a severe time step limitation—known as the "small cell problem (see[ AMReX documentation](https://amrex-codes.github.io/amrex/docs_html/EB.html#small-cell-problem-and-redistribution) for details).
 
 ### References
 

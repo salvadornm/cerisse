@@ -11,7 +11,7 @@ This file sets general options, it is usually modified once and that are require
 
 ## AMRex/Cerisse options
 
-These lines are essential for configuring AMReX and setting the simulation dimensions, which is important for optimizing space and enabling efficient 1D or 2D simulations. They also specify the compiler, precision, and the use of parallelization frameworks like MPI, OpenMP, and GPU acceleration with CUDA. Enabling debugging will compile with additional checks (significantly slowing down execution), while profiling options provide a summary of exclusive and inclusive function times, as well as the minimum and maximum time spent in each routine across processes. For more infromation, see [AMReX Profiling](https://amrex-codes.github.io/amrex/docs\_html/AMReX\_Profiling\_Tools.html)
+These lines are essential for configuring AMReX and setting the simulation dimensions, which is important for optimizing space and enabling efficient 1D or 2D simulations. They also specify the compiler, precision, and the use of parallelization frameworks like MPI, OpenMP, and GPU acceleration with CUDA. Enabling debugging will compile with additional checks (significantly slowing down execution), while profiling options provide a summary of exclusive and inclusive function times, as well as the minimum and maximum time spent in each routine across processes. For more infromation, see [AMReX Profiling](https://amrex-codes.github.io/amrex/docs_html/AMReX_Profiling_Tools.html)
 
 ```makefile
 # AMReX
@@ -40,10 +40,8 @@ USE_EB = FALSE              # use of Emmbedded Boundaries for solid boundaries
 USE_PELEPHYSICS = TRUE      # PelePhysics is used for chemistry/thermodynamics/tarnsport
 ```
 
-
-
-{% hint style="info" %}
-Embedded Boundaries are **AMReX** native, while Immersed Boundaries are **Cerisse**. Both are have pros and cons (check Boundary Conditions).
+{% hint style="success" %}
+Embedded Boundaries are **AMReX** native, while Immersed Boundaries are **Cerisse**. Both are have pros and cons (check [Boundary Conditions](theory/ibmeb.md)).
 {% endhint %}
 
 ## PelePhysics
@@ -51,7 +49,7 @@ Embedded Boundaries are **AMReX** native, while Immersed Boundaries are **Ceriss
 If PelePhysics selected, the GNU Makefile specifies the thermodynamics, transport, and chemistry mechanisms. It uses the [PelePhysics](https://pelephysics.readthedocs.io/en/latest/index.html) style.
 
 {% hint style="warning" %}
-The first time a PelePhysics simulation is running do `make TPL` to download and compile third-party libraries
+The first time preparing  PelePhysics simulation do `make TPL` to download and compile third-party libraries
 {% endhint %}
 
 ```makefile
@@ -79,3 +77,17 @@ The lines below add the user-specified `prob.h` (or different header file), as w
 CEXE_headers += prob.h
 include $(AMR_SOLVER)/src/Make.CNS
 ```
+
+## Other Flags
+
+Is possible to define specific pre-processing flags that are passed to the compiler. An example is the flag
+
+```
+CLIP_MINTEMP = TRUE
+```
+
+which limits the minimum temperature in the system to 10 K (this number can be changed in `CNSConstants.h`). The above line will pass the flag `-DCLIP_TEMPERATURE_MIN=1`  to the compiler. The actual process is defined in `Make.CNS.`&#x20;
+
+{% hint style="warning" %}
+Creating new flags is simple, although is generally **not** recomended as they need to be hard-coded.
+{% endhint %}
