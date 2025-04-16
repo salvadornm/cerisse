@@ -128,7 +128,7 @@ void CNS::compute_rhs(MultiFab& statemf, Real dt, FluxRegister* fr_as_crse, Flux
     for (int dir = 0; dir < AMREX_SPACEDIM; dir++) {
         GpuArray<int, 3> vdir = {int(dir == 0), int(dir == 1), int(dir == 2)};
         auto const& flx = fluxt[dir].array();  
-        ParallelFor(bxg, cls_h.NCONS,
+        ParallelFor(bx, cls_h.NCONS,  // bxg or bx (should be bxg but needs correct flux)
                   [=] AMREX_GPU_DEVICE(int i, int j, int k, int n) noexcept {
                     state(i, j, k, n) +=
                         dxinv[dir] * (flx(i, j, k, n) - flx(i+vdir[0], j+vdir[1], k+vdir[2], n));
@@ -180,7 +180,7 @@ void CNS::compute_rhs(MultiFab& statemf, Real dt, FluxRegister* fr_as_crse, Flux
 
     // Set solid point RHS to 0  (state hold RHS at this point)
 #if AMREX_USE_GPIBM || CNS_USE_EB
-    amrex::ParallelFor(bx, cls_h.NCONS,
+    amrex::ParallelFor(bxg, cls_h.NCONS,
     [=] AMREX_GPU_DEVICE (int i, int j, int k, int n) noexcept
     {
       state(i,j,k,n) = state(i,j,k,n)*(1 - int(geoMarkers(i,j,k,0)));

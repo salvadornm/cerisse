@@ -1,3 +1,4 @@
-CEXE_headers += ebm.h walltypes.h
+CEXE_headers += ebm.h walltypes.h custom_geometry.h
+CEXE_sources += custom_geometry.cpp
 
 

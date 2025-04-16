@@ -14,7 +14,6 @@
 
 #include <AMReX_FArrayBox.H>
 
-
 #include <algorithm>
 #include <cmath>
 
@@ -28,7 +27,7 @@
 
 #include <CNSconstants.h>
 
-// temp
+#include "custom_geometry.h"
 #include <FluxRedistribute.h>
 
 template <typename wallmodel,typename cls_t>
@@ -130,11 +129,10 @@ public:
  
     if (std::find(amrex_defaults.begin(), amrex_defaults.end(), geom_type) ==
       amrex_defaults.end()) {
-
-      amrex::Print() << " custom EB types" << std::endl;    
-      amrex::Abort( " EB Type .. not ready yet (use cerisse1)"); 
-      //  auto geometry = CustomGeometry::create(geom_type); // SNM
-      //   geometry->build(geom, max_coarsening_level);  //SNM
+      amrex::Print() << " custom EB types" << std::endl;         
+      // Non-AMReX default EB types, get from CustomGeometry
+      auto geometry = CustomGeometry::create(geom_type);
+      geometry->build(geom, max_level);
     } 
     else {
       amrex::Print() << " AMReX default EB types" << std::endl;

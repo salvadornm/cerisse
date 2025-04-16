@@ -338,9 +338,9 @@ class viscous_t {
     u22  = tangent_diff<order_runtime>(iv, d1, d2, QU2, q, dxinv);
 #endif
 #if (AMREX_SPACEDIM == 3)
-    Real u31  = normal_diff<order_runtime>(iv, d1, QU3, q, dxinv);
-    Real u13  = tangent_diff<order_runtime>(iv, d1, d3, QU1, q, dxinv);
-    Real u33  = tangent_diff<order_runtime>(iv, d1, d3, QU3, q, dxinv);
+    u31  = normal_diff<order_runtime>(iv, d1, QU3, q, dxinv);
+    u13  = tangent_diff<order_runtime>(iv, d1, d3, QU1, q, dxinv);
+    u33  = tangent_diff<order_runtime>(iv, d1, d3, QU3, q, dxinv);
 #endif  
     // properties
     muf  = interp<order_runtime>(iv, d1, cls_t::CMU, coeffs);

@@ -35,9 +35,9 @@ class test_wall_t
         tan1[2] = 0.0;
         Real tan2[AMREX_SPACEDIM];
         // tan2 = cross_productv(tan1,norm)
-        tan2[0] = tan1[1] * norm[2] - tan1[2] * norm[1], // x component
-        tan2[1] = tan1[2] * norm[0] - tan1[0] * norm[2], // y component
-        tan2[2] = tan1[0] * norm[1] - tan1[1] * norm[0]  // z component      
+        tan2[0] = tan1[1] * norm[2] - tan1[2] * norm[1]; // x component
+        tan2[1] = tan1[2] * norm[0] - tan1[0] * norm[2]; // y component
+        tan2[2] = tan1[0] * norm[1] - tan1[1] * norm[0];  // z component      
 #endif        
         // change of coordinates x,y,z  --> n,t1,t2
         Real vel[AMREX_SPACEDIM]; Real velxyz[AMREX_SPACEDIM];        

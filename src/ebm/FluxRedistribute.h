@@ -31,15 +31,6 @@ inline void cerisse_flux_redistribute (
 
     Real reredistribution_threshold = amrex_eb_get_reredistribution_threshold();
 
-    int bx_ilo = bx.smallEnd()[0];
-    int bx_ihi = bx.bigEnd()[0];
-    int bx_jlo = bx.smallEnd()[1];
-    int bx_jhi = bx.bigEnd()[1];
-#if (AMREX_SPACEDIM == 3)
-    int bx_klo = bx.smallEnd()[2];
-    int bx_khi = bx.bigEnd()[2];
-#endif
-
     //
     // Working arrays
     //
