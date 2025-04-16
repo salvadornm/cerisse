@@ -1,5 +1,5 @@
 # Simulation time
-max_step  =  1
+max_step  =  10
 stop_time =  0.1
 cfl = 0.1
 #time_step = 1.2e-6
@@ -8,16 +8,14 @@ cns.order_rk  = -2
 cns.stages_rk = 2
 
 # Geometry 
-geometry.is_periodic = 0 0 0
+geometry.is_periodic = 0 0 1
 geometry.coord_sys   = 0  
-geometry.prob_lo     = -0.027 -0.027  0.0
-geometry.prob_hi     = 0.027  0.027  0.135
-#geometry.prob_lo     = -2.7 -2.7  0.0
-#geometry.prob_hi     = 2.7  2.7  13.5
+geometry.prob_lo     = -0.6 -0.6  0.0
+geometry.prob_hi     = 0.6  0.6  4.8
 
 # BC
-cns.lo_bc = 2 2 1
-cns.hi_bc = 2 2 2
+cns.lo_bc = 2 2 -1
+cns.hi_bc = 2 2 -1
 
 
 # output screen
@@ -26,7 +24,7 @@ cns.verbose = 0       # 0=quiet, 1=verbose
 amr.v             = 1 # quiet
 
 # Refinement and regridding 
-amr.n_cell            = 128 128 320 
+amr.n_cell            = 32 32 128 
 amr.max_level         = 0      # maximum level number allowed
 amr.ref_ratio         = 2      # refinement ratio per level
 amr.regrid_int        = 5      # how often to regrid per level
@@ -43,17 +41,17 @@ amr.check_file              = chk     # root name of checkpoint file
 amr.check_int               = 20000   # number of timesteps betw.  checkpoints
 amr.plot_files_output = 1
 amr.plot_file         = ./plot/plt    # root name of plotfile
-amr.plot_int          = 200            # number of timesteps between plotfiles
+amr.plot_int          = 5            # number of timesteps between plotfiles
 amr.derive_plot_vars  = pressure velocity temperature
 
 # EB settings
-#eb2.geom_type = cylinder
-#eb2.cylinder_direction = 2 
-#eb2.cylinder_radius = 0.02
-#eb2.cylinder_center = 0.0 0.0 0.1
-#eb2.cylinder_has_fluid_inside = 1
+eb2.geom_type = cylinder
+eb2.cylinder_direction = 2 
+eb2.cylinder_radius = 0.5
+eb2.cylinder_center = 0.0 0.0 2.5
+eb2.cylinder_has_fluid_inside = 1
 
-eb2.geom_type = "custom"
+#eb2.geom_type = "custom"
 
 eb2.eb_weight  = 1.0
 eb2.redistribution_type = "FluxRedist"

@@ -1,4 +1,4 @@
-DEBUG   = FALSE
+DEBUG   = TRUE
 DIM     = 3
 COMP     = gcc
 CXXSTD    = c++20
@@ -23,5 +23,4 @@ AMR_SOLVER = $(abspath ../../../)
 AMREX_HOME = $(abspath ../../../lib/amrex)
 
 CEXE_headers += prob.h
-CEXE_sources += eb_geometry.cpp
 include $(AMR_SOLVER)/src/Make.CNS

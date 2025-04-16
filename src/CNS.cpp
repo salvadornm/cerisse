@@ -615,7 +615,7 @@ void CNS::errorEst(TagBoxArray &tags, int /*clearval*/, int /*tagval*/,
       user_tagging(i, j, k, nt_lev, tagfab, sdatafab, ibfab, geomdata,
                    *lprobparm, lev);
 #else
-    user_tagging(i, j, k, nt_lev, tagfab, sdatafab, geomdata ,*lprobparm, lev);
+      user_tagging(i, j, k, nt_lev, tagfab, sdatafab, geomdata ,*lprobparm, lev);
 #endif
     });
   }
@@ -730,8 +730,6 @@ void CNS::writePlotFile(const std::string &dir, std::ostream &os,
 #ifdef CNS_USE_EB
   n_data_items += 1;
 #endif
-
-
   //------------------------------------------------------------------------------
 
   // get the time from the first State_Type
@@ -766,7 +764,7 @@ void CNS::writePlotFile(const std::string &dir, std::ostream &os,
       }
     }
 
-//----------------------------------------------------------------------modified
+    //----------------------------------------------------------------------modified
 #ifdef AMREX_USE_GPIBM
     os << "sld\n";
     os << "ghs\n";
@@ -880,13 +878,15 @@ void CNS::writePlotFile(const std::string &dir, std::ostream &os,
 #ifdef AMREX_USE_GPIBM
   plotMF.setVal(0.0_rt, cnt, 2, nGrow);
   IBM::ib.bmf_a[level]->copytoRealMF(plotMF, 0, cnt);
+  cnt+=2;
 #endif
 
 #ifdef CNS_USE_EB
   plotMF.setVal(0.0_rt, cnt, 0, nGrow); 
-  EBM::eb.bmf_a[level]->copytoRealMF(plotMF, 0, cnt);
-
- // EBM::eb.copytoRealMF(plotMF, 0, cnt);   // CHECK NEED TO PASS LEVEL
+ // EBM::eb.bmf_a[level]->copytoRealMF(plotMF, 0, cnt);  // boolean 
+  const MultiFab *vfrac = EBM::eb.volmf_a[level];
+  MultiFab::Copy(plotMF, *vfrac, 0, cnt, 1, 0);
+  cnt++;
 #endif
 
   //------------------------------------------------------------------------------

@@ -326,7 +326,9 @@ class viscous_t {
 
     
     constexpr int order_default = 2; // reduce to second order close to walls
-    constexpr int order_runtime = (close_to_wall ? order_default : order_sch);
+    //int order_runtime = (close_to_wall ? order_default : order_sch); // WARNN !!
+
+    constexpr int order_runtime = order_default; //TEMP SNM
 
     int order_local = order_runtime;
         
