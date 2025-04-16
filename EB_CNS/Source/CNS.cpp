@@ -377,6 +377,14 @@ void CNS::post_restart()
   // ifine_mask.define(grids, dmap, 1, 0, MFInfo());
   // fillFineMask();
 
+  // Initialise LES model (must happen before react because pasr may be needed)
+  if (do_les || do_pasr) {
+    ParmParse pp("cns");
+    std::string les_model_name;
+    pp.get("les_model", les_model_name);
+    les_model = LESModel::create(les_model_name);
+  }
+
   // Initialize reactor
   if (do_react) {
     if (chem_integrator == "ReactorNull") {
@@ -389,7 +397,7 @@ void CNS::post_restart()
 
     if (use_typical_vals_chem) { set_typical_values_chem(); }
 
-    react_state(parent->cumTime(), parent->dtLevel(level), true);
+    react_state(parent->cumTime(), parent->dtLevel(level), false);
   }
 
   MultiFab& S_new = get_new_data(State_Type);
@@ -426,14 +434,6 @@ void CNS::post_restart()
     }
   }
 #endif
-
-  // Initialise LES model
-  if (do_les || do_pasr) {
-    ParmParse pp("cns");
-    std::string les_model_name;
-    pp.get("les_model", les_model_name);
-    les_model = LESModel::create(les_model_name);
-  }
 
   ProbParm const* lprobparm = d_prob_parm;
   const auto geomdata = geom.data();
