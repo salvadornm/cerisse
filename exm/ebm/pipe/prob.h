@@ -126,12 +126,43 @@ prob_initdata(int i, int j, int k, Array4<Real> const &state,
   Real r =  rad/prob_parm.Rpipe;
 
   // local vars
-  Real rhot,eint,u[3];
+  Real rhot,eint,u[3],ufluc[3]={0.0, 0.0, 0.0};
 
   rhot =  prob_parm.rho_0;    
   for(int idim=0;idim < AMREX_SPACEDIM;idim++) {u[idim]=prob_parm.vel_0[idim];}
   eint =  prob_parm.eint_0;
- 
+
+  if (r < 1) 
+  {
+    u[2] = prob_parm.vel_0[2]*(1.0-r*r);
+  }
+
+  // fluctuations
+  std::random_device rd;       
+  std::mt19937 generator(rd());
+  std::uniform_real_distribution<double> distribution(-1.0,1.0);
+  // 
+  const Real Lz = 4.8;
+  const int NFREQ=6;
+  Real freqz[NFREQ],Amp[NFREQ];
+  for (int l=0;l<NFREQ;l++)
+  {
+    double r1 = 0.01*distribution(generator); //random shift
+    Amp[l]   = 0.1/(l+1);
+    freqz[l] = l*2.0*M_PI*x/Lz + r1*M_PI;
+    ufluc[0] +=Amp[l]*sin(freqz[l]);
+    ufluc[1] +=Amp[l]*cos(freqz[l]); 
+  }
+  double rn = distribution(generator);
+  ufluc[2]+= 0.02*rn;  
+
+  //
+  // add fluctuations to mean flow
+  for (int dim=0;dim<3;dim++)
+  {u[dim]+=ufluc[dim];}
+
+
+
   Real kin = Real(0.5) * rhot * (u[0] * u[0] + u[1] * u[1] + u[2]*u[2]);
   state(i, j, k, cls.URHO) = rhot;
   state(i, j, k, cls.UMX)  = rhot * u[0];

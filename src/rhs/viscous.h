@@ -323,31 +323,62 @@ class viscous_t {
     if (intersolid_flx) return;  // flux =0  inside solid   
 
     Real u11,dTdn,u21,u12,u22,u31,u13,u33,muf,xif,lamf;
-
     
-    constexpr int order_default = 2; // reduce to second order close to walls
-    //int order_runtime = (close_to_wall ? order_default : order_sch); // WARNN !!
+    constexpr int order_default = 2; 
+    int order_local = (close_to_wall ? order_default : order_sch);   
 
-    constexpr int order_runtime = order_default; //TEMP SNM
-
-    int order_local = order_runtime;
-        
-    dTdn = normal_diff<order_runtime>(iv, d1, cls_t::QT, q, dxinv);
-    u11  = normal_diff<order_runtime>(iv, d1, QU1, q, dxinv);
+    // reduce interpolation and differentiation to second order across the wall
+    if (close_to_wall)
+    {        
+      dTdn = normal_diff<order_default>(iv, d1, cls_t::QT, q, dxinv);
+      u11  = normal_diff<order_default>(iv, d1, QU1, q, dxinv);
 #if (AMREX_SPACEDIM >= 2)
-    u21  = normal_diff<order_runtime>(iv, d1, QU2, q, dxinv);
-    u12  = tangent_diff<order_runtime>(iv, d1, d2, QU1, q, dxinv);
-    u22  = tangent_diff<order_runtime>(iv, d1, d2, QU2, q, dxinv);
+      u21  = normal_diff<order_default>(iv, d1, QU2, q, dxinv);
+      u12  = tangent_diff<order_default>(iv, d1, d2, QU1, q, dxinv);
+      u22  = tangent_diff<order_default>(iv, d1, d2, QU2, q, dxinv);
 #endif
 #if (AMREX_SPACEDIM == 3)
-    u31  = normal_diff<order_runtime>(iv, d1, QU3, q, dxinv);
-    u13  = tangent_diff<order_runtime>(iv, d1, d3, QU1, q, dxinv);
-    u33  = tangent_diff<order_runtime>(iv, d1, d3, QU3, q, dxinv);
+      u31  = normal_diff<order_default>(iv, d1, QU3, q, dxinv);
+      u13  = tangent_diff<order_default>(iv, d1, d3, QU1, q, dxinv);
+      u33  = tangent_diff<order_default>(iv, d1, d3, QU3, q, dxinv);
 #endif  
-    // properties
-    muf  = interp<order_runtime>(iv, d1, cls_t::CMU, coeffs);
-    xif  = interp<order_runtime>(iv, d1, cls_t::CXI, coeffs);
-    lamf = interp<order_runtime>(iv, d1, cls_t::CLAM, coeffs);    
+      // properties
+      muf  = interp<order_default>(iv, d1, cls_t::CMU, coeffs);
+      xif  = interp<order_default>(iv, d1, cls_t::CXI, coeffs);
+      lamf = interp<order_default>(iv, d1, cls_t::CLAM, coeffs);   
+#if NUM_SPECIES > 1    
+      Real rhoD_f[NUM_SPECIES];
+      for (int n = 0; n < NUM_SPECIES; ++n) {  
+        rhoD_f[n] = interp<order_default>(iv, d1, cls_t::CRHOD + n, coeffs); 
+      }
+#endif      
+    }
+    else
+    {
+      dTdn = normal_diff<param::order>(iv, d1, cls_t::QT, q, dxinv);
+      u11  = normal_diff<param::order>(iv, d1, QU1, q, dxinv);
+#if (AMREX_SPACEDIM >= 2)
+      u21  = normal_diff<param::order>(iv, d1, QU2, q, dxinv);
+      u12  = tangent_diff<param::order>(iv, d1, d2, QU1, q, dxinv);
+      u22  = tangent_diff<param::order>(iv, d1, d2, QU2, q, dxinv);
+#endif
+#if (AMREX_SPACEDIM == 3)
+      u31  = normal_diff<param::order>(iv, d1, QU3, q, dxinv);
+      u13  = tangent_diff<param::order>(iv, d1, d3, QU1, q, dxinv);
+      u33  = tangent_diff<param::order>(iv, d1, d3, QU3, q, dxinv);
+#endif  
+      // properties
+      muf  = interp<param::order>(iv, d1, cls_t::CMU, coeffs);
+      xif  = interp<param::order>(iv, d1, cls_t::CXI, coeffs);
+      lamf = interp<param::order>(iv, d1, cls_t::CLAM, coeffs);
+#if NUM_SPECIES > 1    
+      Real rhoD_f[NUM_SPECIES];
+      for (int n = 0; n < NUM_SPECIES; ++n) {  
+        rhoD_f[n] = interp<param::order>(iv, d1, cls_t::CRHOD + n, coeffs); 
+      }
+#endif      
+
+    }  
     
     const Real divu   = AMREX_D_TERM(u11, +u22, +u33);
     
@@ -406,10 +437,7 @@ class viscous_t {
       }      
       dXdx  /= dxinv[d1];
       Yf[n] = Yface; hf[n] = hface;
-
-      const Real rhoD_f = interp<order_runtime>(iv, d1, cls_t::CRHOD + n, coeffs); 
-
-      const Real Vd = -rhoD_f * (dXdx + (Xface - Yface) * dlnp);
+      const Real Vd = -rhoD_f[n] * (dXdx + (Xface - Yface) * dlnp);
       Vc += Vd;
       flx(iv, cls_t::UFS + n) += Vd; 
       flx(iv, cls_t::UET)     += Vd * hface;

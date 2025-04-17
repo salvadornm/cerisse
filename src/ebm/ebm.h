@@ -281,33 +281,19 @@ public:
             amrex::Real norm_wall [AMREX_SPACEDIM]= {0.0};
    
             for (int n = 0; n < AMREX_SPACEDIM; n++) {
-              norm_wall[n] = -normxyz(i,j,k,n); // so the normal points towards the liquid
+              norm_wall[n] = -normxyz(i,j,k,n); // the normal points towards the liquid
             }
 
             // calculate wall flux and add it to rhs
-            wallmodel::wall_flux(geom,i,j,k,norm_wall,prim_wall,flux_wall,cls);             
+            wallmodel::wall_flux(geom,i,j,k,norm_wall,prim_wall,flux_wall,cls);      
+            
+            // from volume and area centroid compute distance to wall centroid
+            
+            // wallmodel::wall_flux_diff(geom,i,j,k,norm_wall,prims,prim_wall,flux_wall,cls);)
 
             for (int n = 0; n < cls_t::NCONS; n++) {
               rhs(i,j,k,n) += flux_wall[n]*vfracinv*bcarea(i,j,k,0)*dxinv[0]; 
             }
-
-
-          // snm  
-          // if ((i==120) && (j==319))
-          //  {
-          //   printf(" in flux wall \n");
-          //   for (int n = 0; n < cls_t::NCONS; n++) {
-          //     printf(" n=%d flux=%f  \n",n,flux_wall[n]);
-          //   }
-          //   printf(" vfrac=%f bcarea=%f",vfrac(i,j,k),bcarea(i,j,k,0));
-          //   for (int n = 0; n < cls_t::NPRIM; n++)
-          //   {
-          //     printf(" n=%d qwall=%f  \n",n,prim_wall[n]);
-          //   }
-
-          //  }
-           // snm
-
 
           }
          

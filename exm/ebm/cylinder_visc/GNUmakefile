@@ -1,4 +1,3 @@
-
 DEBUG   = FALSE
 DIM     = 2
 COMP     = gcc

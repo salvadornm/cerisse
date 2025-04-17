@@ -1,5 +1,5 @@
 # Simulation time
-max_step  =  40000
+max_step  =  1000
 stop_time =  8.0
 cfl = 0.1
 #time_step = 5e-7
@@ -42,7 +42,7 @@ amr.check_file              = chk     # root name of checkpoint file
 amr.check_int               = 20000   # number of timesteps betw.  checkpoints
 amr.plot_files_output = 1
 amr.plot_file         = ./plot/plt    # root name of plotfile
-amr.plot_int          = 500           # number of timesteps between plotfiles
+amr.plot_int          = 100           # number of timesteps between plotfiles
 amr.derive_plot_vars  = pressure velocity temperature
 
 # EB settings
@@ -57,6 +57,6 @@ eb2.box_lo = 9.0  9.0  0.0
 eb2.box_hi = 11.0  11.0  0.0
 eb2.box_has_fluid_inside = 0
 eb2.eb_weight  = 1.0
-eb2.redistribution_type = "FluxRedist
+eb2.redistribution_type = "NoRedist"
 
 

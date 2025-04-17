@@ -78,6 +78,7 @@ class adiabatic_wall_t
 
     ~adiabatic_wall_t() {}
 
+    // Eulerian flux
     static void inline wall_flux(const auto &geomdata, int i, int j, int k, const Real norm[AMREX_SPACEDIM], 
       amrex::GpuArray<amrex::Real, cls_t::NPRIM>& prims, amrex::GpuArray<amrex::Real, cls_t::NCONS>& fluxw,const cls_t* cls) {
 
@@ -90,7 +91,45 @@ class adiabatic_wall_t
         fluxw[cls_t::UMZ] =  P*norm[2];
 #endif        
                                  
-    }                                                           
+    }  
+    // Viscous flux (stress and heat)  (tau) 
+    static void inline wall_flux_diff(const auto &geomdata, int i, int j, int k, const Real norm[AMREX_SPACEDIM],
+        const Array4<Real>& q, amrex::GpuArray<amrex::Real, cls_t::NPRIM>& prims_w, 
+        amrex::GpuArray<amrex::Real, cls_t::NCONS>& fluxw,const cls_t* cls) {
+  
+        // printf(" oo Adiabatic Viscous wall \n ");
+        // tangential vectors 
+        Real tan1[AMREX_SPACEDIM];
+        tan1[0]  =  norm[1];tan1[1]  = -norm[0];
+#if AMREX_SPACEDIM==3        
+        tan1[2] = 0.0;
+        Real tan2[AMREX_SPACEDIM];
+        tan2[0] = tan1[1] * norm[2] - tan1[2] * norm[1]; // x component
+        tan2[1] = tan1[2] * norm[0] - tan1[0] * norm[2]; // y component
+        tan2[2] = tan1[0] * norm[1] - tan1[1] * norm[0]; // z component      
+#endif        
+        Real u[AMREX_SPACEDIM];
+        u[0] = q(i,j,k,cls_t::QU); u[1] = q(i,j,k,cls_t::QV);
+#if AMREX_SPACEDIM==3        
+        u[2] = q(i,j,k,cls_t::QW);
+#endif        
+        Real dudn,dvdn,dwdn,dTdn;
+
+        // compute conductivity and viscosity
+        Real mu_  = cls->visc(prims_w[cls_t::QT]);
+        Real lam  = cls->cond(prims_w[cls_t::QT]);  
+
+        fluxw[cls_t::UMX] +=  0.0;
+        fluxw[cls_t::UMY] +=  0.0;
+  #if AMREX_SPACEDIM==3          
+        fluxw[cls_t::UMZ] +=  0.0;
+  #endif        
+        fluxw[cls_t::UET] +=  lam*dTdn;
+
+                                   
+      }
+    
+    
                                                           
 };
 ////////////////////////////////////////////////////////////////////////////
