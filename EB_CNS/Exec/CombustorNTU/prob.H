@@ -98,6 +98,38 @@ AMREX_GPU_DEVICE AMREX_FORCE_INLINE void
 prob_post_restart(int i, int j, int k, amrex::Array4<amrex::Real> const& state,
                   amrex::GeometryData const& geomdata, ProbParm const& prob_parm)
 {
+  auto eos = pele::physics::PhysicsType::eos();
+  amrex::Real rho, eint;
+  eos.PYT2RE(prob_parm.interior_p, (amrex::Real*)prob_parm.massfrac.begin(),
+             prob_parm.interior_T, rho, eint);
+
+  const amrex::Real* dx = geomdata.CellSize();
+  const amrex::Real* lo = geomdata.ProbLo();
+  const amrex::Real x = lo[0] + (i + 0.5) * dx[0];
+  const amrex::Real y = lo[1] + (j + 0.5) * dx[1];
+  const amrex::Real z = lo[2] + (k + 0.5) * dx[2];
+
+  const amrex::Real Lx = 0.475, Ly = 0.475, Lz = 0.5,
+                    Mturb = prob_parm.inflow_mach/2;
+  const amrex::Real A_max = Mturb / prob_parm.inflow_mach;
+
+  amrex::Real cx = cos(2 * M_PI * x / Lx);
+  amrex::Real cy = cos(2 * M_PI * y / Ly);
+  amrex::Real cz = cos(2 * M_PI * z / Lz);
+  amrex::Real sx = sin(2 * M_PI * x / Lx);
+  amrex::Real sy = sin(2 * M_PI * y / Ly);
+  amrex::Real sz = sin(2 * M_PI * z / Lz);
+  amrex::Real u_turb = -A_max * cx * sy * sz;
+  amrex::Real v_turb = -A_max * sx * cy * sz;
+  amrex::Real w_turb = A_max * sx * sy * cz;
+
+  if (z <= 1.5) {
+  state(i, j, k, UMX) += rho * u_turb;
+  state(i, j, k, UMY) += rho * v_turb; 
+  state(i, j, k, UMZ) += rho * w_turb;
+  state(i, j, k, UEDEN) += 0.5 * rho * 
+                           (u_turb * u_turb + v_turb * v_turb + w_turb * w_turb);  
+  } 
 }
 
 AMREX_GPU_DEVICE AMREX_FORCE_INLINE void
