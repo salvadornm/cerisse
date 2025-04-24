@@ -1,5 +1,5 @@
 # Simulation time
-max_step  =  1000
+max_step  =  20000
 stop_time =  8.0
 cfl = 0.1
 #time_step = 5e-7
@@ -16,15 +16,15 @@ cns.lo_bc = 1 2
 cns.hi_bc = 2 2
 
 # output screen
-cns.screen_output = 0 # 0=quiet, 1=verbose
-cns.verbose = 0       # 0=quiet, 1=verbose
-amr.v               = 0 # quiet
+cns.screen_output = 1 # 0=quiet, 1=verbose
+cns.verbose       = 1 # 0=quiet, 1=verbose
+amr.v             = 1 # quiet
 
 # Refinement and regridding 
 amr.n_cell            = 400 200   # orign 80 x 160 with 1 lev
-amr.max_level         = 0      # maximum level number allowed
+amr.max_level         = 1      # maximum level number allowed
 amr.ref_ratio         = 2 2    # refinement ratio per level
-amr.regrid_int        = 5      # how often to regrid per level
+amr.regrid_int        = 500    # how often to regrid per level
 amr.blocking_factor_x = 8      # blocking factor in x per level
 amr.blocking_factor_y = 8      # blocking factor in y per level
 amr.max_grid_size_x   = 64     # maximum grid size in x per level

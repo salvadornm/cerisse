@@ -30,7 +30,7 @@
 #include "custom_geometry.h"
 #include <FluxRedistribute.h>
 
-template <typename wallmodel,typename cls_t>
+template <typename wallmodel, typename param, typename cls_t>
 class ebm_t
 { 
 
@@ -56,8 +56,13 @@ public:
   // bndryarea  :: is a MultiCutFab with a single component representing the dimensionless boundary area. 
   //               when the cell is isotropic (i.e., ), it’s trivial to convert it to physical units. (*dx)
   //
-  // bndrycent_a:: is a MultiCutFab with AMREX_SPACEDIM components, each component is [-0.5:0.5] respect
-  //               to reguar centere
+  // bndrycent_a:: (embedded boundary centroid)
+  //               MultiCutFab with AMREX_SPACEDIM components, each component is [-0.5:0.5] 
+  //               respect to regular centere
+  // volcent_a:;   (volume centroid)
+  //               MultiCutFab with AMREX_SPACEDIM components, each component is [-0.5:0.5] 
+  //               respect to regular centere
+  
 
   
   //std::array<const amrex::MultiCutFab*, AMREX_SPACEDIM> facecent;
@@ -82,6 +87,7 @@ public:
   Vector<const MultiCutFab*> normmcf_a;
   Vector<const MultiCutFab*> bcareamcf_a;
   Vector<const MultiCutFab*> bndrycent_a;
+  Vector<const MultiCutFab*> volcent_a;
   // mask
   Vector<iMultiFab> level_mask_a;  // object not pointers
  
@@ -154,6 +160,8 @@ public:
     normmcf_a.resize(max_level + 1);
     bcareamcf_a.resize(max_level + 1); 
     bndrycent_a.resize(max_level + 1); 
+    volcent_a.resize(max_level + 1); 
+    
 
     // size of mask
     level_mask_a.resize(max_level + 1); 
@@ -213,15 +221,17 @@ public:
     const Real *dx = geom.CellSize();
 
     // extract EB arrays given a level and mfi
-    Array4<const Real> vfrac = (*volmf_a[lev]).const_array(mfi);             // vfrac
-    Array4<const Real> const& apx = areamcf_a[lev][0]->const_array(mfi);     // areas free in faces x
-    Array4<const Real> const& apy = areamcf_a[lev][1]->const_array(mfi);     // faces in y 
+    Array4<const Real> vfrac = (*volmf_a[lev]).const_array(mfi);              // vfrac
+    Array4<const Real> const& apx = areamcf_a[lev][0]->const_array(mfi);      // areas free in faces x
+    Array4<const Real> const& apy = areamcf_a[lev][1]->const_array(mfi);      // faces in y 
 #if (AMREX_SPACEDIM==3)    
-    Array4<const Real> const& apz = areamcf_a[lev][2]->const_array(mfi);     //   faces in z
+    Array4<const Real> const& apz = areamcf_a[lev][2]->const_array(mfi);      // faces in z
 #endif    
-    Array4<const Real> const& normxyz = (*normmcf_a[lev]).const_array(mfi);  // normal to surface (NDIM components)     
-    Array4<const Real> const& bcarea = (*bcareamcf_a[lev]).const_array(mfi); // area wall
-            
+    Array4<const Real> const& normxyz = (*normmcf_a[lev]).const_array(mfi);      
+    Array4<const Real> const& bcarea  = (*bcareamcf_a[lev]).const_array(mfi); 
+    Array4<const Real> const& bc_centroid  = (*bndrycent_a[lev]).const_array(mfi); 
+    Array4<const Real> const& vol_centroid = (*volcent_a[lev]).const_array(mfi);   
+
     // markers 
     const auto& ebMarkers = (*bmf_a[lev]).array(mfi);
 
@@ -269,6 +279,19 @@ public:
             amrex::GpuArray<Real, cls_t::NCONS> flux_wall = {0.0};                             
             // primitive array at surface
             amrex::GpuArray<Real, cls_t::NPRIM> prim_wall = {0.0};
+
+
+            // compute weights
+            // loop over neighbours  ii,jj,kk
+            // xcell 
+            // if (ii=i jj=j kk=k) xcell=xcentrp
+            // r = (bc_centroid(i,j,k,n) - xcell[n]);
+            // solid phi=0 othwersie phi=1
+            // w = phi/r
+
+
+
+
             for (int n = 0; n < cls_t::NPRIM; n++) {
               prim_wall[n] = prims(i,j,k,n);   // interpolate   ???????????   
               
@@ -277,19 +300,60 @@ public:
 
 
             }  
-            // normal to surface 
-            amrex::Real norm_wall [AMREX_SPACEDIM]= {0.0};
-   
+            // normal to surface (point towards the fluid)
+            Real norm_wall[AMREX_SPACEDIM]= {0.0};
             for (int n = 0; n < AMREX_SPACEDIM; n++) {
-              norm_wall[n] = -normxyz(i,j,k,n); // the normal points towards the liquid
+              norm_wall[n] = -normxyz(i,j,k,n); // -1 to point twds fluid
             }
 
             // calculate wall flux and add it to rhs
             wallmodel::wall_flux(geom,i,j,k,norm_wall,prim_wall,flux_wall,cls);      
             
-            // from volume and area centroid compute distance to wall centroid
-            
-            // wallmodel::wall_flux_diff(geom,i,j,k,norm_wall,prims,prim_wall,flux_wall,cls);)
+            // calculate viscous walls
+            if (param::solve_diffwall)
+            {
+              // from volume and area centroid compute distance to wall 
+              // and project into normal direction
+              Real x_dis[AMREX_SPACEDIM]= {0.0};
+              Real dis = 1.e-8; 
+              for (int n = 0; n < AMREX_SPACEDIM; n++) {
+                x_dis[n] = vol_centroid(i,j,k,n)- bc_centroid(i,j,k,n);
+                dis += x_dis[n]*norm_wall[n];
+              }   
+              dis = dis*dx[0]; // units
+              //         
+              
+      // temp snm
+      // amrex::GpuArray<Real, cls_t::NCONS> flux_visc = {0.0};  
+      // printf(" i=%d j=%d k=%d \n",i,j,k);
+      // printf(" vol_centroid = %f %f \n",vol_centroid(i,j,k,0),vol_centroid(i,j,k,1));
+      // printf(" bc_centroid = %f %f \n",bc_centroid(i,j,k,0),bc_centroid(i,j,k,1));
+      // printf(" distance = %f nx =%f ny=%f\n", dis,norm_wall[0],norm_wall[1]);
+
+      // for (int n = 0; n < cls_t::NPRIM; n++) {
+      //   printf(" %d q=%f \n",n,prim_wall[n]);         
+      // }
+      // printf(" o  \n");
+      // for (int n = 0; n < cls_t::NCONS; n++) {
+      //   printf(" %d flux=%f \n",n,flux_wall[n]);  
+      //   flux_visc[n]= flux_wall[n];
+      // }    
+
+      // printf(" ---  \n");
+      // snm
+
+              wallmodel::wall_flux_diff(geom,i,j,k,dis,norm_wall,prims,prim_wall,flux_wall,cls);
+
+      // temp snm              
+      
+        // for (int n = 0; n < cls_t::NCONS; n++) {
+        //   flux_visc[n]= flux_wall[n]- flux_visc[n];
+        //   printf(" %d visc flux=%f \n",n,flux_visc[n]);  
+        //  }
+        //  printf(" ---  \n");
+      //
+
+            }
 
             for (int n = 0; n < cls_t::NCONS; n++) {
               rhs(i,j,k,n) += flux_wall[n]*vfracinv*bcarea(i,j,k,0)*dxinv[0]; 

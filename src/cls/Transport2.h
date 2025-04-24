@@ -14,10 +14,10 @@ class transport_const_t {
   AMREX_GPU_DEVICE AMREX_FORCE_INLINE Real visc(const Real& T) const {
     return visc_ref;
   } 
-  AMREX_GPU_DEVICE AMREX_FORCE_INLINE Real cond(Real& T) const {
+  AMREX_GPU_DEVICE AMREX_FORCE_INLINE Real cond(const Real& T) const {
     return cond_ref;
   } 
-  AMREX_GPU_DEVICE AMREX_FORCE_INLINE Real xi(Real& T) const {
+  AMREX_GPU_DEVICE AMREX_FORCE_INLINE Real xi(const Real& T) const {
     return xi_ref;
   } 
 };

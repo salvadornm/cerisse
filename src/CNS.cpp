@@ -551,6 +551,8 @@ void CNS::post_regrid(int lbase, int new_finest) {
   EBM::eb.ebflags_a[level] = &(ebfactory.getMultiEBCellFlagFab());
   EBM::eb.bcareamcf_a[level] = &(ebfactory.getBndryArea());
   EBM::eb.bndrycent_a[level] = &(ebfactory.getBndryCent());
+  EBM::eb.volcent_a[level] = &(ebfactory.getCentroid());
+  
 
   // Level mask for redistribution (stored as object not pointer)
   EBM::eb.level_mask_a[level].clear();

@@ -19,7 +19,7 @@ namespace PROB {
 static constexpr Real Mw   = 28.96e-3;    // Molecular weight
 static constexpr Real gam  = 1.4;         // Adiabatic coefficient
 static constexpr Real Mach = 0.5;         // Mach Number
-static constexpr Real Reynolds = 1000.0;  // Reynolds number
+static constexpr Real Reynolds = 100.0;   // Reynolds number
 
 
 // problem parameters 
@@ -61,7 +61,7 @@ struct num_method_param {
 
 };
 
-// viscoisty arameters
+// viscosisty parameters
 struct visc_model_param {
 
   public:
@@ -69,9 +69,18 @@ struct visc_model_param {
   static constexpr int  order = 4;                   // order numerical scheme viscous
   static constexpr Real conductivity = 0.03;         // conductivity (constant)
   static constexpr Real viscosity    = 1.0/Reynolds; // viscosity    (constant)
-  static constexpr bool solve_viscterms_only = false;
 
 };
+
+struct wall_param {
+
+  public:
+  
+  static constexpr Real Twall = 300;                // wall temperature 
+  static constexpr bool solve_diffwall = true;      // solve viscous effects at walls
+
+};
+
 
 
 inline Vector<std::string> cons_vars_names={"Xmom","Ymom","Zmom","Energy","Density"};
@@ -91,8 +100,12 @@ typedef rhs_dt<skew_t<num_method_param, ProbClosures>, viscous_t<visc_model_para
 
 
 // define type of wall and EBM class
-typedef adiabatic_wall_t<ProbClosures> TypeWall;
-typedef ebm_t<TypeWall,ProbClosures> ProbEB;
+
+//typedef adiabatic_wall_t<ProbClosures> TypeWall;
+typedef isothermal_wall_t<wall_param,ProbClosures> TypeWall; //isothermal 300 k
+
+
+typedef ebm_t<TypeWall,wall_param,ProbClosures> ProbEB;
 
 
 

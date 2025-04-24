@@ -25,6 +25,9 @@ static constexpr Real viscosity   = 1.85e-5;      // viscosity    (for constant 
 
 static constexpr bool solve_viscterms_only = false;
 
+// ebm/walls options
+static constexpr Real Twall = 300;              // wall temperature (for isothermal wall type)
+static constexpr bool solve_diffwall = false;   // do not solve viscous fluxes at teh wall (for ebm)
 
 };
 
