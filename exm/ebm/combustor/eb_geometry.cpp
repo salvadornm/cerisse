@@ -1,7 +1,7 @@
 #include <AMReX_FArrayBox.H>
 #include <AMReX_Geometry.H>
 #include <AMReX_ParmParse.H>
-#include "custom_geometry.H"
+#include "custom_geometry.h"
 
 // Geometry function
 void Custom::build(const Geometry& geom, const int max_coarsening_level)

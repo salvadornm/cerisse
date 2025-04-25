@@ -118,14 +118,15 @@ class adiabatic_wall_t
       Real mu_w  = cls->visc(prims_w[cls_t::QT]);
       
       // coordinate transformation
-      #if AMREX_SPACEDIM==2      
+#if AMREX_SPACEDIM==2      
       Real a1 = r43*norm[0]*norm[0] + norm[1]*norm[1];
       Real a2 = norm[0]*norm[0] + r43*norm[1]*norm[1]; 
       Real b1 = r13*norm[0]*norm[1];           
 #elif AMREX_SPACEDIM==3        
       Real a1 = r43*norm[0]*norm[0]+ norm[1]*norm[1]  + norm[2]*norm[2];
       Real a2 = norm[0]*norm[0] + r43*norm[1]*norm[1] + norm[2]*norm[2];
-      Real a3 = norm[0]*norm[0] + norm[1]*norm[1] + r43*norm[2]*norm[2];      
+      Real a3 = norm[0]*norm[0] + norm[1]*norm[1] + r43*norm[2]*norm[2];    
+      Real b1 = r13*norm[0]*norm[1];             
       Real b2 = r13*norm[1]*norm[2]; 
       Real b3 = r13*norm[0]*norm[2];     
 #endif        
@@ -208,7 +209,8 @@ class isothermal_wall_t
 #elif AMREX_SPACEDIM==3        
       Real a1 = r43*norm[0]*norm[0]+ norm[1]*norm[1]  + norm[2]*norm[2];
       Real a2 = norm[0]*norm[0] + r43*norm[1]*norm[1] + norm[2]*norm[2];
-      Real a3 = norm[0]*norm[0] + norm[1]*norm[1] + r43*norm[2]*norm[2];      
+      Real a3 = norm[0]*norm[0] + norm[1]*norm[1] + r43*norm[2]*norm[2];     
+      Real b1 = r13*norm[0]*norm[1];            
       Real b2 = r13*norm[1]*norm[2]; 
       Real b3 = r13*norm[0]*norm[2];     
 #endif        

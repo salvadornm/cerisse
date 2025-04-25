@@ -7,53 +7,75 @@
 #include <Closures.h>
 #include <RHS.h>
 
+#include <Constants.h>
+#include <NumParam.h>
+
+#include <random>
+
 #if CNS_USE_EB    
 #include <ebm.h>
 #include <walltypes.h>
 #endif
 
-// NTU Combustor-type for demonstration purposes
-// created by S Dupre and S Navarro-Martinez (2025)
-
+// Turbulent Pipe Flow
+// created by S Navarro-Martinez (2025)
 
 using namespace amrex;
 
 namespace PROB {
 
-static constexpr Real Mw   = 28.96e-3;  // Molecular weight
-static constexpr Real gam  = 1.4;       // Adiabatic coefficient
+static constexpr Real Mw       = 28.96e-3;         // Molecular weight
+static constexpr Real gam      = 1.4;              // Adiabatic coefficient
+static constexpr Real Rgas     = gas_constant/Mw;  // bulk Mach number
+static constexpr Real Reynolds = 50;               // bulk Reynolds number
+static constexpr Real Pr       = 0.7;              // Prandtl
+static constexpr Real Cv       = Rgas/(gam - 1.0);
+static constexpr Real Cp       = gam*Cv;
+static constexpr Real viscos   = 1.0/Reynolds;    // constant viscosity
+static constexpr Real lambda   = viscos*Cp/Pr;    // constant lambda
+//static constexpr Real Retau    = 1920;            // (based on friction velocity)
+
 
 // problem parameters 
 
 struct ProbParm {  
-  // inflow state
-  Real p_inflow    = pres_atm2si; //[Pa] inflow pressure (1 atm)  
-  Real T_inflow    = 298.0;  //[K]  
-  Real rho_inflow  = p_inflow*Mw/(gas_constant*T_inflow);
-  Real vel_in[3]= {0.0,0.0,10.0}; // array of inflow velocity [m/s]
-  Real eint_inflow = p_inflow/ (gam - Real(1.0));  
-
-  Real rhou_inflow = rho_inflow*vel_in[0];
-  Real rhov_inflow = rho_inflow*vel_in[1];
-  Real rhow_inflow = rho_inflow*vel_in[2];
-  Real kin = Real(0.5) * rho_inflow *
-      (vel_in[0]*vel_in[0]+vel_in[1]*vel_in[1]+vel_in[2]*vel_in[2]);
-  Real rhoe_inflow = eint_inflow + kin;  
   
-  // inside combustor state
+  // inside pipe
   Real p_0     = pres_atm2si; //[Pa] inflow pressure (1 atm) 
   Real T_0     = 300.0;  //[K]  
-  Real rho_0   = p_0*Mw/(gas_constant*T_0);
-  Real vel_0[3]= {0.0,0.0,0.0}; // array of inside velocity [m/s]
+  Real rho_0   = p_0/(Rgas*T_0);    
   Real eint_0  = p_0/ (gam - Real(1.0));  
+  Real u = 1.0; //bulk velocity
 
   // geometry auxiliary
   Real zin = 0.01;
-};
+  Real Dpipe = 1.0;
+  Real Rpipe = 0.5*Dpipe;
 
+  // forcing
+  Real L    =   Dpipe;                     // pipe diameter
+  Real Q    =   u*L;                       // volumetric flow rate (per width unit)
+  Real dpdx = 12.0*Q*Q/(Reynolds*L*L*L);   // forcing term (pressure gradient)
+  //Real tau_w = 0.00284;
+  //Real utau = sqrt(tau_w/rho_0);
+  //Real fx = tau_w/(Rpipe*rho_0);       // forcing term per unit mass 
+  Real fx = dpdx/rho_0;                  // laminar forcing
+
+};
 
 // numerical method parameters
 struct methodparm_t {
+
+  public:
+
+  static constexpr int  order = 2;                  // order numerical scheme   
+  static constexpr Real conductivity = lambda;       // conductivity (for constant value)
+  static constexpr Real viscosity    = viscos;       // viscosity    (for constant value)
+
+};
+
+// parmeters for skew-symmetric method
+struct skewparm_t {
 
   public:
 
@@ -66,8 +88,8 @@ struct methodparm_t {
 struct wall_param {
 
   public:
-
-  static constexpr Real Twall = 300;                // wall temperature (if isothermal used)
+  
+  static constexpr Real Twall = 300;                // wall temperature 
   static constexpr bool solve_diffwall = true;      // solve viscous effects at walls
 
 };
@@ -76,13 +98,15 @@ struct wall_param {
 inline Vector<std::string> cons_vars_names={"Xmom","Ymom","Zmom","Energy","Density"};
 inline Vector<int> cons_vars_type={1,2,3,0,0};
 
-typedef closures_dt<indicies_t, visc_suth_t, cond_suth_t,
-                    calorifically_perfect_gas_t<indicies_t>> ProbClosures;
+// closures
+typedef closures_dt<indicies_t, transport_const_t<methodparm_t>,calorifically_perfect_gas_t<indicies_t> > ProbClosures;
 
-// define nuemrical scheme comment/uncomment to set up 
-//typedef rhs_dt<rusanov_t<ProbClosures>, no_diffusive_t, no_source_t > ProbRHS;
-//typedef rhs_dt<riemann_t<false, ProbClosures>, no_diffusive_t, no_source_t > ProbRHS;
-typedef rhs_dt<skew_t<methodparm_t, ProbClosures>, no_diffusive_t, no_source_t > ProbRHS;
+template <typename cls_t > class user_source_t;
+
+// building rhs
+//typedef rhs_dt<skew_t<skewparm_t,ProbClosures>, no_diffusive_t, user_source_t<ProbClosures> > ProbRHS;
+
+typedef rhs_dt<skew_t<skewparm_t,ProbClosures>, viscous_t<methodparm_t, ProbClosures>, user_source_t<ProbClosures> > ProbRHS;
 //typedef rhs_dt<weno_t<ReconScheme::Teno5, ProbClosures>, no_diffusive_t, no_source_t > ProbRHS;
 
 
@@ -93,7 +117,10 @@ typedef ebm_t<TypeWall,wall_param,ProbClosures> ProbEB;
 #endif
 
 void inline inputs() {
-  //	
+
+  amrex::Print() << " ****** Starting ... ******* " <<  std::endl;
+  amrex::Print() << " 2D Planar Pipe Flow  (Apr 2025)" <<  std::endl;
+  
 }
 
 // initial condition
@@ -107,23 +134,22 @@ prob_initdata(int i, int j, int k, Array4<Real> const &state,
 
   Real x = prob_lo[0] + (i + Real(0.5)) * dx[0];
   Real y = prob_lo[1] + (j + Real(0.5)) * dx[1];
-  Real z = prob_lo[2] + (k + Real(0.5)) * dx[2];
 
-  Real rad = sqrt(x*x + y*y);
+  Real rad = sqrt(y*y);
+  Real r =  rad/prob_parm.Rpipe;
 
   // local vars
-  Real rhot,eint,u[3];
+  Real rhot,eint;
 
-  if (z < prob_parm.zin) {
-    rhot =  prob_parm.rho_inflow;    
-    for(int idim=0;idim < AMREX_SPACEDIM;idim++) {u[idim]=prob_parm.vel_in[idim];}
-    eint =  prob_parm.eint_inflow;
+  Real u[AMREX_SPACEDIM] = {0.0};
+  rhot =  prob_parm.rho_0;      
+  eint =  prob_parm.eint_0;
+
+  if (r < 1) 
+  {    
+    u[0] = prob_parm.u; // axial velocity
   }
-  else {
-    rhot =  prob_parm.rho_0;    
-    for(int idim=0;idim < AMREX_SPACEDIM;idim++) {u[idim]=prob_parm.vel_0[idim];}
-    eint =  prob_parm.eint_0;
-  }
+
   
   Real kin = Real(0.5) * rhot * (u[0] * u[0] + u[1] * u[1] + u[2]*u[2]);
   state(i, j, k, cls.URHO) = rhot;
@@ -151,12 +177,7 @@ bcnormal(const Real x[AMREX_SPACEDIM], Real dratio, const Real s_int[ProbClosure
   switch(face)
   {
     case  3:  // LEFT
-      // inflow
-      s_ext[URHO] = prob_parm.rho_inflow;
-      s_ext[UMX]  = prob_parm.rhou_inflow;
-      s_ext[UMY]  = prob_parm.rhov_inflow;
-      s_ext[UMZ]  = prob_parm.rhow_inflow;
-      s_ext[UET]  = prob_parm.rhoe_inflow;
+      break;
     case  2:  // SOUTH
       break;
     case  1:  // WEST
@@ -172,6 +193,32 @@ bcnormal(const Real x[AMREX_SPACEDIM], Real dratio, const Real s_int[ProbClosure
       break; 
   }
 }
+///////////////////////////////SOURCE TERM /////////////////////////////////////
+template <typename cls_t>
+class user_source_t {
+  public:
+  void inline src(const amrex::MFIter &mfi,
+                  const amrex::Array4<const amrex::Real> &prims,
+                  const amrex::Array4<amrex::Real> &rhs, const cls_t *cls_d,
+                  amrex::Real dt){
+
+    const Box bx = mfi.tilebox();
+
+    ProbParm const prob_parm;
+
+    amrex::ParallelFor(bx,
+      [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept
+      {
+      const auto& cls = *cls_d;
+
+      Real rho = prims(i, j, k, cls.QRHO);
+      rhs(i,j,k,cls.UMX) += rho*prob_parm.fx;
+      rhs(i,j,k,cls.UET) += rho*prob_parm.fx*prims(i,j,k,cls.QU);
+
+      });
+
+  };
+};
 ///////////////////////////////AMR//////////////////////////////////////////////
 AMREX_GPU_DEVICE AMREX_FORCE_INLINE void
 user_tagging(int i, int j, int k, int nt_level, auto &tagfab,
@@ -182,35 +229,12 @@ user_tagging(int i, int j, int k, int nt_level, auto &tagfab,
   const Real *dx = geomdata.CellSize();
   Real x = prob_lo[0] + (i + Real(0.5)) * dx[0];
   Real y = prob_lo[1] + (j + Real(0.5)) * dx[1];
-  Real z = prob_lo[2] + (k + Real(0.5)) * dx[2];
+  Real rad = sqrt(y*y);
+  Real r =  rad/prob_parm.Rpipe;
 
-  const int URHO= ProbClosures::URHO;
+  // refine close to pipe
 
-  // compoute | d rho | normalised with rho
-  Real o_over_rhot = Real(1.0)/sdatafab(i,j,k,URHO);
-
-  Real drhox = Math::abs(sdatafab(i+1,j,k,URHO) - sdatafab(i-1,j,k,URHO));
-  Real drhoy = Math::abs(sdatafab(i,j+1,k,URHO) - sdatafab(i,j-1,k,URHO));
-  Real drhoz = Math::abs(sdatafab(i,j,k+1,URHO) - sdatafab(i,j,k-1,URHO));
-
-  Real gradrho= Real(0.5)*sqrt(drhox*drhox+drhoy*drhoy)*o_over_rhot;        
-
-
-  switch (level)
-  {
-    case 0:
-      tagfab(i,j,k) = (gradrho > 0.1);        
-      break;
-    case 1:
-      tagfab(i,j,k) = (gradrho > 0.2);        
-      break;
-    default:
-      tagfab(i,j,k) = (gradrho > 0.3);        
-    break;
-   }
-    
-  // refine next to body
-
+  tagfab(i,j,k) = (r > 0.9);        
 
 }
 ///////////////////////////////////////////////////////////////////////////////

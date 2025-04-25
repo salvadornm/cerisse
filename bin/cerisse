@@ -74,12 +74,14 @@ case  $1 in
 	tput sgr0
     mkdir $2
 	cp *.H $2
+	cp *.h $2
 	cp *.cpp $2
-	cp inputs $2
-	cp Make.package $2
+	cp inputs $2	
 	cp GNUmakefile $2
+	cp *.py $2
 	mv *chk $2
-	mv plt* $2
+	mv *.visit $2
+	mv plot $2/
 	echo -e "\\033[1;32m  DONE  \\033[0m"
 	;;
     *)
