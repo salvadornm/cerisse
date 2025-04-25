@@ -51,6 +51,13 @@ struct methodparm_t {
   static constexpr Real C2skew=1.5,C4skew=0.0016;   // Skew symmetric default
 
 };
+struct wall_param {
+
+  public:
+
+  static constexpr bool solve_diffwall = false;      // solve viscous effects at walls
+
+};
 
 inline Vector<std::string> cons_vars_names={"Xmom","Ymom","Zmom","Energy","Density"};
 inline Vector<int> cons_vars_type={1,2,3,0,0};
@@ -67,7 +74,7 @@ typedef rhs_dt<weno_t<ReconScheme::Teno5, ProbClosures>, no_diffusive_t, no_sour
 
 // define type of wall and EBM class
 typedef adiabatic_wall_t<ProbClosures> TypeWall;
-typedef ebm_t<TypeWall,ProbClosures> ProbEB;
+typedef ebm_t<TypeWall,wall_param,ProbClosures> ProbEB;
 
 
 

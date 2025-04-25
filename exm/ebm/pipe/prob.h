@@ -80,6 +80,17 @@ struct skewparm_t {
   static constexpr Real C2skew=0.5,C4skew=0.0016;   // Skew symmetric default
 
 };
+// wall parameters
+struct wall_param {
+
+  public:
+  
+  static constexpr Real Twall = 300;                // wall temperature 
+  static constexpr bool solve_diffwall = true;      // solve viscous effects at walls
+
+};
+
+
 
 inline Vector<std::string> cons_vars_names={"Xmom","Ymom","Zmom","Energy","Density"};
 inline Vector<int> cons_vars_type={1,2,3,0,0};
@@ -99,7 +110,7 @@ typedef rhs_dt<skew_t<skewparm_t,ProbClosures>, viscous_t<methodparm_t, ProbClos
 // define type of wall and EBM class
 #if CNS_USE_EB    
 typedef adiabatic_wall_t<ProbClosures> TypeWall;
-typedef ebm_t<TypeWall,ProbClosures> ProbEB;
+typedef ebm_t<TypeWall,wall_param,ProbClosures> ProbEB;
 #endif
 
 void inline inputs() {
@@ -154,7 +165,7 @@ prob_initdata(int i, int j, int k, Array4<Real> const &state,
     ufluc[1] +=Amp[l]*cos(freqz[l]); 
   }
   double rn = distribution(generator);
-  ufluc[2]+= 0.02*rn;  
+  ufluc[2]+= 0.1*rn;  
 
   //
   // add fluctuations to mean flow

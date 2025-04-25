@@ -590,7 +590,7 @@ class multispecies_pele_gas_t {
   * @param array of primitive variables [NPRIM]
   */
   AMREX_GPU_DEVICE AMREX_FORCE_INLINE void cons2prims_point(
-    Real U[idx_t::NCONS], Real* Q ) {
+    Real U[idx_t::NCONS], Real* Q ) const {
 
     Real rho=0.0;
     for (int n = 0; n < NUM_SPECIES; ++n){
