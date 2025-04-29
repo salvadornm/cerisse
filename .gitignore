@@ -41,3 +41,9 @@ build/
 /docs/build_*
 
 lib/boost/b2
+
+#combustion results
+tools/combustion/onedim.csv
+tools/combustion/pmf-X.txt
+tools/combustion/pmf-Y.txt
+

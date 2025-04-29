@@ -27,7 +27,7 @@ class riemann_t {
 #endif
   
     const Box& bx  = mfi.tilebox();
-    const Box& bxg = mfi.growntilebox(cls_t::NGHOST);
+    // const Box& bxg = mfi.growntilebox(cls_t::NGHOST);
     const Box& bxg1 = amrex::grow(bx, 1);
         
     FArrayBox slopef(bxg1, cls_t::NSLOPE, The_Async_Arena()); // NSLOPE= NCONS+1

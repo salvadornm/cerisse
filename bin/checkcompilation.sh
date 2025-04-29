@@ -20,6 +20,7 @@ MAKE_DIRS=(
 	"../exm/ebm/cylinder_visc/"
 	"../exm/ebm/combustor/"
 	"../exm/planar_flame/"	
+	"../tst/tutorial/"
 )
 	
 # make instruction

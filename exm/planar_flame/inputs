@@ -1,6 +1,6 @@
 # Simulation time
 # start time is assumed to be 0, unless re-starting
-max_step  = 40000
+max_step  = 500
 stop_time = 0.1
 #cfl = 0.1
 time_step =1e-7
@@ -18,12 +18,14 @@ geometry.prob_hi     =  0.045  0.06
 # 6 = user defined
 cns.lo_bc = -1  1 
 cns.hi_bc = -1  2 
-cns.screen_output = 1 # 0=quiet, 1=verbose
-cns.verbose =0       # 0=quiet, 1=verbose
+
+# Verbose/screen output 
+cns.verbose          = 1    # Cerisse output    0=quiet, 1=verbose
+amr.v                = 1    # AMReX   output    0=quiet, 1=verbose
 
 # Refinement and regridding 
 amr.n_cell          = 192 128 
-amr.max_level       = 4     # maximum level number allowed
+amr.max_level       = 3     # maximum level number allowed
 amr.ref_ratio       = 2 2   # refinement ratio per level
 amr.regrid_int      = 50     # how often to regrid per level
 amr.blocking_factor_x = 8   # blocking factor in x per level
@@ -32,7 +34,6 @@ amr.max_grid_size_x   = 64  # maximum grid size in x per level
 amr.max_grid_size_y   = 64  # maximum grid size in y per level
 amr.n_error_buf     = 4 4   # number of buffer cells in error est
 amr.grid_eff        = 0.8   # what constitutes an efficient grid
-amr.v               = 0
 
 # Plot and checkpoint
 amr.checkpoint_files_output = 0
@@ -41,11 +42,18 @@ amr.check_int               = 10000    # number of timesteps between checkpoints
 amr.plot_files_output = 1
 amr.plot_file         = plot/plt # root name of plotfile
 amr.derive_plot_vars  = pressure velocity temperature
-amr.plot_int          = 50           # number of timesteps between plotfiles
+amr.plot_int          = 50          # number of timesteps between plotfiles
 
 cns.order_rk  = -2 # original -2 2
 cns.stages_rk = 2
 
+# Utilities
+cns.use_utility = 1
+# Premixed flame initialisation 
+util.use_PMF = 1
+pmf.datafile = pmf.dat
+pmf.do_cellAverage = 1
+pmf.v = 1
 
 # Chemical Options
 cns.reactor_type = "ReactorCvode"

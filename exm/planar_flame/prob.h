@@ -9,6 +9,7 @@
 
 #include "Constants.h"
 #include "CombustionFunctions.h"
+#include "Utilities.h"
 
 #include "Closures.h"
 #include "RHS.h"
@@ -100,7 +101,7 @@ struct ProbParm {
   Real Yflame =   0.5*Ly;
 
   Real SL     =  0.49; // estimated burning velocity
-  Real lf     =  423e-6; // estimated flame thickness  (423 microns)
+  Real lf     =  417e-6; // estimated flame thickness  (417 microns) Using Cantera and 1d-flame-plot.py
   // velocity
   Real u_u   = 1.4*SL;                        // velocity [m/s]
   Real u_b   = (SL*drho + rho_u*u_u)/rho_b;   // velocity [m/s]  (RH)
@@ -127,7 +128,6 @@ using ProbRHS = rhs_dt< riemann_t<false, ProbClosures>, viscous_t<methodparm_t, 
 //using ProbRHS = rhs_dt< riemann_t<false, ProbClosures>, no_diffusive_t, reactor_t<ProbClosures> >;
 
 
-
 void inline inputs() {
   // ParmParse pp;  
   amrex::Print() << " ****** Starting  *******" <<  std::endl;
@@ -141,7 +141,7 @@ void inline inputs() {
 AMREX_GPU_DEVICE AMREX_FORCE_INLINE void prob_initdata(
     int i, int j, int k, Array4<Real> const &state,
     GeometryData const &geomdata, ProbClosures const &cls,
-    ProbParm const &prob_parm) {
+    ProbParm const &prob_parm, Utility* util = nullptr) {
   const Real *prob_lo = geomdata.ProbLo();
   const Real *prob_hi = geomdata.ProbHi();
   const Real *dx = geomdata.CellSize();
@@ -154,49 +154,60 @@ AMREX_GPU_DEVICE AMREX_FORCE_INLINE void prob_initdata(
 
   Real wavelength = prob_parm.Lx;
   Real wave= 2.0*std::numbers::pi/wavelength;
+
   // pertubation and frequency 
-  const Real ypertur = 0.5*prob_parm.lf; // orig 0.04 flame thick.
+  const Real ypertur = 0.04*prob_parm.lf; // orig 0.04 flame thick.
   const Real Nwaves = 1;
 
-  Real yinterf =  prob_parm.Yflame + ypertur*cos(Nwaves*wave*x);
-  // for (int n=1; n <= Nwaves; ++n){
-  //   yinterf += ypertur/n*cos(Nwaves*wave*x*n);
-  // }
+  Real yinterf =  prob_parm.Yflame;
+  for (int n=1; n <= Nwaves; ++n){
+    yinterf += ypertur*cos(Nwaves*wave*x*n);
+  }
   
   // smooth profile over lf 
-  const Real smooth=5; // the smaller the wider the spread (smooth 5, spread over -lf:lf)
-  Real H = (y-yinterf)/prob_parm.lf;
-  Real fburn = 0.5*tanh(smooth*H) + 0.5; // fburn   0:unburn  1:burn
+  // const Real smooth=5; // the smaller the wider the spread (smooth 5, spread over -lf:lf)
+  // Real H = (y-yinterf)/prob_parm.lf;
+  // Real fburn = 0.5*tanh(smooth*H) + 0.5; // fburn   0:unburn  1:burn
 
-  //fburn= 0; //switch off flame (for spark)
+  // Constant Pressure 
+  Pt = prob_parm.p_u ;
+  
+  //--- Initialise 1D flame from data -------------------------------------------------------------------
+  // PMF data from 0...to 0.04 (Flame front position: 0.015634 m) obtained from tools/combustion/1d-flame-plot.py
+  Real yflame_front = 0.015634;
+  // upper and lower position of the cell (relative to flame)
+  Real y1  = y - 0.5*dx[1]- yinterf;
+  Real y2  = y + 0.5*dx[1]- yinterf;
+  // shift to flame_front
+  y1 += yflame_front;
+  y2 += yflame_front;
 
-  Yu  = prob_parm.Y_u.data();
-  Yb  = prob_parm.Y_b.data();
-  // compute 
-  vxt  = prob_parm.u_u*(1.0-fburn)   + fburn*prob_parm.u_b;
-  //vxt = 0.0; // initially at rest
+  // read from PMF profile ----> pmf_vals
+  //--------------------------------------------------------------------------------------
+  // pmf_vals[0] =T  pmf_vals[1]= Velocity  pmf_vals[2] = rho pmf_vals[3+k] = Y[k];
+  GpuArray<Real, NUM_SPECIES + 4 > pmf_vals = {0.0}; 
+
+  pele::physics::PMF::PmfData::DataContainer *pmf_data = util->pmfData.getDeviceData();
+  pele::physics::PMF::pmf(pmf_data,y1,y2,pmf_vals);
+
+  // PMF--> T,u and Y (P is assumed constant)
+  Tt  = pmf_vals[0];
+  vxt = pmf_vals[1];
   Real sumrhoY = 0.0;
   for (int n = 0; n < NUM_SPECIES; ++n) {
-    Yt[n]   = Yu[n]*(1.0-fburn) + fburn*Yb[n];    
+    Yt[n]   = pmf_vals[3+n];    
     sumrhoY += Yt[n];
   }
   // ensure sumY =1
   for (int n = 0; n < NUM_SPECIES; ++n) { Yt[n]   /=  sumrhoY;}
-  // set T and P
-  Tt = prob_parm.T_u*(1.0-fburn)   + fburn*prob_parm.T_b;
-  Pt = prob_parm.p_u*(1.0-fburn)   + fburn*prob_parm.p_b ;
-  
-  // ignition spark
-  // Real Rspark = 5.0*prob_parm.lf;
-  // Real x0 =0; Real y0= prob_parm.Yflame;
-  // Real rad = sqrt((x- x0)*(x-x0) + (y- y0)*(y-y0));
-  // H = (rad-Rspark)/prob_parm.lf;
-  // const Real smoothspark=2.0;
-  // Real fspark = 0.5*tanh(smoothspark*H) + 0.5; // fspark   0:in  1:out
-  // Tt=1500.0*(1.0-fspark) + fspark*prob_parm.T_u;
-  
+  //--------------------------------------------------------------------------------------
 
 
+  // printf(" x=%f y=%f \n",x,y);
+  // printf(" y1=%f y1=%f \n",y1,y2);
+  // printf(" T=%f Vel = %f rho=%f\n",pmf_vals[0],pmf_vals[1],pmf_vals[2]);
+
+  
   // compute density  
   cls.PYT2R(Pt,Yt,Tt,rhot);
   
@@ -227,7 +238,6 @@ bcnormal(const Real x[AMREX_SPACEDIM], Real dratio, const Real s_int[ProbClosure
   const int UET  = ProbClosures::UET;
   const int UFS  = ProbClosures::UFS;
 
-  
   Real rhot, vxt,et,Tt,Pt;
   const Real *Yt;
    
@@ -241,19 +251,7 @@ bcnormal(const Real x[AMREX_SPACEDIM], Real dratio, const Real s_int[ProbClosure
       vxt  = prob_parm.u_u;
       Yt   = prob_parm.Y_u.data();
       et   = prob_parm.e_u;
-
       
-     // Allow Pressure fluctuate  dP/dy = 0   T and Y FIX
-      // rhot  = s_int[URHO]; vxt = s_int[UMY]/rhot;
-      // et    = s_int[UET]/rhot - Real(0.5) * vxt* vxt/rhot;
-      // closures.RYE2TP(rhot,Yt,et,Tt,Pt);   // give as P,T inside
-      // Tt   = prob_parm.T_u;                // T fix
-      // closures.PYT2R(Pt,Yt,Tt,rhot);       // recalculate rho
-      // closures.RYP2E(rhot, Yt, Pt, et);    // recalvulate et
-
-      // vxt = prob_parm.mflow/rhot;       // new vel
-
-
       s_ext[URHO] = rhot;
       s_ext[UMX]  = 0.0;
       s_ext[UMY]  = rhot* vxt;

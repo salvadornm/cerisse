@@ -12,6 +12,10 @@ bool CNS::dt_dynamic = false;
 bool CNS::ib_move = false;
 bool CNS::plot_surf = false;
 
+// utilities
+bool CNS::use_utility = false; 
+Utility CNS::utilidades;
+
 Real CNS::eb_weight = 0.0;
 bool CNS::eb_redistribution = false;
 std::string CNS::eb_redistribution_type = "NoRedist";
@@ -111,6 +115,25 @@ void CNS::read_params() {
     }
   }
 
+  //  Utilities options ----------------
+  pp.query("use_utility",use_utility);
+  if (use_utility)
+  {
+    amrex::Print() << " Using Utilities " << std::endl;      
+    ParmParse pp_util("util");
+
+    bool use_PMF=false;
+    pp_util.query("use_PMF",use_PMF); 
+    if (use_PMF){
+#ifdef USE_PELEPHYSICS      
+      amrex::Print() << " Reading PMF from file.. " << std::endl;      
+      CNS::utilidades.initPMF();
+#else      
+      amrex::Abort("using PMF files need PelePhysics");
+#endif
+    }  
+  }
+
 #if AMREX_USE_GPIBM
   // specific keywords for IB boundaries
   ParmParse ppib("ib");
@@ -196,12 +219,27 @@ void CNS::initData() {
 
   //amrex::Print( ) << " oo CNS::initData  " << std::endl; 
   //amrex::Print( ) << "  calling  prob_init in prob.h ...  " << std::endl; 
-   
-  amrex::ParallelFor(
-      S_new, [=] AMREX_GPU_DEVICE(int box_no, int i, int j, int k) noexcept {
-        prob_initdata(i, j, k, sma[box_no], geomdata, *lclosures, *lprobparm);
-      });
 
+  // placeholder to initialise with random variables the flow field 
+
+  // bool use_pointer = use_utility;
+
+ 
+  // if (use_utility)
+  // {   
+  //   amrex::ParallelFor(
+  //     S_new, [=] AMREX_GPU_DEVICE(int box_no, int i, int j, int k) noexcept {
+  //       prob_initdata(i, j, k, sma[box_no], geomdata, *lclosures, *lprobparm, use_utility ? &CNS::utilidades : nullptr);
+  //     });
+  // }
+  // else
+  // {
+    amrex::ParallelFor(
+      S_new, [=] AMREX_GPU_DEVICE(int box_no, int i, int j, int k) noexcept {
+        prob_initdata(i, j, k, sma[box_no], geomdata, *lclosures, *lprobparm);        
+      });
+  //}
+            
   // TODO: Could compute primitive variables here
 
   // Initialise stats 

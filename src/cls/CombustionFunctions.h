@@ -7,7 +7,8 @@ using namespace amrex;
 
 namespace combustion_functions {
   // Set of useful functions to set-up combustion cases
-  // Thius ar enot use for calculations
+  // These are not use for any calculations within Cerisse 
+  // they  are only to help
 
   constexpr Real molarMassH2  = 2.016;  // [kg/kmol]
   constexpr Real molarMassAir = 28.97;

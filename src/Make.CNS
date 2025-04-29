@@ -92,6 +92,12 @@ ifeq ($(USE_PELEPHYSICS),TRUE)
   DEFINES += -DUSE_PELEPHYSICS
   DEFINES += -DUSE_$(EOS_MODEL)_EOS#    options: GAMMALAW / FUEGO / SRK
   DEFINES += -DUSE_$(TRANSPORT_MODEL)_TRANSPORT# CONSTANT / SIMPLE / SUTHERLAND
+
+  # PelePhysics Utilities
+  include $(PELE_PHYSICS_HOME)/Utility/PMF/Make.package
+  VPATH_LOCATIONS   += $(PELE_PHYSICS_HOME)/Utility/PMF
+  INCLUDE_LOCATIONS += $(PELE_PHYSICS_HOME)/Utility/PMF
+  
 endif
 
 include $(AMREX_HOME)/Src/Base/Make.package
