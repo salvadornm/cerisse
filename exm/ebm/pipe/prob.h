@@ -44,17 +44,21 @@ struct ProbParm {
   Real p_0     = pres_atm2si; //[Pa] inflow pressure (1 atm) 
   Real T_0     = 300.0;  //[K]  
   Real rho_0   = p_0/(Rgas*T_0);
-  Real vel_0[3]= {0.0,0.0,1.0}; // array of inside velocity [m/s]
+  Real ubulk = 1.0;      // bulk velocity
   Real eint_0  = p_0/ (gam - Real(1.0));  
 
+  Real n  = 7.0; //power-law exponent
+  Real uc = ubulk*(n+1.0)*(n+2.0)/(2.0*n); //centre-line velocity
+
   // geometry auxiliary
-  Real zin = 0.01;
   Real Dpipe = 1.0;
   Real Rpipe = 0.5*Dpipe;
 
-  // forcing
-  Real tau_w = 0.00284;
-  Real utau = sqrt(tau_w/rho_0);
+  Real nu_0 = viscos/rho_0;        // kinematic  viscoisty
+  Real utau = Retau*nu_0/Rpipe;    // friction velocity       
+  Real tau_w= rho_0*utau*utau;     // wall shear stress
+
+  // forcing  
   Real fx = tau_w/(Rpipe*rho_0);       // forcing term per unit mass 
 
 };
@@ -67,7 +71,6 @@ struct methodparm_t {
   static constexpr int  order = 2;                  // order numerical scheme   
   static constexpr Real conductivity = lambda;       // conductivity (for constant value)
   static constexpr Real viscosity    = viscos;       // viscosity    (for constant value)
-
 };
 
 // parmeters for skew-symmetric method
@@ -78,7 +81,6 @@ struct skewparm_t {
   static constexpr bool dissipation = true;         // no dissipation
   static constexpr int  order = 4;                  // order numerical scheme   
   static constexpr Real C2skew=0.5,C4skew=0.0016;   // Skew symmetric default
-
 };
 // wall parameters
 struct wall_param {
@@ -87,9 +89,7 @@ struct wall_param {
   
   static constexpr Real Twall = 300;                // wall temperature 
   static constexpr bool solve_diffwall = true;      // solve viscous effects at walls
-
 };
-
 
 
 inline Vector<std::string> cons_vars_names={"Xmom","Ymom","Zmom","Energy","Density"};
@@ -137,40 +137,47 @@ prob_initdata(int i, int j, int k, Array4<Real> const &state,
   Real r =  rad/prob_parm.Rpipe;
 
   // local vars
-  Real rhot,eint,u[3],ufluc[3]={0.0, 0.0, 0.0};
+  Real rhot,eint;
+  Real u[3]={0.0, 0.0, 0.0};
+  Real ufluc[3]={0.0, 0.0, 0.0};
 
   rhot =  prob_parm.rho_0;    
-  for(int idim=0;idim < AMREX_SPACEDIM;idim++) {u[idim]=prob_parm.vel_0[idim];}
   eint =  prob_parm.eint_0;
-
-  if (r < 1) 
-  {
-    u[2] = prob_parm.vel_0[2]*(1.0-r*r);
-  }
 
   // fluctuations
   std::random_device rd;       
   std::mt19937 generator(rd());
   std::uniform_real_distribution<double> distribution(-1.0,1.0);
   // 
+
   const Real Lz = 4.8;
   const int NFREQ=6;
   Real freqz[NFREQ],Amp[NFREQ];
-  for (int l=0;l<NFREQ;l++)
+  
+  // inside pipe
+  if (r < 1) 
   {
-    double r1 = 0.01*distribution(generator); //random shift
-    Amp[l]   = 0.1/(l+1);
-    freqz[l] = l*2.0*M_PI*x/Lz + r1*M_PI;
-    ufluc[0] +=Amp[l]*sin(freqz[l]);
-    ufluc[1] +=Amp[l]*cos(freqz[l]); 
+    // power-law profile
+    u[2] =prob_parm.uc*std::pow(1.0-r,1.0/prob_parm.n);
+    for (int l=0;l<NFREQ;l++)
+    {
+      double r1 = 0.01*distribution(generator); //random shift
+      Amp[l]   = 0.2/(l+1);
+      freqz[l] = l*2.0*M_PI*z/Lz + r1*M_PI;
+      ufluc[0] +=Amp[l]*sin(freqz[l]);
+      ufluc[1] +=Amp[l]*cos(freqz[l]); 
+    }
+    double rn = distribution(generator);
+    ufluc[2]+= 0.2*rn;  
+    // add fluctuations to mean flow
+    for (int dim=0;dim<3;dim++) {u[dim]+=ufluc[dim];}
   }
-  double rn = distribution(generator);
-  ufluc[2]+= 0.1*rn;  
-
-  //
-  // add fluctuations to mean flow
-  for (int dim=0;dim<3;dim++)
-  {u[dim]+=ufluc[dim];}
+  // out pipe (solid cells)
+  else
+  {
+    for (int dim=0;dim<3;dim++) {u[dim]=0.0;}
+  }
+  /////////////////////////////////////////////////////////
 
 
 
