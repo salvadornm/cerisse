@@ -183,10 +183,9 @@ void CNS::init(AmrLevel &old) {
   MultiFab &S_new = get_new_data(State_Type);
   FillPatch(old, S_new, 0, cur_time, State_Type, 0,PROB::ProbClosures::NCONS);
 
-  // SNM
   if (compute_stats){
-  MultiFab &Sstat_new = get_new_data(Stats_Type);
-  FillPatch(old, Sstat_new, 0, cur_time, Stats_Type, 0,PROB::ProbClosures::NSTAT);
+    MultiFab &Sstat_new = get_new_data(Stats_Type);
+    FillPatch(old, Sstat_new, 0, cur_time, Stats_Type, 0,PROB::ProbClosures::NSTAT);
   }
 
 }
@@ -217,31 +216,23 @@ void CNS::initData() {
   PROB::ProbClosures const *lclosures = d_prob_closures;
   PROB::ProbParm const *lprobparm = d_prob_parm;
 
-  //amrex::Print( ) << " oo CNS::initData  " << std::endl; 
   //amrex::Print( ) << "  calling  prob_init in prob.h ...  " << std::endl; 
 
-  // placeholder to initialise with random variables the flow field 
+  // SNM: placeholder to initialise with random variables the flow field   
 
-  // bool use_pointer = use_utility;
-
- 
-  // if (use_utility)
-  // {   
-  //   amrex::ParallelFor(
-  //     S_new, [=] AMREX_GPU_DEVICE(int box_no, int i, int j, int k) noexcept {
-  //       prob_initdata(i, j, k, sma[box_no], geomdata, *lclosures, *lprobparm, use_utility ? &CNS::utilidades : nullptr);
-  //     });
-  // }
-  // else
-  // {
-    amrex::ParallelFor(
+  // Initialise problem by calling user-given prob.h
+#if USE_UTILITY
+  amrex::ParallelFor(
+    S_new, [=] AMREX_GPU_DEVICE(int box_no, int i, int j, int k) noexcept {
+      prob_initdata(i, j, k, sma[box_no], geomdata, *lclosures, *lprobparm, use_utility ? &CNS::utilidades : nullptr);
+  });
+#else
+  amrex::ParallelFor(
       S_new, [=] AMREX_GPU_DEVICE(int box_no, int i, int j, int k) noexcept {
         prob_initdata(i, j, k, sma[box_no], geomdata, *lclosures, *lprobparm);        
-      });
-  //}
+  });
+#endif
             
-  // TODO: Could compute primitive variables here
-
   // Initialise stats 
   if (compute_stats) {
     setupStats();
@@ -251,12 +242,11 @@ void CNS::initData() {
 
 void CNS::buildMetrics() {
 
-  //amrex::Print() << " oo CNS::buildMetrics  " << std::endl;
-
-  // print mesh sizes
-  const Real *dx = geom.CellSize();
-  amrex::Print() << "Mesh size (dx,dy,dz) = ";
-  amrex::Print() << AMREX_D_TERM(dx[0], << "  " << dx[1], << "  " << dx[2]) << "  \n";
+  if (verbose) {
+    const Real *dx = geom.CellSize();
+    amrex::Print() << "Mesh size (dx,dy,dz) = ";
+    amrex::Print() << AMREX_D_TERM(dx[0], << "  " << dx[1], << "  " << dx[2]) << "  \n";
+  }  
 
 }
 

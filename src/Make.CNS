@@ -57,6 +57,11 @@ else
   CLIP_MINTEMP := FALSE
 endif
 
+ifeq ($(USE_UTILITIES), TRUE)
+  DEFINES += -DUSE_UTILITY=1
+else
+  USE_UTILITIES := FALSE
+endif
 
 # ---------   EB  -------------------- 
 ifeq ($(USE_EB), TRUE)

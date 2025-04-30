@@ -79,9 +79,6 @@ struct ProbParm {
   Real T_u   = 298;                   // temperature [K] 
   Real p_u   = 1.0132e+05;            // pressure [Pa]  (5 atm)
   Real e_u   = -1.0255e+05;           // internal energy [J/kg]  
- 
-  combustion_functions::Y_Mixture massfr = combustion_functions::mol2Y_H2Air(mix);  // unburn mass fractions
-  //GpuArray<Real, NUM_SPECIES> Y_u = { massfr.H2, massfr.O2, 0.,0., 0., 0., 0.,0., massfr.N2};  // mass fractions [-] 
   GpuArray<Real, NUM_SPECIES> Y_u = { 0.014468, 0.22963 , 0.,0., 0., 0., 0.,0., 0.7559};  // mass fractions [-] 
 
   // burn gases
@@ -89,22 +86,19 @@ struct ProbParm {
   Real T_b   = 1644.8;                  // temperature [K]  
   Real p_b   = p_u;                     // pressure [Pa]  (1 atm)   
   Real e_b   = -5.1641e+05 ;            // internal energy [J/kg]
-  Real drho = rho_b - rho_u;
-
- 
-  // butn mass fractions
   GpuArray<Real, NUM_SPECIES> Y_b = {5.1557e-07,0.11471,0.12917,8.5022e-09,4.5034e-06,0.00021046,4.7965e-07,3.3189e-08,0.7559};
 
   // geometrical parameters                                     
   Real Lx     =   0.04;  // half-width domain
-  Real Ly     =   0.06;
+  Real Ly     =   0.04;
   Real Yflame =   0.5*Ly;
+
+  Real pertur = 0.04; // perturbation of flame front based on flame thickness (0.1*lf)  
 
   Real SL     =  0.49; // estimated burning velocity
   Real lf     =  417e-6; // estimated flame thickness  (417 microns) Using Cantera and 1d-flame-plot.py
-  // velocity
-  Real u_u   = 1.4*SL;                        // velocity [m/s]
-  Real u_b   = (SL*drho + rho_u*u_u)/rho_b;   // velocity [m/s]  (RH)
+  // unburn gases velocity
+  Real u_u     = 0.534292484155303; // inflow velocity (unburn)
   
   Real mflow =  rho_u*u_u;  // flow rate (per area)
 
@@ -156,8 +150,8 @@ AMREX_GPU_DEVICE AMREX_FORCE_INLINE void prob_initdata(
   Real wave= 2.0*std::numbers::pi/wavelength;
 
   // pertubation and frequency 
-  const Real ypertur = 0.04*prob_parm.lf; // orig 0.04 flame thick.
-  const Real Nwaves = 1;
+  const Real ypertur = prob_parm.pertur*prob_parm.lf; // size of perturbation
+  const Real Nwaves  = 1;
 
   Real yinterf =  prob_parm.Yflame;
   for (int n=1; n <= Nwaves; ++n){
@@ -201,12 +195,6 @@ AMREX_GPU_DEVICE AMREX_FORCE_INLINE void prob_initdata(
   // ensure sumY =1
   for (int n = 0; n < NUM_SPECIES; ++n) { Yt[n]   /=  sumrhoY;}
   //--------------------------------------------------------------------------------------
-
-
-  // printf(" x=%f y=%f \n",x,y);
-  // printf(" y1=%f y1=%f \n",y1,y2);
-  // printf(" T=%f Vel = %f rho=%f\n",pmf_vals[0],pmf_vals[1],pmf_vals[2]);
-
   
   // compute density  
   cls.PYT2R(Pt,Yt,Tt,rhot);
