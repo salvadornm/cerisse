@@ -6,9 +6,16 @@ geometry.coord_sys   = 0  # 0 => cart, 1 => RZ  2=>spherical
 
 # use this domain if NTNU geom
 
+# CM domain dimension
+
 geometry.prob_lo     = -1.0   -1.0      0
 geometry.prob_hi     = 5.4    5.4      12.8
 amr.n_cell           = 64     64       128
+
+
+#geometry.prob_lo     = -0.01  -0.01      0
+#geometry.prob_hi     = 0.054   0.054     0.128
+#amr.n_cell           = 64     64       128
 
 
 # >>>>>>>>>>>>> BC FLAGS <<<<<<<<<<<<<<<<
@@ -22,13 +29,13 @@ cns.hi_bc       =  2 2 2
 cns.do_visc  = 1
 
 cns.do_react = 0
-cns.chem_integrator = Reactor_RK64
+cns.chem_integrator = Reactor_Null
 
 # ==================== WHAT NUMERICS =================== #
 cns.cfl = 0.05
 #cns.fixed_dt  = 1e-7
 cns.dt_cutoff = 5.e-20
-cns.recon_scheme = 1   # 1: Godunov,  2: MUSCL,   3: WENO-Z3, 
+cns.recon_scheme = 5   # 1: Godunov,  2: MUSCL,   3: WENO-Z3, 
                        # 4: WENO-JS5, 5: WENO-Z5, 6: TENO-5
 cns.clip_temp    = 20   # clip minimum temperature [K]
 cns.eb_weight = 0.5
@@ -41,7 +48,7 @@ amr.loadbalance_with_workestimates = 1
 #amr.loadbalance_level0_int = 100
 
 # REFINEMENT / REGRIDDING
-amr.max_level       = 1   # maximum level number allowed
+amr.max_level       = 1  # maximum level number allowed
 amr.ref_ratio       = 2 2 2 # refinement ratios
 amr.regrid_int      = 10      # how often to regrid
 amr.blocking_factor = 8 8 8
@@ -50,27 +57,38 @@ amr.n_error_buf     = 3       # number of buffer cells in error est
 amr.grid_eff        = 0.8
 
 cns.refine_cutcells = false
-cns.refine_box_lo_0 = 1.25 1.25 4
-cns.refine_box_hi_0 = 3.15 3.15 5
+#cns.refine_box_lo_0 = 1.25 1.25 4
+#cns.refine_box_hi_0 = 3.15 3.15 5
 
-cns.refine_velgrad = 1
-cns.refine_velgrad_max_lev = 1
+cns.refinement_indicators = gradu gradv gradw
+cns.gradu.field_name = x_velocity
+cns.gradu.max_level = 2
+cns.gradu.adjacent_difference_greater = 0.4
 
-cns.refine_presgrad = 1
-cns.refine_presgrad_max_lev = 1
+cns.gradv.field_name = y_velocity
+cns.gradv.max_level = 2
+cns.gradv.adjacent_difference_greater = 0.4
 
-#cns.refine_magvort = 3e5
-#cns.refine_magvort_max_lev = 3
+cns.gradw.field_name = z_velocity
+cns.gradw.max_level = 2
+cns.gradw.adjacent_difference_greater = 0.4
+
+
+#cns.refine_velgrad = 1
+#cns.refine_velgrad_max_lev = 1
+
+#cns.refine_presgrad = 1
+#cns.refine_presgrad_max_lev = 1
 
 # CHECKPOINT FILES
 amr.checkpoint_files_output = 0
-amr.check_file      = results/coarse/amr1/forcing/v2/chk #root name of checkpoint file
+amr.check_file      = h2/dns/chk #root name of checkpoint file
 amr.check_int       = 10000        # number of timesteps between checkpoints
 
 # PLOTFILES
 amr.plot_files_output = 1
-amr.plot_file         = results/coarse/amr1/forcing/v2/plt   # root name of plotfile
-amr.plot_int          = 50       # number of timesteps between plotfiles
+amr.plot_file         = h2/dns/plt   # root name of plotfile
+amr.plot_int          = 10      # number of timesteps between plotfiles
 amr.derive_plot_vars  = temp pressure x_velocity y_velocity z_velocity MachNumber divrho divu magvort
 cns.plot_massfrac = 1
 
@@ -79,10 +97,6 @@ eb2.geom_type = "NTNU_combustor"
 cns.eb_no_slip = 1
 cns.redistribution_type="StateRedist"
 cns.eb_isothermal = 0
-cns.eb_wall_temp = 300
 cns.eb_recon_mode = 0
 
-
-prob.inflow_mach = 0.3
-prob.inflow_p = 1.0e6
 

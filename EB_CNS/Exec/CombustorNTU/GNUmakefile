@@ -28,7 +28,7 @@ EXTRA_DEBUG = FALSE
 # PelePhysics
 Eos_Model := Fuego
 Transport_Model := Simple
-Chemistry_Model := air
+Chemistry_Model := BurkeDryer
 
 # CNS
 USE_EB = TRUE

@@ -97,6 +97,8 @@ AMREX_GPU_DEVICE AMREX_FORCE_INLINE void bcnormal(
 AMREX_GPU_DEVICE AMREX_FORCE_INLINE void
 prob_post_restart(int i, int j, int k, amrex::Array4<amrex::Real> const& state,
                   amrex::GeometryData const& geomdata, ProbParm const& prob_parm)
+
+// making incompressible perturbation
 {
   auto eos = pele::physics::PhysicsType::eos();
   amrex::Real rho, eint;
@@ -109,8 +111,8 @@ prob_post_restart(int i, int j, int k, amrex::Array4<amrex::Real> const& state,
   const amrex::Real y = lo[1] + (j + 0.5) * dx[1];
   const amrex::Real z = lo[2] + (k + 0.5) * dx[2];
 
-  const amrex::Real Lx = 0.475, Ly = 0.475, Lz = 0.5,
-                    Mturb = prob_parm.inflow_mach/2;
+  const amrex::Real Lx = 0.00475, Ly = 0.00475, Lz = 0.005,
+                    Mturb = prob_parm.inflow_mach/10;
   const amrex::Real A_max = Mturb / prob_parm.inflow_mach;
 
   amrex::Real cx = cos(2 * M_PI * x / Lx);
@@ -119,11 +121,11 @@ prob_post_restart(int i, int j, int k, amrex::Array4<amrex::Real> const& state,
   amrex::Real sx = sin(2 * M_PI * x / Lx);
   amrex::Real sy = sin(2 * M_PI * y / Ly);
   amrex::Real sz = sin(2 * M_PI * z / Lz);
-  amrex::Real u_turb = -A_max * cx * sy * sz;
-  amrex::Real v_turb = -A_max * sx * cy * sz;
-  amrex::Real w_turb = A_max * sx * sy * cz;
+  amrex::Real u_turb = A_max * cx * cy * cz;
+  amrex::Real v_turb = A_max * sx * sy * cz;
+  amrex::Real w_turb = 0;
 
-  if (z <= 1.5) {
+  if (z <= 0.015) {
   state(i, j, k, UMX) += rho * u_turb;
   state(i, j, k, UMY) += rho * v_turb; 
   state(i, j, k, UMZ) += rho * w_turb;
