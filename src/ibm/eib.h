@@ -99,6 +99,10 @@ public:
   // number of geometries
   int ngeom=1;
 
+  // SNM: types of BC at IB   phi(1) = alfa*phi(2) + beta
+  // Arrays to store BC
+  Real alfa[cls_t::NPRIM],beta[cls_t::NPRIM];
+
   // pointer to Amr class instance
   Amr* amr_p;
 
@@ -491,29 +495,35 @@ void computeGPs(const MFIter& mfi, const Array4<Real>& cons, const Array4<Real>&
       for (int iip=2; iip<2+eorder_tparm; iip++) {
         copy->global2local(iip, primsNormal, norm[ii], tan1[ii], tan2[ii]);
       }
-      copy->computeIB(primsNormal,cls);
-      copy->extrapolate(primsNormal, disGP[ii], disIM[ii]);
+      copy->computeIB(primsNormal,cls);                      // only P,T,Y set 
+      copy->extrapolate(primsNormal, disGP[ii], disIM[ii]);  // only extrapolate up to QLS
 
-      // limiting p and T
-      primsNormal(0,cls_t::QPRES) = max(primsNormal(0,cls_t::QPRES),1.0);
-      primsNormal(0,cls_t::QT)    = max(primsNormal(0,cls_t::QT),50.0);
-      // thermodynamic consistency
-      primsNormal(0,cls_t::QRHO)  = primsNormal(0,cls_t::QPRES)/(primsNormal(0, cls_t::QT)*cls->Rspec);
-
-      // only transform velocity back to global coordinates for gp only
+      // transform velocity back to global coordinates for gp only
       int idx=0;
       copy->local2global(idx,primsNormal,norm[ii],tan1[ii],tan2[ii]);
-
-
+      
+      ///  copy primsNormal  -> Q
+      Real P,T,R,Y[NUM_SPECIES]={0.0};
+      P = primsNormal(0,cls_t::QPRES);
+      T = primsNormal(0,cls_t::QT);
+#if NUM_SPECIES > 1    
+      for (int n = 0; n < NUM_SPECIES; ++n) {
+        Y[n]   =  primsNormal(0,cls_t::QFS+n);
+      }
+#endif 
+      Real ux =  primsNormal(0,cls_t::QU);
+      Real uy =  primsNormal(0,cls_t::QV);
+      Real uz =  primsNormal(0,cls_t::QW);
+      // ensure Thermodynamic consistency and that the prims array is filled
+      Real Q[cls->NPRIM];
+      cls->ensurePTYfillq(P, T, Y, ux,uy,uz,Q); 
+      
       // insert primitive variables into primsFab
       int i=gp_ijk[ii](0); int j=gp_ijk[ii](1); int k = gp_ijk[ii](2);
       for (int nn=0; nn<cls_t::NPRIM; nn++) {
-        prims(i,j,k,nn) = primsNormal(0,nn);
+        // prims(i,j,k,nn) = primsNormal(0,nn);
+        prims(i,j,k,nn) = Q[nn];
       }
-
-      // printf("GP vel: %f %f %f\n \n", prims(i,j,k,cls_t::QU), prims(i,j,k,cls_t::QV), prims(i,j,k,cls_t::QW) );
-
-      // AMREX_ASSERT_WITH_MESSAGE( prims(i,j,k,QPRES)>50,"P<50 at GP");
 
       // insert conservative ghost state into consFab
       // cons(i,j,k,cls_t::URHO) = primsNormal(0,cls_t::QRHO);
@@ -527,11 +537,11 @@ void computeGPs(const MFIter& mfi, const Array4<Real>& cons, const Array4<Real>&
 
 
 private:
-    // Taylor expansion around IB point
+    // Taylor expansion around IB point (only up to QLS)
     AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
     void extrapolate(Array2D<Real,0,eorder_tparm+1,0,cls_t::NPRIM-1>& stateNormal, Real dgp, Real dim) {
       Real sgn_dgp = -dgp ; // negative sign as taylor expansion is around IB point, IM and GP are in opposite directions
-      for (int kk=0; kk<cls_t::NPRIM; kk++) {
+      for (int kk=0; kk<= cls_t::QLS; kk++) {
         // Linear
         Real c1 = stateNormal(1,kk);
         Real c2 = (stateNormal(2,kk) - stateNormal(1,kk))/dim;
@@ -667,6 +677,7 @@ private:
     }
   }
 
+  // @brief Change coordinates of velocity
   AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE 
   void global2local( int iip, Array2D<Real,0,eorder_tparm+1,0,cls_t::NPRIM-1>& primsNormal, const Array1D<Real,0,AMREX_SPACEDIM-1>& norm, const Array1D<Real,0,AMREX_SPACEDIM-1>& tan1, const Array1D<Real,0,AMREX_SPACEDIM-1>& tan2) {
 
@@ -688,19 +699,39 @@ private:
     primsNormal(jj,cls_t::QW) = vel(0)*norm(2) + vel(1)*tan1(2) + vel(2)*tan2(2);
   }
 
+  ////////////////////////////////////////////////////////////////
+  /// \brief computeIB calculates the primitive array at IB (surface)
+  /// based on values interpolated on the normal 
+  /// WARN !! at present does first order
+  //  slip wall (it will use later genartoc alfa and beta)
   AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
   void computeIB(Array2D<Real,0,eorder_tparm+1,0,cls_t::NPRIM-1>& primsNormal, const cls_t* cls) {
-    // no-slip/slip velocity (in local coordinates)
+    
+    // slip velocity (in local coordinates)
     primsNormal(1,cls_t::QU) = 0.0_rt; // un
     primsNormal(1,cls_t::QV) = primsNormal(2,cls_t::QV); // ut1
     primsNormal(1,cls_t::QW) = primsNormal(2,cls_t::QW); // ut2
-    // zerograd temperature and pressure
-    primsNormal(1,cls_t::QPRES) = primsNormal(2,cls_t::QPRES); //2.0_rt*(2.0_rt*primsNormal(2,cls_t::QPRES) - 0.5_rt*primsNormal(3,cls_t::QPRES))/3.0_rt;
-    primsNormal(1,cls_t::QT)    = primsNormal(2,cls_t::QT);
-    // ensure thermodynamic consistency
-    primsNormal(1,cls_t::QRHO)  = primsNormal(1,cls_t::QPRES)/(primsNormal(1,cls_t::QT)*cls->Rspec); 
-    }
 
+    Real Yw[NUM_SPECIES]={0.0};
+
+    // zerograd pressure and T (adiabatic)   
+    primsNormal(1,cls_t::QPRES) = primsNormal(2,cls_t::QPRES); 
+    primsNormal(1,cls_t::QT)    = primsNormal(2,cls_t::QT);
+
+#if NUM_SPECIES > 1    
+    Real sumY = 0.0;
+    for (int n = 0; n < NUM_SPECIES; ++n) {
+      Yw[n]   =  primsNormal(2,cls_t::QFS+n);
+      sumY + = sumY;
+    }
+    for (int n = 0; n < NUM_SPECIES; ++n) { 
+      primsNormal(1,cls_t::QFS+n)   =  Yw[n]/sumY;
+    }
+#endif                      
+
+  }
+  ////////////////////////////////////////////////////////////////
+  /// \brief reads STL greometry from input
   void read_geom()
   {
     ParmParse pp;

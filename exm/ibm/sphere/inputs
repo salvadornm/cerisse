@@ -4,9 +4,11 @@
 # start time is assumed to be 0, unless re-starting
 max_step  = 1000
 stop_time = 10.0
-#time_step = 1.0e-5 # at base level, higher level time step is computed based on the number of subcycles (depending on the subcycling strategy). stop_time = max_step*time_step
-# or
+#time_step = 1.0e-5
 cfl = 0.3
+
+cns.order_rk  = -2 // -2, 1, 2 or 3
+cns.stages_rk = 2 // 1, 2 or 3
 
 # -1 = N/A (Incase of periodic)
 # 0 = Interior           3 = Symmetry
@@ -20,7 +22,8 @@ cns.verbose = 0       # 0=quiet, 1=verbose
 
 #-------------------------------- IMMERSED BOUNDARY ---------------------------#
 ib.filename = sphere.stl
-
+ib.move = 0
+ib.plot_surf = 1
 #-------------------------------- COMPUTATIONAL DOMAIN ------------------------#
 geometry.is_periodic = 0 1 1
 geometry.coord_sys   = 0  # 0 => cart, 1 => RZ  2=>spherical
@@ -29,7 +32,7 @@ geometry.prob_hi     =   4.0     4.0     4.0
 amr.n_cell           =   128     128     128
 
 #-------------------------------- REFINEMENT / REGRIDDING ---------------------#
-amr.max_level       = 1       # maximum level number allowed
+amr.max_level       = 0       # maximum level number allowed
 amr.ref_ratio       = 2 2  # refinement ratio
 amr.regrid_int      = 50 50  # how often to regrid
 amr.blocking_factor_x = 8 8 # blocking factor in x per level
@@ -44,8 +47,8 @@ amr.grid_eff        = 0.8     # what constitutes an efficient grid
 #-------------------------------- PLOTFILES -----------------------------------#
 amr.plot_files_output = 1
 amr.plot_file         = ./plot/plt # root name of plotfile
-amr.plot_int          = 10     # number of timesteps between plotfiles
-amr.derive_plot_vars  = x_velocity pressure x_velocity y_velocity z_velocity temperature
+amr.plot_int          = 50     # number of timesteps between plotfiles
+amr.derive_plot_vars  = pressure velocity temperature
 amr.v = 1 # 0=quiet, 1=verbose
 
 amr.checkpoint_files_output = 0

@@ -225,14 +225,15 @@ Real CNS::advance(Real time, Real dt, int /*iteration*/, int /*ncycle*/) {
     Array4<Real> const& prims = primf.array();
 
     cls_h.cons2prims(mfi, state_temp, prims);
-    IBM::ib.computeGPs(mfi, state_temp, prims, cls_d, level);
 
+    IBM::ib.computeGPs(mfi, state_temp, prims, cls_d, level);
+     
+    // do prims->cns in the GP   
     ParallelFor(bx, [=] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {
       if (ibMarkers(i, j, k, 1)) {
 
         IntVect iv(AMREX_D_DECL(i, j, k)); 
-        Real cons[cls_h.NCONS];
-        // Real* cons = &state(i,j,k,cls_t::NCONS - 1); (prims2cosn shoudl accept a pointer)
+        Real cons[cls_h.NCONS];        
         cls_h.prims2cons(iv,prims,cons);        
         for (int n = 0; n < cls_h.NCONS; n++) {
           state(i, j, k, n) = cons[n];
@@ -250,18 +251,3 @@ Real CNS::advance(Real time, Real dt, int /*iteration*/, int /*ncycle*/) {
   // }
   return dt;
 }
-
-// void where_is_nan(const FArrayBox& fab, bool abort_on_nan = true) {
-//   bool contains_any_nan = false;
-//   for (int n = 0; n < fab.nComp(); ++n) {
-//     IntVect where;
-//     bool contains_nan = fab.contains_nan<RunOn::Gpu>(fab.box(), n, 1, where);    
-//     if (contains_nan) {
-//       amrex::Print() << "NAN found at " << where << " comp " << n << '\n';
-//       contains_any_nan = true;
-//     }
-//   }
-//   if (contains_any_nan && abort_on_nan) {
-//     amrex::Abort();
-//   }
-// }

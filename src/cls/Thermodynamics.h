@@ -39,21 +39,68 @@ class calorifically_perfect_gas_t {
     E = P / (R * gamma_m1);
   }
 
-  AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE void RYE2TP(const Real R,
-                                                       const Real* /*Y*/,
-                                                       const Real E, Real& T,
-                                                       Real& P) const {
+  AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE void RYE2TP( const Real R,
+                                                        const Real* /*Y*/,
+                                                        const Real E, Real& T,
+                                                        Real& P) const {
     P = gamma_m1 * R * E;
     T = P / (R * Rspec);
   }
-
-  AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE void RYE2Cs(const Real /*R*/,
-                                                       const Real* /*Y*/,
-                                                       const Real E,
-                                                       Real& cs) const {
+  // \brief calculate the speed of sound (function of R,Y,E)
+  AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE void RYE2Cs( const Real /*R*/,
+                                                        const Real* /*Y*/,
+                                                        const Real E,
+                                                        Real& cs) const {
     Real T = E / cv;
     cs = std::sqrt(gamma * Rspec * T);
   }
+  // \brief calculate the speed of sound (function of P,YT)
+  AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE void PYT2Cs( const Real /*R*/,
+                                                        const Real* /*Y*/,
+                                                        const Real T,
+                                                        Real& cs) const {
+    cs = std::sqrt(gamma * Rspec * T);
+  }
+
+
+  // \brief calculate the density
+  AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE void PYT2R(
+    const Real P, const Real* /*Y*/, const Real T, Real& R) const {
+
+    R = P/(T *Rspec);    
+  }    
+  
+  // \brief calculate the specific internal energy
+  AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE void PYT2E(
+    const Real /*P*/, const Real* /*Y*/, const Real T, Real& E) const {      
+    E = cv*T;
+  }
+  
+  // \brief this function ensures P and T  do not violate bounds
+  // and then fills the q-array  to ensure consistency
+  // used in IBM to claculate aux primitives corerctly
+
+  AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE void ensurePTYfillq(
+    Real& P, Real& T, Real* /*Y*/, 
+    const Real ux, const Real uy, const Real uz,
+    Real* Q ) const {
+
+    P = std::max(min_euler_press,P);  
+#if CLIP_TEMPERATURE_MIN        
+    T = std::max(min_euler_temp,T);
+#endif    
+    Q[idx_t::QRHO] = P/(T*Rspec);
+    Q[idx_t::QT] = T;
+    Q[idx_t::QPRES] = P;
+    Q[idx_t::QU] = ux;
+    Q[idx_t::QV] = uy;
+    Q[idx_t::QW] = uz;
+    // aux primitives
+    Q[idx_t::QC] =  std::sqrt(gamma * Rspec * T);
+    Q[idx_t::QG] = gamma; 
+    Q[idx_t::QEINT] = cv*T;
+  }   
+  ////////////////////////////////////////////////////////////////
 
   AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE GpuArray<Real, idx_t::NWAVES>
   cons2eigenvals(const int i, const int j, const int k,
@@ -293,8 +340,16 @@ class calorifically_perfect_gas_t {
     Real rhoei = U[idx_t::UET] - rhoke;
     rhoei = max(rhoei,rho*(this->ei_min)); //clip energy
     Real p = (this->gamma_m1) * rhoei;
-    Q[idx_t::QT] = p / (rho * this->Rspec);
+    Real T = p / (rho * this->Rspec);
+    Q[idx_t::QT] = T;
     Q[idx_t::QPRES] = p;
+    Q[idx_t::QU] = ux;
+    Q[idx_t::QV] = uy;
+    Q[idx_t::QW] = uz;
+    // aux primitives
+    Q[idx_t::QC] =  std::sqrt(gamma * Rspec * T);;
+    Q[idx_t::QG] = gamma; 
+    Q[idx_t::QEINT] = cv*T;
   }
 
 };

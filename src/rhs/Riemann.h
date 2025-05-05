@@ -41,7 +41,7 @@ class riemann_t {
 
     amrex::ParallelFor(
         xslpbx, [=, *this] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {
-#ifdef CNS_USE_EB 
+#if (AMREX_USE_GPIBM || CNS_USE_EB ) 
           this->cns_slope_x(i, j, k, slope, prims, *cls, ibMarkers); 
 #else          
           this->cns_slope_x(i, j, k, slope, prims, *cls);
@@ -63,7 +63,7 @@ class riemann_t {
     const Box& yslpbx = amrex::grow(bx, cdir, 1);
     amrex::ParallelFor(
         yslpbx, [=, *this] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {        
-#ifdef CNS_USE_EB 
+#if (AMREX_USE_GPIBM || CNS_USE_EB ) 
           this->cns_slope_y(i, j, k, slope, prims, *cls, ibMarkers); 
 #else          
           this->cns_slope_y(i, j, k, slope, prims, *cls);
@@ -85,7 +85,7 @@ class riemann_t {
     const Box& zslpbx = amrex::grow(bx, cdir, 1);
     amrex::ParallelFor(
         zslpbx, [=, *this] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {
-#ifdef CNS_USE_EB 
+#if (AMREX_USE_GPIBM || CNS_USE_EB )
           this->cns_slope_z(i, j, k, slope, prims, *cls, ibMarkers); 
 #else          
           this->cns_slope_z(i, j, k, slope, prims, *cls);
@@ -198,7 +198,7 @@ class riemann_t {
     }
   }
 
-#ifdef CNS_USE_EB 
+#if (AMREX_USE_GPIBM || CNS_USE_EB )
   AMREX_GPU_DEVICE AMREX_FORCE_INLINE void cns_slope_x(
       int i, int j, int k, const Array4<Real>& dq, const Array4<Real>& q,
       const cls_t& cls, const Array4<bool>& marker) const {
@@ -208,7 +208,7 @@ class riemann_t {
       const cls_t& cls) const {
 #endif
 
-#ifdef CNS_USE_EB 
+#if (AMREX_USE_GPIBM || CNS_USE_EB )
     // const bool wall_left  = marker(i-1,j,k,0);  
     // const bool wall_right = marker(i+1,j,k,0);  
     const bool close_to_wall = marker(i,j,k,1);
@@ -270,7 +270,7 @@ class riemann_t {
       dq(i, j, k, 5 + n) = limiter(dlft, drgt);
     }
 
-#ifdef CNS_USE_EB
+#if (AMREX_USE_GPIBM || CNS_USE_EB )
     if (close_to_wall) 
     {
       for (int n = 0; n < cls.NSLOPE; ++n) { dq(i,j,k,n) = 0.0;}
@@ -282,7 +282,7 @@ class riemann_t {
 
   }
  
-#ifdef CNS_USE_EB 
+#if (AMREX_USE_GPIBM || CNS_USE_EB )
   AMREX_GPU_DEVICE AMREX_FORCE_INLINE void cns_slope_y(
       int i, int j, int k, const Array4<Real>& dq, const Array4<Real>& q,
       const cls_t& cls, const Array4<bool>& marker) const {
@@ -294,7 +294,7 @@ class riemann_t {
 
 
 
-#ifdef CNS_USE_EB 
+#if (AMREX_USE_GPIBM || CNS_USE_EB )
     // const bool wall_left  = marker(i,j-1,k,0);  
     // const bool wall_right = marker(i,j+1,k,0); 
     const bool close_to_wall = marker(i,j,k,1); 
@@ -356,7 +356,7 @@ class riemann_t {
       dq(i, j, k, 5 + n) = limiter(dlft, drgt);
     }
 
-#ifdef CNS_USE_EB
+#if (AMREX_USE_GPIBM || CNS_USE_EB )
     if (close_to_wall) 
     {
       for (int n = 0; n < cls.NSLOPE; ++n) { dq(i,j,k,n) = 0.0;}
@@ -367,7 +367,7 @@ class riemann_t {
 
   }
 
-#ifdef CNS_USE_EB 
+#if (AMREX_USE_GPIBM || CNS_USE_EB )
   AMREX_GPU_DEVICE AMREX_FORCE_INLINE void cns_slope_z(
       int i, int j, int k, const Array4<Real>& dq, const Array4<Real>& q,
       const cls_t& cls, const Array4<bool>& marker) const {
@@ -377,7 +377,7 @@ class riemann_t {
       const cls_t& cls) const {
 #endif
   
-#ifdef CNS_USE_EB 
+#if (AMREX_USE_GPIBM || CNS_USE_EB )
     // const bool wall_left  = marker(i,j-1,k,0);  
     // const bool wall_right = marker(i,j+1,k,0); 
     const bool close_to_wall = marker(i,j,k,1); 
@@ -438,7 +438,7 @@ class riemann_t {
       dq(i, j, k, 5 + n) = limiter(dlft, drgt);
     }
 
-#ifdef CNS_USE_EB
+#if (AMREX_USE_GPIBM || CNS_USE_EB )
     if (close_to_wall) 
     {
       for (int n = 0; n < cls.NSLOPE; ++n) { dq(i,j,k,n) = 0.0;}

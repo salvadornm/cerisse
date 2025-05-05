@@ -42,8 +42,11 @@ class IBMultiFab : public FabArray<IBFab<marker_t,gp_t>> {
       const int ngrow, const MFInfo& info = MFInfo{true, amrex::The_Managed_Arena()},
       const FabFactory<IBFab<marker_t,gp_t>>& factory = DefaultFabFactory<IBFab<marker_t,gp_t>>()) : FabArray<IBFab<marker_t,gp_t>>(bxs, dm, nvar, ngrow, info, factory) {};
 
-  IBMultiFab<marker_t,gp_t>(IBMultiFab<marker_t,gp_t>&& rhs) noexcept 
-                        : FabArray<IBFab<marker_t,gp_t>>(std::move(rhs)) {};
+  // original    
+  //IBMultiFab<marker_t,gp_t>(IBMultiFab<marker_t,gp_t>&& rhs) noexcept 
+  //                      : FabArray<IBFab<marker_t,gp_t>>(std::move(rhs)) {};
+  
+  IBMultiFab(IBMultiFab&& rhs) noexcept; // NEW correct move constructor                       
 
   ~IBMultiFab() {};
 
