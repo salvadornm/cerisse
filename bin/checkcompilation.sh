@@ -14,7 +14,7 @@ MAKE_DIRS=(
 	"../exm/auto_ignition/"
 	"../exm/reactive_sod/"
 	"../exm/shock_reflect/"
-	"../exm/forward_step/"
+	"../exm/ebm/forward_step/"
 	"../exm/viscwall/"
 	"../exm/ebm/cylinder/"
 	"../exm/ebm/cylinder_visc/"

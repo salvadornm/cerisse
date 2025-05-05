@@ -21,8 +21,7 @@ ds = yt.load(latest_file)
 def masked_density(field, data):
     vfrac = data[("boxlib", "vfrac")]
     dens = data[("boxlib", "Density")]
-    return np.where(vfrac <= 0.1, dens, np.nan)
-
+    return np.where(vfrac >= 0.1, dens, np.nan)
 
 ds.add_field(
     ("boxlib", "masked_density"),
