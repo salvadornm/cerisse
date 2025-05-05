@@ -2,7 +2,7 @@
 #define Skew_H_
 
 #include <AMReX_FArrayBox.H>
-#include <CNS.h>
+
 
 //-------------------
 // discontinuity sensor function
@@ -182,34 +182,33 @@ class skew_t {
 #if (AMREX_USE_GPIBM || CNS_USE_EB )  
  void inline eflux_ibm(const Geometry& geom, const MFIter& mfi,
                     const Array4<Real>& prims, std::array<FArrayBox*, AMREX_SPACEDIM> const &flxt,
-                    const Array4<Real>& rhs, const cls_t* cls,const Array4<bool>& ibMarkers) {
+                    const Array4<Real>& cons, const cls_t* cls,const Array4<bool>& ibMarkers) {
 
 #else
   void inline eflux(const Geometry& geom, const MFIter& mfi,
                     const Array4<Real>& prims, std::array<FArrayBox*, AMREX_SPACEDIM> const &flxt,
-                    const Array4<Real>& rhs, const cls_t* cls) {
+                    const Array4<Real>& cons, const cls_t* cls) {
 #endif
 
 
-    const GpuArray<Real, AMREX_SPACEDIM> dxinv = geom.InvCellSizeArray();
     const Box& bx  = mfi.growntilebox(0);
     const Box& bxg = mfi.growntilebox(cls->NGHOST);
     const Box& bxgnodal = mfi.grownnodaltilebox(
         -1, 0);  // extent is 0,N_cell+1 in all directions -- -1 means for all
                  // directions. amrex::surroundingNodes(bx) does the same
     
-    FArrayBox consf(bxg, cls_t::NCONS, The_Async_Arena());
+    //FArrayBox consf(bxg, cls_t::NCONS, The_Async_Arena());
     FArrayBox lambda_maxf(bxg, 1, The_Async_Arena());
 
     // create lambda(0) and cons array
-    Array4<Real> cons   = consf.array();
+    // Array4<Real> cons   = consf.array();
     Array4<Real> lambda_max = lambda_maxf.array();
 
     // copy conservative variables from rhs to cons and clear rhs
-    ParallelFor(bxg, cls_t::NCONS, [=] AMREX_GPU_DEVICE(int i, int j, int k, int n) noexcept {
-      cons(i,j,k,n) = rhs(i,j,k,n);
-      rhs(i, j, k, n)=0.0;              
-      });
+    // ParallelFor(bxg, cls_t::NCONS, [=] AMREX_GPU_DEVICE(int i, int j, int k, int n) noexcept {
+    //   cons(i,j,k,n) = rhs(i,j,k,n);
+    //   rhs(i, j, k, n)=0.0;              
+    //   });
 
     int imask = 3; // reduce order 
     // get global index
@@ -263,18 +262,9 @@ class skew_t {
                   });  
 #endif
         
-
       }
-      // add flux derivative to rhs, i.e.  rhs + = (flx[i] - flx[i+1])/dx (THIS WILL GO)
-      // ParallelFor(bx, cls_t::NCONS,
-      //             [=] AMREX_GPU_DEVICE(int i, int j, int k, int n) noexcept {
-      //               rhs(i, j, k, n) +=
-      //                   dxinv[dir] * (flx(i, j, k, n) - flx(i+vdir[0], j+vdir[1], k+vdir[2], n));
-      //             });
 
     }
-
-  
 
   }
 
@@ -295,16 +285,10 @@ class skew_t {
     int il= i-halfsten*vdir[0]; int jl= j-halfsten*vdir[1]; int kl= k-halfsten*vdir[2];   
 
     for (int l = 0; l < order; l++) {  
-      V[l] = prims(il,jl,kl,Qdir); 
-      // this can be done general to include species?? to test
-      // for (int nvar = 0; nvar < cls_t::NCONS; nvar++) {U[l][nvar] = cons(il,jl,kl,nvar);}
-      U[l][cls_t::URHO] = prims(il,jl,kl,cls_t::QRHO);
-      U[l][cls_t::UMX]  = cons(il,jl,kl,cls_t::UMX);
-      U[l][cls_t::UMY]  = cons(il,jl,kl,cls_t::UMY);
-      U[l][cls_t::UMZ]  = cons(il,jl,kl,cls_t::UMZ);      
-      P[l] = prims(il,jl,kl,cls_t::QPRES);
-      U[l][cls_t::UET] = cons(il,jl,kl,cls_t::UET)  + P[l];
-
+      V[l] = prims(il,jl,kl,Qdir);       
+      for (int nvar = 0; nvar < cls_t::NCONS; nvar++) {U[l][nvar] = cons(il,jl,kl,nvar);}
+      P[l] = prims(il,jl,kl,cls_t::QPRES);      
+      U[l][cls_t::UET] += P[l];
       il +=  vdir[0];jl +=  vdir[1];kl +=  vdir[2];
     }
 
@@ -354,7 +338,7 @@ class skew_t {
         V[l] = prims(il,jl,kl,Qdir); 
         for (int nvar = 0; nvar < cls_t::NCONS; nvar++) {U[l][nvar] = cons(il,jl,kl,nvar);}
         P[l] = prims(il,jl,kl,cls_t::QPRES);
-        U[l][cls_t::UET] = cons(il,jl,kl,cls_t::UET)  + P[l];
+        U[l][cls_t::UET] += P[l];
         il +=  vdir[0];jl +=  vdir[1];kl +=  vdir[2];
       }
       // fluxes
@@ -371,7 +355,7 @@ class skew_t {
         V[l] = prims(il,jl,kl,Qdir); 
         for (int nvar = 0; nvar < cls_t::NCONS; nvar++) {U[l][nvar] = cons(il,jl,kl,nvar);}
         P[l] = prims(il,jl,kl,cls_t::QPRES);
-        U[l][cls_t::UET] = cons(il,jl,kl,cls_t::UET)  + P[l];
+        U[l][cls_t::UET] += P[l];
         il +=  vdir[0];jl +=  vdir[1];kl +=  vdir[2];
       } 
       // fluxes      

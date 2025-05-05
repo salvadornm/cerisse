@@ -50,6 +50,19 @@ ifeq ($(USE_GPIBM),TRUE)
   DEFINES           += -DAMREX_USE_GPIBM 
 endif
 
+# ---------  Cerisse Flags  -------------------- 
+ifeq ($(CLIP_MINTEMP), TRUE)
+  DEFINES += -DCLIP_TEMPERATURE_MIN=1
+else
+  CLIP_MINTEMP := FALSE
+endif
+
+ifeq ($(USE_UTILITIES), TRUE)
+  DEFINES += -DUSE_UTILITY=1
+else
+  USE_UTILITIES := FALSE
+endif
+
 # ---------   EB  -------------------- 
 ifeq ($(USE_EB), TRUE)
   DEFINES += -DCNS_USE_EB=1
@@ -84,6 +97,12 @@ ifeq ($(USE_PELEPHYSICS),TRUE)
   DEFINES += -DUSE_PELEPHYSICS
   DEFINES += -DUSE_$(EOS_MODEL)_EOS#    options: GAMMALAW / FUEGO / SRK
   DEFINES += -DUSE_$(TRANSPORT_MODEL)_TRANSPORT# CONSTANT / SIMPLE / SUTHERLAND
+
+  # PelePhysics Utilities
+  include $(PELE_PHYSICS_HOME)/Utility/PMF/Make.package
+  VPATH_LOCATIONS   += $(PELE_PHYSICS_HOME)/Utility/PMF
+  INCLUDE_LOCATIONS += $(PELE_PHYSICS_HOME)/Utility/PMF
+  
 endif
 
 include $(AMREX_HOME)/Src/Base/Make.package

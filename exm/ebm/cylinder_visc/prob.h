@@ -19,7 +19,7 @@ namespace PROB {
 static constexpr Real Mw   = 28.96e-3;    // Molecular weight
 static constexpr Real gam  = 1.4;         // Adiabatic coefficient
 static constexpr Real Mach = 0.5;         // Mach Number
-static constexpr Real Reynolds = 1000.0;  // Reynolds number
+static constexpr Real Reynolds = 100.0;   // Reynolds number
 
 
 // problem parameters 
@@ -43,10 +43,8 @@ struct ProbParm {
   Real eint_r  = p_r/ (gam - Real(1.0));  
 
   // centre of object
-  Real x0 = 10;
-  Real y0 = 10;
-  // Initial sepration between  flow and no-flow
-  Real xsep = 70;
+  Real x0 = 20;
+  Real y0 = 20;
 };
 
 
@@ -61,7 +59,7 @@ struct num_method_param {
 
 };
 
-// viscoisty arameters
+// viscosisty parameters
 struct visc_model_param {
 
   public:
@@ -69,9 +67,18 @@ struct visc_model_param {
   static constexpr int  order = 4;                   // order numerical scheme viscous
   static constexpr Real conductivity = 0.03;         // conductivity (constant)
   static constexpr Real viscosity    = 1.0/Reynolds; // viscosity    (constant)
-  static constexpr bool solve_viscterms_only = false;
 
 };
+
+struct wall_param {
+
+  public:
+  
+  static constexpr Real Twall = 300;                // wall temperature 
+  static constexpr bool solve_diffwall = true;      // solve viscous effects at walls
+
+};
+
 
 
 inline Vector<std::string> cons_vars_names={"Xmom","Ymom","Zmom","Energy","Density"};
@@ -91,8 +98,12 @@ typedef rhs_dt<skew_t<num_method_param, ProbClosures>, viscous_t<visc_model_para
 
 
 // define type of wall and EBM class
-typedef adiabatic_wall_t<ProbClosures> TypeWall;
-typedef ebm_t<TypeWall,ProbClosures> ProbEB;
+
+//typedef adiabatic_wall_t<ProbClosures> TypeWall;
+typedef isothermal_wall_t<wall_param,ProbClosures> TypeWall; //isothermal 300 k
+
+
+typedef ebm_t<TypeWall,wall_param,ProbClosures> ProbEB;
 
 
 
@@ -118,17 +129,10 @@ prob_initdata(int i, int j, int k, Array4<Real> const &state,
   // local vars
   Real rhot,eint,u[2];
 
-  // final state
-  if (x < prob_parm.xsep) {
-    rhot =  prob_parm.rho_oo;
-    u[0] =  prob_parm.u_oo; u[1] =  prob_parm.v_oo;
-    eint =  prob_parm.eint_oo;
-  }
-  else {
-    rhot =  prob_parm.rho_r;
-    u[0] =  prob_parm.u_r; u[1] =  prob_parm.v_r;
-    eint =  prob_parm.eint_r;
-  }
+  // final state -- freestream
+  rhot =  prob_parm.rho_oo;
+  u[0] =  prob_parm.u_oo; u[1] =  prob_parm.v_oo;
+  eint =  prob_parm.eint_oo;
 
   state(i, j, k, cls.URHO) = rhot;
   state(i, j, k, cls.UMX)  = rhot * u[0];
@@ -185,47 +189,14 @@ user_tagging(int i, int j, int k, int nt_level, auto &tagfab,
   Real y = prob_lo[1] + (j + Real(0.5)) * dx[1];
   // coordinate relative to object
   Real xrel[2];
-  xrel[0]= x-prob_parm.x0; xrel[1]= y-prob_parm.y0;
-
+  xrel[0]= x-prob_parm.x0; xrel[1]= y-prob_parm.y0; 
   Real Rad2 = xrel[0]*xrel[0]+xrel[1]*xrel[1]; 
-
-
-  Real rhot = sdatafab(i,j,k,ProbClosures::URHO);
-
-//  Real dengrad_threshold = 0.5;
-  Real drhox = Math::abs(sdatafab(i+1,j,k,ProbClosures::URHO) -
-   sdatafab(i,j,k,ProbClosures::URHO))/rhot;
-
-  Real drhoy = Math::abs(sdatafab(i,j+1,k,ProbClosures::URHO) -
-   sdatafab(i,j-1,k,ProbClosures::URHO))/rhot;
-
-  Real gradrho= sqrt(drhox*drhox+drhoy*drhoy);        
 
   Real Rmax = 1.5;
 
-  //if (nt_level > 0)
- // {
-    //tag cells based on density gradient
-    switch (level)
-    {
-      case 0:
-        tagfab(i,j,k) = (gradrho > 0.1);        
-        break;
-      case 1:
-        tagfab(i,j,k) = (gradrho > 0.2);        
-        break;
-      default:
-        tagfab(i,j,k) = (gradrho > 0.3);        
-        break;
-    }
-
-    tagfab(i,j,k) = tagfab(i,j,k) || (Rad2 < Rmax*Rmax);
-
- // }
-  
-  // refine next to body
-
-
+  // refine close to square
+  tagfab(i,j,k) = (Rad2 < Rmax*Rmax);
+ 
 }
 ////////////////////////////////////////////////////////////////////////////////
 

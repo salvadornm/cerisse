@@ -6,6 +6,9 @@
 #include <prob.h>
 #include <CNSconstants.h>
 
+#include <Utilities.h>
+
+
 using namespace amrex;
 
 class CNS : public amrex::AmrLevel {
@@ -151,8 +154,19 @@ class CNS : public amrex::AmrLevel {
   static int dist_linear;
   static int order_rk;
   static int stages_rk;
+
+  // Utility-variables
+  static bool use_utility;
+  static Utility utilidades;
+
+  // IBM-specific keywords
   static bool ib_move;
   static bool plot_surf;
+
+  // EB-specific keywords
+  static amrex::Real eb_weight;
+  static bool eb_redistribution;
+  static std::string eb_redistribution_type;
 
  public:
   /*static inline*/ PROB::ProbRHS prob_rhs;

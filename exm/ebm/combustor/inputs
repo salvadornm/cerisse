@@ -1,0 +1,59 @@
+# Simulation time
+max_step  =  1
+stop_time =  0.1
+cfl = 0.1
+#time_step = 1.2e-6
+
+cns.order_rk  = -2 
+cns.stages_rk = 2
+
+# Geometry 
+geometry.is_periodic = 0 0 0
+geometry.coord_sys   = 0  
+geometry.prob_lo     = -0.027 -0.027  0.0
+geometry.prob_hi     = 0.027  0.027  0.135
+#geometry.prob_lo     = -2.7 -2.7  0.0
+#geometry.prob_hi     = 2.7  2.7  13.5
+
+# BC
+cns.lo_bc = 2 2 1
+cns.hi_bc = 2 2 2
+
+
+# output screen
+cns.screen_output = 0 # 0=quiet, 1=verbose
+cns.verbose = 0       # 0=quiet, 1=verbose
+amr.v             = 1 # quiet
+
+# Refinement and regridding 
+amr.n_cell            = 128 128 320 
+amr.max_level         = 0      # maximum level number allowed
+amr.ref_ratio         = 2      # refinement ratio per level
+amr.regrid_int        = 5      # how often to regrid per level
+amr.blocking_factor_x = 8      # blocking factor in x per level
+amr.blocking_factor_y = 8      # blocking factor in y per level
+amr.max_grid_size_x   = 64     # maximum grid size in x per level
+amr.max_grid_size_y   = 64     # maximum grid size in y per level
+amr.n_error_buf       = 4      # number of buffer cells in error est
+amr.grid_eff          = 0.7    # what constitutes an efficient grid
+
+# Plot and checkpoint
+amr.checkpoint_files_output = 0
+amr.check_file              = chk     # root name of checkpoint file
+amr.check_int               = 20000   # number of timesteps betw.  checkpoints
+amr.plot_files_output = 1
+amr.plot_file         = ./plot/plt    # root name of plotfile
+amr.plot_int          = 200            # number of timesteps between plotfiles
+amr.derive_plot_vars  = pressure velocity temperature
+
+# EB settings
+#eb2.geom_type = cylinder
+#eb2.cylinder_direction = 2 
+#eb2.cylinder_radius = 0.02
+#eb2.cylinder_center = 0.0 0.0 0.1
+#eb2.cylinder_has_fluid_inside = 1
+
+eb2.geom_type = "custom"
+
+eb2.eb_weight  = 1.0
+eb2.redistribution_type = "FluxRedist"

@@ -52,13 +52,13 @@ void CNS::computeStats(){
     const Box& bx = mfi.tilebox();
     const Box& bxg = mfi.growntilebox(cls_h.NGHOST);
     // extract arrays
-    Array4<Real> const& state       = S.array(mfi);   
+    Array4<Real> const& state_cons  = S.array(mfi);   
     Array4<Real> const& data_stats  = S_stats.array(mfi);   
     // create primitive array (including ghost)
     FArrayBox primf(bxg, cls_h.NPRIM, The_Async_Arena());
     Array4<Real> const& prims= primf.array();
     // from state variable to primitives (Thermodynamic closure) also update ghost
-    cls_h.cons2prims(mfi, state, prims); 
+    cls_h.cons2prims(mfi, state_cons, prims); 
     amrex::ParallelFor(bx, [=](int i, int j, int k) {       
       Real rho = prims(i,j,k,cls_h.QRHO);
       //Real o_rho = 1.0/rho;

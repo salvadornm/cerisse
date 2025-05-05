@@ -34,7 +34,7 @@ struct ProbParm {
   Real p_r    = p_l;
   Real rho_r  = rho_l;     
   Real c_r    = sqrt(gam*p_r/rho_r); 
-  Real u_r    = 3.0; // temp
+  Real u_r    = u_l; // temp 
   Real v_r    = 0.0;
   Real T_r    = p_r*Mw/(gas_constant*rho_r); ; 
   Real eint_r = p_r/(gam - Real(1.0));;  
@@ -49,6 +49,13 @@ struct methodparm_t {
   static constexpr bool dissipation = true;         // no dissipation
   static constexpr int  order = 4;                  // order numerical scheme   
   static constexpr Real C2skew=1.5,C4skew=0.0016;   // Skew symmetric default
+
+};
+struct wall_param {
+
+  public:
+
+  static constexpr bool solve_diffwall = false;      // solve viscous effects at walls
 
 };
 
@@ -67,7 +74,7 @@ typedef rhs_dt<weno_t<ReconScheme::Teno5, ProbClosures>, no_diffusive_t, no_sour
 
 // define type of wall and EBM class
 typedef adiabatic_wall_t<ProbClosures> TypeWall;
-typedef ebm_t<TypeWall,ProbClosures> ProbEB;
+typedef ebm_t<TypeWall,wall_param,ProbClosures> ProbEB;
 
 
 

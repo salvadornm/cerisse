@@ -65,12 +65,9 @@ struct methodparm_t {
   
 };
 
-//inline Vector<std::string> cons_vars_names={"Xmom","Ymom","Zmom","Energy","Density"};
-//inline Vector<int> cons_vars_type={1,2,3,0,0};
-
 
 using ProbClosures = closures_dt<indicies_t, visc_suth_t, cond_suth_t,
-                                 multispecies_perfect_gas_t<indicies_t>>;
+                                 multispecies_pele_gas_t<indicies_t>>;
 using ProbRHS =
     rhs_dt<weno_t<ReconScheme::Teno5, ProbClosures>, no_diffusive_t, reactor_t<ProbClosures>>;
 

@@ -19,8 +19,8 @@ USE_EB = TRUE
 AMREX_NO_PROBINIT=TRUE
 CUDA_ARCH=8.0
 
-AMR_SOLVER = $(abspath ../../)
-AMREX_HOME = $(abspath ../../lib/amrex)
+AMR_SOLVER = $(abspath ../../../)
+AMREX_HOME = $(abspath ../../../lib/amrex)
 
 CEXE_headers += prob.h
 include $(AMR_SOLVER)/src/Make.CNS

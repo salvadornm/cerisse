@@ -4,6 +4,7 @@
 
 #include "CNS.h"
 #include <cassert>
+#include <vector>
 
 using namespace amrex;
 
@@ -88,13 +89,15 @@ void CNS::recordTimeProbe() {
   if (level != time_probe_lev) return;
   if (this->nStep() % time_probe_int != 0) return;
 
-  if (verbose > 1) {
+  if (verbose) {
     amrex::Print() << "... Processing time statistics\n";
   }
 
   const Real curtime = state[0].curTime();
-  const int num_probes = time_probe_names.size();
-  Real probe[num_probes] = {0.0};
+  const int num_probes = time_probe_names.size(); // uncoment if C99 stantdard used
+  //constexpr int num_probes = 1;
+  //Real probe[num_probes] = {0.0};  // C99 standard (not compatible w/o tinkering flags)
+  Real* probe = new Real[num_probes](); 
   MultiFab S(grids, dmap, h_prob_closures->NCONS, 1, MFInfo(), Factory());
   FillPatch(*this, S, 1, curtime, State_Type, 0, h_prob_closures->NCONS);
 
@@ -104,7 +107,7 @@ void CNS::recordTimeProbe() {
 
     // if name is a state variable, just copy from state
     // if not, derive the box
-    int index, scomp, ncomp;
+    int index, scomp;
     if (isStateVariable(name, index, scomp)) {
 #ifdef AMREX_USE_OMP
 #pragma omp parallel if (Gpu::notInLaunchRegion())

@@ -40,9 +40,9 @@ struct ProbParm {
   Real v_r     = 0.0;
   Real eint_r  = p_r/ (gam - Real(1.0));  
 
-  // centre of cylinder
-  Real x0 = 1;
-  Real y0 = 2;
+  // centre of cylinder (from input file)
+  Real x0 = 1; Real y0 = 2;
+  Real xshock = 0.75;  //[m] initial shock position
 };
 
 
@@ -54,7 +54,7 @@ struct methodparm_t {
   static constexpr bool dissipation = true;         // no dissipation
   static constexpr int  order = 4;                  // order numerical scheme   
   static constexpr Real C2skew=1.5,C4skew=0.0016;   // Skew symmetric default
-
+  static constexpr bool solve_diffwall = false;     // solve viscous effects at walls						    
 };
 
 inline Vector<std::string> cons_vars_names={"Xmom","Ymom","Zmom","Energy","Density"};
@@ -72,8 +72,7 @@ typedef rhs_dt<weno_t<ReconScheme::Teno5, ProbClosures>, no_diffusive_t, no_sour
 
 // define type of wall and EBM class
 typedef adiabatic_wall_t<ProbClosures> TypeWall;
-typedef ebm_t<TypeWall,ProbClosures> ProbEB;
-
+typedef ebm_t<TypeWall,methodparm_t,ProbClosures> ProbEB;
 
 
 void inline inputs() {
@@ -96,7 +95,7 @@ prob_initdata(int i, int j, int k, Array4<Real> const &state,
   Real rhot,eint,u[2];
 
   // final state
-  if (x < 0.5) {
+  if (x < prob_parm.xshock) {
     rhot =  prob_parm.rho_oo;
     u[0] =  prob_parm.u_oo; u[1] =  prob_parm.v_oo;
     eint =  prob_parm.eint_oo;

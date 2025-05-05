@@ -31,6 +31,13 @@ case  $1 in
 	ls -1 plot/plt*/Header | tee movie.visit	
 	echo -e "\\033[1;32m  DONE  \\033[0m"
 	;;
+	run )
+	tput setaf 2
+	echo " ...  running cerisse MPI "
+	tput sgr0
+	mpirun --use-hwthread-cpus main2d.gnu.MPI.ex inputs	
+	echo -e "\\033[1;32m  DONE  \\033[0m"
+	;;
 	plot )
 	tput setaf 2
 	echo " ...  quick x-momentum 2d plot"
@@ -42,9 +49,24 @@ case  $1 in
 	tput setaf 2
 	echo " checking if cerisse is broken "
 	tput sgr0
-	bash checktest.sh
-	tput sgr0
-	echo -e "\\033[1;32m  DONE  \\033[0m"
+	case $2 in
+		basic )
+		echo "       .... basic flow "
+		bash checktest.sh
+		tput sgr0
+		echo -e "\\033[1;32m  DONE  \\033[0m"
+		;;
+		chem )
+		echo "       .... with PelePhysics and chemistry "
+		tput sgr0
+		bash checktestchem.sh
+		tput sgr0
+		echo -e "\\033[1;32m  DONE  \\033[0m"
+		;;
+		*)
+		echo "check [option] not recognised.."
+		echo "basic/chem"
+		esac
 	;;
 	backup )
     tput setaf 2
@@ -52,12 +74,14 @@ case  $1 in
 	tput sgr0
     mkdir $2
 	cp *.H $2
+	cp *.h $2
 	cp *.cpp $2
-	cp inputs $2
-	cp Make.package $2
+	cp inputs $2	
 	cp GNUmakefile $2
+	cp *.py $2
 	mv *chk $2
-	mv plt* $2
+	mv *.visit $2
+	mv plot $2/
 	echo -e "\\033[1;32m  DONE  \\033[0m"
 	;;
     *)

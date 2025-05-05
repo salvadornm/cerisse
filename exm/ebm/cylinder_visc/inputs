@@ -1,7 +1,7 @@
 # Simulation time
-max_step  =  40000
+max_step  =  50000
 stop_time =  8.0
-cfl = 0.1
+cfl = 0.3
 #time_step = 5e-7
 
 
@@ -9,7 +9,7 @@ cfl = 0.1
 geometry.is_periodic = 0 0
 geometry.coord_sys   = 0  
 geometry.prob_lo     = 0.0   0.0
-geometry.prob_hi     = 40   20
+geometry.prob_hi     = 80   40
 
 # BC
 cns.lo_bc = 1 2
@@ -17,14 +17,14 @@ cns.hi_bc = 2 2
 
 # output screen
 cns.screen_output = 0 # 0=quiet, 1=verbose
-cns.verbose = 0       # 0=quiet, 1=verbose
-amr.v               = 0 # quiet
+cns.verbose       = 0 # 0=quiet, 1=verbose
+amr.v             = 0 # quiet
 
 # Refinement and regridding 
 amr.n_cell            = 400 200   # orign 80 x 160 with 1 lev
-amr.max_level         = 0      # maximum level number allowed
+amr.max_level         = 2      # maximum level number allowed
 amr.ref_ratio         = 2 2    # refinement ratio per level
-amr.regrid_int        = 5      # how often to regrid per level
+amr.regrid_int        = 50000  # how often to regrid per level (very large no regrid)
 amr.blocking_factor_x = 8      # blocking factor in x per level
 amr.blocking_factor_y = 8      # blocking factor in y per level
 amr.max_grid_size_x   = 64     # maximum grid size in x per level
@@ -53,8 +53,10 @@ amr.derive_plot_vars  = pressure velocity temperature
 #eb2.cylinder_has_fluid_inside = 0
 
 eb2.geom_type = box
-eb2.box_lo = 9.0  9.0  0.0
-eb2.box_hi = 11.0  11.0  0.0
+eb2.box_lo = 19.0  19.0  0.0
+eb2.box_hi = 21.0  21.0  0.0
 eb2.box_has_fluid_inside = 0
+eb2.eb_weight  = 1.0
+eb2.redistribution_type = "NoRedist"
 
 

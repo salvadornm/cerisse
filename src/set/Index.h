@@ -69,6 +69,8 @@ static constexpr int NPRIM=QFS + NUM_SPECIES; //??? (shodul be 1 less)
 static constexpr int NWAVES=2 + NUM_SPECIES;
 static constexpr int NCOEF= 3 + NUM_SPECIES;
 static constexpr int NGHOST=3; // TODO: make it an automatic parameter
+static constexpr int NSLOPE= NCONS+1; // for reconstruction (+1 due to density)
+
 
 // Statistic space empty  
 static constexpr int NSTAT = 0;    

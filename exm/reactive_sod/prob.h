@@ -32,15 +32,12 @@ struct ProbParm {
                                      0.,         0.,         0.};
 };
 
-using ProbClosures = closures_dt<indicies_t, visc_suth_t, cond_suth_t,
-                                 multispecies_perfect_gas_t<indicies_t>>;
+using ProbClosures = 
+    closures_dt< indicies_t, visc_suth_t, cond_suth_t,multispecies_pele_gas_t<indicies_t> >;
 using ProbRHS =
-    rhs_dt<weno_t<ReconScheme::Teno5, ProbClosures>, no_diffusive_t, reactor_t<ProbClosures>>;
+    rhs_dt<weno_t< ReconScheme::Teno5, ProbClosures>, no_diffusive_t, reactor_t<ProbClosures> >;
 
 void inline inputs() {
-  // ParmParse pp;
-  // pp.add("cns.order_rk", 3);   // -2, 1, 2 or 3"
-  // pp.add("cns.stages_rk", 3);  // 1, 2 or 3
 }
 
 // initial condition

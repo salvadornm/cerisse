@@ -11,6 +11,15 @@ bool CNS::record_probe = false;
 bool CNS::dt_dynamic = false;
 bool CNS::ib_move = false;
 bool CNS::plot_surf = false;
+
+// utilities
+bool CNS::use_utility = false; 
+Utility CNS::utilidades;
+
+Real CNS::eb_weight = 0.0;
+bool CNS::eb_redistribution = false;
+std::string CNS::eb_redistribution_type = "NoRedist";
+
 int CNS::nstep_screen_output = 10;
 int CNS::order_rk = 2;
 int CNS::stages_rk = 2;
@@ -106,7 +115,27 @@ void CNS::read_params() {
     }
   }
 
+  //  Utilities options ----------------
+  pp.query("use_utility",use_utility);
+  if (use_utility)
+  {
+    amrex::Print() << " Using Utilities " << std::endl;      
+    ParmParse pp_util("util");
+
+    bool use_PMF=false;
+    pp_util.query("use_PMF",use_PMF); 
+    if (use_PMF){
+#ifdef USE_PELEPHYSICS      
+      amrex::Print() << " Reading PMF from file.. " << std::endl;      
+      CNS::utilidades.initPMF();
+#else      
+      amrex::Abort("using PMF files need PelePhysics");
+#endif
+    }  
+  }
+
 #if AMREX_USE_GPIBM
+  // specific keywords for IB boundaries
   ParmParse ppib("ib");
   if (!ppib.query("move", ib_move)) {
     amrex::Abort("ib.move not specified (0=false, 1=true)");
@@ -115,6 +144,22 @@ void CNS::read_params() {
     amrex::Abort("ib.plot_surf not specified (0=false, 1=true)");
   }
 #endif
+  
+#if CNS_USE_EB 
+  // specific keywords for EB boundaries
+  ParmParse ppeb2("eb2");  
+  ppeb2.query("eb_weight",eb_weight); 
+  ppeb2.query("redistribution_type", eb_redistribution_type);
+  if (eb_redistribution_type != "StateRedist" && eb_redistribution_type != "FluxRedist" &&
+      eb_redistribution_type != "NoRedist"    && eb_redistribution_type != "NewRedist") {
+    amrex::Abort( " input file: redistribution_type must be StateRedist/FluxRedist/NewRedist/NoRedist");
+  }
+  if (eb_redistribution_type != "NoRedist") eb_redistribution =true;
+  // This communicates to the class (not very elegant)
+  EBM::eb.eb_weight = eb_weight;
+  EBM::eb.redistribution_type = eb_redistribution_type; 
+#endif
+
 
 #if AMREX_USE_GPU
   amrex::Gpu::htod_memcpy(d_prob_closures, h_prob_closures,
@@ -138,10 +183,9 @@ void CNS::init(AmrLevel &old) {
   MultiFab &S_new = get_new_data(State_Type);
   FillPatch(old, S_new, 0, cur_time, State_Type, 0,PROB::ProbClosures::NCONS);
 
-  // SNM
   if (compute_stats){
-  MultiFab &Sstat_new = get_new_data(Stats_Type);
-  FillPatch(old, Sstat_new, 0, cur_time, Stats_Type, 0,PROB::ProbClosures::NSTAT);
+    MultiFab &Sstat_new = get_new_data(Stats_Type);
+    FillPatch(old, Sstat_new, 0, cur_time, Stats_Type, 0,PROB::ProbClosures::NSTAT);
   }
 
 }
@@ -172,16 +216,23 @@ void CNS::initData() {
   PROB::ProbClosures const *lclosures = d_prob_closures;
   PROB::ProbParm const *lprobparm = d_prob_parm;
 
-  //amrex::Print( ) << " oo CNS::initData  " << std::endl; 
   //amrex::Print( ) << "  calling  prob_init in prob.h ...  " << std::endl; 
-   
+
+  // SNM: placeholder to initialise with random variables the flow field   
+
+  // Initialise problem by calling user-given prob.h
+#if USE_UTILITY
+  amrex::ParallelFor(
+    S_new, [=] AMREX_GPU_DEVICE(int box_no, int i, int j, int k) noexcept {
+      prob_initdata(i, j, k, sma[box_no], geomdata, *lclosures, *lprobparm, use_utility ? &CNS::utilidades : nullptr);
+  });
+#else
   amrex::ParallelFor(
       S_new, [=] AMREX_GPU_DEVICE(int box_no, int i, int j, int k) noexcept {
-        prob_initdata(i, j, k, sma[box_no], geomdata, *lclosures, *lprobparm);
-      });
-
-  // TODO: Could compute primitive variables here
-
+        prob_initdata(i, j, k, sma[box_no], geomdata, *lclosures, *lprobparm);        
+  });
+#endif
+            
   // Initialise stats 
   if (compute_stats) {
     setupStats();
@@ -191,12 +242,11 @@ void CNS::initData() {
 
 void CNS::buildMetrics() {
 
-  //amrex::Print() << " oo CNS::buildMetrics  " << std::endl;
-
-  // print mesh sizes
-  const Real *dx = geom.CellSize();
-  amrex::Print() << "Mesh size (dx,dy,dz) = ";
-  amrex::Print() << AMREX_D_TERM(dx[0], << "  " << dx[1], << "  " << dx[2]) << "  \n";
+  if (verbose) {
+    const Real *dx = geom.CellSize();
+    amrex::Print() << "Mesh size (dx,dy,dz) = ";
+    amrex::Print() << AMREX_D_TERM(dx[0], << "  " << dx[1], << "  " << dx[2]) << "  \n";
+  }  
 
 }
 
@@ -402,7 +452,7 @@ void CNS::computeNewDt(int finest_level, int sub_cycle, Vector<int> &n_cycle,
  [[nodiscard]] GpuArray<Real,AMREX_SPACEDIM> CNS::maxEigen() {
   BL_PROFILE("CNS::maxEigen()");
 
-  const auto dx = geom.CellSizeArray();
+  //const auto dx = geom.CellSizeArray();
   PROB::ProbClosures const *d_cls = d_prob_closures;
 
   // Get multifabs
@@ -520,7 +570,7 @@ void CNS::post_regrid(int lbase, int new_finest) {
   EBM::eb.destroy_mf(level);
   EBM::eb.build_mf(grids, dmap, level);
 
-  // update volfrac and EB data
+  // update volfrac and relevant EB data
   const auto& ebfactory = dynamic_cast<EBFArrayBoxFactory const&>(Factory());
 
   EBM::eb.volmf_a[level]  = &(ebfactory.getVolFrac()); 
@@ -528,12 +578,21 @@ void CNS::post_regrid(int lbase, int new_finest) {
   EBM::eb.areamcf_a[level] = ebfactory.getAreaFrac();  
   EBM::eb.ebflags_a[level] = &(ebfactory.getMultiEBCellFlagFab());
   EBM::eb.bcareamcf_a[level] = &(ebfactory.getBndryArea());
-    
+  EBM::eb.bndrycent_a[level] = &(ebfactory.getBndryCent());
+  EBM::eb.volcent_a[level] = &(ebfactory.getCentroid());
   
-  // EBM::eb.bndrycent = &(ebfactory.getBndryCent());
+
+  // Level mask for redistribution (stored as object not pointer)
+  EBM::eb.level_mask_a[level].clear();
+  EBM::eb.level_mask_a[level].define(grids, dmap, 1, 3);
+  EBM::eb.level_mask_a[level].BuildMask(
+        geom.Domain(), geom.periodicity(), CNSConstants::level_mask_covered,
+        CNSConstants::level_mask_notcovered, CNSConstants::level_mask_physbnd,
+        CNSConstants::level_mask_interior);
+
   // EBM::eb.facecent  = ebfactory.getFaceCent();
 
-  
+  // Calculate markers  
   EBM::eb.computeMarkers(level);
 
 #endif
@@ -586,7 +645,7 @@ void CNS::errorEst(TagBoxArray &tags, int /*clearval*/, int /*tagval*/,
       user_tagging(i, j, k, nt_lev, tagfab, sdatafab, ibfab, geomdata,
                    *lprobparm, lev);
 #else
-    user_tagging(i, j, k, nt_lev, tagfab, sdatafab, geomdata ,*lprobparm, lev);
+      user_tagging(i, j, k, nt_lev, tagfab, sdatafab, geomdata ,*lprobparm, lev);
 #endif
     });
   }
@@ -701,8 +760,6 @@ void CNS::writePlotFile(const std::string &dir, std::ostream &os,
 #ifdef CNS_USE_EB
   n_data_items += 1;
 #endif
-
-
   //------------------------------------------------------------------------------
 
   // get the time from the first State_Type
@@ -737,7 +794,7 @@ void CNS::writePlotFile(const std::string &dir, std::ostream &os,
       }
     }
 
-//----------------------------------------------------------------------modified
+    //----------------------------------------------------------------------modified
 #ifdef AMREX_USE_GPIBM
     os << "sld\n";
     os << "ghs\n";
@@ -851,14 +908,15 @@ void CNS::writePlotFile(const std::string &dir, std::ostream &os,
 #ifdef AMREX_USE_GPIBM
   plotMF.setVal(0.0_rt, cnt, 2, nGrow);
   IBM::ib.bmf_a[level]->copytoRealMF(plotMF, 0, cnt);
+  cnt+=2;
 #endif
 
 #ifdef CNS_USE_EB
-  //printf(" cnt= %d level=%d n_data_items=%d   \n",cnt,level,n_data_items);
   plotMF.setVal(0.0_rt, cnt, 0, nGrow); 
-  EBM::eb.bmf_a[level]->copytoRealMF(plotMF, 0, cnt);
-
- // EBM::eb.copytoRealMF(plotMF, 0, cnt);   // CHECK NEED TO PASS LEVEL
+ // EBM::eb.bmf_a[level]->copytoRealMF(plotMF, 0, cnt);  // boolean 
+  const MultiFab *vfrac = EBM::eb.volmf_a[level];
+  MultiFab::Copy(plotMF, *vfrac, 0, cnt, 1, 0);
+  cnt++;
 #endif
 
   //------------------------------------------------------------------------------
