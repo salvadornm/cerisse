@@ -32,7 +32,7 @@ geometry.prob_hi     =   2.0     3.0     3.0
 amr.n_cell           =   96    128     128
 
 #-------------------------------- REFINEMENT / REGRIDDING ---------------------#
-amr.max_level       = 1       # maximum level number allowed
+amr.max_level        = 1       # maximum level number allowed
 amr.ref_ratio       = 2  # refinement ratio
 amr.regrid_int      = 10   # how often to regrid
 amr.blocking_factor_x = 8  # blocking factor in x per level
