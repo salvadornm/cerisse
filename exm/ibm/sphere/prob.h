@@ -10,6 +10,8 @@
 #include <eib.h>
 #include <ratio>
 #include <Constants.h>
+#include <ib_walltypes.h>
+
 
 using namespace amrex;
 using namespace universal_constants;
@@ -17,7 +19,7 @@ using namespace universal_constants;
 namespace PROB {
 
 // constants  
-static constexpr Real Mach     = 6.0;              // bulk Mach number
+static constexpr Real Mach     = 4.0;              // bulk Mach number
 static constexpr Real Mw       = 28.96e-3;         // Molecular weight
 static constexpr Real gam      = 1.4;              // Adiabatic coefficient
 static constexpr Real Rgas     = gas_constant/Mw;  // gas constant
@@ -33,25 +35,25 @@ static constexpr Real lambda   = viscos*Cp/Pr;    // constant lambda
 struct ProbParm
 { 
   // freee-stream conditions  
-  Real p_oo    = 5000.0; //[Pa] free-stream pressure (at 10 km altitude)  
-  Real T_oo    = 223.0;  //[K]  free-stream temperature 
-  Real rho_oo  = p_oo*Mw/(gas_constant*T_oo);
-  Real c_oo    = sqrt(gam*p_oo/rho_oo);
+  Real p_oo    = 100000.0; //[Pa] free-stream pressure   
+  Real T_oo    = 300.0;    //[K]  free-stream temperature 
+  Real rho_oo  = p_oo/(Rgas*T_oo);
+  Real c_oo    = sqrt(gam*Rgas*T_oo);
   Real u_oo    = c_oo*Mach;  
-  Real eint_oo = p_oo/ (gam - Real(1.0));
+  Real eint_oo = rho_oo*Cv*T_oo;
   Real kin_oo  = 0.5*rho_oo*u_oo*u_oo;
  
   // right state
-  Real p_r     = 5000.0; //[Pa] free-stream pressure (at 10 km altitude)  
-  Real T_r     = 223.0;  //[K]  free-stream temperature 
-  Real rho_r   = p_r*Mw/(gas_constant*T_r);
+  Real p_r     = p_oo; //[Pa] free-stream pressure (at 10 km altitude)  
+  Real T_r     = T_oo;  //[K]  free-stream temperature 
+  Real rho_r   = p_r/(Rgas*T_r);
   Real u_r     = 0.0;
-  Real eint_r  = p_r/ (gam - Real(1.0));
+  Real eint_r  = rho_r*Cv*T_r;
  
   // centre of sphere (should be same with STL file)
   Real x0 = 1.0; Real y0 = 2.0; Real z0 = 2.0;
   // initial shock position  
-  Real xshock = 0.5;  
+  Real xshock = 0.65;  
 
 };
 
@@ -73,8 +75,18 @@ struct skewparm_t {
 
   static constexpr bool dissipation = true;         // no dissipation
   static constexpr int  order = 4;                  // order numerical scheme   
-  static constexpr Real C2skew=0.5,C4skew=0.0016;   // Skew symmetric default
+  static constexpr Real C2skew=1.5,C4skew=0.016;   // Skew symmetric values 
 };
+
+struct ibmparm_t {
+
+  public:
+
+  static constexpr int  interp_order = 1;
+  static constexpr int  extrap_order = 1;
+  static constexpr Real alpha= 0.6;      
+};
+
 
 
 // CLOSURES
@@ -83,14 +95,20 @@ typedef closures_dt<indicies_t, transport_const_t<methodparm_t>,
 
 // NUMERICAL SCHEME + EQNS TO SOLVE   (Euler/NS/Source)                 
 
-//typedef rhs_dt<riemann_t<false, ProbClosures>, no_diffusive_t, no_source_t > ProbRHS;
-typedef rhs_dt<skew_t<skewparm_t,ProbClosures>, no_diffusive_t, no_source_t > ProbRHS;
+//typedef rhs_dt<rusanov_t<ProbClosures>, no_diffusive_t, no_source_t > ProbRHS;
+typedef rhs_dt<riemann_t<false, ProbClosures>, no_diffusive_t, no_source_t > ProbRHS;
+//typedef rhs_dt<skew_t<skewparm_t,ProbClosures>, no_diffusive_t, no_source_t > ProbRHS;
 // typedef rhs_dt<skew_t<skewparm_t,ProbClosures>, viscous_t<methodparm_t, ProbClosures>, no_source_t > ProbRHS;
 
 
 // IBM templates
-using d_image = std::ratio<5, 5>;
-typedef eib_t<1,1,d_image,ProbClosures> ProbIB;
+//using d_image = std::ratio<5, 5>;
+//typedef eib_t<1,1,d_image,ProbClosures> ProbIB;
+
+
+typedef ibm_adiabatic_slip_wall_t<ibmparm_t,ProbClosures> TypeWall;
+typedef eib_t<TypeWall,ibmparm_t,ProbClosures> ProbIB;
+
 
 void inline inputs() {
   
@@ -105,7 +123,7 @@ void prob_initdata (int i, int j, int k, amrex::Array4<amrex::Real> const& state
       amrex::GeometryData const& geomdata, ProbClosures const& cls, ProbParm const& pparm) {
   
   const Real* prob_lo = geomdata.ProbLo();
-  const Real* prob_hi = geomdata.ProbHi();
+  // const Real* prob_hi = geomdata.ProbHi(); //
   const Real* dx      = geomdata.CellSize();
 
   Real x = prob_lo[0] + (i+0.5_rt)*dx[0];
@@ -200,15 +218,15 @@ bcnormal(const amrex::Real x[AMREX_SPACEDIM], amrex::Real dratio, const amrex::R
   switch(face)
   {
     case  -1:  // EAST      
+      break;
+    case   1:  // WEST
       // inflow
       s_ext[URHO] = pparm.rho_oo;
       s_ext[UMX]  = pparm.rho_oo * pparm.u_oo;
       s_ext[UMY]  = 0.0;
       s_ext[UMZ]  = 0.0;
       s_ext[UET]  = pparm.eint_oo + pparm.kin_oo;      
-      break;
-    case   1:  //WEST
-      break;      
+      break;  
     default:
       break;
   }

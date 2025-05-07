@@ -1,1 +1,1 @@
-CEXE_headers += eib.h IBMultiFab.h
+CEXE_headers += eib.h IBMultiFab.h ib_walltypes.h

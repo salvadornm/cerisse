@@ -25,6 +25,8 @@
 // CGAL header for inout testing
 #include <CGAL/Side_of_triangle_mesh.h>
 
+// #include <ib_walltypes.h>
+
 
 // CGAL types ------------------------------------------------------------------
 typedef CGAL::Simple_cartesian<Real> K2;
@@ -72,6 +74,7 @@ struct gpData_t {
   //  ... ]
   Gpu::ManagedVector<Array3D<int,0,eorder_tparm-1,0,7,0,AMREX_SPACEDIM-1>> imp_ip_ijk;
   Gpu::ManagedVector<Array2D<Real, 0, eorder_tparm - 1, 0, 7>> imp_ipweights;
+
 };
 
 // main class ------------------------------------------------------------------
@@ -81,27 +84,23 @@ struct gpData_t {
 /// class. It holds an array of IBMultiFab, one for each AMR level; and it also holds
 /// the geometry
 ///
-/// \param iorder integer interpolation order
-/// \param eorder integer extrapolation order
-/// \param cip real interpolation distance factor (relative to mesh diagonal)
-/// \param cls_t Number of image points (type)
-///
-template <int iorder_tparm, int eorder_tparm, typename cim_tparm, typename cls_t>
+template <typename wallmodel, typename param, typename cls_t>
 class eib_t
 {
 public:
   // constant factor for image point
-  Real cim = Real(cim_tparm::num) / cim_tparm::den;
+  //Real cim = Real(cim_tparm::num) / cim_tparm::den;
+  //Real cim = 0.5;
+
+  static const int iorder_tparm = param::interp_order;
+  static const int eorder_tparm = param::extrap_order;  
+  static constexpr Real cim = param::alpha;
 
   // image point distance per level
   Vector<Real> di_a;
 
   // number of geometries
   int ngeom=1;
-
-  // SNM: types of BC at IB   phi(1) = alfa*phi(2) + beta
-  // Arrays to store BC
-  Real alfa[cls_t::NPRIM],beta[cls_t::NPRIM];
 
   // pointer to Amr class instance
   Amr* amr_p;
@@ -389,9 +388,16 @@ void initialiseGPs(int lev) {
             gpData.tangent1.push_back(tan1);
             gpData.tangent2.push_back(tan2);
 
+            //ib_xyz
+            Array1D<Real, 0, AMREX_SPACEDIM - 1> ib_xyz = {cp[0],cp[1],cp[2]};
+            gpData.ib_xyz.push_back(ib_xyz); //SNM
+
             // IM points -------------------------------------------
             Array2D<Real, 0, eorder_tparm - 1, 0, AMREX_SPACEDIM - 1> imp_xyz;
             Array2D<int, 0, eorder_tparm - 1, 0, AMREX_SPACEDIM - 1> imp_ijk;
+
+
+             //    imp_xyz(0, kk) = cp[kk] ??? 
 
             // find image point and the bottom left point closest to the image
             // point
@@ -461,6 +467,11 @@ void computeGPs(const MFIter& mfi, const Array4<Real>& cons, const Array4<Real>&
   auto const norm = ibFab.gpData.normal.data();
   auto const tan1 = ibFab.gpData.tangent1.data();
   auto const tan2 = ibFab.gpData.tangent2.data();
+  // surface coordinates
+  auto const ib_xyz =  ibFab.gpData.ib_xyz.data();
+
+  // snm surface coordinates (per GP) (no only relevant IM)
+  //auto const imp_xyz = ibFab.gpData.imp_xyz.data();
 
   ParallelFor(ibFab.gpData.ngps, [=,copy=this] AMREX_GPU_DEVICE (int ii)
     {
@@ -495,15 +506,19 @@ void computeGPs(const MFIter& mfi, const Array4<Real>& cons, const Array4<Real>&
       for (int iip=2; iip<2+eorder_tparm; iip++) {
         copy->global2local(iip, primsNormal, norm[ii], tan1[ii], tan2[ii]);
       }
-      copy->computeIB(primsNormal,cls);                      // only P,T,Y set 
-      copy->extrapolate(primsNormal, disGP[ii], disIM[ii]);  // only extrapolate up to QLS
+     
+      // copy->computeIB(primsNormal,cls);                      // only P,T,Y set 
 
-      // transform velocity back to global coordinates for gp only
-      int idx=0;
-      copy->local2global(idx,primsNormal,norm[ii],tan1[ii],tan2[ii]);
+      // compute surface values based on wallmodel  (set u,P,T,Y)      
+      wallmodel::compute_surfIB(ib_xyz[ii],norm[ii],primsNormal,cls);   
       
-      ///  copy primsNormal  -> Q
-      Real P,T,R,Y[NUM_SPECIES]={0.0};
+      // only extrapolate to GP the values of  u,P,T,Y
+      copy->extrapolate(primsNormal, disGP[ii], disIM[ii]);  
+      // transform velocity back to global coordinates (GP only)
+      int idx=0;
+      copy->local2global(idx,primsNormal,norm[ii],tan1[ii],tan2[ii]);      
+      ///.  copy primsNormal  -> Q
+      Real P,T,Y[NUM_SPECIES]={0.0};
       P = primsNormal(0,cls_t::QPRES);
       T = primsNormal(0,cls_t::QT);
 #if NUM_SPECIES > 1    
@@ -514,10 +529,12 @@ void computeGPs(const MFIter& mfi, const Array4<Real>& cons, const Array4<Real>&
       Real ux =  primsNormal(0,cls_t::QU);
       Real uy =  primsNormal(0,cls_t::QV);
       Real uz =  primsNormal(0,cls_t::QW);
+      ///.
+
       // ensure Thermodynamic consistency and that the prims array is filled
       Real Q[cls->NPRIM];
       cls->ensurePTYfillq(P, T, Y, ux,uy,uz,Q); 
-      
+            
       // insert primitive variables into primsFab
       int i=gp_ijk[ii](0); int j=gp_ijk[ii](1); int k = gp_ijk[ii](2);
       for (int nn=0; nn<cls_t::NPRIM; nn++) {
@@ -679,7 +696,8 @@ private:
 
   // @brief Change coordinates of velocity
   AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE 
-  void global2local( int iip, Array2D<Real,0,eorder_tparm+1,0,cls_t::NPRIM-1>& primsNormal, const Array1D<Real,0,AMREX_SPACEDIM-1>& norm, const Array1D<Real,0,AMREX_SPACEDIM-1>& tan1, const Array1D<Real,0,AMREX_SPACEDIM-1>& tan2) {
+  void global2local( int iip, Array2D<Real,0,eorder_tparm+1,0,cls_t::NPRIM-1>& primsNormal, 
+                    const Array1D<Real,0,AMREX_SPACEDIM-1>& norm, const Array1D<Real,0,AMREX_SPACEDIM-1>& tan1, const Array1D<Real,0,AMREX_SPACEDIM-1>& tan2) {
 
     Array1D<Real,0,AMREX_SPACEDIM-1> vel;
     vel(0) = primsNormal(iip,cls_t::QU); vel(1) = primsNormal(iip,cls_t::QV); vel(2) = primsNormal(iip,cls_t::QW);
@@ -703,7 +721,6 @@ private:
   /// \brief computeIB calculates the primitive array at IB (surface)
   /// based on values interpolated on the normal 
   /// WARN !! at present does first order
-  //  slip wall (it will use later genartoc alfa and beta)
   AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
   void computeIB(Array2D<Real,0,eorder_tparm+1,0,cls_t::NPRIM-1>& primsNormal, const cls_t* cls) {
     
@@ -711,6 +728,7 @@ private:
     primsNormal(1,cls_t::QU) = 0.0_rt; // un
     primsNormal(1,cls_t::QV) = primsNormal(2,cls_t::QV); // ut1
     primsNormal(1,cls_t::QW) = primsNormal(2,cls_t::QW); // ut2
+
 
     Real Yw[NUM_SPECIES]={0.0};
 

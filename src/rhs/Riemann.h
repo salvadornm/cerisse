@@ -52,7 +52,11 @@ class riemann_t {
     const Box& xflxbx = amrex::surroundingNodes(bx, cdir);
     amrex::ParallelFor(
         xflxbx, [=, *this] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {
-          this->cns_riemann_x(i, j, k, flx1, slope, prims, *cls);
+#if (AMREX_USE_GPIBM || CNS_USE_EB )            
+          const bool wallflx= ibMarkers(i,j,k,0) && ibMarkers(i-1,j,k,0); 
+          if (!wallflx)
+#endif                    
+          this->cns_riemann_x(i, j, k, flx1, slope, prims, *cls);          
         });
 
 #if AMREX_SPACEDIM >= 2
@@ -72,14 +76,20 @@ class riemann_t {
         });
     const Box& yflxbx = amrex::surroundingNodes(bx, cdir);
     amrex::ParallelFor(
-        yflxbx, [=, *this] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {          
-          this->cns_riemann_y(i, j, k, flx2, slope, prims, *cls);
+        yflxbx, [=, *this] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {
+#if (AMREX_USE_GPIBM || CNS_USE_EB )            
+          const bool wallflx= ibMarkers(i,j,k,0) && ibMarkers(i,j-1,k,0); 
+          if (!wallflx)         
+#endif          
+          this->cns_riemann_y(i, j, k, flx2, slope, prims, *cls);                    
         });
 #endif
 
 #if AMREX_SPACEDIM == 3
     // z-direction
     cdir = 2;
+    //GpuArray<int, 3> vdir = {int(cdir == 0), int(cdir == 1), int(cdir == 2)};
+  
     auto const& flx3 = flxt[cdir]->array(); 
   
     const Box& zslpbx = amrex::grow(bx, cdir, 1);
@@ -95,8 +105,13 @@ class riemann_t {
         });
     const Box& zflxbx = amrex::surroundingNodes(bx, cdir);
     amrex::ParallelFor(
-        zflxbx, [=, *this] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {
-          this->cns_riemann_z(i, j, k, flx3, slope, prims, *cls);
+        zflxbx, [=, *this] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {          
+
+#if (AMREX_USE_GPIBM || CNS_USE_EB )          
+          const bool wallflx= ibMarkers(i,j,k,0) && ibMarkers(i,j,k-1,0); 
+          if (!wallflx)
+#endif          
+          this->cns_riemann_z(i, j, k, flx3, slope, prims, *cls);                    
         });
 #endif
   };
@@ -198,6 +213,8 @@ class riemann_t {
     }
   }
 
+  // \brief: function that computes slope in a cell(i) based on
+  // characteristci variables (in x-diretion)
 #if (AMREX_USE_GPIBM || CNS_USE_EB )
   AMREX_GPU_DEVICE AMREX_FORCE_INLINE void cns_slope_x(
       int i, int j, int k, const Array4<Real>& dq, const Array4<Real>& q,
@@ -209,22 +226,24 @@ class riemann_t {
 #endif
 
 #if (AMREX_USE_GPIBM || CNS_USE_EB )
-    // const bool wall_left  = marker(i-1,j,k,0);  
-    // const bool wall_right = marker(i+1,j,k,0);  
-    const bool close_to_wall = marker(i,j,k,1);
-    const bool intersolid_flx = marker(i,j,k,0) &&  marker(i-1,j,k,0);
-    if (intersolid_flx) {
+    // reduce order in a GP(IB) or partial cell (EB)     
+    const bool reduce_order =  marker(i,j,k,1) || marker(i,j,k,0); 
+    
+    if (reduce_order) {
       for (int n = 0; n < cls.NSLOPE; ++n) { dq(i,j,k,n) = 0.0;}
       return;
     }  
 #endif
 
     Real cspeed = q(i, j, k, cls.QC) + 1.e-40;
+
+    // left slope  (involves  i and i-1)   
     Real dlft = Real(0.5) *
                     (q(i, j, k, cls.QPRES) - q(i - 1, j, k, cls.QPRES)) /
                     cspeed -
                 Real(0.5) * q(i, j, k, cls.QRHO) *
                     (q(i, j, k, cls.QU) - q(i - 1, j, k, cls.QU));
+    // right slope  (involves i+1 and i)                    
     Real drgt = Real(0.5) *
                     (q(i + 1, j, k, cls.QPRES) - q(i, j, k, cls.QPRES)) /
                     cspeed -
@@ -269,17 +288,6 @@ class riemann_t {
       drgt = q(i + 1, j, k, cls.QFS + n) - q(i, j, k, cls.QFS + n);
       dq(i, j, k, 5 + n) = limiter(dlft, drgt);
     }
-
-#if (AMREX_USE_GPIBM || CNS_USE_EB )
-    if (close_to_wall) 
-    {
-      for (int n = 0; n < cls.NSLOPE; ++n) { dq(i,j,k,n) = 0.0;}
-    }    
-#endif    
-
-
-
-
   }
  
 #if (AMREX_USE_GPIBM || CNS_USE_EB )
@@ -292,19 +300,14 @@ class riemann_t {
       const cls_t& cls) const {
 #endif
 
-
-
 #if (AMREX_USE_GPIBM || CNS_USE_EB )
-    // const bool wall_left  = marker(i,j-1,k,0);  
-    // const bool wall_right = marker(i,j+1,k,0); 
-    const bool close_to_wall = marker(i,j,k,1); 
-    const bool intersolid_flx = marker(i,j,k,0) &&  marker(i,j-1,k,0);
-    if (intersolid_flx) {
+    // reduce order in a GP(IB) or partial cell (EB)     
+    const bool reduce_order =  marker(i,j,k,1) || marker(i,j,k,0); 
+    if (reduce_order) {
       for (int n = 0; n < cls.NSLOPE; ++n) { dq(i,j,k,n) = 0.0;}
       return;
-    }
+   }  
 #endif
-
 
     Real cspeed = q(i, j, k, cls.QC) + 1.e-40;
     Real dlft = Real(0.5) *
@@ -355,16 +358,6 @@ class riemann_t {
       drgt = q(i, j + 1, k, cls.QFS + n) - q(i, j, k, cls.QFS + n);
       dq(i, j, k, 5 + n) = limiter(dlft, drgt);
     }
-
-#if (AMREX_USE_GPIBM || CNS_USE_EB )
-    if (close_to_wall) 
-    {
-      for (int n = 0; n < cls.NSLOPE; ++n) { dq(i,j,k,n) = 0.0;}
-    }    
-#endif    
- 
-
-
   }
 
 #if (AMREX_USE_GPIBM || CNS_USE_EB )
@@ -378,14 +371,12 @@ class riemann_t {
 #endif
   
 #if (AMREX_USE_GPIBM || CNS_USE_EB )
-    // const bool wall_left  = marker(i,j-1,k,0);  
-    // const bool wall_right = marker(i,j+1,k,0); 
-    const bool close_to_wall = marker(i,j,k,1); 
-    const bool intersolid_flx = marker(i,j,k,0) &&  marker(i,j,k-1,0);
-    if (intersolid_flx) {
+    // reduce order in a GP(IB) or partial cell (EB)     
+    const bool reduce_order =  marker(i,j,k,1) || marker(i,j,k,0); 
+    if (reduce_order) {
       for (int n = 0; n < cls.NSLOPE; ++n) { dq(i,j,k,n) = 0.0;}
       return;
-    }
+    }  
 #endif
 
     Real cspeed = q(i, j, k, cls.QC) + 1.e-40;
@@ -438,15 +429,17 @@ class riemann_t {
       dq(i, j, k, 5 + n) = limiter(dlft, drgt);
     }
 
-#if (AMREX_USE_GPIBM || CNS_USE_EB )
-    if (close_to_wall) 
-    {
-      for (int n = 0; n < cls.NSLOPE; ++n) { dq(i,j,k,n) = 0.0;}
-    }    
-#endif   
-
   }
 
+  //----------------------------
+
+  //---------------------------
+
+
+  // \brief compute flux between cell i and i-1
+  // computes left and right state
+  // UL = q(i-1) + f(dq(i-1))
+  // UR = q(i)   + d(dq(i))
   AMREX_GPU_DEVICE AMREX_FORCE_INLINE void cns_riemann_x(
       int i, int j, int k, Array4<Real> const& fx, Array4<Real> const& dq,
       Array4<Real> const& q, cls_t const& cls) const {

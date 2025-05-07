@@ -2,7 +2,7 @@
 #                                 INPUT FILE
 #------------------------------------------------------------------------------#
 # start time is assumed to be 0, unless re-starting
-max_step  = 1000
+max_step  = 5000
 stop_time = 10.0
 #time_step = 1.0e-5
 cfl = 0.3
@@ -15,9 +15,9 @@ cns.stages_rk = 2 // 1, 2 or 3
 # 1 = Inflow             4 = SlipWall
 # 2 = Outflow            5 = NoSlipWall
 # 6 = user defined
-cns.lo_bc = 2 -1 -1
-cns.hi_bc = 2 -1 -1
-cns.nstep_screen_output = 5 # 
+cns.lo_bc = 1 2 2
+cns.hi_bc = 2 2 2
+cns.nstep_screen_output = 1 # 
 cns.verbose = 0       # 0=quiet, 1=verbose
 
 #-------------------------------- IMMERSED BOUNDARY ---------------------------#
@@ -25,29 +25,29 @@ ib.filename = sphere.stl
 ib.move = 0
 ib.plot_surf = 1
 #-------------------------------- COMPUTATIONAL DOMAIN ------------------------#
-geometry.is_periodic = 0 1 1
+geometry.is_periodic = 0 0 0
 geometry.coord_sys   = 0  # 0 => cart, 1 => RZ  2=>spherical
-geometry.prob_lo     =   0.0     0.0     0.0
-geometry.prob_hi     =   4.0     4.0     4.0
-amr.n_cell           =   128     128     128
+geometry.prob_lo     =   0.5     1.0     1.0
+geometry.prob_hi     =   2.0     3.0     3.0
+amr.n_cell           =   96    128     128
 
 #-------------------------------- REFINEMENT / REGRIDDING ---------------------#
-amr.max_level       = 0       # maximum level number allowed
-amr.ref_ratio       = 2 2  # refinement ratio
-amr.regrid_int      = 50 50  # how often to regrid
-amr.blocking_factor_x = 8 8 # blocking factor in x per level
-amr.blocking_factor_y = 8 8 # blocking factor in x per level
-amr.blocking_factor_z = 8 8 # blocking factor in x per level
-amr.max_grid_size_x   = 64 64  # maximum grid size in x per level
-amr.max_grid_size_y   = 64 64  # maximum grid size in y per level
-amr.max_grid_size_z   = 64 64  # maximum grid size in z per level
-amr.n_error_buf     = 2 2  # number of buffer cells in error est
+amr.max_level       = 1       # maximum level number allowed
+amr.ref_ratio       = 2  # refinement ratio
+amr.regrid_int      = 10   # how often to regrid
+amr.blocking_factor_x = 8  # blocking factor in x per level
+amr.blocking_factor_y = 8  # blocking factor in x per level
+amr.blocking_factor_z = 8  # blocking factor in x per level
+amr.max_grid_size_x   = 64   # maximum grid size in x per level
+amr.max_grid_size_y   = 64   # maximum grid size in y per level
+amr.max_grid_size_z   = 64   # maximum grid size in z per level
+amr.n_error_buf     = 2   # number of buffer cells in error est
 amr.grid_eff        = 0.8     # what constitutes an efficient grid
 
 #-------------------------------- PLOTFILES -----------------------------------#
 amr.plot_files_output = 1
 amr.plot_file         = ./plot/plt # root name of plotfile
-amr.plot_int          = 50     # number of timesteps between plotfiles
+amr.plot_int          = 100     # number of timesteps between plotfiles
 amr.derive_plot_vars  = pressure velocity temperature
 amr.v = 1 # 0=quiet, 1=verbose
 

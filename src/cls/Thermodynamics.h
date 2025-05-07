@@ -95,10 +95,12 @@ class calorifically_perfect_gas_t {
     Q[idx_t::QU] = ux;
     Q[idx_t::QV] = uy;
     Q[idx_t::QW] = uz;
+    Q[idx_t::QFS] = 1.0;
     // aux primitives
     Q[idx_t::QC] =  std::sqrt(gamma * Rspec * T);
     Q[idx_t::QG] = gamma; 
     Q[idx_t::QEINT] = cv*T;
+    
   }   
   ////////////////////////////////////////////////////////////////
 
