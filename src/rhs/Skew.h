@@ -216,12 +216,12 @@ class skew_t {
     const int* domhi = geom.Domain().hiVect();
 
     // masking BC here function of global geometry  (only non-periodic dirs)       
-    for (int l = 0; l < AMREX_SPACEDIM; l++) {  
-      if (geom.isPeriodic(l)==0) {
-        mask_sen(l,1) = domlo[l] + imask;     
-        mask_sen(l,2) = domhi[l] - imask;     
-      }
-    }  
+    // for (int l = 0; l < AMREX_SPACEDIM; l++) {  
+    //   if (geom.isPeriodic(l)==0) {
+    //     mask_sen(l,1) = domlo[l] + imask;     
+    //     mask_sen(l,2) = domhi[l] - imask;     
+    //   }
+    // }  
 
     // ---------------------------------------------------------------------  //
     // loop over directions
