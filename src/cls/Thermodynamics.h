@@ -518,7 +518,45 @@ class multispecies_pele_gas_t {
     Real (&hk)[NUM_SPECIES]) {
     auto eos = pele::physics::PhysicsType::eos();
     eos.RTY2Hi(rho, T, Y, hk);
-  } 
+  }
+  //------------------------------------------------------------------------------------- 
+  AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE void ensurePTYfillq(
+    Real& P, Real& T, Real* Y, 
+    const Real ux, const Real uy, const Real uz,
+    Real* Q ) const {
+
+    //local vars  
+    
+    P = std::max(min_euler_press,P);  
+#if CLIP_TEMPERATURE_MIN        
+    T = std::max(min_euler_temp,T);
+#endif    
+          
+    // compute rho,ei,gamma,cs from eos   SI->cgs
+    auto eos = pele::physics::PhysicsType::eos();
+    Real p_cgs = P * pres_si2cgs;    
+    Real rho_cgs;
+    eos.PYT2R(p_cgs, Y, T, rho_cgs);
+    Real e_cgs; 
+    eos.RYP2E(rho_cgs, Y, p_cgs, e_cgs);
+    Real G;    
+    eos.RTY2G(rho_cgs, T, Y, G);
+    Real cs_cgs = std::sqrt(G * p_cgs / rho_cgs);
+    //
+    Q[idx_t::QRHO] = rho_cgs*rho_cgs2si;  
+    Q[idx_t::QT] = T;
+    Q[idx_t::QPRES] = P;
+    Q[idx_t::QU] = ux;
+    Q[idx_t::QV] = uy;
+    Q[idx_t::QW] = uz;    
+    for (int n = 0; n < NUM_SPECIES; ++n) {
+      Q[idx_t::QFS + n] = Y[n];
+    }
+    // aux primitives    
+    Q[idx_t::QC] =  cs_cgs*speed_cgs2si;
+    Q[idx_t::QG] = G; 
+    Q[idx_t::QEINT] = e_cgs*specenergy_cgs2si;    
+  }   
   //-------------------------------------------------------------------------------------
   AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE GpuArray<Real, idx_t::NWAVES>
   cons2eigenvals(const int i, const int j, const int k,
@@ -679,7 +717,6 @@ class multispecies_pele_gas_t {
     }  
   }
   
-
   // belows are for high-order reconstruction
 
   AMREX_GPU_DEVICE AMREX_FORCE_INLINE void prims2cons(

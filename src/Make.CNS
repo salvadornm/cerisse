@@ -77,14 +77,26 @@ ifeq ($(USE_EB), TRUE)
   include $(AMR_SOLVER)/src/ebm/Make.package
 endif
 
+# PelePhysics Mechanisms  (v25)
+#CHEM_HOME = Mechanisms/$(CHEMISTRY_MODEL)# for latest pelephys  
+#Pdirs := Source Source/Eos Source/Transport Source/Reactions  Source/Utility/BlackBoxFunction $(CHEM_HOME)
 
 ifeq ($(USE_PELEPHYSICS),TRUE)
-  CHEM_HOME = Support/Mechanism/Models/$(CHEMISTRY_MODEL)
-  Pdirs := Source Eos Transport Reactions $(CHEM_HOME)
-  #CHEM_HOME = Mechanisms/$(CHEMISTRY_MODEL)# for latest pelephys
-  #Pdirs := Source Source/Eos Source/Transport Source/Reactions $(CHEM_HOME)
+  
+ifeq ($(USE_LOCALCHEM), TRUE) 
+  CHEM_HOME = $(LOCALCHEM_PATH)/$(CHEMISTRY_MODEL)
+  AbsPdirs  := $(CHEM_HOME)
+  Pdirs := Source Eos Transport Reactions
   Ppack += $(foreach dir, $(Pdirs), $(PELE_PHYSICS_HOME)/$(dir)/Make.package)
+  Ppack += $(AbsPdirs)/Make.package  
   Plocs += $(foreach dir, $(Pdirs), $(PELE_PHYSICS_HOME)/$(dir))
+  Plocs += $(AbsPdirs)
+else
+  CHEM_HOME  = Support/Mechanism/Models/$(CHEMISTRY_MODEL)    
+  Pdirs := Source Eos Transport Reactions $(CHEM_HOME)  
+  Ppack += $(foreach dir, $(Pdirs), $(PELE_PHYSICS_HOME)/$(dir)/Make.package)
+  Plocs += $(foreach dir, $(Pdirs), $(PELE_PHYSICS_HOME)/$(dir))  
+endif
 
   include $(Ppack)
   INCLUDE_LOCATIONS += $(Plocs)
@@ -98,10 +110,14 @@ ifeq ($(USE_PELEPHYSICS),TRUE)
   DEFINES += -DUSE_$(EOS_MODEL)_EOS#    options: GAMMALAW / FUEGO / SRK
   DEFINES += -DUSE_$(TRANSPORT_MODEL)_TRANSPORT# CONSTANT / SIMPLE / SUTHERLAND
 
-  # PelePhysics Utilities
+  # PelePhysics Utilities  (uncomment for v23)
   include $(PELE_PHYSICS_HOME)/Utility/PMF/Make.package
   VPATH_LOCATIONS   += $(PELE_PHYSICS_HOME)/Utility/PMF
   INCLUDE_LOCATIONS += $(PELE_PHYSICS_HOME)/Utility/PMF
+  # PelePhysics Utilities  (v25)
+  #include $(PELE_PHYSICS_HOME)/Source/Utility/PMF/Make.package
+  #VPATH_LOCATIONS   += $(PELE_PHYSICS_HOME)/Source/Utility/PMF
+  #INCLUDE_LOCATIONS += $(PELE_PHYSICS_HOME)/Source/Utility/PMF
   
 endif
 
@@ -126,7 +142,7 @@ TPLclean:
 	@cd $(PELE_PHYSICS_HOME)/ThirdParty; $(MAKE) SUNDIALS_HOME=$(SUNDIALS_HOME) AMREX_HOME=$(AMREX_HOME) USE_SYCL=$(USE_SYCL) USE_HIP=$(USE_HIP) USE_CUDA=$(USE_CUDA) PELE_USE_KLU=$(PELE_USE_KLU) PELE_USE_MAGMA=$(PELE_USE_MAGMA) DEBUG=$(DEBUG) COMP=$(HOSTCC) NVCC=$(COMP) CUDA_ARCH=$(CUDA_ARCH) PRECISION=$(PRECISION) clean
 
 TPLrealclean:
-	@echo "==> Removing SUNDIALS library"
+	@echo "==> Removing SUNDIALS library (realclean)"
 	@cd $(PELE_PHYSICS_HOME)/ThirdParty; $(MAKE) SUNDIALS_HOME=$(SUNDIALS_HOME) AMREX_HOME=$(AMREX_HOME) USE_SYCL=$(USE_SYCL) USE_HIP=$(USE_HIP) USE_CUDA=$(USE_CUDA) PELE_USE_KLU=$(PELE_USE_KLU) PELE_USE_MAGMA=$(PELE_USE_MAGMA) DEBUG=$(DEBUG) COMP=$(HOSTCC) NVCC=$(COMP) CUDA_ARCH=$(CUDA_ARCH) PRECISION=$(PRECISION) realclean
 
 #

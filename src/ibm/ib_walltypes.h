@@ -49,7 +49,7 @@ class ibm_isothermal_slip_wall_t
     Real sumY = 0.0;
     for (int n = 0; n < NUM_SPECIES; ++n) {
       Yw[n]   =  q(2,cls_t::QFS+n);
-      sumY + = sumY;
+      sumY += sumY;
     }
     for (int n = 0; n < NUM_SPECIES; ++n) { 
       q(1,cls_t::QFS+n)   =  Yw[n]/sumY;
@@ -88,7 +88,7 @@ class ibm_isothermal_noslip_wall_t
       Real sumY = 0.0;
       for (int n = 0; n < NUM_SPECIES; ++n) {
         Yw[n]   =  q(2,cls_t::QFS+n);
-        sumY + = sumY;
+        sumY += sumY;
       }
       for (int n = 0; n < NUM_SPECIES; ++n) { 
         q(1,cls_t::QFS+n)   =  Yw[n]/sumY;
@@ -126,7 +126,7 @@ class ibm_adiabatic_slip_wall_t
       Real sumY = 0.0;
       for (int n = 0; n < NUM_SPECIES; ++n) {
         Yw[n]   =  q(2,cls_t::QFS+n);
-        sumY + = sumY;
+        sumY += sumY;
       }
       for (int n = 0; n < NUM_SPECIES; ++n) { 
         q(1,cls_t::QFS+n)   =  Yw[n]/sumY;
@@ -165,7 +165,7 @@ class ibm_adiabatic_noslip_wall_t
       Real sumY = 0.0;
       for (int n = 0; n < NUM_SPECIES; ++n) {
         Yw[n]   =  q(2,cls_t::QFS+n);
-        sumY + = sumY;
+        sumY += sumY;
       }
       for (int n = 0; n < NUM_SPECIES; ++n) { 
         q(1,cls_t::QFS+n)   =  Yw[n]/sumY;

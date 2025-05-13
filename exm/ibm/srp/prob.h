@@ -4,11 +4,13 @@
 #include <AMReX_Geometry.H>
 #include <AMReX_FArrayBox.H>
 #include <AMReX_ParmParse.H>
-#include <AMReX_AmrLevel.H>
+#include <PelePhysics.H>
+#include <ReactorBase.H> 
+
 #include <Closures.h>
 #include <RHS.h>
+
 #include <eib.h>
-#include <ratio>
 #include <Constants.h>
 #include <NozzleFunctions.h>
 #include <ib_walltypes.h>
@@ -22,6 +24,7 @@ namespace PROB {
 static constexpr Real Mach     = 2.0;              // bulk Mach number
 static constexpr Real Mw       = 44.e-3;           // Molecular weight [CO2]
 static constexpr Real gam      = 1.3;              // Adiabatic coefficient 
+static constexpr Real gam_srp  = 1.4;              // Adiabatic coefficient 
 static constexpr Real Rgas     = gas_constant/Mw;  // gas constant
 static constexpr Real Reynolds = 10000;            // bulk Reynolds number
 static constexpr Real Pr       = 0.7;              // Prandtl
@@ -32,7 +35,6 @@ static constexpr Real lambda   = viscos*Cp/Pr;    // constant lambda
 
 static constexpr int ibm_eorder=1;
   
-
 //////////////////////////// Physical modelling ////////////////////////////////
 struct ProbParm
 { 
@@ -40,17 +42,20 @@ struct ProbParm
   // freee-stream conditions  (roughly 10 km Mars entry)
   static constexpr Real p_oo    = 284.0; //[Pa] free-stream pressure   
   static constexpr Real T_oo    = 227.0;    //[K]  free-stream temperature 
-  static constexpr Real rho_oo  = p_oo/(Rgas*T_oo);
-  static constexpr Real c_oo    = sqrt(gam*Rgas*T_oo);
+
+  // density, energy, speeed of sound (using script propertie.py)
+  static constexpr Real rho_oo  = 0.0065954;  // [kg/m3] 
+  static constexpr Real c_oo    = 239.720;    // [m/s]
   static constexpr Real u_oo    = c_oo*Mach;  
-  static constexpr Real eint_oo = rho_oo*Cv*T_oo;
+  static constexpr Real eint_oo = -8.6835e+06; // [J/kg]
   static constexpr Real kin_oo  = 0.5*rho_oo*u_oo*u_oo;
- 
+  
+  static constexpr Real  Yco2_oo = 0.96; // 96% CO2
+  static constexpr Real  Yar_oo  = 0.04; //  4% Argon
+  
   // stagnation pressure and temperature
   static constexpr Real P0  = nozzle_functions::Pstag(p_oo,Mach,gam);
   static constexpr Real T0  = nozzle_functions::Tstag(T_oo,Mach,gam);
-
-
 
   // centre of probe (approx)
   static constexpr Real x0 = 1.0, y0 = 2.0, z0 = 2.0;
@@ -59,10 +64,11 @@ struct ProbParm
   static constexpr Real P0srp = P0;
   static constexpr Real T0srp = 5.0*T0;
   // compute conditions at throat
-  static constexpr Real Pt = nozzle_functions::Pchok(P0srp,gam);
-  static constexpr Real Tt = nozzle_functions::Pchok(T0srp,gam);
-  // sonic conditions a throw
-  static constexpr Real u_srp    = sqrt(gam*Rgas*Tt);
+  static constexpr Real Pt = nozzle_functions::Pchok(P0srp,gam_srp);
+  static constexpr Real Tt = nozzle_functions::Pchok(T0srp,gam_srp);
+  // sonic conditions at the throat
+  static constexpr Real u_srp    = sqrt(gam_srp*gas_constant*Tt/28.e-3);
+  
 
   static constexpr Real xsrp= 0.6225,ysrp = 0.75, zsrp=0.75;
   static constexpr Real Rsrp= 0.008; // nozzle radius
@@ -99,21 +105,18 @@ struct ibmparm_t {
   static constexpr Real alpha= 0.6;      
 };
 
-
-
 // CLOSURES
-typedef closures_dt<indicies_t, transport_const_t<methodparm_t>,
-                    calorifically_perfect_gas_t<indicies_t>> ProbClosures;
+using ProbClosures = closures_dt< indicies_t, transport_Pele_t, multispecies_pele_gas_t<indicies_t> >;
+
 
 // NUMERICAL SCHEME + EQNS TO SOLVE   (Euler/NS/Source)                 
 
-//typedef rhs_dt<rusanov_t<ProbClosures>, no_diffusive_t, no_source_t > ProbRHS;
 typedef rhs_dt<riemann_t<false, ProbClosures>, no_diffusive_t, no_source_t > ProbRHS;
-//typedef rhs_dt<skew_t<skewparm_t,ProbClosures>, no_diffusive_t, no_source_t > ProbRHS;
-// typedef rhs_dt<skew_t<skewparm_t,ProbClosures>, viscous_t<methodparm_t, ProbClosures>, no_source_t > ProbRHS;
 
-// declaration of user-specific ibm
-template < typename param, typename cls_t > class ibm_user_t; // see bottom file
+//using ProbRHS = rhs_dt< riemann_t<false, ProbClosures>, viscous_t<methodparm_t, ProbClosures>, reactor_t<ProbClosures> >;
+
+// declaration of user-specific ibm (see bottom of the file for definition)
+template < typename param, typename cls_t > class ibm_user_t; 
 
 // IBM templates
 typedef ibm_user_t<ProbParm,ProbClosures> TypeWall;
@@ -123,8 +126,10 @@ typedef eib_t<TypeWall,ibmparm_t,ProbClosures> ProbIB;
 void inline inputs() {
   
   amrex::Print() << " ****** Starting ... ******* " <<  std::endl;
-  amrex::Print() << " Supersonic Flow over Sphere (IBM) " <<  std::endl;
-
+  amrex::Print() << " Supersonic Flow over Phoebus geom " <<  std::endl;
+  amrex::Print() << " free stream mimic mars atmosphere " <<  std::endl;
+  amrex::Print() << " SRP jet of Nitrogen " <<  std::endl;  
+  amrex::Print() << " **************************** " <<  std::endl;
 }
 
 //////////////////////////// Initial conditions ////////////////////////////////
@@ -132,33 +137,32 @@ AMREX_GPU_DEVICE AMREX_FORCE_INLINE
 void prob_initdata (int i, int j, int k, amrex::Array4<amrex::Real> const& state,
       amrex::GeometryData const& geomdata, ProbClosures const& cls, ProbParm const& pparm) {
   
-  const Real* prob_lo = geomdata.ProbLo();
-  // const Real* prob_hi = geomdata.ProbHi(); //
-  const Real* dx      = geomdata.CellSize();
+  //const Real* prob_lo = geomdata.ProbLo();  
+  //const Real* dx      = geomdata.CellSize();
 
-  Real x = prob_lo[0] + (i+0.5_rt)*dx[0];
+  // Real x = prob_lo[0] + (i+0.5_rt)*dx[0];
   // Real y = prob_lo[1] + (j+0.5_rt)*dx[1];
   // Real z = prob_lo[2] + (k+0.5_rt)*dx[2];
+
   // local vars
   Real rhot,eint,u[3]={0.0};
-  
-  // initial state
-  //if (z < pparm.xshock) { // left of shock
-    rhot =  pparm.rho_oo;
-    u[0] =  pparm.u_oo;
-    eint =  pparm.eint_oo;
-  // }
-  // else {                  // after shock
-  //   rhot =  pparm.rho_r;
-  //   u[0] =  pparm.u_r; 
-  //   eint =  pparm.eint_r;
-  // }
+  Real Yt[NUM_SPECIES] ={0.0};
 
-  state(i, j, k, cls.URHO) = rhot;
+  // initial state
+  rhot =  pparm.rho_oo;
+  u[0] =  pparm.u_oo;
+  eint =  pparm.rho_oo*pparm.eint_oo;
+  
+  Yt[CO2_ID]   = pparm.Yco2_oo;
+  Yt[AR_ID]    = pparm.Yar_oo;
+
   state(i, j, k, cls.UMX)  = rhot * u[0];
   state(i, j, k, cls.UMY)  = rhot * u[1];
   state(i, j, k, cls.UMZ)  = rhot * u[2];
   state(i, j, k, cls.UET)  = eint + Real(0.5) * rhot * u[0] * u[0] ; 
+  for (int n = 0; n < NUM_SPECIES; ++n) {
+    state(i, j, k, cls.UFS + n) = rhot * Yt[n];
+  }
   
 
 }
@@ -181,17 +185,16 @@ void user_tagging(int i, int j, int k, int nt, auto& tagfab, const auto &sdatafa
   Real rhofluc_threshold[6] = {0.3_rt,0.6_rt,0.9_rt,1000_rt,1000_rt,1000_rt};
 
   
-  int URHO = ProbClosures::URHO; 
-  // refine close to grads of density 
+  int URHO = ProbClosures::UFS + 1; // rho ~ rho*YCO2 
+  // refine close to grads of rho*YCO2 
   Real drhox = std::abs(sdatafab(i+1,j,k,URHO) - sdatafab(i-1,j,k,URHO))*0.5;
   Real drhoy = std::abs(sdatafab(i,j+1,k,URHO) - sdatafab(i,j-1,k,URHO))*0.5;
   Real drhoz = std::abs(sdatafab(i,j,k+1,URHO) - sdatafab(i,j,k-1,URHO))*0.5;
-  Real rhop  = sdatafab(i,j,k,URHO);
+  Real rhop  = sdatafab(i,j,k,URHO) + 1.e-8;
   Real rhofluc = std::sqrt(drhox*drhox + drhoy*drhoy + drhoz*drhoz)/rhop ;
 
   // rho flux is relative drho in a cell
-
-  tagfab(i,j,k) = (rhofluc > rhofluc_threshold[level]);
+  //tagfab(i,j,k) = (rhofluc > rhofluc_threshold[level]);
 
   // always refine close to body (at all levels)
   // use ghost points to refine
@@ -217,7 +220,7 @@ bcnormal(const amrex::Real x[AMREX_SPACEDIM], amrex::Real dratio, const amrex::R
          const int idir, const int sgn, const amrex::Real time,
          amrex::GeometryData const& /*geomdata*/,  ProbClosures const& closures, ProbParm const& pparm)  
 {
-  const int URHO = ProbClosures::URHO;
+  const int UFS  = ProbClosures::UFS;
   const int UMX  = ProbClosures::UMX;
   const int UMY  = ProbClosures::UMY;
   const int UMZ  = ProbClosures::UMZ;
@@ -226,13 +229,19 @@ bcnormal(const amrex::Real x[AMREX_SPACEDIM], amrex::Real dratio, const amrex::R
 
   switch(face)
   {    
+    case  -1:  // EAST
+      break; 
     case   1:  // WEST
-      // inflow
-      s_ext[URHO] = pparm.rho_oo;
+      // inflow      
       s_ext[UMX]  = pparm.rho_oo * pparm.u_oo;
       s_ext[UMY]  = 0.0;
       s_ext[UMZ]  = 0.0;
-      s_ext[UET]  = pparm.eint_oo + pparm.kin_oo;      
+      s_ext[UET]  = pparm.rho_oo *pparm.eint_oo + pparm.kin_oo;      
+      
+      s_ext[UFS + N2_ID]  =  0.0;  
+      s_ext[UFS + CO2_ID] =  pparm.rho_oo*pparm.Yco2_oo;  
+      s_ext[UFS + AR_ID]  =  pparm.rho_oo*pparm.Yar_oo;  
+      
       break;  
     default:
       break;
@@ -265,17 +274,18 @@ class ibm_user_t
       // zerograd temperature
       q(1,cls_t::QT)    = q(2,cls_t::QT);
 
-// #if NUM_SPECIES > 1    
-//       Real Yw[NUM_SPECIES]={0.0};
-//       Real sumY = 0.0;
-//       for (int n = 0; n < NUM_SPECIES; ++n) {
-//         Yw[n]   =  q(2,cls_t::QFS+n);
-//         sumY + = sumY;
-//       }
-//       for (int n = 0; n < NUM_SPECIES; ++n) { 
-//         q(1,cls_t::QFS+n)   =  Yw[n]/sumY;
-//       }
-// #endif                      
+      // zerograd species (normalise so sum(Y)=1)
+#if NUM_SPECIES > 1          
+      Real Yw[NUM_SPECIES] ={0.0};
+      Real sumY = 0.0;
+      for (int n = 0; n < NUM_SPECIES; ++n) {
+        Yw[n]   =  q(2,cls_t::QFS+n);
+        sumY += Yw[n];
+      }
+      for (int n = 0; n < NUM_SPECIES; ++n) { 
+        q(1,cls_t::QFS+n)   =  Yw[n]/sumY;
+      }
+#endif                      
      
       // locate the SRP
       
@@ -290,9 +300,15 @@ class ibm_user_t
         q(1,cls_t::QU)    = param::u_srp; 
         q(1,cls_t::QPRES) = param::Pt; 
         q(1,cls_t::QT)    = param::Tt;         
+        // SRP-jet composition  (pure Nitrogen)
+        Real Yjet[NUM_SPECIES] ={0.0};
+        Yjet[N2_ID] = 1.0; 
+        for (int n = 0; n < NUM_SPECIES; ++n) {
+          q(1,cls_t::QFS+n) = Yjet[n];         
+        }
+      }
 
-
-        // std::cout << " Pt = " << param::Pt  << std::endl; 
+              // std::cout << " Pt = " << param::Pt  << std::endl; 
         // std::cout << " Tt = " << param::Tt << std::endl; 
         // std::cout << " ut = " << param::u_srp << std::endl;         
         // printf(" norm %f %f %f \n", norm(0),norm(1),norm(2));
@@ -300,7 +316,6 @@ class ibm_user_t
         // std::cout << " P0 = " << param::P0  << std::endl; 
         // std::cout << " T0 = " << param::T0  << std::endl; 
         // std::cout << " T0srp = " << param::T0srp  << std::endl;                 
-      }
 
 
 

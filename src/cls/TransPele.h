@@ -4,8 +4,15 @@
 #ifdef USE_PELEPHYSICS
 #include <PelePhysics.H>
 
+// v23
 static pele::physics::transport::TransportParams<
-    pele::physics::PhysicsType::transport_type> trans_parms;
+       pele::physics::PhysicsType::transport_type> trans_parms;
+
+// v25       
+// static pele::physics::transport::TransParm<
+// pele::physics::PhysicsType::eos_type,
+// pele::physics::PhysicsType::transport_type> trans_parms;
+
 
 #endif
 ////////////////////////////////TRANSPORT/////////////////////////////////
@@ -20,7 +27,8 @@ class transport_Pele_t {
   AMREX_GPU_HOST_DEVICE
   transport_Pele_t()
   {
-   // trans_parms.allocate(); 
+   // trans_parms.allocate();    
+    //trans_parms.initialize();
   }
 
 

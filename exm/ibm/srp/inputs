@@ -2,7 +2,7 @@
 #                                 INPUT FILE
 #------------------------------------------------------------------------------#
 # start time is assumed to be 0, unless re-starting
-max_step  = 20000
+max_step  = 5000
 stop_time = 10.0
 #time_step = 1.0e-5
 cfl = 0.3
@@ -32,7 +32,7 @@ geometry.prob_hi     =   1.5    1.75     1.75
 amr.n_cell           =   64    64   64
 
 #-------------------------------- REFINEMENT / REGRIDDING ---------------------#
-amr.max_level        = 4       # maximum level number allowed
+amr.max_level        = 3       # maximum level number allowed
 amr.ref_ratio       = 2  # refinement ratio
 amr.regrid_int      = 20   # how often to regrid
 amr.blocking_factor_x = 8  # blocking factor in x per level
@@ -47,7 +47,7 @@ amr.grid_eff        = 0.8     # what constitutes an efficient grid
 #-------------------------------- PLOTFILES -----------------------------------#
 amr.plot_files_output = 1
 amr.plot_file         = ./plot/plt # root name of plotfile
-amr.plot_int          = 100     # number of timesteps between plotfiles
+amr.plot_int          = 50     # number of timesteps between plotfiles
 amr.derive_plot_vars  = pressure velocity temperature
 amr.v = 1 # 0=quiet, 1=verbose
 
@@ -56,3 +56,10 @@ amr.checkpoint_files_output = 0
 #amr.check_int               = 100    # number of timesteps between checkpoints
 
 amrex.the_arena_is_managed=1 # NOTE: computing markers on CPU relies on this option
+
+# Chemical Options
+cns.reactor_type = "ReactorCvode"
+cvode.solve_type =  "dense_direct"
+ode.clean_init_massfrac = 1
+
+

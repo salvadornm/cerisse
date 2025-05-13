@@ -474,7 +474,7 @@ void computeGPs(const MFIter& mfi, const Array4<Real>& cons, const Array4<Real>&
   //auto const imp_xyz = ibFab.gpData.imp_xyz.data();
 
   ParallelFor(ibFab.gpData.ngps, [=,copy=this] AMREX_GPU_DEVICE (int ii)
-    {
+  {
 
 // #if TEST_IB_INTERPOLATION
     // printf("GP %d -------\n",ii);
@@ -499,8 +499,15 @@ void computeGPs(const MFIter& mfi, const Array4<Real>& cons, const Array4<Real>&
 
       Array2D<Real,0,eorder_tparm+1,0,cls_t::NPRIM-1> primsNormal={0.0};
       copy->interpolateIMs(imp_ip_ijk[ii],imp_ipweights[ii],prims,primsNormal);
-      // printf("norm: %f %f %f\n", norm[ii](0), norm[ii](1), norm[ii](2) );
-      // printf("IP vel: %f %f %f\n", primsNormal(2,cls_t::QU), primsNormal(2,cls_t::QV), primsNormal(2,cls_t::QW));
+
+      
+      // snm
+      //  for (int nn=0; nn<cls_t::NPRIM; nn++) 
+      //  {
+      //  printf("prims(2,%d)=%f \n",nn,primsNormal(2,nn));
+      //  }
+      //  printf(" ----\n");
+
 
       // transform velocity to local coordinates for image points only
       for (int iip=2; iip<2+eorder_tparm; iip++) {
@@ -512,11 +519,27 @@ void computeGPs(const MFIter& mfi, const Array4<Real>& cons, const Array4<Real>&
       // compute surface values based on wallmodel  (set u,P,T,Y)      
       wallmodel::compute_surfIB(ib_xyz[ii],norm[ii],primsNormal,cls);   
       
+      // snm
+      //  for (int nn=0; nn<cls_t::NPRIM; nn++) 
+      //  {
+      //  printf("prims(1,%d)=%f \n",nn,primsNormal(1,nn));
+      //  }
+      //  printf(" ----\n");
+
       // only extrapolate to GP the values of  u,P,T,Y
       copy->extrapolate(primsNormal, disGP[ii], disIM[ii]);  
       // transform velocity back to global coordinates (GP only)
       int idx=0;
       copy->local2global(idx,primsNormal,norm[ii],tan1[ii],tan2[ii]);      
+
+
+      // snm
+      // for (int nn=0; nn<cls_t::NPRIM; nn++) 
+      //  {
+      //  printf("prims(0,%d)=%f \n",nn,primsNormal(0,nn));
+      //  }
+      //  printf(" ----\n");
+
       ///.  copy primsNormal  -> Q
       Real P,T,Y[NUM_SPECIES]={0.0};
       P = primsNormal(0,cls_t::QPRES);
@@ -529,8 +552,7 @@ void computeGPs(const MFIter& mfi, const Array4<Real>& cons, const Array4<Real>&
       Real ux =  primsNormal(0,cls_t::QU);
       Real uy =  primsNormal(0,cls_t::QV);
       Real uz =  primsNormal(0,cls_t::QW);
-      ///.
-
+            
       // ensure Thermodynamic consistency and that the prims array is filled
       Real Q[cls->NPRIM];
       cls->ensurePTYfillq(P, T, Y, ux,uy,uz,Q); 
@@ -538,18 +560,10 @@ void computeGPs(const MFIter& mfi, const Array4<Real>& cons, const Array4<Real>&
       // insert primitive variables into primsFab
       int i=gp_ijk[ii](0); int j=gp_ijk[ii](1); int k = gp_ijk[ii](2);
       for (int nn=0; nn<cls_t::NPRIM; nn++) {
-        // prims(i,j,k,nn) = primsNormal(0,nn);
-        prims(i,j,k,nn) = Q[nn];
+        prims(i,j,k,nn) = Q[nn];       
       }
 
-      // insert conservative ghost state into consFab
-      // cons(i,j,k,cls_t::URHO) = primsNormal(0,cls_t::QRHO);
-      // cons(i,j,k,cls_t::UMX)  = primsNormal(0,cls_t::QRHO)*primsNormal(0,cls_t::QU);
-      // cons(i,j,k,cls_t::UMY)  = primsNormal(0,cls_t::QRHO)*primsNormal(0,cls_t::QV);
-      // cons(i,j,k,cls_t::UMZ)  = primsNormal(0,cls_t::QRHO)*primsNormal(0,cls_t::QW);
-      // Real ek   = 0.5_rt*(primsNormal(0,cls_t::QU)*primsNormal(0,cls_t::QU) + primsNormal(0,cls_t::QV)* primsNormal(0,cls_t::QV) + primsNormal(0,cls_t::QW)*primsNormal(0,cls_t::QW));
-      // cons(i,j,k,cls_t::UET) = primsNormal(0,cls_t::QPRES)/(cls->gamma-1.0_rt) + primsNormal(0,cls_t::QRHO)*ek;
-      });
+    });
 };
 
 
@@ -740,7 +754,7 @@ private:
     Real sumY = 0.0;
     for (int n = 0; n < NUM_SPECIES; ++n) {
       Yw[n]   =  primsNormal(2,cls_t::QFS+n);
-      sumY + = sumY;
+      sumY += sumY;
     }
     for (int n = 0; n < NUM_SPECIES; ++n) { 
       primsNormal(1,cls_t::QFS+n)   =  Yw[n]/sumY;

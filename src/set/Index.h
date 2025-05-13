@@ -73,7 +73,7 @@ static constexpr int CLAM=2;  // heat conductivity
 static constexpr int CRHOD=3; // species diffusivity (rho*D)
 
 static constexpr int NCONS = UFS + NUM_SPECIES;
-static constexpr int NPRIM = QLASTVAR + NUM_SPECIES;
+static constexpr int NPRIM = QLASTVAR + 1;
 static constexpr int NWAVES=2 + NUM_SPECIES;
 static constexpr int NCOEF= 3 + NUM_SPECIES;
 static constexpr int NGHOST=3; // TODO: make it an automatic parameter
