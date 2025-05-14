@@ -346,6 +346,48 @@ $$
 \frac{\partial abc }{\partial x} \right)
 $$
 
+
+# Time Marching
+
+## Expict Runge-Kutta second order (RK2)
+
+A Runge-Kutta 2-stage, 2nd-order method is a time integration scheme 
+that uses two evaluations (stages) of the right-hand side function (RHS)
+per timestep and achieves second-order accuracy in time.
+
+
+$$
+U^{n+1/2} = U^n + \frac{\Delta t}{2} RHS(U^n)
+$$
+
+$$
+U^{n+1} = U^n + \Delta t RHS(U^{n+1/2})
+$$
+
+
+### Strong Stability Preserving Runge-Kutta
+
+The SSPRK(Strong Stability Preserving Runge-Kutta, n-stage, m-order) scheme is a time integration method designed to preserve the strong stability properties (e.g., total variation diminishing, monotonicity) of certain spatial discretizations when applied to hyperbolic PDEs
+
+Some spatial discretizations (like TVD schemes) are non-oscillatory and stable under forward Euler time stepping with a small enough timestep.
+SSP Runge-Kutta schemes extend this stability to higher-order time integrators by writing the method as a convex combination of forward Euler steps.
+
+$$
+\begin{aligned}
+u^{(0)} &= u^n, \\
+u^{(i)} &= \sum_{j=0}^{i-1} \left( \alpha_{i,j} u^{(j)} + \Delta t \, \beta_{i,j} L(u^{(j)}) \right), \quad i = 1, 2, \dots, s, \\
+u^{n+1} &= u^{(s)}.
+\end{aligned}
+$$
+
+To ensure strong stability preservation, the method must satisfy:
+
+- $\alpha_{i,j} \geq 0$, $\beta_{i,j} \geq 0$
+- $\sum_{j=0}^{i-1} \alpha_{i,j} = 1$ (convex combination)
+- Each stage $u^{(i)}$ is a convex combination of forward Euler steps
+
+
+
 ### References
 
 \[1]: Morinishi, Y. (1995). Conservative properties of finite difference schemes for incompressible flow. [Center for Turbulence Research Annual Research Briefs](https://ntrs.nasa.gov/citations/19960022304)

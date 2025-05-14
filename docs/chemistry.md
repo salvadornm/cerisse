@@ -35,7 +35,9 @@ make TPL
 
 ## Chemical Mechanisms
 
-The chemical mechanism are located in `PelePhysics/Support/Mechanism/Models`
+The chemical mechanism are located in `PelePhysics/Support/Mechanism/Models` 
+(PelePhysics **v23**) or `PelePhysics/Mechanisms` (PelePhysics **v25**), this has the
+samne name as `CHEMISTRY_MODEL` in the `GNUMakefile`
 
 ```bash
 $ ls lib/PelePhysics/Support/Mechanism/Models
@@ -54,7 +56,10 @@ Kolla           chem-H              heptane_3sp
 LiDryer         converter.sh        heptane_fc
 ```
 
-All of them are in _yaml_ fromat used in [Cantera](https://cantera.org). The list of chemical mechanisms directlly available can be obtained direclty by `$cat PelePhysics/Support/Mechanism/Models/list_mech` with a few more that use QSSA (see `list_qss_mech` file). Opening the `mechanism.yaml` file within a directory, will give an indication of the species involved and chemical reactions
+A local mechanism can be used by setting `USE_LOCALCHEM = TRUE` and specify a `LOCALCHEM_PATH` (absolute path) in GNUMakefile. To build the code, the mechanism folder need sa `mechanism.H`, 
+`mechanims.cpp` and a `Make.package` file (see example of local chemistry `exm\ibm\srp\`).
+
+All mechanisms are derived from _yaml_ format used in [Cantera](https://cantera.org). The list of chemical mechanisms directlly available can be obtained direclty by `$cat PelePhysics/Support/Mechanism/Models/list_mech` with a few more that use QSSA (see `list_qss_mech` file). Opening the `mechanism.yaml` file within a directory, will give an indication of the species involved and chemical reactions.
 
 For example, in the Jones and Lindstedt mechanism (a 4-step process for hydrocarbon combustion), seven species are used. The label **phases** indicates which chemical components will be included.
 
@@ -95,7 +100,7 @@ species:
   ...
 ```
 
-Similarly the **reactions** label describes the chemical reactiosn used.
+Similarly the **reactions** label describes the chemical reactions used.
 
 ```
 reactions:
@@ -112,6 +117,36 @@ See details of yaml format in [YAML](https://cantera.org/tutorials/yaml/defining
 ### Generate a new mechanism
 
 For all the available mechanisms, a Cantera yaml format is provided. If CHEMKIN files are present Pelephysics rely on Cantera’s _**ck2yaml**_ utility to convert CHEMKIN files to the Cantera yaml format. They are converter scripts to faciliatte this process. Check [PelePhysics Tutorial](https://pelephysics.readthedocs.io/en/latest/EOS.html)
+
+Once the mechanism.yaml is generated, is good idea to check that is readable by 
+Cantera (scripts in `tools/combustion` can be helpful).
+The yaml format needs to generate two chemistry-specific files: `mechanism.cpp` and `mechanism.H`.
+These are the files that Cerisse/Pele code need to run. 
+To convert  use the CLI utility `ceptr` (located in `Pelephysics/Support/ceptr`). 
+This requires the [poetry](https://python-poetry.org/docs/) package manager. 
+
+Beware that
+`ceptr` requires Python version between (>=3.8 and <3.11). Is best to work with environments, 
+**pyenv**,
+**conda** or similar. This may require careful python install (see tips)
+
+The script command is then
+```bash
+$ cd ${PELE_PHYSICS_HOME}/Support/ceptr
+$ poetry run convert -f ${PATH_TO_CHEMISTRY}/mechanism.yaml
+```
+This will create the required files in  `${PATH_TO_CHEMISTRY}`
+
+A similar script can be used to convert CHEMKIN files to yaml (and later to C++)  
+
+```bash
+$ cd ${PELE_PHYSICS_HOME}/Support/ceptr
+$ poetry run ck2yaml --input ${PATH_TO_CHEMISTRY}/mechanism.inp 
+--thermo ${PATH_TO_CHEMISTRY}/therm.dat --transport ${PATH_TO_CHEMISTRY}/tran.dat --permissive 
+```
+
+More details in Cantera [CK2YAML](https://cantera.org/3.1/userguide/ck2yaml-tutorial.html) documentation
+
 
 ## Equations of State
 

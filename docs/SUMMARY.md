@@ -41,5 +41,8 @@
   * [Thermo Solver](thermosolver.md)
   * [Advance Step](code/advance.md)
   * [EBM Solver](code/ebm.md)
+  * [IBM Solver](code/ibm.md)
   * [Viscous Solver](code/viscous.md)
+  * [Bugs](code/bugs.md)
+  * [Performance](code/performance.md)
 

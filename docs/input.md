@@ -66,6 +66,21 @@ If option "0" is selected, the corresponding `geometry.is_periodic` must also be
 
 If option "1" is selected, the `bcnormal` function in `prob.H` will be activated (see boundary conditions).
 
+### Time Marching
+
+| Option         | Type       | Default | Description                           |
+| -------------- | ---------- | ------- | ------------------------------------- |
+| **cns.order\_rk** | Int |         | Order of RK  (-2/0/1/2/3)|
+| **cns.stages\_rk** | Int |         | RK stages  (1/2/3)|
+
+*Runge-Kutta order options*
+
+`-2`   Original RK2 Scheme
+`0`    (for testing) returns RHS 
+`1`    Euler scheme
+`2`    Low storage Runge-Kutta  second order SSPRK(m,2) with *m* stages 
+`3`    Third order SSP Runge-Kutta  (options stages 3 or 4)
+
 ### Geometry EB options
 
 In the **input** file, users should specify the geometry of the embedded boundary with `eb2.geom_type`, then supply the required parameters in the format of `eb2.{geom_param}`.

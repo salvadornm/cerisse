@@ -58,8 +58,16 @@ $ git checkout AmazingNewFeature
 $ git rebase develop        # fix any identified conflicts between "develop" and "AmazingNewFeature" 
 ```
 
-3. To mare sure the feature does not bertak the code do test
+3. To mare sure the feature does not break the code, run a regression test by
 
 ```bash
 $ cerisse test
 ```
+Similarly check for compilation across examples to prevent breaking options.
+In the `/bin` directory
+
+```bash
+$ ./checkcompilation.sh
+```
+This will test compilation across multiple examples. This will take up to 10 minutes and
+assumes third party libraries hav ebeen installed (PelePhysics and CGAL)

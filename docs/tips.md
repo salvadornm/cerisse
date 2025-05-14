@@ -4,7 +4,9 @@ icon: info
 
 # Tips
 
-Small tips on installation of auxiliary files and scripts
+This page shos some small tips reagarding installation of auxiliary files and scripts,
+that may help with the workflow of the simulatiom.
+It is also wseful to check the Errors page (CHECK) for common mistakes.
 
 ## yt
 
@@ -28,7 +30,7 @@ In recent systems (for example Ubuntu 24), the use of virtual environments is en
 $ source ~/virtual/bin/activate
 ```
 
-You will need to do this to install python package, such as yt and markdown, required for postprocessing or managing the documentation.
+You will need to do this to install python packages, such as *yt* and *markdown*, required for postprocessing or managing the documentation.
 
 ## Cerisse script
 
@@ -52,7 +54,57 @@ Althoigh the main documentation is onine in Gitbooks. It is possible to generate
 
 You may need to install the `python-markdown-math` extension for rendering equations and the `markdown-callouts` extension for correctly displaying the warning and note blocks. For help editing the documentation visit [mkdocs.org](https://www.mkdocs.org).
 
-### Running on Imperial's HPC
+
+## Python environments (for poetry)
+
+1- Make sure `libffi-dev` dependency is installed (other prerequisites may be needed)
+
+```bash
+$ sudo apt install libffi-dev
+```
+
+2-Install `pyenv`
+
+```bash
+$ curl https://pyenv.run | bash
+```
+
+3-Add to your shell `~/.bashrc`
+
+```bash
+export PATH="HOME/.pyenx/bin:$PATH"
+eval "$(pyenv init --path)"
+eval "$(pyenv init -)"
+```
+
+4-Install a specific python version (<3.11 is required for *ceptr*, see chemistry)
+
+```bash
+$ pyenv install 3.10
+```
+
+4-Create a virtual environment (named `myenv-310` for example)
+
+```bash
+$ pyenv shell 3.10
+$ python -m venv ~/myenv-310
+```
+
+To use
+
+```bash
+$ source ~/myenv-310/bin/activate
+```
+
+Install packages as usual  (for example cantera)
+
+```bash
+$ pip install  cantera 
+```
+
+
+
+### Running on Imperial HPC
 
 To run on Imperial's CX2/3, you need to load the following modules
 
@@ -81,7 +133,8 @@ mpirun ./Cerisse3d.gnu.MPI.ex inputs
 
 NOTE: There is an issue with MPI version >2020b on CX3 that causes deadlocks when writing chk or plt files.
 
-#### Legacy (intel-2019.8.254)
+
+**Legacy (intel-2019.8.254)**
 
 Below is for running with Intel MPI 2019, which is unrecommended by RCS but still works.
 
