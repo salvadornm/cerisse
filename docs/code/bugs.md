@@ -1,93 +1,102 @@
-# Common errors
+# Bugs
+
+## Common errors
 
 This section outlines common errors, their possible causes, and suggested solutions.
 
-## input file
+### input file
 
-ERROR
 ```
 SIGABRT
 Domain size not divisible by blocking_factor
 ```
 
-**Cause:**  
+**Cause:**\
 The mesh domain size is not divisible by the specified `blocking_factor`.
 
-**Fix:**  
-- Ensure that each domain dimension is divisible by the `blocking_factor`.  
-- If embedded boundaries (EB) are used, ensure the mesh is isotropic, i.e., `dx = dy = dz`.
+**Fix:**
 
-## IBM related
+* Ensure that each domain dimension is divisible by the `blocking_factor`.
+* If embedded boundaries (EB) are used, ensure the mesh is isotropic, i.e., `dx = dy = dz`.
 
-ERROR  via ASSERT
+### IBM related
+
 ```
+ERROR via ASSERT
 Interpolation point weights do not sum to 1
 ```
 
-**Cause:**  
+**Cause:**\
 Presence of extremely thin surfaces prevents valid grid points (GP) from being placed in solid regions.
 
-**Fix:**  
-- Refine the mesh, or  
-- Coarsen the geometry to ensure proper interpolation.
+**Fix:**
 
-ERROR via ASSERT
+* Refine the mesh, or
+* Coarsen the geometry to ensure proper interpolation.
+
 ```
+ERROR via ASSERT
 Grid point on IB surface
 ```
 
-**Cause:**  
+**Cause:**\
 A grid point lies exactly on the immersed boundary (IB) surface, which is ambigous.
 
-**Fix:**  
-- Slightly shift the domain to prevent grid lines from aligning exactly with the surface.
+**Fix:**
 
+* Slightly shift the domain to prevent grid lines from aligning exactly with the surface.
 
-WARNING
 ```
+WARNING
 Less than 2 interpolation points are fluid points !
 ```
 
-**Cause:**  
+**Cause:**\
 The geometry is too detailed relative to the mesh resolution.
 
-**Fix:**  
-- Clean or simplify the STL geometry (recommended), or  
-- Refine the mesh in that region
+**Fix:**
 
- **Note:** This is a warning, but the simulation may crash in affected areas.
+* Clean or simplify the STL geometry (recommended), or
+* Refine the mesh in that region
 
+{% hint style="warning" %}
+This is a warning, but the simulation will probably crash in theaffected areas.
+{% endhint %}
 
-## Chemistry related
+### Chemistry related
 
 While compiling
+
 ```
 fatal error: mechanism.H
 ```
 
-**Cause:**  
-- The selected chemical mechanism in the `GNUMakefile` is not available (e.g., *JL4* in PelePhysics v23), or  
-- The mechanism does not exist.
+**Cause:**
 
-**Fix:**  
-- Check whether the mechanism is supported in your PelePhysics version (e.g., v25).  
-- Alternatively, convert your chemistry input from CHEMKIN or YAML format using available tools (CHECK).
+* The selected chemical mechanism in the `GNUMakefile` is not available (e.g., _JL4_ in PelePhysics v23), or
+* The mechanism does not exist.
 
+**Fix:**
 
-# Known bugs
+* Check whether the mechanism is supported in your PelePhysics version (e.g., v25).
+* Alternatively, convert your chemistry input from CHEMKIN or YAML format using available tools&#x20;
 
+## Known bugs
 
-## IBM-Specific Bug
+### IBM-Specific
 
-**Issue:**  
+{% hint style="danger" %}
+**Issue:**\
 Mesh refinement fails near the immersed body at simulation step 0.
+{% endhint %}
 
-**Workaround:**  
+**Workaround:**\
 Apply solid marker-based refinement only after time step 0 using a condition like:
 
-
-**Issue:**  
+{% hint style="danger" %}
+**Issue:**\
 Restarts using checkpoints and IBM must have the same number of levels.
+{% endhint %}
 
-**Workaround:**  
+**Workaround:**\
 NRY

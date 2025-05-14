@@ -8,7 +8,7 @@ Turbulent Combustion model
 
 ## ATF
 
-The Artificial Thickening Method (ATF) approach essentially involves "thickening" the flame, allowing the mesh to resolve the scalar gradients across it. This serves a dual purpose: it enables capturing the flame dynamics and reduces numerical diffusion errors associated with resolving the sharp scalar jumps in the flame. The aim of ATF methods is to achieve adequate resolution within the flame front (_i.e._, the region with the sharpest gradients) on the transformed mesh, even when the coarse LES mesh lacks sufficient resolution. The geometry transformation ratio, denoted as $$\mathcal{F}$$, is referred to as the thickening factor.
+The **Artificial Thickening Method** (ATF) approach essentially involves "thickening" the flame, allowing the mesh to resolve the scalar gradients across it. This serves a dual purpose: it enables capturing the flame dynamics and reduces numerical diffusion errors associated with resolving the sharp scalar jumps in the flame. The aim of ATF methods is to achieve adequate resolution within the flame front (_i.e._, the region with the sharpest gradients) on the transformed mesh, even when the coarse LES mesh lacks sufficient resolution. The geometry transformation ratio, denoted as $$\mathcal{F}$$, is referred to as the thickening factor.
 
 $$
 \frac{\partial \rho Y_k}{\partial \tau} +\frac{\partial \rho u_i Y_k}{\partial \xi_i}= \frac{\partial}{\partial \xi_i }\left(\rho D \mathcal{F}\frac{\partial Y_k}{\partial \xi_i}\right) + \frac{ \dot{\omega}}{\mathcal{F}}
@@ -32,11 +32,27 @@ $$
 \mathcal{E} \approx 1+\beta \Delta \vert <\nabla  \vec{n} >_{sgs}\vert
 $$
 
-where $$\beta$$ is a constant and $$\vert <\nabla \vec{n} >_{sgs}\vert$$ is the SGS surface curvature.
+where $$\beta$$ is a constant and $$\vert <\nabla \vec{n} >_{sgs}\vert$$ is the sub-grid surface curvature.
 
 ## PasR
 
-The Partially Stired Reactor Model
+Broadly speaking,  the **Partially Stirred Reactor Model** (PaSR) model assumes that within a computational cell (or sub-grid region), the reacting mixture is represented by a **statistical ensemble** of **partially stirred reactors**. The core idea is that **chemical reactions** and **mixing** occur over **separate timescales:** $$\tau_c$$  A **chemical reaction timescale,** $$\tau_c$$ , and a turbulent mixing timescale, $$\tau_{sgs}$$. The filtered reaction rate of i-species  scales with
+
+$$
+\dot{\omega}_i^{\text{PaSR}} = \frac{\tau_{c}}{\tau_{sgs} + \tau_{\text{c}}} \cdot \dot{\omega}_i (\overline{\phi}) = \gamma^\ast \dot{\omega}_i
+$$
+
+Or introducing the sub-grid Damkholer number $$\text{Da}_{sgs} \equiv \tau_{sgs}/\tau_c$$ then
+
+$$
+\gamma^\ast = \frac{1}{1 + \text{Da}_{sgs}}
+$$
+
+If sub-grid turbulent mixing is fast relative to chemistry, reactions take place in a well-mixed environment. $$\gamma^\ast \rightarrow 1$$ If chemistry is fast, chemical equilibrium is sough   $$\gamma^\ast \rightarrow 0$$. This is similar to the **Eddy Dissipation Concept** (EDC) where turbulence causes reactions to only take place in localized pockets (**fine structure**) and $$\gamma^\ast$$ represents the volume fraction of these pockets
+
+{% hint style="danger" %}
+To write
+{% endhint %}
 
 ## Eulerian Stochastic Fields
 

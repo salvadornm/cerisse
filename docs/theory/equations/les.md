@@ -125,7 +125,7 @@ The length scale $$l_{sgs}= C_S \Delta$$ is a sub-grid length scale, which can b
 
 #### WALE
 
-The eddy viscosity in the WALE model \[1] is computed&#x20;
+The eddy viscosity in the WALE model [\[1\]](les.md#references) is computed&#x20;
 
 $$
 \mu_{sgs}  = \bar{\rho} (C_w \Delta) ^2  
@@ -151,10 +151,10 @@ $$
 where $$D_{sgs}$$ is the sub-grid diffusivity, which taken proportional to sub-grid viscosity
 
 $$
-\bar{\rho}  D_{sgs} = \frac{\mu_{sgs}}{Sc_{sgs}}
+\bar{\rho}  D_{sgs} = \frac{\mu_{sgs}}{\text{Sc}_{sgs}}
 $$
 
-with $$Sc_{sgs}$$ a constant often taken as 0.4-1.
+with $$\text{Sc}_{sgs}$$ a constant often taken as 0.4-1.
 
 In conventional LES, fluctuations of transport properties are assumed to be small within the filter width and therefore, molecular fluxes can be approximated by
 
@@ -162,7 +162,7 @@ $$
 \overline{q}_j \approx - \lambda (\tilde{T}) \frac{\partial \tilde{T}}{\partial x_j}
 $$
 
-Molecular fluxes scale with $$Re^{-1}$$, making them relatively small in turbulent flows. Consequently, errors associated with molecular transport properties often (but not always)  have a small  impact in the solution.
+Molecular fluxes scale with the inverse of Reynolds number, $$\text{Re}^{-1}$$, making them relatively small in turbulent flows. Consequently, errors associated with molecular transport properties often (but not always)  have a small  impact in the solution.
 
 #### References
 

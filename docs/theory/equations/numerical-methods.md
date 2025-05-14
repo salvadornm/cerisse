@@ -4,9 +4,11 @@ icon: function
 
 # Numerical Methods
 
+## Numerical Methods
+
 Cerisse has implemented several numerical methods within the finite volume framework. While most of these methods are designed for high-speed flows, not all are limited to such cases. The method discussed here specifically addresses the Euler (convective) term of the equations. In compressible flows, high-frequency noise can accumulate when physical scales are not adequately resolved, especially near discontinuities. To mitigate this, many methods either directly filter or dissipate the noise, or use upwind-type stencils that indirectly introduce dissipation. It is important to note that no perfect numerical scheme exists; a compromise must be made between accuracy, speed, and stability. In the sections below, a brief overview of the rationale behind the numerical methods is provided. This description is not exhaustive, and the reader is encouraged to refer to the original papers for a more comprehensive explanation.
 
-## HLLC Riemann Solver
+### HLLC Riemann Solver
 
 Cerisse employs the Harten-Lax-van Leer Contact (HLLC) solver, developed by Toro et al. (1994). The HLLC solver enhances approximate Riemann Solvers by incorporating the intermediate contact wave, a feature that is particularly crucial for accurate modelling in reactive flows applications.
 
@@ -26,7 +28,7 @@ $$
 
 The corresponding flux $$F_{RP}$$ is just $$F_{RP}=F(U_{RP})$$.
 
-### The Average State
+#### The Average State
 
 Assuming the sonic waves speeds, $$S_L$$ and $$S_R$$ are known, we need $$S_M$$ to estimate the intermediate average states $$U^\ast$$. The normal velocity and the pressure do not change across a contact discontinuity (mechanical equilbrium) and therefore the normal velocity is the contact wave speed
 
@@ -76,7 +78,7 @@ $$
 F_{i+1/2}= F(U_{RP})
 $$
 
-### The Sonic Wave Speed Estimates
+#### The Sonic Wave Speed Estimates
 
 To compute the intermediate states the sonic wave speeds ($$S_L,S_R$$) are needed. Following Batten, the wave speeds can be obtained from
 
@@ -114,11 +116,11 @@ $$
 r_{\rho}=\sqrt{\rho_r/\rho_l}
 $$
 
-### High order extension
+#### High order extension
 
 The above scheme is formally first-order, a high order extension can be build by using a Total Variation Diminishing (TVD) reconstruction
 
-## Rusanov Scheme
+### Rusanov Scheme
 
 The Rusanov flux is a simple upwind flux that requires a single wave-speed estimate. In the current implementation, it is very compact and can be used to perform quick tests. The numerical flux function is typically given by:
 
@@ -128,7 +130,7 @@ $$
 
 where $$\lambda_i$$ ​ is the local characteristic speed at the i-th cell (often taken as the maximum eigenvalue of the Jacobian of the flux function).
 
-### Skew-symmetric
+#### Skew-symmetric
 
 Numerical errors associated with discretisation can be categorised into truncation and aliasing errors (Kravchenko and Moin, 1997; Lilly, 1965). Therefore, the concept of numerical order alone is insufficient to fully characterize performance. Key properties such as dissipation, dispersion, and conservation are strongly influenced by the discretization scheme used for the convective term. To illustrate this, consider a one-dimensional scalar equation and three possible formulations for the nonlinear, hyperbolic term:
 
@@ -168,7 +170,7 @@ $$
 
 and a fourth-order formulation scheme, despite its built-in de-aliasing properties, remains a derivative of the family of centered schemes. As such, it can still face stability challenges. Additional strategies to mitigate oscillations and effectively handle shock waves follows
 
-#### Artificial dissipation
+**Artificial dissipation**
 
 A way to stabilise the mechanism is through two terms (following Jameson)
 
@@ -218,8 +220,6 @@ $$
 \frac{\partial^2 \Delta U}{\partial x^2} = \frac{ -1 /12 \Delta U_{i+5/2} + 4/3 \Delta U_{i+3/2} - 5/2 \Delta U_{i+1/2} + 4/3 \Delta U_{i-1/2} -1/12 \Delta U_{i-3/2} }{\Delta x^2} + \mathcal{O}(\Delta x^4)
 $$
 
-
-
 the flux is similarly written as
 
 $$
@@ -254,21 +254,76 @@ $$
 
 ### WENO and TENO
 
-Weighted Essentially Non-Oscillatory (WENO) methods, introduced by Liu et al. (1994), employ a nonlinear adaptive procedure to automatically select the locally smoothest stencil. This approach aims to avoid using stencils that cross discontinuities when interpolating the interface flux.
+**Weighted Essentially Non-Oscillatory** (WENO) methods, introduced by Liu et al. (1994), employ a nonlinear adaptive procedure to automatically select the locally smoothest stencil. This approach aims to avoid using stencils that cross discontinuities when interpolating the interface flux.
 
-The WENO family encompasses various variations, which can be further classified. Despite these differences, all WENO methods share a common feature: the interface flux is expressed as a linear combination of fluxes derived from the stencils.
+The WENO family encompasses various variations, which can be further classified. Despite these differences, all WENO methods share a common feature: the interface flux is expressed as **a linear combination of fluxes derived from the stencils.**
 
 $$
-F_{i+1/2} = \sum_s w_s F^s_{i+2}  \; \;  w_s = \frac{\alpha_s}{\sum_s \alpha_s}
+F_{i+1/2} = \sum_k w_k F^{(k)}_{i+2}
 $$
 
 Reconstruction in characteristic variables improves performance, as the post-shock oscillations are reduced. WENO is known to be excessively dissipative in smooth parts of the flow
 
-### TENO
+#### TENO
 
-Designed to reduce numerical dissipation further than WENO (TOWRITE)
+Like WENO, TENO uses multiple **lower-order candidate stencils** to build a **high-order approximation**. But instead of blending them with nonlinear weights, TENO uses a **cutoff function** to **selectively activate only smooth stencils**.
 
-## KEEP
+Given a set of candidate stencils, $$k = 0, ... ,r$$   compute the **polynomial reconstruction** on each stencil:\
+$$\hat{F}^{(k)}$$ using third order or similar. For each stencil, compute a **smoothness indicator** $$\beta_k$$​ (same as in WENO-JS):
+
+$$
+\beta_k = \sum_{l=1}^{r} \int_{x_{i-1}}^{x_{i+1}} \Delta x^{2l-1} \left( \frac{d^l}{dx^l} \hat{F}^{(k)}(x) \right)^2 dx
+$$
+
+In practice, the indicators are precomputed using finite difference formulas. For example:
+
+$$
+\beta_k = \sum_{m=1}^2 c_m \left( \Delta^m \hat{F}^{(k)} \right)^2
+$$
+
+These expressions are designed to measure the oscillation or variation of $$\hat{F}^{(k)}(x)$$, and are minimized when the function is smooth over stencil $$k$$.
+
+TENO introduces a **normalized sensor** $$\tau$$ (like in WENO-Z):
+
+$$
+\tau = | \beta_0 - \beta_r |
+$$
+
+Then define the exponential cutoff function for each stencil:
+
+$$
+\chi_k = \exp\left( - \frac{ \left( {\beta_k}/{\tau + \varepsilon} \right)^q }{\lambda} \right)
+$$
+
+**Turn off** stencils with large smoothness indicators (discontinuities), and use **optimal linear weights**  to combine the rest:
+
+$$
+\gamma_k =
+\begin{cases}
+d_k, & \text{if } \chi_k > \delta \\
+0,   & \text{otherwise}
+\end{cases}
+$$
+
+Normalise the weights
+
+$$
+\omega_k = \frac{\gamma_k}{\sum_j \gamma_j}
+$$
+
+And finally use the same functional form as WENO
+
+$$
+F_{i+1/2} = \sum_k w_k F^{(k)}_{i+2}
+$$
+
+
+
+{% hint style="danger" %}
+Under construction
+{% endhint %}
+
+### KEEP
 
 Central KEEP (_non-dissipative and physically-consistent kinetic energy and entropy preserving_) schemes for compressible flows These scheme are based on splitting the energy equation.
 
@@ -288,8 +343,6 @@ $$
 \frac{\partial \rho e }{\partial t} + \frac{\partial \rho u_j e }{\partial x_j} + p \frac{\partial u_j }{\partial x_j} = 0
 $$
 
-
-
 using the fundamental equation of thermodynmics in differential form
 
 $$
@@ -302,11 +355,9 @@ $$
 \frac{\partial \rho s }{\partial t} + \frac{\partial \rho u_j s }{\partial x_j} = 0
 $$
 
-
-
 The KEEP scheme still need a shock capturing term.
 
-### Split terms
+#### Split terms
 
 Given a function $$f = a b$$, there are two forms to split the derivate
 
@@ -346,15 +397,13 @@ $$
 \frac{\partial abc }{\partial x} \right)
 $$
 
+## Time Marching
 
-# Time Marching
+### Expict Runge-Kutta RK2
 
-## Expict Runge-Kutta second order (RK2)
-
-A Runge-Kutta 2-stage, 2nd-order method is a time integration scheme 
-that uses two evaluations (stages) of the right-hand side function (RHS)
+A Runge-Kutta 2-stage, 2nd-order method is a time integration scheme\
+that uses two evaluations (stages) of the right-hand side function (RHS)\
 per timestep and achieves second-order accuracy in time.
-
 
 $$
 U^{n+1/2} = U^n + \frac{\Delta t}{2} RHS(U^n)
@@ -364,31 +413,31 @@ $$
 U^{n+1} = U^n + \Delta t RHS(U^{n+1/2})
 $$
 
-
 ### Strong Stability Preserving Runge-Kutta
 
-The SSPRK(Strong Stability Preserving Runge-Kutta, n-stage, m-order) scheme is a time integration method designed to preserve the strong stability properties (e.g., total variation diminishing, monotonicity) of certain spatial discretizations when applied to hyperbolic PDEs
+The _Strong Stability Preserving Runge-Kutta_ with n-stage and m-order, **SSPRK(n,m)**,   scheme is a time integration method designed to preserve the strong stability properties (e.g., total variation diminishing, monotonicity) of certain spatial discretizations when applied to hyperbolic PDEs
 
-Some spatial discretizations (like TVD schemes) are non-oscillatory and stable under forward Euler time stepping with a small enough timestep.
-SSP Runge-Kutta schemes extend this stability to higher-order time integrators by writing the method as a convex combination of forward Euler steps.
+Some spatial discretizations (like TVD schemes) are non-oscillatory and stable under forward Euler time stepping with a small enough timestep. SSP Runge-Kutta schemes extend this stability to higher-order time integrators by writing the method as a convex combination of forward Euler steps.
 
 $$
 \begin{aligned}
-u^{(0)} &= u^n, \\
-u^{(i)} &= \sum_{j=0}^{i-1} \left( \alpha_{i,j} u^{(j)} + \Delta t \, \beta_{i,j} L(u^{(j)}) \right), \quad i = 1, 2, \dots, s, \\
-u^{n+1} &= u^{(s)}.
+U^{(0)} &= U^n, \\
+U^{(i)} &= \sum_{j=0}^{i-1} \left( \alpha_{i,j} U^{(j)} + \Delta t \, \beta_{i,j} RHS(U^{(j)}) \right), \quad i = 1, 2, \dots, s, \\
+U^{n+1} &= U^{(s)}.
 \end{aligned}
 $$
 
+
+
+
+
 To ensure strong stability preservation, the method must satisfy:
 
-- $\alpha_{i,j} \geq 0$, $\beta_{i,j} \geq 0$
-- $\sum_{j=0}^{i-1} \alpha_{i,j} = 1$ (convex combination)
-- Each stage $u^{(i)}$ is a convex combination of forward Euler steps
+* $$\alpha_{i,j} \geq 0$$, $$\beta_{i,j} \geq 0$$
+* $$\sum_{j=0}^{i-1} \alpha_{i,j} = 1$$ (convex combination)
+* Each stage $$U^{(i)}$$ is a convex combination of forward Euler steps
 
-
-
-### References
+#### References
 
 \[1]: Morinishi, Y. (1995). Conservative properties of finite difference schemes for incompressible flow. [Center for Turbulence Research Annual Research Briefs](https://ntrs.nasa.gov/citations/19960022304)
 
@@ -409,3 +458,6 @@ To ensure strong stability preservation, the method must satisfy:
 \[9]: Toro, E. F., Spruce, M., and Speares, W. (1994). Restoration of the contact surface in the hll-riemann solver. [Shock waves, 4(1):25–34](https://doi.org/10.1007/BF01414629)
 
 \[10]: Bouheraoua, L. (2014). Simulation aux grandes échelles et modélisation de la combustion supersonique. [PhD thesis](https://theses.hal.science/tel-01197487v1), Rouen, INSA.
+
+\[11]: Shu, C-W. (1988). Total-Variation-Diminishing Time Discretizations. [SIAM Journal of Scientific and Statistical Computing, 9(6):1073-1084](https://epubs.siam.org/doi/abs/10.1137/0909073)
+

@@ -35,8 +35,8 @@ make TPL
 
 ## Chemical Mechanisms
 
-The chemical mechanism are located in `PelePhysics/Support/Mechanism/Models` 
-(PelePhysics **v23**) or `PelePhysics/Mechanisms` (PelePhysics **v25**), this has the
+The chemical mechanism are located in `PelePhysics/Support/Mechanism/Models`\
+(PelePhysics **v23**) or `PelePhysics/Mechanisms` (PelePhysics **v25**), this has the\
 samne name as `CHEMISTRY_MODEL` in the `GNUMakefile`
 
 ```bash
@@ -56,8 +56,7 @@ Kolla           chem-H              heptane_3sp
 LiDryer         converter.sh        heptane_fc
 ```
 
-A local mechanism can be used by setting `USE_LOCALCHEM = TRUE` and specify a `LOCALCHEM_PATH` (absolute path) in GNUMakefile. To build the code, the mechanism folder need sa `mechanism.H`, 
-`mechanims.cpp` and a `Make.package` file (see example of local chemistry `exm\ibm\srp\`).
+A local mechanism can be used by setting `USE_LOCALCHEM = TRUE` and specify a `LOCALCHEM_PATH` (absolute path) in GNUMakefile. To build the code, the mechanism folder need sa `mechanism.H`,`mechanims.cpp` and a `Make.package` file (see example of local chemistry `exm\ibm\srp\`).
 
 All mechanisms are derived from _yaml_ format used in [Cantera](https://cantera.org). The list of chemical mechanisms directlly available can be obtained direclty by `$cat PelePhysics/Support/Mechanism/Models/list_mech` with a few more that use QSSA (see `list_qss_mech` file). Opening the `mechanism.yaml` file within a directory, will give an indication of the species involved and chemical reactions.
 
@@ -112,32 +111,29 @@ reactions:
   ...
 ```
 
-See details of yaml format in [YAML](https://cantera.org/tutorials/yaml/defining-phases.html)
+See details of _yaml_ format in [YAML](https://cantera.org/tutorials/yaml/defining-phases.html)
 
 ### Generate a new mechanism
 
-For all the available mechanisms, a Cantera yaml format is provided. If CHEMKIN files are present Pelephysics rely on Cantera’s _**ck2yaml**_ utility to convert CHEMKIN files to the Cantera yaml format. They are converter scripts to faciliatte this process. Check [PelePhysics Tutorial](https://pelephysics.readthedocs.io/en/latest/EOS.html)
+For all the available mechanisms, a Cantera _yaml_ format is provided. If CHEMKIN files are present Pelephysics rely on Cantera’s _**ck2yaml**_ utility to convert CHEMKIN files to the Cantera _yaml_ format. They are converter scripts to faciliatte this process. Check [PelePhysics Tutorial](https://pelephysics.readthedocs.io/en/latest/EOS.html)
 
-Once the mechanism.yaml is generated, is good idea to check that is readable by 
-Cantera (scripts in `tools/combustion` can be helpful).
-The yaml format needs to generate two chemistry-specific files: `mechanism.cpp` and `mechanism.H`.
-These are the files that Cerisse/Pele code need to run. 
-To convert  use the CLI utility `ceptr` (located in `Pelephysics/Support/ceptr`). 
-This requires the [poetry](https://python-poetry.org/docs/) package manager. 
+Once the `mechanism.yaml` is generated, is good idea to check that is readable by Cantera (scripts in `tools/combustion` can be helpful). The _yaml_ format needs to generate two chemistry-specific files: `mechanism.cpp` and `mechanism.H`. These are the files that Cerisse/Pele codes require to run.\
+To convert use the CLI utility `ceptr` (located in `Pelephysics/Support/ceptr`), which requires the [poetry](https://python-poetry.org/docs/) package manager.
 
-Beware that
-`ceptr` requires Python version between (>=3.8 and <3.11). Is best to work with environments, 
-**pyenv**,
-**conda** or similar. This may require careful python install (see tips)
+{% hint style="warning" %}
+Beware that`ceptr` requires Python version between (>=3.8 and <3.11). Is best to work with environments: **pyenv**,**conda** or similar. This may require careful python install (see [Tips](tips.md))
+{% endhint %}
 
 The script command is then
+
 ```bash
 $ cd ${PELE_PHYSICS_HOME}/Support/ceptr
 $ poetry run convert -f ${PATH_TO_CHEMISTRY}/mechanism.yaml
 ```
-This will create the required files in  `${PATH_TO_CHEMISTRY}`
 
-A similar script can be used to convert CHEMKIN files to yaml (and later to C++)  
+This will create the required files in `${PATH_TO_CHEMISTRY}`
+
+A similar script can be used to convert CHEMKIN files to yaml (and later to C++)
 
 ```bash
 $ cd ${PELE_PHYSICS_HOME}/Support/ceptr
@@ -146,7 +142,6 @@ $ poetry run ck2yaml --input ${PATH_TO_CHEMISTRY}/mechanism.inp
 ```
 
 More details in Cantera [CK2YAML](https://cantera.org/3.1/userguide/ck2yaml-tutorial.html) documentation
-
 
 ## Equations of State
 
@@ -178,10 +173,10 @@ The input file consists of specific blocks containing keywords that apply to dif
 
 ### Key Parameters and Options
 
-| Keyword                   | Description                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
-| ------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `ode.reactor_type`        | Switches between a **CV reactor** and a **CVH reactor**.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
-| `cvode.solve_type`        | <p>Controls the CVODE linear integration method:<br><strong>1</strong> = Dense direct linear solver<br><strong>5</strong> = Sparse direct linear solver (requires KLU library)<br><strong>99</strong> = Krylov iterative solver</p>                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
-| `ode.analytical_jacobian` | <p>Determines the Jacobian solver method, with different behaviors based on <code>cvode.solve_type</code>:</p><ul><li><strong>If <code>cvode.solve_type = 1</code></strong>   <code>ode.analytical_jacobian = 1</code> enables the <strong>Analytical Jacobian</strong>.</li><li><strong>If <code>cvode.solve_type = 99</code></strong>  <code>ode.analytical_jacobian = 1</code> activates the <strong>preconditioned GMRES solver</strong>, while setting <code>ode.analytical_jacobian = 0</code> enables the <strong>non-preconditioned GMRES solver</strong>.</li><li><strong>If <code>cvode.solve_type = 99</code></strong> and the <strong>KLU library is linked</strong>, then the preconditioned solver operates in a <strong>sparse format</strong>.</li><li><strong>If <code>cvode.solve_type = 5</code></strong>, the only valid option is <code>ode.analytical_jacobian = 1</code>.</li></ul> |
+| Keyword                   | Description                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
+| ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `ode.reactor_type`        | Switches between a **CV reactor** and a **CVH reactor**.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
+| `cvode.solve_type`        | <p>Controls the CVODE linear integration method:<br><strong>1</strong> = Dense direct linear solver<br><strong>5</strong> = Sparse direct linear solver (requires KLU library)<br><strong>99</strong> = Krylov iterative solver</p>                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| `ode.analytical_jacobian` | <p>Determines the Jacobian solver method, with different behaviors based on <code>cvode.solve_type</code>:</p><ul><li><strong>If <code>cvode.solve_type = 1</code></strong> <code>ode.analytical_jacobian = 1</code> enables the <strong>Analytical Jacobian</strong>.</li><li><strong>If <code>cvode.solve_type = 99</code></strong> <code>ode.analytical_jacobian = 1</code> activates the <strong>preconditioned GMRES solver</strong>, while setting <code>ode.analytical_jacobian = 0</code> enables the <strong>non-preconditioned GMRES solver</strong>.</li><li><strong>If <code>cvode.solve_type = 99</code></strong> and the <strong>KLU library is linked</strong>, then the preconditioned solver operates in a <strong>sparse format</strong>.</li><li><strong>If <code>cvode.solve_type = 5</code></strong>, the only valid option is <code>ode.analytical_jacobian = 1</code>.</li></ul> |
 
 This structure allows users to configure the solver behavior efficiently based on their requirements.

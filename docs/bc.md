@@ -67,7 +67,9 @@ For example, a slip wall in the bottom wall (y-direction) would be defined as
 
 If the boundary is not defined, the code will use the one specified in the input for that particular face.
 
-NOTE: Boundary conditions are specified for the _conserved_ variables so appropiate conservations may be required.
+{% hint style="warning" %}
+Boundary conditions are specified for the _conserved_ variables so appropiate conversion rules may be required.
+{% endhint %}
 
 ## Immersed Boundaries
 
@@ -108,28 +110,23 @@ A IBM header needs to be included in the file.
 Together with the required IBM template&#x20;
 
 ```cpp
-typedef std::ratio<5,5> d_image;
-typedef eib_t<2,1,d_image,ProbClosures> ProbIB;
+typedef ibm_adiabatic_slip_wall_t<ibmparm_t,ProbClosures> TypeWall;
+typedef eib_t<TypeWall,ibmparm_t,ProbClosures> ProbIB;
 ```
 
-The `std::ratio<5,5> d_image;` defines a rational number 5/5 (with numerator 5 and denominator 5) which in modern C++ is equivalent to:
+This passes a struct `ibmparm_t`  with IBM-related properties.
 
 ```cpp
-using d_image = std::ratio<5, 5>;
+struct ibmparm_t {
+  public:
+  static constexpr int  interp_order = 1;
+  static constexpr int  extrap_order = 1;
+  static constexpr Real alpha= 0.6;      
+};
 ```
 
-The template class **eib\_t** is defined as
-
-```cpp
-template <int iorder_tparm, int eorder_tparm, typename cim_tparm, typename cls_t>
-```
-
-where `iorder_tparm` is the interpolation order, in the above example  2.\
-`eorder_tparm` is the extrapolation order (one in the example)
-
-`cim_tparm` is the interpolation distance factor relative to mesh diagonal, in the above example to 5/5=1 and therefore the distance is the diagonal $$\sqrt{2} h$$ in 2D, see [IBM theory](theory/ibmeb.md#immersed-boundaries).
-
-All information required for the IBM is stored in the class **ProbIB** in `CNS.h`.
+where `alpha`  is the interpolation distance factor relative to mesh diagonal,  $$\sqrt{2} h$$ in 2D, see [IBM theory](theory/ibmeb.md#immersed-boundaries) where `iorder_order` is the _interpolation order-1_, in the above example, it would be 2 and.\
+`extrap_order` is the _extrapolation order -1_  (therefore 2 in the example) . All information required for the IBM is stored in the class **ProbIB** in `CNS.h`. See details of implementaion in [IBM implementation](code/ibm.md).
 
 #### markers
 

@@ -7,7 +7,7 @@ This page explains how the [EB method](../theory/ibmeb.md) is implemented in Cer
         ebMarkers(i, j, k, 1) = flag_arr(i,j,k).isSingleValued();    
 ```
 
-The first boolean  `ebMarkers(i, j, k, 0)`  indicates if the cell is solid or not, if **true**, then is a solid cell or internal. The second boolean `ebMarkers(i, j, k, 1)`  if **true**, shows that the cell is partially covered and therefore requires especial treatment of the fluxes.
+The first boolean `ebMarkers(i, j, k, 0)` indicates if the cell is solid or not, if **true**, then is a solid cell or internal. The second boolean `ebMarkers(i, j, k, 1)` if **true**, shows that the cell is partially covered and therefore requires especial treatment of the fluxes.
 
 ## Fluxes in EB
 
@@ -28,17 +28,14 @@ At the outset of this function, we extract pointers to Embedded Boundary (EB) da
   ...
 ```
 
-This line retrieves the volume fraction (`vfrac`) of fluid within each cell. The Array4 class in AMReX offers a multidimensional, non-owning view into the underlying data, facilitating efficient access patterns, especially within GPU kernels.
+This line retrieves the volume fraction (`vfrac`) of fluid within each cell. The Array4 class in AMReX offers a multidimensional, non-owning view into the underlying data, facilitating efficient access patterns, especially within GPU kernels.\
 Beyond `vfrac`, similar constructs are employed to access other EB-related geometric quantities:
-
 
 ### Re-adjust fluxes
 
 The fluxes in the cells adjacent to the solid boundary need to be recomputed and modified, as shown in the Figure.
 
-
 <figure><img src="../.gitbook/assets/wallflux.png" alt=""><figcaption><p>Fluxes in Cut cell, notation as used in the code in <code>ebm.h</code></p></figcaption></figure>
-
 
 Later a call to the `wall_flux` function (defined in `ebm/walltypes.h`), which need the primitive values at the wall (as a first-order approximation the values at the cell centre) and return the flux at the wall `flux_wall` which is added to the RHS.
 
@@ -60,8 +57,7 @@ The viscous fluxes are computed separately in a dedicated function, `wall_flux`,
   wallmodel::wall_flux_diff(geom,i,j,k,dis,norm_wall,prims,prim_wall,flux_wall,cls);
 ```
 
-Computing the viscous part is controlled by the variable
-`param::solve_diffwall` which is passed in the param.
+Computing the viscous part is controlled by the variable`param::solve_diffwall` which is passed in the param.
 
 For example, in the `ebm/cylnder_visc` example, wall conditions are written as (in `prob.h`)
 
@@ -79,8 +75,6 @@ and then the wall is set-up as
 typedef isothermal_wall_t<wall_param,ProbClosures> TypeWall; 
 typedef ebm_t<TypeWall,wall_param,ProbClosures> ProbEB;
 ```
-
-
 
 ### Wall Types
 
@@ -119,11 +113,11 @@ $$
 Where the coefficients are
 
 $$
-\alpha_1 = \frac{4}{3} n_x^2 + n_y^2 
+\alpha_1 = \frac{4}{3} n_x^2 + n_y^2
 $$
 
 $$
-\alpha_2 =  n_x^2 + \frac{4}{3} n_y^2 
+\alpha_2 =  n_x^2 + \frac{4}{3} n_y^2
 $$
 
 $$
@@ -152,11 +146,9 @@ $$
 
 The geometric qauntities are build based on the Figure
 
+<figure><img src="../.gitbook/assets/centroid.png" alt=""><figcaption></figcaption></figure>
 
-*FIGURE HERE*
-
-
-### User-wall 
+### User-wall
 
 Both wall functions can be user-specific in prob.h by defining a user class
 
@@ -172,6 +164,10 @@ static void inline wall_flux(const auto &geomdata, int i, int j, int k, const Re
 }
 ```
 
-that contains  a `wall_flux` function to define a specific wall flux. That (for example) depend on cell-position (which can be extracted by cell position `i,j,k`)
+that contains a `wall_flux` function to define a specific wall flux. That (for example) depend on cell-position (which can be extracted by cell position `i,j,k`)
 
 ## Redistribution
+
+{% hint style="danger" %}
+TODO
+{% endhint %}
