@@ -176,7 +176,7 @@ void CNS::compute_rhs(MultiFab& statemf, Real dt, FluxRegister* fr_as_crse, Flux
 #endif 
 
     // Source terms, including update mask (e.g inside IB)
-    prob_rhs.src(mfi, prims, state, cls_d, dt);
+    prob_rhs.src(geom,mfi, prims, state, cls_d, dt);
 
     // Set solid point RHS to 0  (state hold RHS at this point)
 #if AMREX_USE_GPIBM || CNS_USE_EB
