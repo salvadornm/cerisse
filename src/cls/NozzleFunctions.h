@@ -22,22 +22,18 @@ namespace nozzle_functions {
     const Real exponent = gamma / (gamma - 1.0);
     return P * std::pow(term, exponent);
   }
-
   // \brief computes stagnation temperature,function T,M,gamma
   // \param T:     Temperature
   // \param M:     Mach number
   // \param gamma: gamma (assumes ideal gas)  
   static constexpr Real Tstag(const Real T, const Real M, const Real gamma)
-  {      
-   
+  {         
     Real T0 = T*( 1 + 0.5*(gamma-1)*M*M) ;
-
     return(T0);
   }
-
   // \brief Computes the choked pressure (throat pressure) for isentropic flow
   // Assumes ideal gas and Mach = 1
-  // \param P0:    staganation pressure  
+  // \param P0:    stagnation pressure  
   // \param gamma: gamma  
   static constexpr Real Pchok(const Real P0, const Real gamma)
   {
@@ -46,23 +42,29 @@ namespace nozzle_functions {
   }
   // Computes the choked temperature (throat temperature) for isentropic flow
   // Assumes ideal gas and Mach = 1
-  // \param P0:    staganation pressure  
+  // \param P0:    stagnation pressure  
   // \param gamma: gamma  
   static constexpr Real Tchok(const Real T0, const Real gamma)
   {
     return T0 * (2.0 / (gamma + 1.0));
   }  
   // \brief computes choked mass flow rate [kg/s]
-  // \param T0:     stganation Temperature
-  // \param P0:     stganation pressure
+  // \param T0:     stagnation Temperature
+  // \param P0:     stagnation pressure
   // \param gamma: gamma (assumes ideal gas)
   static constexpr Real masschok(const Real T0, const Real P0, const Real gamma)
   {      
-    Real R = 287; //air
-    Real gamma_p1_o2 = 0.5*(gamma+1.0);
-    Real m = P0*sqrt(gamma/(R*T0))*std::pow(1.0/gamma_p1_o2,gamma_p1_o2/(gamma-1));
-
+    const Real R = 287; //air
+    const Real gamma_p1_o2 = 0.5*(gamma+1.0);
+    const Real m = P0*sqrt(gamma/(R*T0))*std::pow(1.0/gamma_p1_o2,gamma_p1_o2/(gamma-1));
     return(m);
+  }
+  // \brief computes Presure as function Ma,P0 and gam
+  // \param P0:     stagnation pressure
+  static constexpr Real Pnozz(const Real Mach, const Real P0, const Real gamma) {
+    if (Mach < 0.0) {return 0.0;}
+    const Real factor = 1.0 + 0.5*(gamma - 1.0) * Mach * Mach;
+    return P0 * std::pow(factor, -gamma / (gamma - 1.0));
   }
 
 }

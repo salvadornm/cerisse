@@ -5,10 +5,10 @@
 max_step  = 5000
 stop_time = 10.0
 #time_step = 1.0e-5
-cfl = 0.6
+cfl = 0.05
 
-cns.order_rk  = -2 // -2, 1, 2 or 3
-cns.stages_rk = 2 // 1, 2 or 3
+cns.order_rk  = 3 // -2, 1, 2 or 3
+cns.stages_rk = 3 // 1, 2 or 3
 
 # -1 = N/A (Incase of periodic)
 # 0 = Interior           3 = Symmetry
@@ -21,20 +21,20 @@ cns.nstep_screen_output = 1 #
 cns.verbose = 0       # 0=quiet, 1=verbose
 
 #-------------------------------- IMMERSED BOUNDARY ---------------------------#
-ib.filename = phoebus_srp.stl
+ib.filename = trinozzle.stl
 ib.move = 0
 ib.plot_surf = 1
 #-------------------------------- COMPUTATIONAL DOMAIN ------------------------#
 geometry.is_periodic = 0 0 0
 geometry.coord_sys   = 0  # 0 => cart, 1 => RZ  2=>spherical
-geometry.prob_lo     =   -0.5   -0.25   -0.25
-geometry.prob_hi     =   1.5    1.75     1.75
+geometry.prob_lo     =   0.0    -0.045 -0.045
+geometry.prob_hi     =   0.64    0.595  0.595   # centre geometry at 0.275,0.275
 amr.n_cell           =   64    64   64
 
 #-------------------------------- REFINEMENT / REGRIDDING ---------------------#
-amr.max_level        = 3       # maximum level number allowed
+amr.max_level        = 4       # maximum level number allowed
 amr.ref_ratio       = 2  # refinement ratio
-amr.regrid_int      = 20   # how often to regrid
+amr.regrid_int      = 50   # how often to regrid
 amr.blocking_factor_x = 8  # blocking factor in x per level
 amr.blocking_factor_y = 8  # blocking factor in x per level
 amr.blocking_factor_z = 8  # blocking factor in x per level
@@ -51,15 +51,10 @@ amr.plot_int          = 100     # number of timesteps between plotfiles
 amr.derive_plot_vars  = pressure velocity temperature
 amr.v = 1 # 0=quiet, 1=verbose
 
-amr.checkpoint_files_output = 0
+amr.checkpoint_files_output = 1
 amr.check_file              = chk    # root name of checkpoint file
-amr.check_int               = 1000    # number of timesteps between checkpoints
+amr.check_int               = 2000    # number of timesteps between checkpoints
 #amr.restart                 = chk03000
 amrex.the_arena_is_managed=1 # NOTE: computing markers on CPU relies on this option
-
-# Chemical Options
-cns.reactor_type = "ReactorCvode"
-cvode.solve_type =  "dense_direct"
-ode.clean_init_massfrac = 1
 
 

@@ -473,6 +473,18 @@ void computeGPs(const MFIter& mfi, const Array4<Real>& cons, const Array4<Real>&
   // snm surface coordinates (per GP) (no only relevant IM)
   //auto const imp_xyz = ibFab.gpData.imp_xyz.data();
 
+  // create a copy of prims to use local prims0 (needed?)
+  const Box& bxg = mfi.growntilebox(cls->NGHOST);
+  FArrayBox primf(bxg, cls_t::NPRIM, The_Async_Arena());
+  Array4<Real> const& prims0= primf.array();
+  ParallelFor(bxg, cls_t::NPRIM, [=] 
+      AMREX_GPU_DEVICE(int i, int j, int k, int n) noexcept {
+      prims0(i,j,k,n) = prims(i,j,k,n);    
+    });
+  //
+  
+
+
   ParallelFor(ibFab.gpData.ngps, [=,copy=this] AMREX_GPU_DEVICE (int ii)
   {
 
@@ -498,18 +510,11 @@ void computeGPs(const MFIter& mfi, const Array4<Real>& cons, const Array4<Real>&
 // #endif
 
       Array2D<Real,0,eorder_tparm+1,0,cls_t::NPRIM-1> primsNormal={0.0};
-      copy->interpolateIMs(imp_ip_ijk[ii],imp_ipweights[ii],prims,primsNormal);
 
-      
-      // snm
-      //  for (int nn=0; nn<cls_t::NPRIM; nn++) 
-      //  {
-      //  printf("prims(2,%d)=%f \n",nn,primsNormal(2,nn));
-      //  }
-      //  printf(" ----\n");
+      // check put prims0 instead of prims
+      copy->interpolateIMs(imp_ip_ijk[ii],imp_ipweights[ii],prims0,primsNormal);
 
-
-      // transform velocity to local coordinates for image points only
+      // transform velocity to local coordinates for image points only >2
       for (int iip=2; iip<2+eorder_tparm; iip++) {
         copy->global2local(iip, primsNormal, norm[ii], tan1[ii], tan2[ii]);
       }
@@ -518,27 +523,13 @@ void computeGPs(const MFIter& mfi, const Array4<Real>& cons, const Array4<Real>&
 
       // compute surface values based on wallmodel  (set u,P,T,Y)      
       wallmodel::compute_surfIB(ib_xyz[ii],norm[ii],primsNormal,cls);   
-      
-      // snm
-      //  for (int nn=0; nn<cls_t::NPRIM; nn++) 
-      //  {
-      //  printf("prims(1,%d)=%f \n",nn,primsNormal(1,nn));
-      //  }
-      //  printf(" ----\n");
-
+          
       // only extrapolate to GP the values of  u,P,T,Y
       copy->extrapolate(primsNormal, disGP[ii], disIM[ii]);  
+      
       // transform velocity back to global coordinates (GP only)
       int idx=0;
       copy->local2global(idx,primsNormal,norm[ii],tan1[ii],tan2[ii]);      
-
-
-      // snm
-      // for (int nn=0; nn<cls_t::NPRIM; nn++) 
-      //  {
-      //  printf("prims(0,%d)=%f \n",nn,primsNormal(0,nn));
-      //  }
-      //  printf(" ----\n");
 
       ///.  copy primsNormal  -> Q
       Real P,T,Y[NUM_SPECIES]={0.0};
@@ -562,6 +553,39 @@ void computeGPs(const MFIter& mfi, const Array4<Real>& cons, const Array4<Real>&
       for (int nn=0; nn<cls_t::NPRIM; nn++) {
         prims(i,j,k,nn) = Q[nn];       
       }
+
+      //snm CHECK
+      // for (int nn=0; nn<cls_t::NPRIM; nn++) {      
+      //    Real aux = Q[nn];
+      //   if (amrex::isnan(aux) || (aux > 1e10 ) )
+      //   {
+      //   std::cout << "  ------------------------------------- \n";
+      //   std::cout << " NaN detected  in: \n";
+      //   std::cout << " i j k " << i << "," << j << "," << k << "(n=" << nn << "): " << "\n";        
+      //   std::cout << "   array:  \n";
+      //   for (int m = 0; m < cls_t::NPRIM; m++) {
+      //     std::cout << "( " << m << " )" << " = " << prims(i,j,k,m) << " \n";          
+      //   }        
+      //   std::cout << "  ------------------------------------- \n";
+      //   printf(" GP ii=%d \n ", ii);
+      //   printf(" P=%f T=%f \n ", P,T);
+      //   printf(" xyz=%f %f %f\n ",ib_xyz[ii](0),ib_xyz[ii](1),ib_xyz[ii](2) );
+
+      //   printf(" norm =%f %f %f \n",norm[ii](0),norm[ii](1),norm[ii](2));
+      //   printf(" norm =%f %f %f \n",norm[ii](0),norm[ii](1),norm[ii](2));
+      //   printf(" tan1 =%f %f %f \n",tan1[ii](0),tan1[ii](1),tan1[ii](2));
+      //   printf(" tan2 =%f %f %f \n",tan2[ii](0),tan2[ii](1),tan2[ii](2));
+      //   for (int iip=0; iip<8; iip++){
+      //   printf(" imp_ipweights(iip) =%f  \n",iip,imp_ipweights[ii](0,iip));
+      //   }
+                
+      //   for (int m = 0; m < cls_t::NPRIM; m++) {
+      //     printf(" %d GP=%f IB=%f IP=%f\n",m,primsNormal(0,m),primsNormal(1,m),primsNormal(2,m));
+      //   }
+      //   amrex::Abort();
+      //   }
+      // }
+      // snm
 
     });
 };
