@@ -50,10 +50,10 @@ class keep_euler_t {
   AMREX_GPU_HOST_DEVICE
   ~keep_euler_t() {}
 
-  void inline eflux(const Geometry& geom, const MFIter& mfi,
-                    const Array4<Real>& prims, const Array4<Real>& flx,
-                    const Array4<Real>& rhs,
-                    const cls_t* cls) {
+    void inline eflux(const Geometry& geom, const MFIter& mfi,
+                    const Array4<Real>& prims, std::array<FArrayBox*, AMREX_SPACEDIM> const &flxt,
+                    const Array4<Real>& cons, const cls_t* cls) {
+
     const GpuArray<Real, AMREX_SPACEDIM> dxinv = geom.InvCellSizeArray();
     const Box& bx  = mfi.growntilebox(0);
     const Box& bxg = mfi.growntilebox(cls_t::NGHOST);
@@ -66,10 +66,11 @@ class keep_euler_t {
         coeffs(halfsten - 1, 0), coeffs(halfsten - 1, 1),
         coeffs(halfsten - 1, 2)};  // get coefficients array for current scheme
 
-    // compute interface fluxes at i-1/2, j-1/2, k-1/2
-    ParallelFor(bxg, cls_t::NCONS, [=] AMREX_GPU_DEVICE(int i, int j, int k, int n) noexcept {rhs(i, j, k, n)=0.0;});
-
     for (int dir = 0; dir < AMREX_SPACEDIM; dir++) {
+
+      auto const& flx = flxt[dir]->array(); 
+
+
       ParallelFor(bxgnodal,
                   [=, *this] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {
                     this->flux_dir(i, j, k, dir, order_coeffs, prims, flx, cls);

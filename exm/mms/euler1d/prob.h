@@ -24,7 +24,7 @@ struct methodparm_t {
   public:
 
   static constexpr bool dissipation = false;         // no dissipation
-  static constexpr int  order = 6;                  // order numerical scheme
+  static constexpr int  order = 4;                  // order numerical scheme
   static constexpr Real C2skew=0.1,C4skew=0.0016;   // Skew symmetric default
 
 };
@@ -34,10 +34,18 @@ typedef closures_dt<indicies_t, visc_suth_t, cond_suth_t,
 
 template <typename cls_t > class user_source_t;
 
+// HLLC-Riemann MUSCL
 //typedef rhs_dt<riemann_t<false, ProbClosures>, no_diffusive_t, user_source_t <ProbClosures> >  ProbRHS;
-
-typedef rhs_dt<skew_t<methodparm_t, ProbClosures>, no_diffusive_t, user_source_t <ProbClosures> > ProbRHS;
-    
+// Skew
+//typedef rhs_dt<skew_t<methodparm_t, ProbClosures>, no_diffusive_t, user_source_t <ProbClosures> > ProbRHS;
+// Rusanov
+//typedef rhs_dt<rusanov_t<ProbClosures>, no_diffusive_t, user_source_t <ProbClosures> >  ProbRHS;
+// WENO & TENO   WenoZ5/Teno5/Teno6
+typedef rhs_dt<weno_t<ReconScheme::Teno6, ProbClosures>, no_diffusive_t, user_source_t <ProbClosures> > ProbRHS;
+// KEEP 2/4/6
+//typedef rhs_dt<keep_euler_t<false,false,6, ProbClosures>, no_diffusive_t, user_source_t <ProbClosures> > ProbRHS;
+// CD 2/4/6
+//typedef rhs_dt<centraldif_t<false,false,6, ProbClosures>, no_diffusive_t, user_source_t <ProbClosures> > ProbRHS;
 
 void inline inputs() {
   amrex::Print() << " MMS Euler " << std::endl;

@@ -19,6 +19,7 @@ inline void derpres(const Box& bx, FArrayBox& derfab, int dcomp, int /*ncomp*/,
   amrex::ParallelFor(bx, [=] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {
 
     Real Q[cls->NPRIM],U[cls->NCONS];
+    
     for (int n = 0; n < cls->NCONS; ++n) {
       U[n] = dat(i,j,k,n);
     }  

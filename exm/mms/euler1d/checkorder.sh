@@ -6,7 +6,6 @@ MESH=(
 	"32"
 	"64"
 	"128"
-	"256"
 )
 
 RUN="./main1d.gnu.ex"
@@ -15,6 +14,7 @@ echo "Checking  Spatial Order Euler ..."
 echo "  "
 echo "  "
 
+rm -rf plot*
 # run and create directories 
 for grid in "${MESH[@]}"; do
    $RUN input_dir/inputs$grid

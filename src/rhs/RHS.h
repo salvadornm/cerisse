@@ -7,6 +7,7 @@
 // Euler numerical methods
 #include <Weno.h>
 #include <CentralKEEP.h>
+#include <CentralDif.h>
 #include <Riemann.h>
 #include <Rusanov.h>
 #include <Skew.h>

@@ -10,7 +10,9 @@
 *  @param CDcoef  array of central derivatives coefficients
 */
 /// i-2    i-1    i   |  i+1  i+2   i+3
-///  0       1    2   |  3     4     5
+///               0   |   1                      Order 2
+///          0    1   |   2    3                 Order 4 
+///  0       1    2   |   3    4     5           Order 6
 ///  -2.5h-1.5h -0.5h | 0.5h  1.5h  2.5h
 
 template <int order>
@@ -28,11 +30,11 @@ AMREX_GPU_DEVICE AMREX_FORCE_INLINE void calc_CDcoeffs(
       CDcoef(1)  = Real(1.0);      
       break;
     case 4:
-      // interpolation (correct coefficents Feb 2025)
-      INTcoef(0) = -Real(1.0/16.0); 
-      INTcoef(1) =  Real(9.0/16.0);
-      INTcoef(2) =  Real(9.0/16.0);
-      INTcoef(3) = -Real(1.0/16.0);   
+      // interpolation 
+      INTcoef(0) = -Real(1.0/12.0);  
+      INTcoef(1) =  Real(7.0/12.0);  
+      INTcoef(2) =  Real(7.0/12.0);  
+      INTcoef(3) = -Real(1.0/12.0);  
       // derivatives coefficients
       CDcoef(0)  =   Real(1.0/24);
       CDcoef(1)  = - Real(9.0/8.0);      
@@ -42,10 +44,10 @@ AMREX_GPU_DEVICE AMREX_FORCE_INLINE void calc_CDcoeffs(
     case 6: 
       // interpolation 
       INTcoef(0) = Real(1.0/60.0); // correction
-      INTcoef(1) = -Real(3.0/20.0);
-      INTcoef(2) = Real(45.0/60.0);
-      INTcoef(3) = Real(45.0/60.0);        
-      INTcoef(4) = -Real(3.0/20.0);
+      INTcoef(1) = -Real(8.0/60.0);
+      INTcoef(2) = Real(37.0/60.0);
+      INTcoef(3) = Real(37.0/60.0);        
+      INTcoef(4) = -Real(8.0/60.0);
       INTcoef(5) = Real(1.0/60.0);
       // derivatives coefficients  (needs CHECK)
       CDcoef(0)   =   Real(1.0/60);
@@ -55,10 +57,8 @@ AMREX_GPU_DEVICE AMREX_FORCE_INLINE void calc_CDcoeffs(
       CDcoef(4)   = + Real(9.0/60); 
       CDcoef(5)   = - Real(1.0/60);                  
       break;
-    default: // crash
-    
+    default: 
       amrex::Abort("Diffusive order available 2/4/6 MUST specify one of those ");      
-
       break;
     }
     
