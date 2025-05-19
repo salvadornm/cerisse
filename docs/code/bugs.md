@@ -1,4 +1,8 @@
-# Bugsm, Errors, features not ready
+---
+icon: bug
+---
+
+# Bugs
 
 ## Common errors
 
@@ -79,10 +83,9 @@ fatal error: mechanism.H
 **Fix:**
 
 * Check whether the mechanism is supported in your PelePhysics version (e.g., v25).
-* Alternatively, convert your chemistry input from CHEMKIN or YAML format using available tools&#x20;
+* Alternatively, convert your chemistry input from CHEMKIN or YAML format using available tools
 
 ## Known bugs
-
 
 ### Skew
 
@@ -93,7 +96,6 @@ fatal error: mechanism.H
 
 **Workaround:**\
 NRY, use different scheme
-
 
 ### IBM-Specific
 
@@ -112,7 +114,6 @@ Restarts using checkpoints and IBM must have the same number of levels.
 
 **Workaround:**\
 NRY
-
 
 ## Features missing
 

@@ -14,7 +14,7 @@ $$
 \Psi =  \Gamma \exp(-r/R)^2
 $$
 
-where _r_ is relative to the initial position of the vortex  $$(x_0, y_0 )$$. The velocity is therefore
+where _r_ is relative to the initial position of the vortex $$(x_0, y_0 )$$. The velocity is therefore
 
 $$
 u = U_0 + \frac{\partial \Psi}{\partial y}   \; \; \; \; \; \; \; \;  v = -\frac{\partial \Psi}{\partial x}
@@ -26,7 +26,7 @@ $$
 p =  p_0 - \frac{2 \Gamma^2 }{ R^2} \exp(-r/R)^2
 $$
 
-The solution is the actual vortex propagated in _x_ and the solution repeats itself every flow-through time  $$L/U_0$$ .
+The solution is the actual vortex propagated in _x_ and the solution repeats itself every flow-through time $$L/U_0$$ .
 
 The analytical solution can be obtained by differentiating the stream function:
 
@@ -42,14 +42,14 @@ $$
 
 The parameters are:
 
-| parameter   | value           |
-| ----------- | --------------- |
-|  $$p_0$$    | 101300 Pa       |
-|  $$\rho_0$$ | 1.1717047 kg/m3 |
-|  $$U_0$$    | 35 m/s          |
-|  $$L$$      | 0.3112 m        |
-|  $$R$$      |  $$L/20$$       |
-| $$\beta$$   | 0.04            |
+| parameter | value           |
+| --------- | --------------- |
+| $$p_0$$   | 101300 Pa       |
+| $$ho_0$$  | 1.1717047 kg/m3 |
+| $$U_0$$   | 35 m/s          |
+| $$L$$     | 0.3112 m        |
+| $$R$$     | $$L/20$$        |
+| $$\beta$$ | 0.04            |
 
 where $$\beta$$ represents the strength of the vortex such that:
 
@@ -141,7 +141,7 @@ $$
 T =  T_0 + \Delta T  \exp(-r/\delta)^2
 $$
 
-with  $$T_0 = 300$$  and  $$\Delta T = 100$$ ,  $$\delta$$ somehow determines the "width" of the initial pulse in temperature. The set-up is based on [HAMISH validation case](https://www.ukctrf.com/index.php/benchmarking-of-the-new-software/) using periodic boundary conditions.
+with $$T_0 = 300$$ and $$\Delta T = 100$$ , $$\delta$$ somehow determines the "width" of the initial pulse in temperature. The set-up is based on [HAMISH validation case](https://www.ukctrf.com/index.php/benchmarking-of-the-new-software/) using periodic boundary conditions.
 
 | Tested   |         grid        |                 comment |
 | -------- | :-----------------: | ----------------------: |
@@ -165,7 +165,7 @@ The Temperature distribution at x=0, using `$ python ./plot.py`
 
 ## Periodic channel laminar flow
 
-The test is located in `exm/viscwall` and is used to validate the implementation of the viscous terms and follows (approximately)  the [HAMISH validation](https://www.ukctrf.com/index.php/benchmarking-of-the-new-software/). A pressure drop is imposed given a volumetric flow rate and Reynolds number
+The test is located in `exm/viscwall` and is used to validate the implementation of the viscous terms and follows (approximately) the [HAMISH validation](https://www.ukctrf.com/index.php/benchmarking-of-the-new-software/). A pressure drop is imposed given a volumetric flow rate and Reynolds number
 
 $$
 \frac{\partial p}{\partial x} = 12 \frac{Q^2}{L^3 \mbox{Re}}
@@ -181,25 +181,23 @@ The results are compared to the analytical solution for a bulk **Reynolds number
 
 <figure><img src=".gitbook/assets/viscwall.png" alt=""><figcaption><p>Axial velocity calculated with Cerisse compared to analtycal expression</p></figcaption></figure>
 
-
-
 ## Supersonic flow Forward Step
 
 This example examines the behaviour of EBM in simple canonical case (located in `exm/forward_step`) The test consists of a supersonic flow in a channel at **Mach 3** , with facing a step of height **0.2 h**, where h is the channel height. The flow configuration is the same used by [Woodward and Collela (1984)](https://www.sciencedirect.com/science/article/abs/pii/0021999184901426) and the main parameters are summarised below (using non-dimensional units)
 
-| parameter   | value |
-| ----------- | ----- |
-| $$p_0$$     | 1     |
-| $$\rho_0$$  | 1.4   |
-| $$U_0$$     | 3     |
+| parameter | value |
+| --------- | ----- |
+| $$p_0$$   | 1     |
+| $$ho_0$$  | 1.4   |
+| $$U_0$$   | 3     |
 
-where a perfect gas with $$\gamma=1.4$$  is used. The simulation runs until time equals 4. The case is simulated with Skew, Rusanov and WENO schemes at different meshes. A constant time step is used, based on an initial Courant Number (CFL) of 0.32. See Figures 2-3  with density iso-contours (30 contours, linearly spaced between 0.46 and 6.8). A quick png image of the final result  can be extracted using python and yt can be extracted by using (see  Figure 1)
+where a perfect gas with $$\gamma=1.4$$ is used. The simulation runs until time equals 4. The case is simulated with Skew, Rusanov and WENO schemes at different meshes. A constant time step is used, based on an initial Courant Number (CFL) of 0.32. See Figures 2-3 with density iso-contours (30 contours, linearly spaced between 0.46 and 6.8). A quick png image of the final result can be extracted using python and yt can be extracted by using (see Figure 1)
 
 ```sh
 $ python ./plot.py
 ```
 
-<figure><img src=".gitbook/assets/forwardstep.png" alt=""><figcaption><p>Figure 1:  Composite image of four method son the 240 x 80 mesh using the plot.py script. Resukst shown at t=4</p></figcaption></figure>
+<figure><img src=".gitbook/assets/forwardstep.png" alt=""><figcaption><p>Figure 1: Composite image of four method son the 240 x 80 mesh using the plot.py script. Resukst shown at t=4</p></figcaption></figure>
 
 <figure><img src=".gitbook/assets/stepfig1.png" alt=""><figcaption><p>Figure 2: Three different meshes using Skew-symmetrtic 4th order methods with dissipation. Results shown at t=4.</p></figcaption></figure>
 
@@ -207,7 +205,7 @@ $ python ./plot.py
 
 ## Hypersonic flow over a cylinder
 
-&#x20;This setup consists of a perfect gas flowing over a cylinder at Mach 6. The high-speed nature of the flow makes it a strong test case for [Embedded Boundaries](code/ebm.md) and [Flux Redistribution](https://amrex-codes.github.io/amrex/docs_html/EB.html#small-cell-problem-and-redistribution) algorithms.
+This setup consists of a perfect gas flowing over a cylinder at Mach 6. The high-speed nature of the flow makes it a strong test case for [Embedded Boundaries](code/ebm.md) and [Flux Redistribution](https://amrex-codes.github.io/amrex/docs_html/EB.html#small-cell-problem-and-redistribution) algorithms.
 
 As mesh refinement increases, cells that are partially covered by the solid boundary contain progressively less fluid volume, leading to a tighter CFL constraint. When using the HLLC/MUSCL Riemann solver _without_ any flux redistribution, the maximum stable CFL number decreases significantly:
 
@@ -217,7 +215,7 @@ As mesh refinement increases, cells that are partially covered by the solid boun
 
 However, with flux redistribution enabled, the CFL number can be maintained as high as **0.4**, even with multiple levels of refinement.
 
-The main parameters are summarised below&#x20;
+The main parameters are summarised below
 
 | parameter | value   |
 | --------- | ------- |
@@ -225,46 +223,46 @@ The main parameters are summarised below&#x20;
 | $$T_0$$   | 223 K   |
 | Mach      | 6       |
 
-where a perfect gas with $$\gamma=1.4$$   and molecular weight of  28.96 kg/kmol,  is used. The cylinder has 0.5 m in diameter. The simulation runs until time equals **3 ms** . The case is run fixing the CFL number and the total number of steps is around 640 with largest CFL.&#x20;
+where a perfect gas with $$\gamma=1.4$$ and molecular weight of 28.96 kg/kmol, is used. The cylinder has 0.5 m in diameter. The simulation runs until time equals **3 ms** . The case is run fixing the CFL number and the total number of steps is around 640 with largest CFL.
 
-<figure><img src=".gitbook/assets/cylinderAMR.png" alt=""><figcaption><p>Figure 4: Density distribution around a cylinder in Mach 6 flow, shown with overlaid computational mesh. Base mesh 80 x 160 with 3 levels of refinement next to cylinder and density gradients </p></figcaption></figure>
+<figure><img src=".gitbook/assets/cylinderAMR.png" alt=""><figcaption><p>Figure 4: Density distribution around a cylinder in Mach 6 flow, shown with overlaid computational mesh. Base mesh 80 x 160 with 3 levels of refinement next to cylinder and density gradients</p></figcaption></figure>
 
 This test is highly sensitive to the flux redistribution algorithm (see [available options](input.md) in the input file). With two levels of mesh refinement, cells with fluid fractions as low as approximately 0.006 can appear, _i.e_ less than 1% of the cell volume contains fluid.
 
 This implies that, without any form of redistribution, the CFL number may need to be reduced to below **0.006** to maintain stability. The exact threshold is strongly dependent on the numerical scheme being used. High-order schemes—such as TENO—are particularly susceptible to instabilities in the presence of very small fluid volumes.
 
-<figure><img src=".gitbook/assets/cylindernumerics.png" alt=""><figcaption><p>Figure 5: Snaphost using dofferent nuemrical methods. Base mesh 80 x 160 using 2 levels of refinement next to cylinder and density gradients </p></figcaption></figure>
-
+<figure><img src=".gitbook/assets/cylindernumerics.png" alt=""><figcaption><p>Figure 5: Snaphost using dofferent nuemrical methods. Base mesh 80 x 160 using 2 levels of refinement next to cylinder and density gradients</p></figcaption></figure>
 
 ## Von-Karmann vortex behind a square cylinder
 
-The set-up (located in `exm/ebm/cylinder_visc`) where a flow of Mach number of 0.5 and a Reynolds number of 100. The wall is maintained isothermal  with a wall temperature approximately 5.2 times the free stream.
-The mesh consist of a 400 x 200 mesh, with two levels of refinement close to the body.
-Skew-symmetric 4th order, using dissipation, with constants C2=0.5 and C4=0.016.
+The set-up (located in `exm/ebm/cylinder_visc`) where a flow of **Mach=0.5** and **Reynolds=100**. The wall is maintained isothermal with a wall temperature approximately 5.2 times the free stream.\
+The mesh consist of a 400 x 200 mesh, with two levels of refinement close to the body.\
+Skew-symmetric 4th order, using dissipation, with constants **C2=0.5** and **C4=0.016**.
 
-FIGURE
+<figure><img src=".gitbook/assets/VonKarmann0000.png" alt=""><figcaption><p>Figure 6: Vorticity plots, showing the Von-Karmman sheet after the square cylinder. <br>Dimensions scaled with the half width of the square </p></figcaption></figure>
 
-Density contour plots can be seen by
+Density contour plots can be seen by (Figrue 6 obtained with Visit)
+
 ```bash
 $ python plot.py
 ```
 
 ## Planar Flame
 
-The set-up (located in `exm/planar_flame`)  corresponds to a freely propagating two-dimensional hydrogen/aire premixed flame at **0.5** equivalence ratio.
+The set-up (located in `exm/planar_flame`) corresponds to a freely propagating two-dimensional hydrogen/aire premixed flame at **0.5** equivalence ratio.
 
 The unburn parameters are (1 atm at 298 K):
 
-| parameter   | value     |
-| ----------- | --------- |
-| $$p_0$$     | 101300 Pa |
-| $$T_u$$     | 298 K     |
-| $$u_{in}$$  | 0.686 m/s |
-| $$l_f$$     | 0.423 mm  |
+| parameter  | value     |
+| ---------- | --------- |
+| $$p_0$$    | 101300 Pa |
+| $$T_u$$    | 298 K     |
+| $$u_{in}$$ | 0.686 m/s |
+| $$l_f$$    | 0.423 mm  |
 
-The domain is approximately 200 x 200 flame thickness (85 x 85 mm). At these conditions the laminar burning velocity is 0.49 m/s.&#x20;
+The domain is approximately 200 x 200 flame thickness (85 x 85 mm). At these conditions the laminar burning velocity is 0.49 m/s.
 
-The flame is initiliased with 1D flame profiles obtained from Cantera (LINK)
+The flame is initiliased with **1D flame profiles** obtained from [Cantera](https://cantera.org/)  using [PMF](chemistry.md#premixed-flame-initialisation)\
 by the addition of the following lines in `prob.h`
 
 ```cpp
@@ -281,14 +279,14 @@ by the addition of the following lines in `prob.h`
         Yt[n]   = pmf_vals[3+n];    
     }
 ```
-The `void prob_initdata` function has an additional argument
-`Utility* util = nullptr` that passes the Utility
-and the line in `GNUmakefile`:
+
+The `void prob_initdata` function has an additional argument`Utility* util = nullptr` that passes the Utility and the line in `GNUmakefile`:
+
 ```
 USE_UTILITIES = TRUE
 ```
-This allow to use the utilities class (see SET-UP).
-In the input file the following options have been set
+
+This allow to use the utilities class (see [SET-UP](prob.md#utility)). In the input file the following options have been set
 
 ```
 # Utilities
@@ -300,7 +298,7 @@ pmf.do_cellAverage = 1
 pmf.v = 1
 ```
 
-The last one, are the required utility (**PMF**) and options (file name, average, etc).
+The last one, are the required utility (**PMF**) and options (file name, average, etc).\
 It follows [PelePhysics Utility](https://pelephysics.readthedocs.io/en/latest/Utility.html)
 
 {% hint style="danger" %}
