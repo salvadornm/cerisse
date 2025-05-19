@@ -159,7 +159,7 @@ $$
 \alpha_n y_k + \beta_n h_n \dot{y}_k = 0
 $$
 
-And need a linear solver, PelePhysics has difefrent options, see [PelePhsyics doc](https://amrex-combustion.github.io/PelePhysics/IntroductionToCvode.html)
+that require a linear solver, PelePhysics has different options, see [PelePhsyics doc](https://amrex-combustion.github.io/PelePhysics/IntroductionToCvode.html)
 
 to activate CVODE, in the GNUMakefile
 
@@ -180,3 +180,34 @@ The input file consists of specific blocks containing keywords that apply to dif
 | `ode.analytical_jacobian` | <p>Determines the Jacobian solver method, with different behaviors based on <code>cvode.solve_type</code>:</p><ul><li><strong>If <code>cvode.solve_type = 1</code></strong> <code>ode.analytical_jacobian = 1</code> enables the <strong>Analytical Jacobian</strong>.</li><li><strong>If <code>cvode.solve_type = 99</code></strong> <code>ode.analytical_jacobian = 1</code> activates the <strong>preconditioned GMRES solver</strong>, while setting <code>ode.analytical_jacobian = 0</code> enables the <strong>non-preconditioned GMRES solver</strong>.</li><li><strong>If <code>cvode.solve_type = 99</code></strong> and the <strong>KLU library is linked</strong>, then the preconditioned solver operates in a <strong>sparse format</strong>.</li><li><strong>If <code>cvode.solve_type = 5</code></strong>, the only valid option is <code>ode.analytical_jacobian = 1</code>.</li></ul> |
 
 This structure allows users to configure the solver behavior efficiently based on their requirements.
+
+
+### Premixed Flame Initialisation
+
+Pre-computed profiles from 1D freely propagating premixed flames can be used to initialise a solutions.
+To create a 1D profile, a python script is used `tools/combustion/1d-flame-run.py` that uses
+Cantera and  requires a chemistry files in *yaml*.
+The script can be modified to create different profile. The flame profiles
+can be seen by 
+```bash
+python 1d-flame-plot.py
+```
+A `pmf-Y.txt` file (or `pmf-X.txt` depending on the options) will be created.
+PelePhysics requires a specific *.dat* format that is used in Cerisse as well.
+To convert the files, you can use the Python script `pmf_f2dat.py` in `lib/PelePhysics/Utility` (PelePhysics v23)
+
+```bash
+python pmf_f2dat.py inputfile.txt pmf.dat
+```
+
+The `pmf.dat` file  will look like (for a 9-species hydrogen mechanism)
+```
+VARIABLES  =  "X"  "temp"  "u"  "rho"  "Y_H2" "Y_O2" "Y_H2O" "Y_H" "Y_O" "Y_OH" "Y_HO2" "Y_H2O2" "Y_N2"
+ ZONE  I=454  FORMAT=POINT  SPECFORMAT=MASS 
+0.0 298.0 0.534292484155303 0.9893277276003428 0.014467517837899192 0.22962878760502656 1.1722583290927352e-19 -5.887036225686357e-21 6.511836937427712e-19 -3.6814739215435833e-19 -3.4206663655715174e-18 -1.7741231617078512e-18 0.7559036945570743
+```
+
+And is the file that the code needs, the place can be selected in the input file (see example of planar flame).
+This set-up does not reuire to set-up poetry, but additional options can be done following
+[Pelephysics documentation](https://pelephysics.readthedocs.io/en/latest/Utility.html)
+

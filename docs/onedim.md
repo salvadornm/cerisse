@@ -111,3 +111,88 @@ which generates the image
 
 <figure><img src=".gitbook/assets/autoignition.png" alt=""><figcaption><p>Autoignition of a hydrogen/air mixture using the Li and Dryer mechanism. Cerisse uses a  constant time step of <strong>dt=1e-7</strong></p></figcaption></figure>
 
+## MMS 
+
+In the Method of Manufactured Solutions (MMS), you construct an artificial, known (manufactured) solution to the equations and then derive the corresponding forcing terms that make this manufactured solution an exact solution to the modified equations. This helps test if the solver is implemented correctly and order of convergence.
+There are several examples, locates under `exm/mms`
+
+### Steady Euler
+
+Located in `exm/mms/euler1d`. The selected solution is steady and does not depend on time.
+
+$$
+\rho = 1 + 0.2 \sin(2 \pi x)
+$$
+
+$$
+u = 1
+$$
+
+$$
+p = 1 + 0.3 \cos(2 \pi x)
+$$
+
+
+The respective forcing source terms are:
+
+*Density equation*
+
+$$
+f_\rho = 0.4 \pi \cos{\left(2 \pi x \right)}
+$$
+
+*Momentum equation*
+$$
+f_{\rho u}  =- 0.6 \pi \sin{\left(2 \pi x \right)} + 0.4 \pi \cos{\left(2 \pi x \right)}
+$$
+
+*Energy*
+
+$$
+f_{\rho e}  = - 2.1 \pi \sin{\left(2 \pi x \right)} + 0.2 \pi \cos{\left(2 \pi x \right)}
+$$
+
+The expressions can be obtained with `python generate_force.py`, which computes the
+analytic derivatives using [sympy](https://www.sympy.org/en/index.html)
+for symbolic mathematics.
+
+The numerical solution is compared after a single time step using a small CFL number of 0.01 to minimize temporal errors. Since the exact solution is time-independent, any observed error arises solely from the spatial discretization.
+
+The \( L_2 \) error in the density field is used to assess the accuracy of each scheme.
+
+A local script, `checkorder.sh`, is provided to automate the generation of solution directories and convergence plots. It runs simulations on meshes with 16, 32, 64, and 128 grid points.
+
+To compare the numerical and exact solutions for a specific resolution (e.g., from `plot16`), run:
+
+`python check_solution.py plot16`
+
+
+PLOT HERE
+
+
+The order of 14 different numerical schemes in Cerisse is shown in Table 1
+
+
+| Scheme     | Order  | Absolute L2 Error (coarse)     |
+|------------|--------|-------------------------------|
+| Riemann    | 2.466  | 3.58660e-05                   |
+| Skew 2     | 2.998  | 5.90192e-06                   |
+| Skew 4     | 4.995  | 1.80107e-07                   |
+| Skew 6     | -      | (under construction)          |
+| Rusanov    | 2.000  | 9.92539e-05                   |
+| Central 2  | 2.998  | 5.90192e-06                   |
+| Central 4  | 4.995  | 1.80107e-07                   |
+| Central 6  | 6.987  | 5.88292e-09 *(NOTE)*          |
+| WenoZ5 5   | 6.125  | 1.17584e-07                   |
+| TENO 5     | 6.007  | 8.01648e-08                   |
+| TENO 6     | 6.987  | 5.88292e-09 *(NOTE)*          |
+| KEEP 2     | 2.998  | 5.90192e-06                   |
+| KEEP 4     | 4.995  | 1.80107e-07                   |
+| KEEP 6     | 6.987  | 5.88292e-09 *(NOTE)*          |
+
+
+When the forcing term is not included, the convergence rate appears to be first-order. This is because only a single time step is executed, and the time step size \( \Delta t \) is proportional to \( \Delta x \) due to a constant CFL condition. As a rough approximation, the observed order matches the values listed in **Table -1**.
+
+The manufactured solution is smooth, so the numerical results closely match theoretical predictions. Similarly, the `skew4` and `keep4` schemes produce equivalent results, as expected.
+
+> **Note**: Using 256 grid points may drive the error below machine precision, which prevents the script `checkorder.py` from computing a meaningful convergence order. For this reason, the `plot256` directory should be removed from the analysis.

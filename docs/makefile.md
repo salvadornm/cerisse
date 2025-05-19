@@ -80,6 +80,13 @@ include $(AMR_SOLVER)/src/Make.CNS
 
 ## Other Flags
 
+The most common in the option to use the utilities class
+
+```makefile
+USE_UTILITIES = TRUE
+```
+which allow use the utilities class (see SET-UP).
+
 Is possible to define specific pre-processing flags that are passed to the compiler. An example is the flag
 
 ```
@@ -87,6 +94,7 @@ CLIP_MINTEMP = TRUE
 ```
 
 which limits the minimum temperature in the system to 10 K (this number can be changed in `CNSConstants.h`). The above line will pass the flag `-DCLIP_TEMPERATURE_MIN=1`  to the compiler. The actual process is defined in `Make.CNS.`&#x20;
+
 
 {% hint style="warning" %}
 Creating new flags is simple, although is generally **not** recomended as they need to be hard-coded.

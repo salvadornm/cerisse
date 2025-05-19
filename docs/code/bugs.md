@@ -1,4 +1,4 @@
-# Bugs
+# Bugsm, Errors, features not ready
 
 ## Common errors
 
@@ -83,6 +83,18 @@ fatal error: mechanism.H
 
 ## Known bugs
 
+
+### Skew
+
+{% hint style="danger" %}
+**Issue:**\
+6th order Skew-symmetric scheme does not work. Cause unknown, probably a big in coefficients.
+{% endhint %}
+
+**Workaround:**\
+NRY, use different scheme
+
+
 ### IBM-Specific
 
 {% hint style="danger" %}
@@ -100,3 +112,8 @@ Restarts using checkpoints and IBM must have the same number of levels.
 
 **Workaround:**\
 NRY
+
+
+## Features missing
+
+KEEP and central schemes not ready for IBM or EB boundary method

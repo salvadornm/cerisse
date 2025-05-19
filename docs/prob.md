@@ -144,7 +144,7 @@ In most examples, a few auxiliar definitions follow that extract the size the do
   Real x = prob_lo[0] + (i + Real(0.5)) * dx[0];
 ```
 
-This allow to define, for example, different condtion depending on the _x_ coordinate. The structure `prob_parm`of type **ProbParm** is used to recall problem parameters
+This allow to define, for example, different condition depending on the _x_ coordinate. The structure `prob_parm`of type **ProbParm** is used to recall problem parameters
 
 ```cpp
   Real Pt, rhot, uxt;
@@ -171,9 +171,13 @@ The function needs to fille the `state` array, where the conservative variables 
 }
 ```
 
-Since this is pure C++ code, it allows for the construction of complex initial conditions. PelePhysics can also be utilized to incorporate chemistry profiles, such as those for 1D premixed flames.
+Since this is pure C++ code, it allows for the construction of complex initial conditions.
+Additionaly the utility class can be used to incorporporate 
+incorporate chemistry profiles, turbulent inflows etc, inspired in the utilty options
+in (PelePhysics)[https://pelephysics.readthedocs.io/en/latest/Utility.html]
 
-NOTE: indicies is common, an dit allocates spaces for so in 1D `state(i,j,k,cls.UMY)=0`, `state(i,j,k,cls.UMZ)=0` and in 2D UMZ=0
+NOTE: the most common variable labels are in the template `indicies_t`.**Cerisse**
+expects 3D labels UMY nd UMZ even in 1 or 2D. In 1D `state(i,j,k,cls.UMY)=0` amd `state(i,j,k,cls.UMZ)=0` and in 2D `state(i,j,k,cls.UMZ)=0`.
 
 ## Source
 
@@ -207,6 +211,26 @@ class user_source_t {
 ## Boundary Condition
 
 The `prob.h` can be used to implement user-specific boundary conditions (transient, turbulent, etc). To do that, a local template is defined (see boundaries tab for detail).
+
+## Utility
+
+The utility class can be used to incorporporate 
+chemistry profiles, turbulent inflows etc, in the initial and boundary coditions.
+It inspired in the utility options
+in (PelePhysics)[https://pelephysics.readthedocs.io/en/latest/Utility.html]
+and is a placeholder for complex interactions not specified in this file.
+For example new turbulent inflows, new data read from files, etc. As utility can access data from input and external files (condition defiend in PROB are compiled at run time).
+To use requires a line in GNU_Makefile and to change the `prob_initdata` to allow an additional argument
+
+```cpp
+AMREX_GPU_DEVICE AMREX_FORCE_INLINE void prob_initdata(
+    int i, int j, int k, Array4<Real> const &state,
+    GeometryData const &geomdata, ProbClosures const &cls,
+    ProbParm const &prob_parm, Utility* util = nullptr) {
+```
+
+This class allows access to multiples functions (for example PMF in **PelePhysics**)
+
 
 ## Other
 

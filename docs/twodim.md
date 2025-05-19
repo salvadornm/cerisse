@@ -235,6 +235,20 @@ This implies that, without any form of redistribution, the CFL number may need t
 
 <figure><img src=".gitbook/assets/cylindernumerics.png" alt=""><figcaption><p>Figure 5: Snaphost using dofferent nuemrical methods. Base mesh 80 x 160 using 2 levels of refinement next to cylinder and density gradients </p></figcaption></figure>
 
+
+## Von-Karmann vortex behind a square cylinder
+
+The set-up (located in `exm/ebm/cylinder_visc`) where a flow of Mach number of 0.5 and a Reynolds number of 100. The wall is maintained isothermal  with a wall temperature approximately 5.2 times the free stream.
+The mesh consist of a 400 x 200 mesh, with two levels of refinement close to the body.
+Skew-symmetric 4th order, using dissipation, with constants C2=0.5 and C4=0.016.
+
+FIGURE
+
+Density contour plots can be seen by
+```bash
+$ python plot.py
+```
+
 ## Planar Flame
 
 The set-up (located in `exm/planar_flame`)  corresponds to a freely propagating two-dimensional hydrogen/aire premixed flame at **0.5** equivalence ratio.
@@ -250,7 +264,44 @@ The unburn parameters are (1 atm at 298 K):
 
 The domain is approximately 200 x 200 flame thickness (85 x 85 mm). At these conditions the laminar burning velocity is 0.49 m/s.&#x20;
 
+The flame is initiliased with 1D flame profiles obtained from Cantera (LINK)
+by the addition of the following lines in `prob.h`
 
+```cpp
+    GpuArray<Real, NUM_SPECIES + 4 > pmf_vals = {0.0}; 
+
+    pele::physics::PMF::PmfData::DataContainer *pmf_data = util->pmfData.getDeviceData();
+    pele::physics::PMF::pmf(pmf_data,y1,y2,pmf_vals);
+
+    // PMF--> T,u and Y (P is assumed constant)
+    Tt  = pmf_vals[0];
+    vxt = pmf_vals[1];
+    Real sumrhoY = 0.0;
+    for (int n = 0; n < NUM_SPECIES; ++n) {
+        Yt[n]   = pmf_vals[3+n];    
+    }
+```
+The `void prob_initdata` function has an additional argument
+`Utility* util = nullptr` that passes the Utility
+and the line in `GNUmakefile`:
+```
+USE_UTILITIES = TRUE
+```
+This allow to use the utilities class (see SET-UP).
+In the input file the following options have been set
+
+```
+# Utilities
+cns.use_utility = 1
+# Premixed flame initialisation 
+util.use_PMF = 1
+pmf.datafile = pmf.dat
+pmf.do_cellAverage = 1
+pmf.v = 1
+```
+
+The last one, are the required utility (**PMF**) and options (file name, average, etc).
+It follows [PelePhysics Utility](https://pelephysics.readthedocs.io/en/latest/Utility.html)
 
 {% hint style="danger" %}
 Plots to add, soon ...
