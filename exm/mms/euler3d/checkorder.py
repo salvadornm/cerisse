@@ -16,20 +16,36 @@ yt.funcs.mylog.setLevel("ERROR")  # or "CRITICAL" to suppress almost everything
 
 
 # Exact solution
-x, t = sp.symbols('x t')
-rho = 1 + 0.2 * sp.sin(2*sp.pi * x) 
-u = 1
-p = 1 + 0.3 * sp.cos(2*sp.pi * x)
+x, y, z, t = sp.symbols('x y z t')
+rho = 1.16 + 0.1 * sp.sin(2*sp.pi * x)  + 0.15 * sp.cos(2*sp.pi*y) + 0.2 * sp.sin(6*sp.pi*z) 
+u = 152+ 27.0 * sp.sin(4*sp.pi * x) - 17.0 * sp.cos(2*sp.pi*y) +0.0 * sp.sin(4*sp.pi*z) 
+v = 100 + 69 *sp.sin(4*sp.pi*x)   + 0.0 * sp.cos(4*sp.pi*y)  + +0.0 * sp.sin(2*sp.pi*z) 
+w = 0.0 *sp.sin(4*sp.pi*x)   +0.0 * sp.cos(4*sp.pi*y)  + +0.0 * sp.sin(2*sp.pi*z)  
+p = 1e5 - 350 * sp.sin(2*sp.pi * x) + 60 * sp.cos(4*sp.pi *y) + 25 * sp.sin(6*sp.pi*z) 
+
 
 # functions
-rho_func = sp.lambdify(x, rho, modules=["numpy"])
-u_func   = sp.lambdify(x, u, modules=["numpy"])
-p_func   = sp.lambdify(x, p, modules=["numpy"])
+rho_func = sp.lambdify((x, y, z), rho, modules=["numpy"])
+u_func   = sp.lambdify((x, y, z),   u, modules=["numpy"])
+v_func   = sp.lambdify((x, y, z),   v, modules=["numpy"])
+w_func   = sp.lambdify((x, y, z),   w, modules=["numpy"])
+p_func   = sp.lambdify((x, y, z),   p, modules=["numpy"])
 
+
+# Define the domain
 x_vals = np.linspace(0, 1, 100)
-rho_exact = rho_func(x_vals)
-u_exact = u_func(x_vals)
-p_exact = p_func(x_vals)
+y_vals = np.linspace(0, 1, 100)
+z_vals = np.linspace(0, 1, 100)
+
+# Create 3D grid
+X, Y, Z = np.meshgrid(x_vals, y_vals, z_vals, indexing='ij')
+
+# Evaluate rho_func on the grid
+rho_exact = rho_func(X, Y, Z)
+u_exact   = u_func(X, Y, Z)
+v_exact   = v_func(X, Y, Z)
+w_exact   = w_func(X, Y, Z)
+p_exact   = p_func(X, Y, Z)
 
 # Step 2: Define directories
 base_dirs = sorted([d for d in os.listdir() if re.match(r'plot\d+', d)],
@@ -47,18 +63,20 @@ for dir_name in base_dirs:
     datasets = [file_name]
     ds = yt.load(datasets[0]);
 
-    xaxis = 0
-    lineout = ds.ortho_ray(xaxis, (0, 0))
-    srt = np.argsort(lineout["index", "x"])
+    # Get all cell centers
+    ad = ds.all_data()
+    X0 = ad["index", "x"].to("code_length").ndarray_view()
+    Y0 = ad["index", "y"].to("code_length").ndarray_view()
+    Z0 = ad["index", "z"].to("code_length").ndarray_view()
 
-    x_pred = np.array(lineout["index", "x"])[srt]
-    rho_pred = np.array(lineout["boxlib", "Density"][srt])
+    # Get predicted density
+    rho_pred = ad["boxlib", "Density"].ndarray_view()
 
-    # Evaluate exact solution at numerical x points
-    rho_exact_vals = rho_func(x_pred)
+    # Evaluate exact solution at those points
+    rho_exact_pred = rho_func(X0, Y0, Z0)
 
-    # L2 norm of error
-    abs_error = np.abs(rho_pred - rho_exact_vals)
+    # Compute error density
+    abs_error = np.abs(rho_pred - rho_exact_pred)
     l2_error = np.sqrt(np.mean(abs_error**2))
 
     # Extract resolution (e.g., 16 from plot16)

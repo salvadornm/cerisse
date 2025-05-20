@@ -9,11 +9,12 @@ gamma = sp.Rational(7, 5)  # gamma = 1.4
 
 # Manufactured solution
 # steady
-rho = 1.16 + 0.1 * sp.sin(2*sp.pi * x)  + 0.15 * sp.cos(2*sp.pi*y) + 0.2 * sp.sin(3*sp.pi*z) 
-u = 152+ 27.0 * sp.sin(1.5*sp.pi * x) - 17.0 * sp.cos(0.75*sp.pi*y) +0.0 * sp.sin(3*sp.pi*z) 
-v = 100 + 69 *sp.sin(4*sp.pi*x)   + 0.0 * sp.cos(4*sp.pi*y)  + +0.0 * sp.sin(3*sp.pi*z) 
-w = 0.0 *sp.sin(4*sp.pi*x)   +0.0 * sp.cos(4*sp.pi*y)  + +0.0 * sp.sin(3*sp.pi*z)  
-p = 1e5 - 35000 * sp.sin(2*sp.pi * x) + 6000 * sp.cos(4*sp.pi *y) + 2500 * sp.sin(0.5*sp.pi*z) 
+rho = 1.16 + 0.1 * sp.sin(2*sp.pi * x)  + 0.15 * sp.cos(2*sp.pi*y) + 0.2 * sp.sin(6*sp.pi*z) 
+u = 152+ 27.0 * sp.sin(4*sp.pi * x) - 17.0 * sp.cos(2*sp.pi*y) +0.0 * sp.sin(4*sp.pi*z) 
+v = 100 + 69 *sp.sin(4*sp.pi*x)   + 0.0 * sp.cos(4*sp.pi*y)  + +0.0 * sp.sin(2*sp.pi*z) 
+w = 0.0 *sp.sin(4*sp.pi*x)   +0.0 * sp.cos(4*sp.pi*y)  + +0.0 * sp.sin(2*sp.pi*z)  
+p = 1e5 - 350 * sp.sin(2*sp.pi * x) + 60 * sp.cos(4*sp.pi *y) + 25 * sp.sin(6*sp.pi*z) 
+
 
 # functions
 rho_func = sp.lambdify((x, y, z), rho, modules=["numpy"])

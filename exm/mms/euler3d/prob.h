@@ -25,7 +25,7 @@ struct methodparm_t {
   public:
 
   static constexpr bool dissipation = false;         // no dissipation
-  static constexpr int  order = 4;                  // order numerical scheme
+  static constexpr int  order = 2;                  // order numerical scheme
   static constexpr Real C2skew=0.1,C4skew=0.0016;   // Skew symmetric default
 
 };
@@ -36,13 +36,13 @@ typedef closures_dt<indicies_t, visc_suth_t, cond_suth_t,
 template <typename cls_t > class user_source_t;
 
 // HLLC-Riemann MUSCL
-//typedef rhs_dt<riemann_t<false, ProbClosures>, no_diffusive_t, user_source_t <ProbClosures> >  ProbRHS;
+typedef rhs_dt<riemann_t<false, ProbClosures>, no_diffusive_t, user_source_t <ProbClosures> >  ProbRHS;
 // Skew
 //typedef rhs_dt<skew_t<methodparm_t, ProbClosures>, no_diffusive_t, user_source_t <ProbClosures> > ProbRHS;
 // Rusanov
 //typedef rhs_dt<rusanov_t<ProbClosures>, no_diffusive_t, user_source_t <ProbClosures> >  ProbRHS;
 // WENO & TENO   WenoZ5/Teno5/Teno6
-typedef rhs_dt<weno_t<ReconScheme::Teno6, ProbClosures>, no_diffusive_t, user_source_t <ProbClosures> > ProbRHS;
+//typedef rhs_dt<weno_t<ReconScheme::WenoZ5, ProbClosures>, no_diffusive_t, user_source_t <ProbClosures> > ProbRHS;
 // KEEP 2/4/6
 //typedef rhs_dt<keep_euler_t<false,false,6, ProbClosures>, no_diffusive_t, user_source_t <ProbClosures> > ProbRHS;
 // CD 2/4/6
@@ -61,21 +61,22 @@ prob_initdata(int i, int j, int k, Array4<Real> const &state,
                 const Real *prob_lo = geomdata.ProbLo();
   const Real *dx = geomdata.CellSize();
   Real x = prob_lo[0] + (i + Real(0.5)) * dx[0];
+  Real y = prob_lo[1] + (j + Real(0.5)) * dx[1];
+  Real z = prob_lo[2] + (k + Real(0.5)) * dx[2];
   
   const Real pi = 3.14159265358979323846; // in C++20 std::numbers::pi
 
-  // initial conditions
-  Real rhot = 1.0 + 0.2 * sin(2.0*pi * x);
-  Real Pt   = 1.0 + 0.3 * cos(2.0*pi * x);
-  Real uxt  = 1.0;
+  // initial conditions from mms
+  Real rhot,ut,vt,wt,Pt;
+  mms_exact(x, y, z, rhot, ut, vt, wt, Pt);
+
   
   state(i, j, k, cls.URHO) = rhot;
-  state(i, j, k, cls.UMX)  = rhot * uxt;
-  state(i, j, k, cls.UMY)  = Real(0.0);
-  state(i, j, k, cls.UMZ)  = Real(0.0);
+  state(i, j, k, cls.UMX)  = rhot * ut;
+  state(i, j, k, cls.UMY)  = rhot * vt;
+  state(i, j, k, cls.UMZ)  = rhot * wt;
   Real et = Pt / (cls.gamma - Real(1.0));
-  state(i, j, k, cls.UET) = et + Real(0.5) * rhot * uxt * uxt;
-
+  state(i, j, k, cls.UET) = et + Real(0.5) * rhot * (ut * ut + vt*vt + wt*wt);
 }
 
 AMREX_GPU_DEVICE AMREX_FORCE_INLINE void
@@ -105,19 +106,25 @@ class user_source_t {
     const Real *prob_lo = geomdata.ProbLo();
     const Real *dx = geomdata.CellSize();
 
-    const Real pi = 3.14159265358979323846; // in C++20 std::numbers::pi
-
     amrex::ParallelFor(bx,
       [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept
       {
 
         Real x = prob_lo[0] + (i + Real(0.5)) * dx[0];
+        Real y = prob_lo[1] + (j + Real(0.5)) * dx[1];
+        Real z = prob_lo[2] + (k + Real(0.5)) * dx[2];
 
+        // source terms from mms
+        Real Srho,Srhou,Srhov,Srhow,Srhoe;
+        mms_source(x, y, z, Srho,Srhou,Srhov,Srhow,Srhoe);
+      
         //  MMS Source           
-        rhs(i,j,k,cls_t::URHO) +=  0.4*pi*cos(2.0*pi*x);
-        rhs(i,j,k,cls_t::UMX)  += -0.6*pi*sin(2.0*pi*x) + 0.4*pi*cos(2.0*pi * x);
-        rhs(i,j,k,cls_t::UET)  += -2.1*pi*sin(2.0*pi*x) + 0.2*pi*cos(2.0*pi * x);
-      });
+        rhs(i,j,k,cls_t::URHO) += Srho;
+        rhs(i,j,k,cls_t::UMX)  += Srhou;
+        rhs(i,j,k,cls_t::UMY)  += Srhov;
+        rhs(i,j,k,cls_t::UMZ)  += Srhow;
+        rhs(i,j,k,cls_t::UET)  += Srhoe;
+       });
   };
 };
 
