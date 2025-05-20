@@ -26,6 +26,7 @@ static constexpr Real Rgas     = gas_constant/Mw;  // gas constant
 static constexpr Real Cv       = Rgas/(gam - 1.0);
 static constexpr Real Cp       = gam*Cv;
 
+static constexpr bool srp_on   = false;
 static constexpr int ibm_eorder=1;
   
 //////////////////////////// Physical modelling ////////////////////////////////
@@ -223,7 +224,7 @@ void user_tagging(int i, int j, int k, int nt, auto& tagfab, const auto &sdatafa
   //   refine = foundGP || refine;
   // }
 
-  // RULE 4
+  // RULE 4: refine close to nozzles
   for (int nozz=0;nozz<pparm.nozzles;nozz++) {
     Real xjet = x - pparm.xsrp[nozz];
     Real yjet = y - pparm.ysrp[nozz];
@@ -294,26 +295,29 @@ class ibm_user_t
       // zerograd temperature
       q(1,cls_t::QT)    = q(2,cls_t::QT);
 
-      // uncomment to activate SRP 
-      // locate the SRP ------- (looking in the three nozzles)
-      // NOTE: all xyz points are in the surface
-      for (int nozz=0;nozz<param::nozzles;nozz++) 
+      // activate SRP 
+      if (srp_on)
       {
-        // vector to centre of nozzle  xjet
-        Real xjet = xyz(0) - param::xsrp[nozz];
-        Real yjet = xyz(1) - param::ysrp[nozz];
-        Real zjet = xyz(2) - param::zsrp[nozz];
-        // distance to centre nozlle
-        Real Rjet = sqrt(xjet*xjet + yjet*yjet + zjet*zjet);
-        // detects points close to centre nozzle        
-        if (Rjet < param::Rsrp)
+        // locate the SRP ------- (looking in the three nozzles)
+        // NOTE: all xyz points are in the surface
+        for (int nozz=0;nozz<param::nozzles;nozz++) 
         {
-          q(1,cls_t::QU) = param::u_srp; 
-          q(1,cls_t::QV) = 0.0; 
-          q(1,cls_t::QW) = 0.0; 
-          q(1,cls_t::QPRES) = param::Pt; 
-          q(1,cls_t::QT)    = param::Tt;         
-        }
+          // vector to centre of nozzle  xjet
+          Real xjet = xyz(0) - param::xsrp[nozz];
+          Real yjet = xyz(1) - param::ysrp[nozz];
+          Real zjet = xyz(2) - param::zsrp[nozz];
+          // distance to centre nozlle
+          Real Rjet = sqrt(xjet*xjet + yjet*yjet + zjet*zjet);
+          // detects points close to centre nozzle        
+          if (Rjet < param::Rsrp)
+          {
+            q(1,cls_t::QU) = param::u_srp; 
+            q(1,cls_t::QV) = 0.0; 
+            q(1,cls_t::QW) = 0.0; 
+            q(1,cls_t::QPRES) = param::Pt; 
+            q(1,cls_t::QT)    = param::Tt;         
+          }
+      }
       }
       // -----------
 
