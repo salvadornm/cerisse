@@ -1,6 +1,6 @@
 # Simulation time
 # start time is assumed to be 0, unless re-starting
-max_step  = 1
+max_step  = 5
 stop_time = 0.2
 #time_step = 0.001 
 cfl= 0.01
