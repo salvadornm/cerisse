@@ -134,11 +134,7 @@ void CNS::compute_rhs(MultiFab& statemf, Real dt, FluxRegister* fr_as_crse, Flux
                         dxinv[dir] * (flx(i, j, k, n) - flx(i+vdir[0], j+vdir[1], k+vdir[2], n));
                   });
     }                  
-
-
-  //printinfo_point(" point check 120 320 (aft flux)",mfi, 120,320,0,cls_h.NCONS,cls_h.NPRIM, prims,cons,state);
-  
-                        
+                      
 #if CNS_USE_EB    
     // internal geometry fluxes
     const Box&  ebbox  = mfi.growntilebox(0);  // box without ghost points 
@@ -150,9 +146,6 @@ void CNS::compute_rhs(MultiFab& statemf, Real dt, FluxRegister* fr_as_crse, Flux
     if (fab_with_eb) {
       EBM::eb.ebflux(geom,mfi, prims, {AMREX_D_DECL(&fluxt[0], &fluxt[1], &fluxt[2])},state, cls_d,level);
     }
-
-   // printinfo_point("(aft fluxwall)",mfi, 120,320,0,cls_h.NCONS,cls_h.NPRIM, prims,cons,state);
-
 
     // redistribution 
     // WARNING: state is  the RHS array, prims is the prims 
@@ -166,8 +159,6 @@ void CNS::compute_rhs(MultiFab& statemf, Real dt, FluxRegister* fr_as_crse, Flux
     // do redistribution only in box with EB
     if (eb_redistribution && fab_with_eb){      
 
-      // printf(" redisting .. \n");
-
       EBM::eb.redist(geom,mfi,cons,divc, {AMREX_D_DECL(&fluxt[0], &fluxt[1], &fluxt[2])},
                     state, cls_d,level,dt,h_phys_bc);
     }                    
@@ -175,7 +166,7 @@ void CNS::compute_rhs(MultiFab& statemf, Real dt, FluxRegister* fr_as_crse, Flux
 
 #endif 
 
-    // Source terms, including update mask (e.g inside IB)
+    // Source terms
     prob_rhs.src(geom,mfi, prims, state, cls_d, dt);
 
     // Set solid point RHS to 0  (state hold RHS at this point)

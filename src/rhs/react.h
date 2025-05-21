@@ -51,7 +51,7 @@ class reactor_t {
    * @param dt     The time step size. (react() requires it to be non-const)
    */
   // https://www.codeproject.com/Articles/48575/How-to-Define-a-Template-Class-in-a-h-File-and-Imp
-  void inline src(const amrex::MFIter& mfi,
+  void inline src(const Geometry& /*geomdata*/, const amrex::MFIter& mfi,
                   const amrex::Array4<const amrex::Real>& prims,
                   const amrex::Array4<amrex::Real>& rhs, const cls_t* cls_d,
                   amrex::Real dt) {

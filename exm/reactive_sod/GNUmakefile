@@ -1,6 +1,7 @@
 # AMReX
 DIM = 1
 COMP = gnu
+CXXSTD = c++20
 PRECISION = DOUBLE
 
 # Profiling

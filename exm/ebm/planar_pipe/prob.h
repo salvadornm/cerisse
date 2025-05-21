@@ -197,7 +197,7 @@ bcnormal(const Real x[AMREX_SPACEDIM], Real dratio, const Real s_int[ProbClosure
 template <typename cls_t>
 class user_source_t {
   public:
-  void inline src(const amrex::MFIter &mfi,
+  void inline src(const Geometry& /*geomdata*/, const amrex::MFIter &mfi,
                   const amrex::Array4<const amrex::Real> &prims,
                   const amrex::Array4<amrex::Real> &rhs, const cls_t *cls_d,
                   amrex::Real dt){

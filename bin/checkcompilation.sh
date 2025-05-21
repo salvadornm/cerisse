@@ -21,6 +21,8 @@ MAKE_DIRS=(
 	"../exm/ebm/combustor/"
 	"../exm/planar_flame/"	
 	"../exm/ibm/sphere/"
+	"../exm/ibm/srp/"
+	"../exm/mms/euler3d/"
 	"../tst/tutorial/"
 )
 	
