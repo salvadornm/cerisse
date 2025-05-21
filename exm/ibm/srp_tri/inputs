@@ -2,10 +2,10 @@
 #                                 INPUT FILE
 #------------------------------------------------------------------------------#
 # start time is assumed to be 0, unless re-starting
-max_step  = 5000
+max_step  = 2000
 stop_time = 10.0
-#time_step = 1.0e-5
-cfl = 0.1
+#time_step = 1.0e-7
+cfl = 0.4
 
 cns.order_rk  = 3 // -2, 1, 2 or 3
 cns.stages_rk = 3 // 1, 2 or 3
@@ -32,9 +32,9 @@ geometry.prob_hi     =   0.64    0.595  0.595   # centre geometry at 0.275,0.275
 amr.n_cell           =   64    64   64
 
 #-------------------------------- REFINEMENT / REGRIDDING ---------------------#
-amr.max_level        = 2       # maximum level number allowed
-amr.ref_ratio       = 2  # refinement ratio
-amr.regrid_int      = 10   # how often to regrid
+amr.max_level        = 2    # maximum level number allowed
+amr.ref_ratio       = 2    # refinement ratio
+amr.regrid_int      = 20   # how often to regrid
 amr.blocking_factor_x = 8  # blocking factor in x per level
 amr.blocking_factor_y = 8  # blocking factor in x per level
 amr.blocking_factor_z = 8  # blocking factor in x per level
@@ -47,14 +47,14 @@ amr.grid_eff        = 0.8     # what constitutes an efficient grid
 #-------------------------------- PLOTFILES -----------------------------------#
 amr.plot_files_output = 1
 amr.plot_file         = ./plot/plt # root name of plotfile
-amr.plot_int          = 20     # number of timesteps between plotfiles
+amr.plot_int          = 100     # number of timesteps between plotfiles
 amr.derive_plot_vars  = pressure velocity temperature
 amr.v = 1 # 0=quiet, 1=verbose
 
 amr.checkpoint_files_output = 1
 amr.check_file              = chk    # root name of checkpoint file
-amr.check_int               = 2000    # number of timesteps between checkpoints
-#amr.restart                 = chk03000
+amr.check_int               = 1000    # number of timesteps between checkpoints
+#amr.restart                 = chk00100
 amrex.the_arena_is_managed=1 # NOTE: computing markers on CPU relies on this option
 
 

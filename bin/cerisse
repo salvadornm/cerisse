@@ -105,7 +105,8 @@ case  $1 in
 	cp inputs $2	
 	cp GNUmakefile $2
 	cp *.py $2
-	mv *chk $2
+	mv chk* $2
+	nv screen $2
 	mv *.visit $2
 	mv plot $2/
 	echo -e "\\033[1;32m  DONE  \\033[0m"
