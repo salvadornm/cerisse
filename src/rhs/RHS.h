@@ -7,6 +7,7 @@
 // Euler numerical methods
 #include <Weno.h>
 #include <CentralKEEP.h>
+#include <CentralDif.h>
 #include <Riemann.h>
 #include <Rusanov.h>
 #include <Skew.h>
@@ -36,8 +37,8 @@ public:
   void eflux_ibm(Args&&... args){}
 #else  
   //void eflux(Args&&... args){}
-  void eflux(const Geometry& geom, const MFIter& mfi,
-    const Array4<Real>& prims, std::array<FArrayBox*, AMREX_SPACEDIM> const &flxt,            
+  void eflux(const Geometry& /*geom*/, const MFIter& /*mfi*/,
+    const Array4<Real>& /*prims*/, std::array<FArrayBox*, AMREX_SPACEDIM> const &flxt,            
     const Array4<Real>& rhs, Args&&... args) { }
 #endif  
 };
