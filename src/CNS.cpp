@@ -115,13 +115,15 @@ void CNS::read_params() {
     }
   }
 
-  //  Utilities options ----------------
+  //  Utilities options ----------------------------------------------------
+  // specific keywords for Utilities
   pp.query("use_utility",use_utility);
   if (use_utility)
   {
     amrex::Print() << " Using Utilities " << std::endl;      
     ParmParse pp_util("util");
 
+    // PMF
     bool use_PMF=false;
     pp_util.query("use_PMF",use_PMF); 
     if (use_PMF){
@@ -132,6 +134,17 @@ void CNS::read_params() {
       amrex::Abort("using PMF files need PelePhysics");
 #endif
     }  
+
+    // Read from file
+    bool use_turb_file  = false;
+    pp_util.query("use_turb_file",use_turb_file); 
+    if (use_turb_file){
+      std::string turbfilename;
+      pp_util.query("turb_file",turbfilename); 
+      amrex::Print() << " Reading turbulence from file: " << turbfilename << std::endl; 
+      CNS::utilidades.initTurbulenceFile(turbfilename);
+    }
+
   }
 
 #if AMREX_USE_GPIBM
