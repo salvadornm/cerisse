@@ -54,9 +54,8 @@ class keep_euler_t {
                     const Array4<Real>& prims, std::array<FArrayBox*, AMREX_SPACEDIM> const &flxt,
                     const Array4<Real>& cons, const cls_t* cls) {
 
-    const GpuArray<Real, AMREX_SPACEDIM> dxinv = geom.InvCellSizeArray();
-    const Box& bx  = mfi.growntilebox(0);
-    const Box& bxg = mfi.growntilebox(cls_t::NGHOST);
+    // const Box& bx  = mfi.growntilebox(0);
+    // const Box& bxg = mfi.growntilebox(cls_t::NGHOST);
     const Box& bxgnodal = mfi.grownnodaltilebox(
         -1, 0);  // extent is 0,N_cell+1 in all directions -- -1 means for all
                  // directions. amrex::surroundingNodes(bx) does the same
@@ -69,7 +68,6 @@ class keep_euler_t {
     for (int dir = 0; dir < AMREX_SPACEDIM; dir++) {
 
       auto const& flx = flxt[dir]->array(); 
-
 
       ParallelFor(bxgnodal,
                   [=, *this] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {

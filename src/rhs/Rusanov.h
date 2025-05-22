@@ -27,7 +27,6 @@ class rusanov_t {
                     const Array4<Real>& rhs, const cls_t* cls) {
 #endif
 
-    const GpuArray<Real, AMREX_SPACEDIM> dxinv = geom.InvCellSizeArray();
     const Box& bx  = mfi.growntilebox(0);
     const Box& bxg = mfi.growntilebox(cls->NGHOST);
     const Box& bxgnodal = mfi.grownnodaltilebox(
@@ -70,13 +69,6 @@ class rusanov_t {
                   [=,*this] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {
                     this->flux_dir(i, j, k, vdir, cons, cell_fluxes, lambda_max, flx, cls);      
                   });
-
-      // add flux derivative to rhs = -(fi+1 - fi)/dx = (fi - fi+1)/dx
-      // ParallelFor(bx, cls_t::NCONS,
-      //             [=] AMREX_GPU_DEVICE(int i, int j, int k, int n) noexcept {
-      //               rhs(i, j, k, n) +=
-      //                   dxinv[dir] * (flx(i, j, k, n) - flx(i+vdir[0], j+vdir[1], k+vdir[2], n));
-      //             });
     }
   }
 

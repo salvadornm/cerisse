@@ -41,7 +41,7 @@ class transport_suth_t {
     return cond_ref * T * sqrt(T) / (Tcond_ref + T);
   }
 
-  AMREX_GPU_DEVICE AMREX_FORCE_INLINE Real xi(Real& T) const {
+  AMREX_GPU_DEVICE AMREX_FORCE_INLINE Real xi(Real& /*T*/) const {
     return xi_ref;
   }
 

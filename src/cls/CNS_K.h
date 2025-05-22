@@ -84,7 +84,7 @@ inline void derdensity(const Box& bx, FArrayBox& derfab, int dcomp, int ncomp,
 }
 
 inline void derkineticenergy(const Box& bx, FArrayBox& derfab, int dcomp,
-                             int ncomp, const FArrayBox& datfab,
+                             int /*ncomp*/, const FArrayBox& datfab,
                              const Geometry& /*geomdata*/, Real /*time*/,
                              const int* /*bcrec*/, const int /*level*/) {
   auto const dat = datfab.const_array();
@@ -123,14 +123,14 @@ inline void dermagvort(const Box& bx, FArrayBox& derfab, int dcomp, int ncomp,
     for (int n = 0; n < NUM_SPECIES; ++n) {
       rho += dat(i, j, k, cls->UFS + n);
     }
-    AMREX_D_TERM(larr(i, j, k, 0) = dat(i, j, k, cls->UMX) / rho;
-                 , larr(i, j, k, 1) = dat(i, j, k, cls->UMY) / rho;
-                 , larr(i, j, k, 2) = dat(i, j, k, cls->UMZ) / rho;)
+    AMREX_D_TERM( larr(i, j, k, 0) = dat(i, j, k, cls->UMX) / rho;
+                , larr(i, j, k, 1) = dat(i, j, k, cls->UMY) / rho;
+                , larr(i, j, k, 2) = dat(i, j, k, cls->UMZ) / rho;)
   });
 
-  AMREX_D_TERM(const amrex::Real dx = geomdata.CellSize(0);
-               , const amrex::Real dy = geomdata.CellSize(1);
-               , const amrex::Real dz = geomdata.CellSize(2);)
+  AMREX_D_TERM( const amrex::Real dx = geomdata.CellSize(0);
+              , const amrex::Real dy = geomdata.CellSize(1);
+              , const amrex::Real dz = geomdata.CellSize(2);)
 
   // Calculate vorticity
   amrex::ParallelFor(bx, [=] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {
@@ -153,7 +153,7 @@ inline void dermagvort(const Box& bx, FArrayBox& derfab, int dcomp, int ncomp,
   });
 }
 
-inline void derenstrophy(const Box& bx, FArrayBox& derfab, int dcomp, int ncomp,
+inline void derenstrophy(const Box& bx, FArrayBox& derfab, int dcomp, int /*ncomp*/,
                          const FArrayBox& datfab, const Geometry& geomdata,
                          Real /*time*/, const int* /*bcrec*/,
                          const int /*level*/) {

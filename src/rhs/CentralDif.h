@@ -31,9 +31,8 @@ class centraldif_t {
                     const Array4<Real>& prims, std::array<FArrayBox*, AMREX_SPACEDIM> const &flxt,
                     const Array4<Real>& cons, const cls_t* cls) {
                       
-    const GpuArray<Real, AMREX_SPACEDIM> dxinv = geom.InvCellSizeArray();
-    const Box& bx  = mfi.growntilebox(0);
-    const Box& bxg = mfi.growntilebox(cls->NGHOST);
+    // const Box& bx  = mfi.growntilebox(0);
+    // const Box& bxg = mfi.growntilebox(cls->NGHOST);
     const Box& bxgnodal = mfi.grownnodaltilebox(
         -1, 0);  // extent is 0,N_cell+1 in all directions -- -1 means for all
                  // directions. amrex::surroundingNodes(bx) does the same
@@ -56,7 +55,7 @@ class centraldif_t {
   // compute flux in each direction at f[i-1/2]   stored in i,j,k
   // central formulation following f[i-1/2] = 1/2 (fi + fi-1)
   AMREX_GPU_DEVICE AMREX_FORCE_INLINE void flux_dir(
-    int i, int j, int k, int dir,const GpuArray<int, 3>& vdir, const Array4<Real>& cons, const Array4<Real>& prims, const Array4<Real>& flx,
+    int i, int j, int k, int dir,const GpuArray<int, 3>& vdir, const Array4<Real>& /*cons*/, const Array4<Real>& prims, const Array4<Real>& flx,
     const cls_t* cls) const {
     
     Real flux_l[cls_t::NCONS];

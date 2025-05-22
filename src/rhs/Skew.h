@@ -190,8 +190,7 @@ class skew_t {
                     const Array4<Real>& cons, const cls_t* cls) {
 #endif
 
-
-    const Box& bx  = mfi.growntilebox(0);
+    //const Box& bx  = mfi.growntilebox(0);
     const Box& bxg = mfi.growntilebox(cls->NGHOST);
     const Box& bxgnodal = mfi.grownnodaltilebox(
         -1, 0);  // extent is 0,N_cell+1 in all directions -- -1 means for all
@@ -210,10 +209,9 @@ class skew_t {
     //   rhs(i, j, k, n)=0.0;              
     //   });
 
-    int imask = 3; // reduce order 
-    // get global index
-    const int* domlo = geom.Domain().loVect();
-    const int* domhi = geom.Domain().hiVect();
+    // int imask = 3; // reduce order 
+    // const int* domlo = geom.Domain().loVect();
+    // const int* domhi = geom.Domain().hiVect();
 
     // masking BC here function of global geometry  (only non-periodic dirs)       
     // for (int l = 0; l < AMREX_SPACEDIM; l++) {  
@@ -275,8 +273,8 @@ class skew_t {
   // V velocity vector               (ux,uy,uz)    //
   // fi = 1/2 ( U + Ui-1) * 1/2 *(V + Vi-1)  (example of second order)
   AMREX_GPU_DEVICE AMREX_FORCE_INLINE void flux_dir(
-    int i, int j, int k, int Qdir,const GpuArray<int, 3>& vdir, const Array4<Real>& cons, const Array4<Real>& prims, const Array4<Real>& lambda_max, const Array4<Real>& flx,
-    const cls_t* cls) const {
+    int i, int j, int k, int Qdir,const GpuArray<int, 3>& vdir, const Array4<Real>& cons, const Array4<Real>& prims, 
+    const Array4<Real>& /*lambda_max*/, const Array4<Real>& flx, const cls_t* cls) const {
     
     Real V[order],P[order];
     Real U[order][cls_t::NCONS];
@@ -393,8 +391,6 @@ class skew_t {
 
     int i0[3],i1[3],i2[3],i3[3];
  
-    const int idir = Qdir -1;
-
     // calculate sensor    
     Real p0,p1,p2,p3;
     Real sen_num= Real(0.0),sen_denom=Real(1.0e-16);
@@ -479,14 +475,14 @@ class skew_t {
 
   // .............................................................
   AMREX_GPU_DEVICE AMREX_FORCE_INLINE void fluxdissip_dir(
-    int i, int j, int k, int Qdir,const GpuArray<int, 3>& vdir, const Array4<Real>& cons, const Array4<Real>& prims, const Array4<Real>& lambda, const Array4<Real>& flx,
+    int i, int j, int k, int Qdir,const GpuArray<int, 3>& vdir, const Array4<Real>& cons, const Array4<Real>& prims, const Array4<Real>& /* lambda */, const Array4<Real>& flx,
     const cls_t* cls) const {
          
     int ir = i+vdir[0];   int jr = j+vdir[1];   int kr = k+vdir[2];   
     int il = i-vdir[0];   int jl = j-vdir[1];   int kl = k-vdir[2];   
     int ill= il-vdir[0]; int jll = jl-vdir[1]; int kll= kl-vdir[2];   
  
-    const int idir = Qdir -1;
+    // const int idir = Qdir -1;
 
     // calculate sensor    
     Real p0,p1,p2,p3;

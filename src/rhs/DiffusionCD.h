@@ -144,10 +144,10 @@ class diffusiveheat_t {
       int i, int j, int k, int dir,const GpuArray<int, 3>& vdir,
       amrex::Array4<amrex::Real> const& fx,
       amrex::Array4<const amrex::Real> const& prims,
-      amrex::Array4<const amrex::Real> const& mu_arr,
+      amrex::Array4<const amrex::Real> const& /* mu_arr */,
       amrex::Array4<const amrex::Real> const& lam_arr,
       amrex::GpuArray<amrex::Real, amrex::SpaceDim> const& dxinv,
-      const cls_t* cls) const {
+      const cls_t* /* cls */) const {
 
     using amrex::Real;    
 

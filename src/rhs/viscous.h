@@ -6,8 +6,11 @@
 
 #include <Constants.h>
 #include <TransPele.h>
+#include <LES.h>
+
 
 #include "diff_ops.H"
+
 template <typename param, typename cls_t>
 class viscous_t {
 
@@ -126,7 +129,6 @@ class viscous_t {
     //   }      
     // });    
     //
-
 
 
     // if (LES)   Pseudo-code for LES

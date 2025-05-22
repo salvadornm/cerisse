@@ -9,7 +9,7 @@ class visc_const_t {
  public:
   Real visc_ref = param::viscosity;
 
-  AMREX_GPU_DEVICE AMREX_FORCE_INLINE Real visc(const Real& T) const {
+  AMREX_GPU_DEVICE AMREX_FORCE_INLINE Real visc(const Real& /*T*/) const {
     return visc_ref;
   }
 };
@@ -33,7 +33,7 @@ class cond_const_t {
  public:
   Real cond_ref = param::conductivity;
   
-  AMREX_GPU_DEVICE AMREX_FORCE_INLINE Real cond(Real& T) const {
+  AMREX_GPU_DEVICE AMREX_FORCE_INLINE Real cond(Real& /*T*/) const {
     return cond_ref;
   }
 
