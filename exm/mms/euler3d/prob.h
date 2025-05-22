@@ -36,7 +36,7 @@ typedef closures_dt<indicies_t, visc_suth_t, cond_suth_t,
 template <typename cls_t > class user_source_t;
 
 // HLLC-Riemann MUSCL
-typedef rhs_dt<riemann_t<false, ProbClosures>, no_diffusive_t, user_source_t <ProbClosures> >  ProbRHS;
+//typedef rhs_dt<riemann_t<false, ProbClosures>, no_diffusive_t, user_source_t <ProbClosures> >  ProbRHS;
 // Skew
 //typedef rhs_dt<skew_t<methodparm_t, ProbClosures>, no_diffusive_t, user_source_t <ProbClosures> > ProbRHS;
 // Rusanov
@@ -44,7 +44,7 @@ typedef rhs_dt<riemann_t<false, ProbClosures>, no_diffusive_t, user_source_t <Pr
 // WENO & TENO   WenoZ5/Teno5/Teno6
 //typedef rhs_dt<weno_t<ReconScheme::WenoZ5, ProbClosures>, no_diffusive_t, user_source_t <ProbClosures> > ProbRHS;
 // KEEP 2/4/6
-//typedef rhs_dt<keep_euler_t<false,false,6, ProbClosures>, no_diffusive_t, user_source_t <ProbClosures> > ProbRHS;
+typedef rhs_dt<keep_euler_t<false,false,4, ProbClosures>, no_diffusive_t, user_source_t <ProbClosures> > ProbRHS;
 // CD 2/4/6
 //typedef rhs_dt<centraldif_t<false,false,6, ProbClosures>, no_diffusive_t, user_source_t <ProbClosures> > ProbRHS;
 
