@@ -112,32 +112,32 @@ class viscous_t {
         });
 #endif     
 
-    // TEST properties    
-    // amrex::ParallelFor( bxg, [=, *this] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {              
-    //   printf(" i = %d j=%d k= %d \n");
-    //   const Real rho= prims(i,j,k,cls_t::QRHO);
-    //   std::cout << " T " << prims(i,j,k,cls_t::QT) << std::endl;
-    //   std::cout << " rho " << rho << std::endl;      
-    //   for (int n=0;n<NUM_SPECIES; n++){
-    //     std::cout << " spec= " << n << " Y " << prims(i,j,k,cls_t::QFS +n) << std::endl;
-    //   }
-    //   std::cout << " visc " << mu_arr(i,j,k) << std::endl;
-    //   std::cout << " cond " << lam_arr(i,j,k) << std::endl;
-    //   std::cout << " xi   " << xi_arr(i,j,k) << std::endl;
-    //   for (int n=0;n<NUM_SPECIES; n++){        
-    //     printf(" spec= %d rhoD= %f D= %f \n",n,rhoD_arr(i,j,k,n),rhoD_arr(i,j,k,n)/rho );
-    //   }      
-    // });    
-    //
+    // -------  LES Options  ----------- //
+    if (param::use_LES)
+    {
+      const GpuArray<Real, AMREX_SPACEDIM> dx = geom.CellSizeArray(); // mesh sizes
+      Real Delta = cls->calc_delta(dx); // compute filter width
+      Real mu_sgs,cond_sgs, diff_sgs;
+      // loop over cells (including enough ghost to build stencil)  
+      const Box& bxgs = mfi.growntilebox(halfsten);   
+      // BEWARE cannot go over all the ghost cell !! 
+      // for viscous order 2, LES order can be  2,4
+      // for viscous order 4, LES order can be  2
+      // for viscous order 6, LES cannot be used
+      amrex::ParallelFor( bxgs, [=, *this] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {
 
+        Real Cp_o_Pr = lam_arr(i,j,k)/mu_arr(i,j,k); 
+        cls-> compute_sgsterms(i,j,k,prims, dxinv, Delta, Cp_o_Pr,  mu_sgs, cond_sgs, diff_sgs);
+        mu_arr(i,j,k) += mu_sgs;
+        lam_arr(i,j,k)+= cond_sgs;   
+        for (int n=0;n<NUM_SPECIES; n++){        
+          rhoD_arr(i,j,k,n) += diff_sgs;
+        }   
+       // xi_arr(i,j,k) += xi_sgs; 
+      }); 
+    }          
 
-    // if (LES)   Pseudo-code for LES
-    // {
-    //  cls->compute_sgsterms(prims(UX-UZ)) 
-    //  muarr+= cls->musgs()
-    //  lamarr+=  ls->lamsgs()
-    // }
-    
+  
     // loop over directions -----------------------------------------------
     for (int dir = 0; dir < AMREX_SPACEDIM; dir++) {
      // GpuArray<int, 3> vdir = {int(dir == 0), int(dir == 1), int(dir == 2)};

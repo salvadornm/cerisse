@@ -168,6 +168,9 @@ class CNS : public amrex::AmrLevel {
   static bool eb_redistribution;
   static std::string eb_redistribution_type;
 
+  // LES -variables
+  static bool use_LES;
+
  public:
   /*static inline*/ PROB::ProbRHS prob_rhs;
   static PROB::ProbClosures* h_prob_closures;

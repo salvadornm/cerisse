@@ -4,7 +4,7 @@
 #include <CNSconstants.h>
 
 //////////////////////////////// LES TEMPLATE /////////////////////////////////
-template <typename param, typename cls_t>
+template <typename param, typename idx_t>
 class LES_t {
 
   public:
@@ -14,18 +14,11 @@ class LES_t {
   AMREX_GPU_HOST_DEVICE
   ~LES_t() {}
 
-  const Real Prsgs = param::Prsgs;
-  const Real Scsgs = param::Scsgs;
-  const Real Delta = param::Delta;
-  const bool fixDelta = param::fixDelta;
-  const Real CI = param::CI;  // Yoshizawa constant
-  const Real Cs = param::Cs;  // Smagorinky constant
-
+  static constexpr Real Pr_o_Prsgs = param::Pr_o_Prsgs;
   const int order  = param::order;
-  static constexpr Real Prsgs_inv = 1.0/param::Prsgs;
   static constexpr Real Scsgs_inv = 1.0/param::Scsgs;
   // Indexes
-  static constexpr int QUn[3]={cls_t::QU,cls_t::QV,cls_t::QW};
+  static constexpr int QUn[3]={idx_t::QU,idx_t::QV,idx_t::QW};
   // WALE constant
   static constexpr Real Cw = std::sqrt(10.6) * param::Cs;
     
@@ -68,13 +61,13 @@ class LES_t {
 };
 
 //////////////////////////////// SMAG TEMPLATE /////////////////////////////////
-template <typename param, typename cls_t>
-class Smagorinsky_t : public LES_t<param, cls_t> {
+template <typename param, typename idx_t>
+class Smagorinsky_t : public LES_t<param, idx_t> {
 
   public :
 
   /**
-   * \brief calculates sub-grid viscosiy
+   * \brief calculates sub-grid viscosity
    * \param[in] i,j,k,dxinv,delta
    * \param[out] mu_T 
   */
@@ -82,13 +75,13 @@ class Smagorinsky_t : public LES_t<param, cls_t> {
   const int i, const int j, const int k, const Array4<const Real>& q,
   const GpuArray<Real, AMREX_SPACEDIM>& dxinv, const Real delta, Real& mu_T)
   {
-    // Calculate derivatives at cell centers, second order central difference
+    // Calculate derivatives at cell centers uisng  central differences
     const amrex::IntVect iv{AMREX_D_DECL(i, j, k)};
     Real dUdx[3][3] = {{0.0}};
     // finite difference central order 2/4/6
     for (int m = 0; m < AMREX_SPACEDIM; m++) {
       for (int n = 0; n < AMREX_SPACEDIM; n++) {
-        dUdx[m][n]  = normal_diff<param::order>(iv, n, this->QUn[m], q, dxinv); // dUmdn
+        dUdx[m][n]  = normal_diff_cc<param::order>(iv, n, this->QUn[m], q, dxinv); // dUmdn
      }
     }
     // || Sij ||
@@ -109,11 +102,11 @@ class Smagorinsky_t : public LES_t<param, cls_t> {
   */
   AMREX_GPU_DEVICE AMREX_FORCE_INLINE void cond_sgs(
   const int i, const int j, const int k, const Array4<const Real>& q,
-  const GpuArray<Real, AMREX_SPACEDIM>& dxinv, const Real delta, const Real& Cp, Real& cond_T)
+  const GpuArray<Real, AMREX_SPACEDIM>& dxinv, const Real delta, const Real& Cp_o_Pr, Real& cond_T)
   {
     Real mu_T;
     visc_sgs(i,j,k,q,dxinv,delta,mu_T);
-    cond_T = mu_T*this->Prsgs_inv*Cp;
+    cond_T = mu_T*this->Pr_o_Prsgs*Cp_o_Pr;
   }  
   /**
    * \brief calculates sub-grid diffusivity
@@ -135,11 +128,11 @@ class Smagorinsky_t : public LES_t<param, cls_t> {
   */
   AMREX_GPU_DEVICE AMREX_FORCE_INLINE void compute_sgsterms(
   const int i, const int j, const int k, const Array4<const Real>& q,
-  const GpuArray<Real, AMREX_SPACEDIM>& dxinv, const Real delta, const Real& Cp, 
+  const GpuArray<Real, AMREX_SPACEDIM>& dxinv, const Real delta, const Real& Cp_o_Pr, 
   Real& mu_T, Real& cond_T, Real& rhoD_T)
   {
     visc_sgs(i,j,k,q,dxinv,delta,mu_T);
-    cond_T = mu_T*this->Prsgs_inv*Cp;
+    cond_T = mu_T*param::Pr_o_Prsgs*Cp_o_Pr;
     rhoD_T = mu_T*this->Scsgs_inv;
   }  
   /**
@@ -158,8 +151,8 @@ class Smagorinsky_t : public LES_t<param, cls_t> {
 
 };
 //////////////////////////////// SMAG TEMPLATE /////////////////////////////////
-template <typename param, typename cls_t>
-class WALE_t : public LES_t<param, cls_t> {
+template <typename param, typename idx_t>
+class WALE_t : public LES_t<param, idx_t> {
 
 public :
 
@@ -173,7 +166,7 @@ public :
     // finite difference central order 2/4/6
     for (int m = 0; m < AMREX_SPACEDIM; m++) {
       for (int n = 0; n < AMREX_SPACEDIM; n++) {
-        dUdx[m][n]  = normal_diff<param::order>(iv, n, this->QUn[m], q, dxinv); // dUmdn
+        dUdx[m][n]  = normal_diff_cc<param::order>(iv, n, this->QUn[m], q, dxinv); // dUmdn
      }
     }
     //
@@ -205,11 +198,11 @@ public :
   }
   AMREX_GPU_DEVICE AMREX_FORCE_INLINE void cond_sgs(
   const int i, const int j, const int k, const Array4<const Real>& q,
-  const GpuArray<Real, AMREX_SPACEDIM>& dxinv, const Real delta, const Real& Cp, Real& cond_T)
+  const GpuArray<Real, AMREX_SPACEDIM>& dxinv, const Real delta, const Real& Cp_o_Pr, Real& cond_T)
   {
     Real mu_T;
     visc_sgs(i,j,k,q,dxinv,delta,mu_T);
-    cond_T = mu_T*this->Prsgs_inv*Cp;
+    cond_T = mu_T*this->Prsgs_o_Pr*Cp_o_Pr;
   }  
   /**
    * \brief calculates sub-grid diffusivity
@@ -231,11 +224,11 @@ public :
   */
   AMREX_GPU_DEVICE AMREX_FORCE_INLINE void compute_sgsterms(
   const int i, const int j, const int k, const Array4<const Real>& q,
-  const GpuArray<Real, AMREX_SPACEDIM>& dxinv, const Real delta, const Real& Cp, 
+  const GpuArray<Real, AMREX_SPACEDIM>& dxinv, const Real delta, const Real& Cp_o_Pr, 
   Real& mu_T, Real& cond_T, Real& rhoD_T)
   {
     visc_sgs(i,j,k,q,dxinv,delta,mu_T);
-    cond_T = mu_T*this->Prsgs_inv*Cp;
+    cond_T = mu_T*this->Pr_o_Prsgs*Cp_o_Pr;
     rhoD_T = mu_T*this->Scsgs_inv;
   }  
   /**

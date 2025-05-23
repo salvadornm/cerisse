@@ -41,10 +41,7 @@ struct methodparm_t {
 
   static constexpr int  order = 2;                  // order numerical scheme viscous
   static constexpr Real conductivity = 0.0262;      // conductivity (for constant value)
-  static constexpr Real viscosity    = 1.0/Reynolds;// viscosity    (for constant value)
-
-  static constexpr bool solve_viscterms_only = true;
-  
+  static constexpr Real viscosity    = 1.0/Reynolds;// viscosity    (for constant value)  
 };
 
 inline Vector<std::string> cons_vars_names={"Xmom","Ymom","Zmom","Energy","Density"};

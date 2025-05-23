@@ -4,8 +4,10 @@
 #include <AMReX_FArrayBox.H>
 #include <AMReX_Geometry.H>
 #include <AMReX_ParmParse.H>
+
 #include <Closures.h>
 #include <RHS.h>
+#include <LES.h>
 #include "Utilities.h"
 
 using namespace amrex;
@@ -15,8 +17,10 @@ namespace PROB {
 // problem parameters
 struct ProbParm {
   Real u0= 1.0;
-  Real p0= 100000.0;
+  Real p0= 10000.0;
   Real rho0= 1.0;
+  Real gamma = 1.4;
+  Real c0 = std::sqrt(gamma*p0/rho0);
 };
 
 // numerical method parameters
@@ -29,9 +33,34 @@ struct methodparm_t {
   static constexpr Real C2skew=0.1,C4skew=0.0016;   // Skew symmetric default
 
 };
+// LES parameters
+struct LESparm_t {
+
+  public:
+
+  static constexpr int  order = 2;        // order numerical scheme (for gradient estimation)
+  static constexpr Real Pr_o_Prsgs = 0.8; // Pr/Prsgs
+  static constexpr Real Scsgs = 0.7;      // sgs Sc
+  static constexpr Real Cs = 0.1;         // Smagorinsky constant
+  static constexpr Real CI = 0.08;        // Yoshizawa constant
+  static constexpr bool fixDelta = true;  // Fix filter witdth
+  static constexpr Real Delta = 0.02;     // Filter width (if above true)  L/20
+};
+
+
+struct viscparm_t {
+
+  public :
+
+  static constexpr int  order = 2;
+  static constexpr bool use_LES = true;
+
+};
+
+// changes indicies_t to indicesgen_t<4>, which allocates more ghost points
 
 typedef closures_dt<indicies_t, visc_suth_t, cond_suth_t,
-                    calorifically_perfect_gas_t<indicies_t>> ProbClosures;
+                    calorifically_perfect_gas_t<indicies_t>, Smagorinsky_t<LESparm_t,indicies_t> > ProbClosures;
 
 template <typename cls_t > class user_source_t;
 
@@ -49,7 +78,11 @@ template <typename cls_t > class user_source_t;
 typedef rhs_dt<centraldif_t<false,false,4, ProbClosures>, no_diffusive_t, no_source_t > ProbRHS;
 
 void inline inputs() {
+  ProbParm data;
+  amrex::Print() << "**************  " << std::endl;
   amrex::Print() << " HIT test  " << std::endl;
+  amrex::Print() << " Ma_rms =  " << data.u0/data.c0 << std::endl;
+  amrex::Print() << "**************  " << std::endl;
 }
 
 //-------------------------------------------------------------------------------------------
@@ -59,11 +92,11 @@ AMREX_GPU_DEVICE AMREX_FORCE_INLINE void prob_initdata(
   GeometryData const &geomdata, ProbClosures const &cls,
   ProbParm const &prob_parm, Utility* util = nullptr) {
 
-  const Real *prob_lo = geomdata.ProbLo();
-  const Real *dx = geomdata.CellSize();
-  Real x = prob_lo[0] + (i + Real(0.5)) * dx[0];
-  Real y = prob_lo[1] + (j + Real(0.5)) * dx[1];
-  Real z = prob_lo[2] + (k + Real(0.5)) * dx[2];
+  // const Real *prob_lo = geomdata.ProbLo();
+  // const Real *dx = geomdata.CellSize();
+  // Real x = prob_lo[0] + (i + Real(0.5)) * dx[0];
+  // Real y = prob_lo[1] + (j + Real(0.5)) * dx[1];
+  // Real z = prob_lo[2] + (k + Real(0.5)) * dx[2];
   
   // initial conditions rho P
   Real rhot = prob_parm.rho0;

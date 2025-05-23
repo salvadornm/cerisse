@@ -38,8 +38,8 @@ public:
 #else  
   //void eflux(Args&&... args){}
   void eflux(const Geometry& /*geom*/, const MFIter& /*mfi*/,
-    const Array4<Real>& /*prims*/, std::array<FArrayBox*, AMREX_SPACEDIM> const &flxt,            
-    const Array4<Real>& rhs, Args&&... args) { }
+    const Array4<Real>& /*prims*/, std::array<FArrayBox*, AMREX_SPACEDIM> const /*&flxt*/,            
+    const Array4<Real>& /*rhs*/, Args&&... args) { }
 #endif  
 };
 
