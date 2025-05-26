@@ -42,6 +42,7 @@ struct methodparm_t {
   static constexpr int  order = 2;                  // order numerical scheme viscous
   static constexpr Real conductivity = 0.0262;      // conductivity (for constant value)
   static constexpr Real viscosity    = 1.0/Reynolds;// viscosity    (for constant value)  
+  static constexpr bool use_LES = false;
 };
 
 inline Vector<std::string> cons_vars_names={"Xmom","Ymom","Zmom","Energy","Density"};
@@ -160,7 +161,7 @@ class user_source_t {
   void inline src(const Geometry& /*geomdata*/, const amrex::MFIter &mfi,
                   const amrex::Array4<const amrex::Real> &prims,
                   const amrex::Array4<amrex::Real> &rhs, const cls_t *cls_d,
-                  amrex::Real dt){
+                  amrex::Real /*dt*/){
 
     const Box bx = mfi.tilebox();
 

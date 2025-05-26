@@ -110,6 +110,7 @@ struct methodparm_t {
   public:
 
   static constexpr int  order = 2;        
+  static constexpr Real use_LES = false
 
 };
 

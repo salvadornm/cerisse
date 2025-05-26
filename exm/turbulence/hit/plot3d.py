@@ -29,9 +29,18 @@ ds = yt.load(latest_file)
 # You can change 'z' to 'x' or 'y' depending on which slice you want
 slc = yt.SlicePlot(ds, 'z', ('boxlib', 'x_velocity'))
 
-# Optional: Set contour levels or colormap
-#slc.set_zlim(('boxlib', 'Density'), 0.81, 1.51)
-#slc.set_cmap(('boxlib', 'Density'), 'viridis')
+# Set linear scale (remove log)
+slc.set_log(('boxlib', 'x_velocity'), False)
+
+# Set color limits (adjust as needed)
+slc.set_zlim(('boxlib', 'x_velocity'), -2.0, 2.0)
+
+# Set a custom colormap (e.g., 'RdBu_r' or 'viridis', 'plasma', etc.)
+slc.set_cmap(('boxlib', 'x_velocity'), 'RdBu_r')  # Red to Blue, reversed
+
+# clear axes
+slc.set_axes_unit(None)
+slc.set_colorbar_label(('boxlib', 'x_velocity'), 'x_velocity')
 
 # Save the plot
 slc.save()

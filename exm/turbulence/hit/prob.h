@@ -15,12 +15,14 @@ using namespace amrex;
 namespace PROB {
 
 // problem parameters
-struct ProbParm {
-  Real u0= 1.0;
-  Real p0= 10000.0;
+struct ProbParm {  
   Real rho0= 1.0;
   Real gamma = 1.4;
-  Real c0 = std::sqrt(gamma*p0/rho0);
+  Real t0 = 0.01;   // nondimensional time
+  Real c0 = 1.0/t0;
+  Real p0 = rho0*c0*c0/gamma;
+  Real Ma_rms = 0.2; 
+  Real u0= c0*Ma_rms;
 };
 
 // numerical method parameters
@@ -28,9 +30,9 @@ struct methodparm_t {
 
   public:
 
-  static constexpr bool dissipation = false;         // no dissipation
-  static constexpr int  order = 2;                  // order numerical scheme
-  static constexpr Real C2skew=0.1,C4skew=0.0016;   // Skew symmetric default
+  static constexpr bool dissipation = true;         // no dissipation
+  static constexpr int  order = 4;                  // order numerical scheme
+  static constexpr Real C2skew=0.1,C4skew=0.016;   // Skew symmetric default
 
 };
 // LES parameters
@@ -38,13 +40,13 @@ struct LESparm_t {
 
   public:
 
-  static constexpr int  order = 2;        // order numerical scheme (for gradient estimation)
-  static constexpr Real Pr_o_Prsgs = 0.8; // Pr/Prsgs
-  static constexpr Real Scsgs = 0.7;      // sgs Sc
-  static constexpr Real Cs = 0.1;         // Smagorinsky constant
-  static constexpr Real CI = 0.08;        // Yoshizawa constant
-  static constexpr bool fixDelta = true;  // Fix filter witdth
-  static constexpr Real Delta = 0.02;     // Filter width (if above true)  L/20
+  static constexpr int  order = 2;         // order numerical scheme (for gradient estimation)
+  static constexpr Real Pr_o_Prsgs = 0.8;  // Pr/Prsgs
+  static constexpr Real Scsgs = 0.7;       // sgs Sc
+  static constexpr Real Cs = 0.0;          // Smagorinsky constant
+  static constexpr Real CI = 0.08;         // Yoshizawa constant
+  static constexpr bool fixDelta = false;  // Fix filter witdth
+  static constexpr Real Delta = 0.02;      // Filter width (if above true)  L/20
 };
 
 
@@ -55,11 +57,15 @@ struct viscparm_t {
   static constexpr int  order = 2;
   static constexpr bool use_LES = true;
 
+  // zero-viscosity and conductivity  (infinite Reynolds)
+  static constexpr Real viscosity    = 0.0;  // viscosity    (for constant value)  
+  static constexpr Real conductivity = 0.0;  // conductivity (for constant value)
+
 };
 
 // changes indicies_t to indicesgen_t<4>, which allocates more ghost points
 
-typedef closures_dt<indicies_t, visc_suth_t, cond_suth_t,
+typedef closures_dt<indicies_t, transport_const_t<viscparm_t>,
                     calorifically_perfect_gas_t<indicies_t>, Smagorinsky_t<LESparm_t,indicies_t> > ProbClosures;
 
 template <typename cls_t > class user_source_t;
@@ -67,7 +73,7 @@ template <typename cls_t > class user_source_t;
 // HLLC-Riemann MUSCL
 //typedef rhs_dt<riemann_t<false, ProbClosures>, no_diffusive_t,  no_source_t >  ProbRHS;
 // Skew
-//typedef rhs_dt<skew_t<methodparm_t, ProbClosures>, no_diffusive_t,  no_source_t > ProbRHS;
+typedef rhs_dt<skew_t<methodparm_t, ProbClosures>, no_diffusive_t,  no_source_t > ProbRHS;
 // Rusanov
 //typedef rhs_dt<rusanov_t<ProbClosures>, no_diffusive_t,  no_source_t >  ProbRHS;
 // WENO & TENO   WenoZ5/Teno5/Teno6
@@ -75,13 +81,16 @@ template <typename cls_t > class user_source_t;
 // KEEP 2/4/6
 //typedef rhs_dt<keep_euler_t<false,false,4, ProbClosures>, no_diffusive_t,  no_source_t> ProbRHS;
 // CD 2/4/6
-typedef rhs_dt<centraldif_t<false,false,4, ProbClosures>, no_diffusive_t, no_source_t > ProbRHS;
+//typedef rhs_dt<centraldif_t<false,false,4, ProbClosures>, no_diffusive_t, no_source_t > ProbRHS;
 
 void inline inputs() {
   ProbParm data;
   amrex::Print() << "**************  " << std::endl;
   amrex::Print() << " HIT test  " << std::endl;
   amrex::Print() << " Ma_rms =  " << data.u0/data.c0 << std::endl;
+  amrex::Print() << " c0 [m/s]=  " << data.c0 << std::endl;
+  amrex::Print() << " t0 [s]  =  " << 1.0/data.c0 << std::endl;
+  
   amrex::Print() << "**************  " << std::endl;
 }
 
@@ -118,8 +127,8 @@ AMREX_GPU_DEVICE AMREX_FORCE_INLINE void prob_initdata(
 AMREX_GPU_DEVICE AMREX_FORCE_INLINE void
 bcnormal(const Real x[AMREX_SPACEDIM], Real dratio, const Real s_int[5],
          const Real s_refl[ProbClosures::NCONS], Real s_ext[5], const int idir,
-         const int sgn, const Real time, GeometryData const & /*geomdata*/,
-         ProbClosures const &closures, ProbParm const &prob_parm) {
+         const int /*sgn*/, const Real time, GeometryData const & /*geomdata*/,
+         ProbClosures const &closures, ProbParm const &/*prob_parm*/) {
   if (idir == 1) { // ylo or yhi
 
     Abort("bcnormal not coded");

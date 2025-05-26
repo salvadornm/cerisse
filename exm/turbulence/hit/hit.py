@@ -56,12 +56,25 @@ def initialize_hit_velocity_field(N, L=1.0, L_t=1.0, seed=None, spectrum=None):
         # Limit injection to a band of wavenumbers
         #envelope = apply_band_limited_kolmogorov(k_mag, E_target=1.0, L_target=L_t) 
     
-        # all profile
+        # Kolmogorov profile
         envelope[nonzero] = k_mag[nonzero]**(-5.0/3.0)
        
         fx *= envelope
         fy *= envelope
         fz *= envelope
+    if spectrum == 'power_law':
+        envelope = np.zeros_like(k_mag)
+        nonzero = k_mag > 0     
+
+        # all profile
+        k0 = 2
+
+        # Power (Garnier paper)  
+        envelope[nonzero] = k_mag[nonzero]**4*np.exp(-2*(k_mag[nonzero]/k0)**2)
+       
+        fx *= envelope
+        fy *= envelope
+        fz *= envelope   
 
     # Enforce incompressibility (divergence-free)
     k_dot_f = kx * fx + ky * fy + kz * fz
@@ -167,15 +180,16 @@ def export_velocity_field_binary(u, filename="velocity_field.bin"):
 
 
 # --- Main ---
-N = 64
+N = 128
 L = 2 * np.pi
 L_int0 = 0.3*L/10 #  Estimate of Integral Length scale
 u_rms0 = 1
 Re = 40   #  Initial estimate Reynolds based on Integral Length scale to compute viscosity
+spectra_type = 'power_law'
 
 nu = u_rms0*L_int0/Re
 
-velocity_field = initialize_hit_velocity_field(N, L=L,L_t=L_int0, seed=42, spectrum='kolmogorov')
+velocity_field = initialize_hit_velocity_field(N, L=L,L_t=L_int0, seed=42, spectrum=spectra_type)
 k_vals, E_k = compute_energy_spectrum(velocity_field, L)
 
 u_rms = compute_rms_velocity(velocity_field)

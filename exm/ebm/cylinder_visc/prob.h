@@ -67,6 +67,7 @@ struct visc_model_param {
   static constexpr int  order = 4;                   // order numerical scheme viscous
   static constexpr Real conductivity = 0.03;         // conductivity (constant)
   static constexpr Real viscosity    = 1.0/Reynolds; // viscosity    (constant)
+  static constexpr Real use_LES = false;
 
 };
 

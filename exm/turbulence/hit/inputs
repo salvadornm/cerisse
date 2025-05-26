@@ -1,9 +1,9 @@
 # Simulation time
 # start time is assumed to be 0, unless re-starting
-max_step  = 5
-stop_time = 0.2
-#time_step = 0.001 
-cfl= 0.3
+max_step  = 5000
+stop_time = 0.1
+time_step = 2e-5 
+#cfl= 0.3
 
 cns.order_rk  = -2 
 cns.stages_rk = 2
@@ -12,7 +12,7 @@ cns.stages_rk = 2
 geometry.is_periodic = 1 1 1
 geometry.coord_sys   = 0  # 0 => cart, 1 => RZ  2=>spherical
 geometry.prob_lo     = 0.0    0.0    0.0
-geometry.prob_hi     = 1.0    1.0    1.0
+geometry.prob_hi     = 6.28318 6.28318 6.28318
 
 # -1 = N/A (Incase of periodic)
 # 0 = Interior           3 = Symmetry
@@ -22,10 +22,10 @@ geometry.prob_hi     = 1.0    1.0    1.0
 cns.lo_bc = -1 -1 -1
 cns.hi_bc = -1 -1 -1
 cns.screen_output = 1 # 0=quiet, 1=verbose
-cns.verbose = 1       # 0=quiet, 1=verbose
+cns.verbose = 0       # 0=quiet, 1=verbose
 
 # Refinement and regridding 
-amr.n_cell          = 64 64 64
+amr.n_cell          = 128 128 128
 amr.max_level       = 0     # maximum level number allowed
 amr.ref_ratio       = 2  # refinement ratio per level
 amr.regrid_int      = 2  # how often to regrid per level
@@ -46,7 +46,7 @@ amr.check_file              = chk    # root name of checkpoint file
 amr.check_int               = 100    # number of timesteps between checkpoints
 amr.plot_files_output = 1
 amr.plot_file         = ./plot/plt # root name of plotfile
-amr.plot_int          = 5         # number of timesteps between plotfiles
+amr.plot_int          = 500         # number of timesteps between plotfiles
 amr.derive_plot_vars  = pressure velocity temperature
 
 # Utilities
@@ -54,3 +54,24 @@ cns.use_utility = 1
 # Turbulence initialisation
 util.use_turb_file = 1
 util.turb_file = velocity_field.bin
+
+# Analyisis
+# DIAGNOSTICS
+amr.data_log = time_probe.log
+cns.record_probe = 1
+cns.time_probe_lev = 0
+cns.time_probe_int = 1
+cns.time_probes = KineticEnergy Enstrophy Density PressurePoint
+KineticEnergy.field_name = kinetic_energy
+KineticEnergy.box_lo = 0.0 0.0 0.0
+KineticEnergy.box_hi = 6.28318 6.28318 6.28318
+Enstrophy.field_name = enstrophy
+Enstrophy.box_lo = 0.0 0.0 0.0
+Enstrophy.box_hi = 6.28318 6.28318 6.28318
+Density.field_name = Density
+Density.box_lo = 0.0 0.0 0.0
+Density.box_hi = 6.28318 6.28318 6.28318
+PressurePoint.field_name = pressure
+PressurePoint.box_lo = 3.14159 3.14159 3.14159
+PressurePoint.box_hi = 3.19068 3.19068 3.19068
+

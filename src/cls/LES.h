@@ -30,7 +30,7 @@ class LES_t {
   AMREX_GPU_DEVICE AMREX_FORCE_INLINE Real calc_delta(
   const GpuArray<Real, AMREX_SPACEDIM>& dx){
 
-    if (param::fixDelta) {
+    if constexpr (param::fixDelta) {
       return(param::Delta);
     }
     else

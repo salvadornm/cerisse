@@ -33,11 +33,11 @@ class viscous_t {
 #if (AMREX_USE_GPIBM || CNS_USE_EB )  
   void inline dflux_ibm(const Geometry& geom, const MFIter& mfi,
             const Array4<Real>& prims, std::array<FArrayBox*, AMREX_SPACEDIM> const &flxt,            
-            const Array4<Real>& rhs, const cls_t* cls,const Array4<bool>& ibMarkers) {
+            const Array4<Real>& /*cons*/, const cls_t* cls,const Array4<bool>& ibMarkers) {
 #else
   void inline dflux(const Geometry& geom, const MFIter& mfi,
             const Array4<Real>& prims, std::array<FArrayBox*, AMREX_SPACEDIM> const &flxt, 
-            const Array4<Real>& rhs, const cls_t* cls) {
+            const Array4<Real>& /*cons*/, const cls_t* cls) {
 #endif
 
     // mesh sizes
@@ -113,7 +113,7 @@ class viscous_t {
 #endif     
 
     // -------  LES Options  ----------- //
-    if (param::use_LES)
+    if constexpr (param::use_LES)
     {
       const GpuArray<Real, AMREX_SPACEDIM> dx = geom.CellSizeArray(); // mesh sizes
       Real Delta = cls->calc_delta(dx); // compute filter width
@@ -126,7 +126,7 @@ class viscous_t {
       // for viscous order 6, LES cannot be used
       amrex::ParallelFor( bxgs, [=, *this] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {
 
-        Real Cp_o_Pr = lam_arr(i,j,k)/mu_arr(i,j,k); 
+        Real Cp_o_Pr = lam_arr(i,j,k)/(mu_arr(i,j,k)+1.e-15); 
         cls-> compute_sgsterms(i,j,k,prims, dxinv, Delta, Cp_o_Pr,  mu_sgs, cond_sgs, diff_sgs);
         mu_arr(i,j,k) += mu_sgs;
         lam_arr(i,j,k)+= cond_sgs;   
@@ -179,14 +179,17 @@ class viscous_t {
       amrex::Array4<amrex::Real> const& flx,
       amrex::Array4<const amrex::Real> const& coeffs,
       amrex::GpuArray<amrex::Real, AMREX_SPACEDIM> const& dxinv,
-      const cls_t* cls) const {
+      const cls_t* /*cls*/) const {
     
     using amrex::Real;
     const amrex::IntVect iv{AMREX_D_DECL(i, j, k)};
     const amrex::IntVect ivm = iv - amrex::IntVect::TheDimensionVector(d1);
 
     const int d2 = d1 == 0 ? 1 : 0;
+#if (AMREX_SPACEDIM == 3)    
     const int d3 = d1 == 2 ? 1 : 2;
+#endif    
+
     AMREX_D_TERM(const int QU1 = cls_t::QU + d1;,  const int QU2 = cls_t::QU + d2;
                , const int QU3 = cls_t::QU + d3;)
     AMREX_D_TERM(const int UM1 = cls_t::UMX + d1;, const int UM2 = cls_t::UMX + d2;

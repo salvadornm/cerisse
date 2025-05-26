@@ -46,7 +46,7 @@ inline void dertemp(const Box& bx, FArrayBox& derfab, int dcomp, int /*ncomp*/,
   });
 }
 
-inline void dervel(const Box& bx, FArrayBox& derfab, int dcomp, int ncomp,
+inline void dervel(const Box& bx, FArrayBox& derfab, int dcomp, int /*ncomp*/,
                    const FArrayBox& datfab, const Geometry& /*geomdata*/,
                    Real /*time*/, const int* /*bcrec*/, const int /*level*/) {
   auto const dat = datfab.const_array();
@@ -66,7 +66,7 @@ inline void dervel(const Box& bx, FArrayBox& derfab, int dcomp, int ncomp,
   });
 }
 
-inline void derdensity(const Box& bx, FArrayBox& derfab, int dcomp, int ncomp,
+inline void derdensity(const Box& bx, FArrayBox& derfab, int dcomp, int /*ncomp*/,
                        const FArrayBox& datfab, const Geometry& /*geomdata*/,
                        Real /*time*/, const int* /*bcrec*/,
                        const int /*level*/) {
@@ -103,7 +103,7 @@ inline void derkineticenergy(const Box& bx, FArrayBox& derfab, int dcomp,
   });
 }
 
-inline void dermagvort(const Box& bx, FArrayBox& derfab, int dcomp, int ncomp,
+inline void dermagvort(const Box& bx, FArrayBox& derfab, int dcomp, int /*ncomp*/,
                        const FArrayBox& datfab, const Geometry& geomdata,
                        Real /*time*/ = -1, const int* /*bcrec*/ = nullptr,
                        const int /*level*/ = -1) {
