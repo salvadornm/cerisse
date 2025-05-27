@@ -67,8 +67,7 @@ For example in the `src( ..)` function:
 
 The numerical solution is compared after a single time step using a small CFL number of 0.01 to minimize temporal errors. Since the exact solution is time-independent, any observed error arises solely from the spatial discretization.
 
-The L2 error in the density field is used to assess the accuracy of each scheme. A local script, `checkorder.sh`, is provided to automate the generation of solution directories and convergence plots. It runs simulations on meshes with 16, 32, 64, and 128 grid points.\
-Order of convergence can be obtained by
+The L2 error in the density field is used to assess the accuracy of each scheme. A local script, `checkorder.sh`, is provided to automate the generation of solution directories and convergence plots. It runs simulations on meshes with 16, 32, 64, and 128 grid points. The estimated order of convergence can be obtained by
 
 ```bash
 $ python python checkorder.py
@@ -104,11 +103,7 @@ The flow, albeit simple, has density and pressure variation in three directions.
 
 <figure><img src=".gitbook/assets/mms_128_euler.png" alt="" width="188"><figcaption><p>Exact solution with 128 x 128 x 128</p></figcaption></figure>
 
-###
-
-### Supersonic Euler
-
-## Taylor Green Vortex
+### Taylor Green Vortex
 
 The Taylor-Green vortex is a classical benchmark problem used to test and validate numerical methods for simulating turbulent flows. Basically to study vortex dynamics, turbulent transition, turbulent decay and the energy dissipation process (proposed AIAA First International Workshop on High-Order Methods in Computational Fluid Dynamics.)\
 The simulations are performed in a cube of non-dimensional length $$2 \pi$$, with periodic boundary conditions in all The Mach number, Prandtl number and Reynolds number of the flow are set  as **0.1**, **0.71** and **1600** based on data from [ Jammy et al. (2016)](http://dx.doi.org/10.5258/SOTON/401892)
@@ -141,19 +136,14 @@ In progress, check cerisse1 docs
 
 ## Homogenous Isotropic Turbulence
 
-The freely decaying homogeneous isotropic turbulence test case is a classical benchmark for compressible code performance evaluation.
-
-The test case is quasi-incompressible with $$\mbox{Ma}_{rms} = 0.2$$ to compare with reference data\
-and compare numerical methods and LES models.\
-The Reynodls number is infinite (Euler terms) and dissipation is only due to nuemrical dissipation\
-or LES sub-griud models\
-An initial incompressible velocity field with spectra is fitted
+The freely decaying homogeneous isotropic turbulence test case is a classical benchmark for compressible code performance evaluation. The test case is quasi-incompressible with $$\mbox{Ma}_{rms} = 0.2$$ to compare with reference data and between numerical methods and LES models. The Reynolds number is infinite (Euler , or inviscid Navier-Stokes) and dissipation is only due to numerical dissipation\
+and  LES sub-grid models. An initial incompressible velocity field with spectra is fitted
 
 $$
 E(k) \propto k^{4} exp(-2 k/k_0)
 $$
 
-with $$k_0=2$$, following [Garnier et al](https://doi.org/10.1006/jcph.1999.6268) This will ensure a large scale turbulence with all most energy in large scale along wavenumber 2. The solution will decay into homogeneous isotropic turbulence, inctreasing enstropy and then followed a conventional decay. The domain is a cube of size  $$2 \pi$$, velocity   $$2 \phi$ , with reference values of$$$$u_0 = u_{rms} = 1$$ and $$T_0=1$$, with $$\gamma=1.4$$ and a reference pressure of $$p_0=17.86$$. The simulations are run until non-dimensional time of $$t^\ast=10$$
+with $$k_0=2$$, following [Garnier et al](https://doi.org/10.1006/jcph.1999.6268) This  ensures a large scale turbulence with most energy in the large scales around wavenumber 2. The solution will decay into homogeneous isotropic turbulence, increasing enstropy and then followed a conventional decay. The domain is a cube of size  $$2 \pi$$, velocity   $$2 \phi$ , with reference values of$$$$u_0 = u_{rms} = 1$$ and $$T_0=1$$, with $$\gamma=1.4$$ and a reference pressure of $$p_0=17.86$$. The simulations are run until non-dimensional time of $$t^\ast=10$$
 
 To generate the initial turbulent spectra, the provided python script can be used
 
@@ -172,11 +162,8 @@ Re = 40   #
 ```
 
 The Reynolds number is just a marker to estimate Kolomogorov length scale and does not affect\
-the flow field.\
-This script will fit a energy spectrum to the require profile (other spectra can be fitted)
-
-The script will generate a `velocity_field.bin` $$N^3$$ datafile with the initial turbulent velocity field.\
-This file will be read by adding the following to the input file
+the flow field. This script will fit a energy spectrum to the require profile (other spectra can be fitted) a generate a `velocity_field.bin` $$N^3$$ datafile with the initial turbulent velocity field.\
+This file can  read by adding the following lines to the input file (and setiing  `USE_UTILITIES = TRUE`)
 
 ```cpp
 # Turbulence initialisation
@@ -214,8 +201,11 @@ where field is one of _kinetic/ensthropy/density/pressure_
 
 ## Supersonic Retropropulsion
 
-In `exm/ibm/srp`\
-Example of Martian re-entry
+An example of Martian re-entry with supersonic retropropulsion can be found in `exm/ibm/srp`. This case demonstrates the capabilities of the IBM framework, including support for user-defined boundary conditions and a custom chemistry model not available in PelePhysics.
+
+#### **User-specific chemistry**&#x20;
+
+The chemistry is specified in `GNUMakefile`:
 
 ```
 # PelePhysics
@@ -226,6 +216,8 @@ CHEMISTRY_MODEL := MartianAtmos
 USE_LOCALCHEM = TRUE
 LOCALCHEM_PATH = $(abspath ./)
 ```
+
+In this case a made-up chemistry "MartianAtmos" has been selected. Additional optiosn are required, such as specify that is a "local" nom-stadard chemistry and that its path is in `LOCALCHEM_PATH` . A directory `MartianAtmos` is required. This directory needs to contain ultimately a `Make.package` file plus the chemsiutry itself a `mechanism.H` and `mechanism.cpp` These file are automatically generated by **Python/Cantera** scripts (see [Chemistry](chemistry.md#generate-a-new-mechanism)) and contain all the infomation to integrate teh chemistry and evaluate its properties. To generate the scripst the most common is to start with a CHEMKIN mechanism. For example:
 
 ```
 ELEMENTS
@@ -240,18 +232,22 @@ REACTIONS
 END
 ```
 
-Initialisation
+This is a very simple chemistry, where no chemical reactions are present and only three species are considered.  The process is to convert **CHEMKIN** to **Cantera** and then to **PelePhysics** format (see [mechanism conversion](chemistry.md#generate-a-new-mechanism)).  Once the files are generated and placed under `MartianAtmos` its use is very simple. For example, the Martian Atmosphere is approximately
 
 ```cpp
   static constexpr Real  Yco2_oo = 0.96; // 96% CO2
   static constexpr Real  Yar_oo  = 0.04; //  4% Argon
 ```
 
+and an array can be generated that stored CO2 and Ar composition in the correct places in the array through identifiers CO2\_ID, AR\_ID, etc.
+
 ```cpp
     Real Yt[NUM_SPECIES] ={0.0};
     Yt[CO2_ID]   = pparm.Yco2_oo;
     Yt[AR_ID]    = pparm.Yar_oo;
 ```
+
+For example to set, the composition of the SRP jet
 
 ```cpp
     // SRP-jet composition  (pure Nitrogen)
@@ -261,6 +257,36 @@ Initialisation
         q(1,cls_t::QFS+n) = Yjet[n];
     }
 ```
+
+#### &#x20;**User-specific boundary**
+
+This example has a user-specific IBM class, that specifies the BC in the surface of the solid. The function `compute_surfIB` takes the position in the surface as inoiut and applies different boundarry condition based on it.
+
+For example:
+
+<pre class="language-cpp"><code class="lang-cpp">// coordinates relative to centre of nozzle
+<strong>      const Real xjet = xyz(0) - param::xsrp;
+</strong>      const Real yjet = xyz(1) - param::ysrp;
+      const Real zjet = xyz(2) - param::zsrp;
+      const Real Rjet=sqrt(yjet*yjet + zjet*zjet);
+      bool isjet = (std::fabs(xjet) &#x3C; 0.01) &#x26;&#x26; (Rjet &#x3C; param::Rsrp);
+      if (isjet)
+      {
+        q(1,cls_t::QU)    = param::u_srp; 
+        q(1,cls_t::QPRES) = param::Pt; 
+        q(1,cls_t::QT)    = param::Tt;         
+        // SRP-jet composition  (pure Nitrogen)
+        Real Yjet[NUM_SPECIES] ={0.0};
+        Yjet[N2_ID] = 1.0; 
+        for (int n = 0; n &#x3C; NUM_SPECIES; ++n) {
+          q(1,cls_t::QFS+n) = Yjet[n];         
+        }
+      }
+</code></pre>
+
+The above code applies BC  at the surface (specifies velocity, pressure, composition and temperature) if the surface coordinates are within certain tolerance of the nozzle (passed as parameters to the class)
+
+<figure><img src=".gitbook/assets/SRP20000.png" alt=""><figcaption><p>Nitrogen supersonic jet issuing into a Mach=2  CO/Ar flow.</p></figcaption></figure>
 
 ## Supersonic Retropropulsion (tri-nozzle)
 

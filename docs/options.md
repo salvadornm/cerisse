@@ -19,7 +19,7 @@ Example use is
 typedef closures_dt<indicies_t, transport_const_t<viscparm_t>, ...  > ProbClosures;
 ```
 
-where specifci values of conductivitu and viscosity are selected
+where specific values of conductivity and viscosity are selected
 
 ```cpp
 struct viscparm_t {

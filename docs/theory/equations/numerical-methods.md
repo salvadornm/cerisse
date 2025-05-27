@@ -10,7 +10,7 @@ Cerisse has implemented several numerical methods within the finite volume frame
 
 ### HLLC Riemann Solver
 
-Cerisse employs the Harten-Lax-van Leer Contact (HLLC) solver, developed by Toro et al. (1994). The HLLC solver enhances approximate Riemann Solvers by incorporating the intermediate contact wave, a feature that is particularly crucial for accurate modelling in reactive flows applications.
+Cerisse employs the Harten-Lax-van Leer Contact (HLLC) solver, developed by [Toro et al. (1994)](numerical-methods.md#references). The HLLC solver enhances approximate Riemann Solvers by incorporating the intermediate contact wave, a feature that is particularly crucial for accurate modelling in reactive flows applications.
 
 <figure><img src="../../.gitbook/assets/rieman.jpg" alt=""><figcaption><p>Scheme of the HLLC Riemann Solver with three waves propagating ar speed SL, SM and SR.<br>Two acoustic waves and one contact. The waves separate four constant states <span class="math">U_L</span> , <span class="math">U_L^\ast</span>, <span class="math">U_R^\ast</span>, <span class="math">U_R</span></p></figcaption></figure>
 
@@ -120,9 +120,13 @@ $$
 
 The above scheme is formally first-order, a high order extension can be build by using a Total Variation Diminishing (TVD) reconstruction
 
+{% hint style="danger" %}
+Under construction
+{% endhint %}
+
 ### Rusanov Scheme
 
-The Rusanov flux is a simple upwind flux that requires a single wave-speed estimate. In the current implementation, it is very compact and can be used to perform quick tests. The numerical flux function is typically given by:
+The[ Rusanov](numerical-methods.md#references) flux is a simple upwind flux that requires a single wave-speed estimate. In the current implementation, it is very compact and can be used to perform quick tests. The numerical flux function is typically given by:
 
 $$
 F_{i+1/2}= \frac{1}{2} \left( F_{i+1} + F_{i} \right) - \frac{1}{2} \left( \left| \lambda_{i+1} \right| + \left| \lambda_i \right| \right) (U_{i+1} - U_i)
@@ -132,7 +136,7 @@ where $$\lambda_i$$ ​ is the local characteristic speed at the i-th cell (ofte
 
 #### Skew-symmetric
 
-Numerical errors associated with discretisation can be categorised into truncation and aliasing errors (Kravchenko and Moin, 1997; Lilly, 1965). Therefore, the concept of numerical order alone is insufficient to fully characterize performance. Key properties such as dissipation, dispersion, and conservation are strongly influenced by the discretization scheme used for the convective term. To illustrate this, consider a one-dimensional scalar equation and three possible formulations for the nonlinear, hyperbolic term:
+Numerical errors associated with discretisation can be categorised into truncation and aliasing errors ([Kravchenko and Moin, 1997](numerical-methods.md#references); [Lilly, 1965](numerical-methods.md#references)). Therefore, the concept of numerical order alone is insufficient to fully characterize performance. Key properties such as dissipation, dispersion, and conservation are strongly influenced by the discretization scheme used for the convective term. To illustrate this, consider a one-dimensional scalar equation and three possible formulations for the nonlinear, hyperbolic term:
 
 $$
 \frac{\partial U}{\partial t} + \frac{\partial H U}{\partial x} = 0
@@ -152,9 +156,9 @@ $$
 
 Although the three forms above are equivalent at the continuous level, their discretizations differ significantly in terms of intrinsic properties and performance.
 
-The skew-symmetric form, when used with centered schemes, has been demonstrated to conserve quadratic quantities of interest—such as kinetic energy in the incompressible limit . This conservation is attributed to the reduction of aliasing errors. Furthermore, a Fourier analysis of the three forms reveals that the skew-symmetric formulation possesses superior built-in de-aliasing characteristics (Blaisdell et al. 1996) .
+The skew-symmetric form, when used with centered schemes, has been demonstrated to conserve quadratic quantities of interest—such as kinetic energy in the incompressible limit . This conservation is attributed to the reduction of aliasing errors. Furthermore, a Fourier analysis of the three forms reveals that the skew-symmetric formulation possesses superior built-in de-aliasing characteristics [(Blaisdell et al. 1996) ](numerical-methods.md#references).
 
-The method implemented here is the approach of Ducros et al. (2000) , which capitalises on the built in de-aliasing property of the skew-symmetric operator of centred schemes, while ensuring local conservation by employing the flux-based formulation:
+The method implemented here is the approach of [Ducros et al. (2000)](numerical-methods.md#references) , which capitalises on the built in de-aliasing property of the skew-symmetric operator of centred schemes, while ensuring local conservation by employing the flux-based formulation:
 
 The flux can be derived in a convective an pressure term
 
@@ -244,9 +248,9 @@ $$
 \psi_{i} = 2 \frac{|\phi_{i+1} - 2\phi_i + \phi_{i-1} |}{P_{JST} + P_{TVD} + \varepsilon}
 $$
 
-where $$\varepsilon$$ is simply a small offset to ensure the denominator is never zero, while $$P_{TVD} = |\phi_{i+1} -\phi_{i} | + |\phi_{i} -\phi_{i-1} |$$and $$P_{JST} = \phi_{i+1} - 2\phi_i + \phi_{i-1}$$
+where $$\varepsilon$$ is  a small offset to ensure the denominator is never zero, while $$P_{TVD} = |\phi_{i+1} -\phi_{i} | + |\phi_{i} -\phi_{i-1} |$$and $$P_{JST} = \phi_{i+1} - 2\phi_i + \phi_{i-1}$$
 
-The original formulation works with a sensor on pressure. Cerisse implements the improved approach of Bouheraoua (2014) by including an additional density sensor and coupling the two as :
+The original formulation works with a sensor on pressure. Cerisse implements the improved approach of [Bouheraoua (2014)](numerical-methods.md#references) by including an additional density sensor and coupling the two as :
 
 $$
 \psi = \frac{\psi_\rho^2 + \psi_P^2}{\psi_\rho + \psi_P}
@@ -254,9 +258,7 @@ $$
 
 ### WENO and TENO
 
-**Weighted Essentially Non-Oscillatory** (WENO) methods, introduced by Liu et al. (1994), employ a nonlinear adaptive procedure to automatically select the locally smoothest stencil. This approach aims to avoid using stencils that cross discontinuities when interpolating the interface flux.
-
-The WENO family encompasses various variations, which can be further classified. Despite these differences, all WENO methods share a common feature: the interface flux is expressed as **a linear combination of fluxes derived from the stencils.**
+**Weighted Essentially Non-Oscillatory** (WENO) methods, introduced by [Liu et al. (1994),](numerical-methods.md#references) employ a nonlinear adaptive procedure to automatically select the locally smoothest stencil. This approach aims to avoid using stencils that cross discontinuities when interpolating the interface flux. The WENO family encompasses various variations, which can be further classified. Despite these differences, all WENO methods share a common feature: the interface flux is expressed as **a linear combination of fluxes derived from the stencils.**
 
 $$
 F_{i+1/2} = \sum_k w_k F^{(k)}_{i+2}
@@ -317,21 +319,19 @@ $$
 F_{i+1/2} = \sum_k w_k F^{(k)}_{i+2}
 $$
 
-
-
 {% hint style="danger" %}
 Under construction
 {% endhint %}
 
 ### KEEP
 
-Central KEEP (_non-dissipative and physically-consistent kinetic energy and entropy preserving_) schemes for compressible flows These scheme are based on splitting the energy equation.
+The central KEEP (_non-dissipative and physically-consistent kinetic energy and entropy preserving_) schemes for compressible flows ([Kuya and Kawai 2020](numerical-methods.md#references)) are based on splitting the energy equation.
 
 $$
 \frac{\partial E_t }{\partial t} + \frac{\partial (\rho e + \rho k + p) u_j}{\partial x_j} = 0
 $$
 
-where $$E_t = \rho e + \rho k$$ is the total energy plus kinetic energy. In the inviscid limit, from the momentum equation is possible to derive the kinetic energy equation
+where $$E_t = \rho e + \rho k$$ is the toral energy (internal plus kinetic energy). In the inviscid limit, from the momentum equation is possible to derive the kinetic energy equation
 
 $$
 \frac{\partial \rho k }{\partial t} + \frac{\partial \rho u_j k }{\partial x_j} + u \frac{\partial p }{\partial x_j} = 0
@@ -343,17 +343,21 @@ $$
 \frac{\partial \rho e }{\partial t} + \frac{\partial \rho u_j e }{\partial x_j} + p \frac{\partial u_j }{\partial x_j} = 0
 $$
 
-using the fundamental equation of thermodynmics in differential form
+using the fundamental equation of thermodynamics in differential form
 
 $$
 d e = T d s - \frac{p}{\rho^2} d \rho
 $$
 
-it can be shown (see original paper) that if mass is conserved and internal energy follows the above expression and then entropy is conserved
+it can be shown (see original paper) that if mass is conserved and internal energy follows the above expression, then entropy is conserved
 
 $$
 \frac{\partial \rho s }{\partial t} + \frac{\partial \rho u_j s }{\partial x_j} = 0
 $$
+
+{% hint style="danger" %}
+Under construction
+{% endhint %}
 
 The KEEP scheme still need a shock capturing term.
 
@@ -401,9 +405,7 @@ $$
 
 ### Expict Runge-Kutta RK2
 
-A Runge-Kutta 2-stage, 2nd-order method is a time integration scheme\
-that uses two evaluations (stages) of the right-hand side function (RHS)\
-per timestep and achieves second-order accuracy in time.
+A _Runge-Kutta_ 2-stage, 2nd-order method is a time integration scheme that uses two evaluations (stages) of the right-hand side function (RHS) per timestep and achieves second-order accuracy in time.
 
 $$
 U^{n+1/2} = U^n + \frac{\Delta t}{2} RHS(U^n)
@@ -427,10 +429,6 @@ U^{n+1} &= U^{(s)}.
 \end{aligned}
 $$
 
-
-
-
-
 To ensure strong stability preservation, the method must satisfy:
 
 * $$\alpha_{i,j} \geq 0$$, $$\beta_{i,j} \geq 0$$
@@ -439,25 +437,27 @@ To ensure strong stability preservation, the method must satisfy:
 
 #### References
 
-\[1]: Morinishi, Y. (1995). Conservative properties of finite difference schemes for incompressible flow. [Center for Turbulence Research Annual Research Briefs](https://ntrs.nasa.gov/citations/19960022304)
+\[1] Morinishi, Y. (1995). Conservative properties of finite difference schemes for incompressible flow. [Center for Turbulence Research Annual Research Briefs](https://ntrs.nasa.gov/citations/19960022304)
 
-\[2]: Blaisdell, G., Spyropoulos, E., and Qin, J. (1996). The effect of the formulation of nonlinear terms on aliasing errors in spectral methods. [Applied Numerical Mathematics, 21(3):207–219](https://doi.org/10.1016/0168-9274\(96\)00005-0)
+\[2] Blaisdell, G., Spyropoulos, E., and Qin, J. (1996). The effect of the formulation of nonlinear terms on aliasing errors in spectral methods. [Applied Numerical Mathematics, 21(3):207–219](https://doi.org/10.1016/0168-9274\(96\)00005-0)
 
-\[3]: Ducros, F., Laporte, F., Soulères, T., Guinot, V., Moinat, P., and Caruelle, B. (2000). High order fluxes for conservative skew-symmetric-like schemes in structured meshes: application to compressible flows. [Journal of Computational Physics, 161(1):114–139](https://doi.org/10.1006/jcph.2000.6492)
+\[3] Ducros, F., Laporte, F., Soulères, T., Guinot, V., Moinat, P., and Caruelle, B. (2000). High order fluxes for conservative skew-symmetric-like schemes in structured meshes: application to compressible flows. [Journal of Computational Physics, 161(1):114–139](https://doi.org/10.1006/jcph.2000.6492)
 
-\[4]: Kravchenko, A. and Moin, P. (1997). On the effect of numerical errors in large eddy simulations of turbulent flows. [Journal of Computational physics, 131(2):310–322](https://doi.org/10.1006/jcph.1996.5597)
+\[4] Kravchenko, A. and Moin, P. (1997). On the effect of numerical errors in large eddy simulations of turbulent flows. [Journal of Computational physics, 131(2):310–322](https://doi.org/10.1006/jcph.1996.5597)
 
-\[5]: Lilly, D. K. (1965). On the computational stability of numerical solutions of time-dependent non-linear geophysical fluid dynamics problems. [Monthly Weather Review, 93(1):11–25](https://doi.org/10.1175/1520-0493\(1965\)093%3C0011:OTCSON%3E2.3.CO;2)
+\[5] Lilly, D. K. (1965). On the computational stability of numerical solutions of time-dependent non-linear geophysical fluid dynamics problems. [Monthly Weather Review, 93(1):11–25](https://doi.org/10.1175/1520-0493\(1965\)093%3C0011:OTCSON%3E2.3.CO;2)
 
-\[6]: Liu, X.-D., Osher, S., and Chan, T. (1994). Weighted essentially non-oscillatory schemes. [Journal of Computational physics, 115(1):200–212](https://doi.org/10.1006/jcph.1994.1187)
+\[6] Liu, X.-D., Osher, S., and Chan, T. (1994). Weighted essentially non-oscillatory schemes. [Journal of Computational physics, 115(1):200–212](https://doi.org/10.1006/jcph.1994.1187)
 
-\[7]: Yuichi Kuya, Soshi Kawai, (2020) A stable and non-dissipative kinetic energy and entropy preserving (KEEP) scheme for non-conforming block boundaries on Cartesian grids, [Computers & Fluids, Volume 200, 104427](https://doi.org/10.1016/j.compfluid.2020.104427)
+\[7] Yuichi Kuya, Soshi Kawai, (2020) A stable and non-dissipative kinetic energy and entropy preserving (KEEP) scheme for non-conforming block boundaries on Cartesian grids, [Computers & Fluids, Volume 200, 104427](https://doi.org/10.1016/j.compfluid.2020.104427)
 
-\[8]: Fu, L., Hu, X. Y., and Adams, N. A. (2017). Targeted eno schemes with tailored resolution property for hyperbolic conservation laws. [Journal of Computational Physics, 349:97–121](https://doi.org/10.1016/j.jcp.2017.07.054)
+\[8] Fu, L., Hu, X. Y., and Adams, N. A. (2017). Targeted ENO schemes with tailored resolution property for hyperbolic conservation laws. [Journal of Computational Physics, 349:97–121](https://doi.org/10.1016/j.jcp.2017.07.054)
 
-\[9]: Toro, E. F., Spruce, M., and Speares, W. (1994). Restoration of the contact surface in the hll-riemann solver. [Shock waves, 4(1):25–34](https://doi.org/10.1007/BF01414629)
+\[9] Toro, E. F., Spruce, M., and Speares, W. (1994). Restoration of the contact surface in the HLL-Riemann solver. [Shock waves, 4(1):25–34](https://doi.org/10.1007/BF01414629)
 
-\[10]: Bouheraoua, L. (2014). Simulation aux grandes échelles et modélisation de la combustion supersonique. [PhD thesis](https://theses.hal.science/tel-01197487v1), Rouen, INSA.
+\[10] Bouheraoua, L. (2014). Simulation aux grandes échelles et modélisation de la combustion supersonique. [PhD thesis](https://theses.hal.science/tel-01197487v1), Rouen, INSA.
 
-\[11]: Shu, C-W. (1988). Total-Variation-Diminishing Time Discretizations. [SIAM Journal of Scientific and Statistical Computing, 9(6):1073-1084](https://epubs.siam.org/doi/abs/10.1137/0909073)
+\[11] Shu, C-W. (1988). Total-Variation-Diminishing Time Discretizations. [SIAM Journal of Scientific and Statistical Computing, 9(6):1073-1084](https://epubs.siam.org/doi/abs/10.1137/0909073)
+
+\[12] Rusanov, V. V. E. (1962). The calculation of the interaction of non-stationary shock waves and obstacles. [_USSR Computational Mathematics and Mathematical Physics_, _1_(2), 304-320.](https://doi.org/10.1016/0041-5553\(62\)90062-9)
 

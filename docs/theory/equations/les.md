@@ -26,7 +26,7 @@ G(\mathbf{x}-\mathbf{x}',\Delta) =
 \right.
 $$
 
-Other filter kernels are possible (see [Pope's book](https://www.cambridge.org/highereducation/books/turbulent-flows/C58EFF59AF9B81AE6CFAC9ED16486B3A#overview) for more detail on LES filters).  In the finite volume method, when the filter width matches the local cell size , _i.e._, $$\Delta= h$$ and the filter used is the box filter; the _cell-averaged_ value of a variable is equivalent to its _filtered_ value.
+Other filter kernels are possible (see [Pope's book](https://www.cambridge.org/highereducation/books/turbulent-flows/C58EFF59AF9B81AE6CFAC9ED16486B3A#overview) for more detail on LES filters). In the finite volume method, when the filter width matches the local cell size , _i.e._, $$\Delta= h$$ and the filter used is the box filter; the _cell-averaged_ value of a variable is equivalent to its _filtered_ value.
 
 For variable density flows it is convenient to introduce the mass-weighted Favre filtering operation :
 
@@ -111,21 +111,21 @@ $$
 \left( \tilde{S}_{ij} - \frac{1}{3} \tilde{S}_{kk} \right)
 $$
 
-A  sub-grid viscosity is introduced, similar to turbulent viscosity in RANS-type models that requires modelling. Implemenetd models include
+A sub-grid viscosity is introduced, similar to turbulent viscosity in RANS-type models that requires modelling. Implemented models include:
 
-#### Smagorinsky
+#### Smagorinsky Model
+
+The Smagorinsky model [\[3\]](les.md#references) assumes that small, unresolved turbulent eddies behave like an **eddy viscosity**, enhancing momentum diffusion.&#x20;
 
 $$
 \mu_{sgs}  = \bar{\rho} (C_S \Delta) ^2 || \tilde{S}_{ij} ||
 $$
 
-with $$\tilde{S}_{ij}$$represents the filtered strain tensor and $$C_S$$ the Smagorinsky constant, with values between 0.1-0.2. $$||\tilde{S}_{ij}|| = \sqrt{2 \tilde{S}_{ij} \tilde{S}_{ij} }$$ is the Frobenius norm of the filtered strain tensor.&#x20;
+with $$\tilde{S}_{ij}$$represents the filtered strain tensor and $$C_S$$ the Smagorinsky constant, with values between **0.1-0.2**. $$||\tilde{S}_{ij}|| = \sqrt{2 \tilde{S}_{ij} \tilde{S}_{ij} }$$ is the Frobenius norm of the filtered strain tensor.  The length scale $$l_{sgs}= C_S \Delta$$ is a sub-grid length scale, which can be consider proportional to the integral lenght-scale $$\ell$$. The model assumes that small scales are isotropic
 
-The length scale $$l_{sgs}= C_S \Delta$$ is a sub-grid length scale, which can be consider proportional to the integral lenght-scale $$\ell$$.
+#### WALE Model
 
-#### WALE
-
-The eddy viscosity in the WALE model [\[1\]](les.md#references) is computed&#x20;
+The eddy viscosity in the WALE model [\[1\]](les.md#references) is computed
 
 $$
 \mu_{sgs}  = \bar{\rho} (C_w \Delta) ^2  
@@ -138,9 +138,9 @@ $$
 \mathcal{S}_{ij} = \frac{1}{2} \left(\frac{\partial u_i}{\partial x_k} \frac{\partial u_k}{\partial x_j} + \frac{\partial u_j}{\partial x_k} \frac{\partial u_k}{\partial x_i} \right)
 $$
 
-Model coefficients are in the range $$C_w = 0.325 - 0.5$$
+Model coefficient is in the range $$C_w = \sqrt{10.6} \cdot C_S = 0.325 - 0.5$$
 
-#### Diffusivty and heat
+#### Diffusivity and heat
 
 The sub-grid transport of a scalar is splitted in
 
@@ -154,31 +154,39 @@ $$
 \bar{\rho}  D_{sgs} = \frac{\mu_{sgs}}{\text{Sc}_{sgs}}
 $$
 
-with $$\text{Sc}_{sgs}$$ a constant often taken as 0.4-1. All species diffuse at the smallest scales 
-*due to turbulence* at the same speed.
-
-
+with $$\text{Sc}_{sgs}$$ is a constant often taken as **0.4-1**. All species diffuse at the smallest scales _due to turbulence_ at the same speed.
 
 $$
-\overline{\rho u_j (e_t + P/\rho )} = \bar{\rho} \widetilde{ u_j h_t}
-= \tilde{u}_j \tilde{h}_t   - \lambda_{sgs} \frac{\partial \tilde{T}{\partial x_j}
+\overline{\rho u_j (e_t + P/\rho )}  = \bar{\rho} \widetilde{ u_j h_t} = \bar{\rho}\tilde{u}_j \tilde{h}_t - \lambda_{sgs} \frac{\partial \tilde{T}}{\partial x_j}
 $$
 
-where $$h_t /equiv e_t + P/\rho $$ is the specific total enthalpy and $\lambda_{sgs} $ a sub-grid
-conductivity
+where $$h_t \equiv  e_t + P/\rho$$is the specific total enthalpy and $$\lambda_{sgs}$$ a sub-grid conductivity, that can be related to the sub-grid viscosity through:
 
 $$
-\lambda_{sgs} = \frac{\mu_{sgs} C_p}{\text{Pr}_{sgs}} = \frac{\mu_{sgs} C_p}{\text{Pr}}} \frac{\text{Pr}}{\text{Pr}_{sgs}} 
+\lambda_{sgs} = \frac{\mu_{sgs} C_p}{\text{Pr}_{sgs}}
 $$
 
-The ratio $$\text{Pr}/\text{Pr}_{sgs}$$ is often less than 1,  $$\approx 0.8 $$
+Where the sub-grid Prandtl number is introduced, which is a constant taken in the range **0.4-1**. Cerisse works with the ratio to molecular Prandtl number and redefines the  sub-grid conductivity as
 
 $$
-\frac{\lambda_{sgs}}{\lambda} = \frac{\mu_{sgs}}{\mu} \frac{\text{Pr}}{\text{Pr}_{sgs}} 
+\frac{\lambda_{sgs}}{\lambda} = \frac{\mu_{sgs}}{\mu} \frac{\text{Pr}}{\text{Pr}_{sgs}}
 $$
 
-In general, if $${\text{Pr}}{\text{Pr}_{sgs}} > 1 $$ sub-grid turbulent eddies transport momentum more efficiently than heat (vs. molecular case). If $${\text{Pr}}{\text{Pr}_{sgs}} < 1 $$ (common in gases),
-sub-grid turbulent eddies transport momentum more efficiently than heat (vs. molecular case).
+To avoid computing the specific heat.  The ratio $$\text{Pr}/\text{Pr}_{sgs}$$ is often less than 1 in gases, with a common choice of 0.5/0.7  $$\approx$$**0.7**  . In general, if $${\text{Pr}}/{\text{Pr}_{sgs}} > 1$$, sub-grid turbulent eddies transport momentum more efficiently than heat (_vs. molecular case_). If $${\text{Pr}}/{\text{Pr}_{sgs}} < 1$$, sub-grid turbulent eddies transport momentum more efficiently than heat (_vs. molecular case_).\
+\
+The isotropic part of the sub-grid stress $$⅓ \tau_{kk}$$ is neglected in incompressible flows (absorved in the pressure)  and is often modelled using **Yoshizawa** model [\[2\]](les.md#references) in compressible flows&#x20;
+
+$$
+\tau_{kk} = \bar{\rho} C_I \Delta^2 ||\tilde{S}_{ij}||^2
+$$
+
+where  $$C_I$$ is a model constant taken often as  **0.008**. This expression can be used to estimate the sub-grid kinetic energy
+
+$$
+k_{sgs} =\frac{3}{2} \tau_{kk}  = C_Y \Delta^2 ||\tilde{S}_{ij}||^2
+$$
+
+with $$C_Y$$ taken as **0.0066**
 
 ### Other unknowns
 
@@ -188,20 +196,14 @@ $$
 \overline{q}_j \approx - \lambda (\tilde{T}) \frac{\partial \tilde{T}}{\partial x_j}
 $$
 
-Molecular fluxes scale with the inverse of Reynolds number, $$\text{Re}^{-1}$$, making them relatively small in turbulent flows. Consequently, errors associated with molecular transport properties often (but not always)  have a small  impact in the solution.
-
-### Subgrid kinetic energy
-
-$$
-\frac{1}{2}overline {u_j^2}  = \frac{1}{2} \bar{u}_j^2 +  k_{sgs}
-$$
-
-$$
-\frac{\partial \bar{\rho} k_{sgs}  }{\partial t} + 
-\frac{\partial \bar{\rho} \tilde{u}_j k_{sgs}}{\partial x_j} = \mathcal{P}_{sgs} - \epsilon_{sgs}
-$$
-
+Molecular fluxes scale with the inverse of Reynolds number, $$\text{Re}^{-1}$$, making them relatively small in turbulent flows. Consequently, errors associated with molecular transport properties often (but not always) have a small impact in the solution.
 
 #### References
 
-\[1] Nicoud, F., Ducros, F. Subgrid-Scale Stress Modelling Based on the Square of the Velocity Gradient Tensor. [_Flow, Turbulence and Combustion_ 62, 183–200 (1999). ](https://doi.org/10.1023/A:1009995426001)
+\[1] Nicoud, F., Ducros, F. Subgrid-Scale Stress Modelling Based on the Square of the Velocity Gradient Tensor. [_Flow, Turbulence and Combustion_ 62, 183–200 (1999).](https://doi.org/10.1023/A:1009995426001)\
+\[2] Yoshizawa, A.   Horiuti,  K A Statistically-Derived Subgrid-Scale Kinetic Energy Model for the Large-Eddy Simulation of Turbulent Flows.[ _Journal of the Physical Society of Japan, 54, 2834-2839 (1985)_](https://doi.org/10.1143/JPSJ.54.2834)\
+\[3] Smagorinsky, J. (1963). General circulation experiments with the primitive equations. [_Monthly Weather Review, 91(3):99–164._](https://doi.org/10.1175/1520-0493\(1963\)091%3C0099:GCEWTP%3E2.3.CO;2)\
+
+
+\
+\

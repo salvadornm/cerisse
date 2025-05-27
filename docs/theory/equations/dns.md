@@ -57,7 +57,7 @@ $$
 
 where $$\lambda$$ is the conductivity.
 
-In the **diffusion flux** is common to use the Hirschfelder-Curtiss approximation that simplifies the Maxwell-Stefan equation by introducing an effective diffusion coefficient of specie-k in a mixture of gases. The molar flux is (neglecting pressure and temperature gradients)
+In the **diffusion flux** is common to use the _Hirschfelder-Curtiss approximation_ that simplifies the Maxwell-Stefan equation by introducing an effective diffusion coefficient of specie-k in a mixture of gases. The molar flux is (neglecting pressure and temperature gradients)
 
 $$
 \overline{J}_j^k = - D_k \frac{\partial X_k }{\partial x_j}
@@ -106,4 +106,4 @@ $$
 h = h_k^0 Y_k + \int_{T^0}^T C_p dT
 $$
 
-and the specific internal energy can be directly obtained by $$e = h - p/\rho$$. The current implementations include perfect gas, ideal gas and Soave-Redlich-Kwong (through PelePhysics), including mixtures.
+and the specific internal energy can be directly obtained by $$e = h - p/\rho$$. The current implementations include **perfect gas**, i**deal gas** and **Soave-Redlich-Kwong** (through PelePhysics), including mixtures.

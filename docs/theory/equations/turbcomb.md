@@ -4,7 +4,11 @@ icon: fire
 
 # Turbulent Combustion
 
-Turbulent Combustion model
+Turbulent Combustion models...
+
+{% hint style="danger" %}
+Under construction
+{% endhint %}
 
 ## ATF
 
@@ -102,6 +106,8 @@ $$
 
 ### References
 
-1. Omer Rathore, "Numerical Simulation of Combustion Instability" _PhD Thesis_, Imperial College London (2022)&#x20;
-2. Yuri Almeida "Large Eddy Simulation of Supersonic Combustion using a Probability Density Function method" _PhD Thesis_, Imperial College London (2019)
-3. Tin-Hang Un and Salvador Navarro-Martinez, “Stochastic fields with adaptive mesh refinement for high-speed turbulent combustion”, [_Comb. Flame_, 272, 113897 (2025)](https://doi.org/10.1016/j.combustflame.2024.113897)
+\[1] Omer Rathore, "Numerical simulation of combustion instability: flame thickening and boundary conditions" [_PhD Thesis_, Imperial College London (2022) ](https://doi.org/10.25560/107649)
+
+\[2] Yuri Almeida "Large Eddy Simulation of Supersonic Combustion using a Probability Density Function method" [_PhD Thesis_, Imperial College London (2019)](https://doi.org/10.25560/77819)
+
+\[3] Tin-Hang Un and Salvador Navarro-Martinez, “Stochastic fields with adaptive mesh refinement for high-speed turbulent combustion”, [_Comb. Flame_, 272, 113897 (2025)](https://doi.org/10.1016/j.combustflame.2024.113897)

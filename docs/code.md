@@ -63,11 +63,13 @@ $ git rebase develop        # fix any identified conflicts between "develop" and
 ```bash
 $ cerisse test
 ```
-Similarly check for compilation across examples to prevent breaking options.
+
+Similarly check for compilation across examples to prevent breaking options.\
 In the `/bin` directory
 
 ```bash
 $ ./checkcompilation.sh
 ```
-This will test compilation across multiple examples. This will take up to 10 minutes and
+
+This will test compilation across multiple examples. This will take around 10 minutes and\
 assumes third party libraries have been installed (PelePhysics and CGAL)
