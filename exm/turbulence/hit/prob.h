@@ -18,11 +18,13 @@ namespace PROB {
 struct ProbParm {  
   Real rho0= 1.0;
   Real gamma = 1.4;
-  Real t0 = 0.01;   // nondimensional time
-  Real c0 = 1.0/t0;
-  Real p0 = rho0*c0*c0/gamma;
+  Real L0 = 6.28318;
+  Real T0 = 1.0;  
+  Real u0 = 1.0;
   Real Ma_rms = 0.2; 
-  Real u0= c0*Ma_rms;
+  Real c0 = u0/Ma_rms;
+  Real p0 = rho0*c0*c0/gamma;
+  Real t0 = L0/u0;
 };
 
 // numerical method parameters
@@ -89,7 +91,9 @@ void inline inputs() {
   amrex::Print() << " HIT test  " << std::endl;
   amrex::Print() << " Ma_rms =  " << data.u0/data.c0 << std::endl;
   amrex::Print() << " c0 [m/s]=  " << data.c0 << std::endl;
-  amrex::Print() << " t0 [s]  =  " << 1.0/data.c0 << std::endl;
+  amrex::Print() << " u0 (RMS)[m/s]=  " << data.u0 << std::endl;
+  amrex::Print() << " P0 [s]  =  " << data.p0 << std::endl;  
+  amrex::Print() << " t0 [s]  =  " << data.t0 << std::endl;
   
   amrex::Print() << "**************  " << std::endl;
 }
@@ -110,10 +114,13 @@ AMREX_GPU_DEVICE AMREX_FORCE_INLINE void prob_initdata(
   // initial conditions rho P
   Real rhot = prob_parm.rho0;
   Real Pt   = prob_parm.p0;
+  Real u0   = prob_parm.p0;
 
   // read velocity field from datafile
   Real ut,vt,wt;
   util->get_velocity(i,j,k,ut,vt,wt);
+  // scale to rms
+  ut *= u0; vt *= u0; wt *= u0;
   //
 
   state(i, j, k, cls.URHO) = rhot;

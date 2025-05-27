@@ -180,7 +180,7 @@ def export_velocity_field_binary(u, filename="velocity_field.bin"):
 
 
 # --- Main ---
-N = 128
+N = 64
 L = 2 * np.pi
 L_int0 = 0.3*L/10 #  Estimate of Integral Length scale
 u_rms0 = 1

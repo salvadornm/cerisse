@@ -7,6 +7,7 @@ case  $1 in
     	rm -rf ./plot/plt*
 	rm -f *.tmp
 	rm -f *.visit
+	rm -f *.log
 	rm -f screen
 	rm -rf Backtrace*
 	echo -e "\\033[1;32m  dir clean and ready to run \\033[0m"
