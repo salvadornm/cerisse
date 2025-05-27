@@ -60,6 +60,7 @@ struct methodparm_t {
   static constexpr int  order = 2;                  // order numerical scheme   
   static constexpr Real conductivity = lambda;       // conductivity (for constant value)
   static constexpr Real viscosity    = viscos;       // viscosity    (for constant value)
+  static constexpr bool use_LES = false;						     
 };
 
 
@@ -89,10 +90,7 @@ typedef closures_dt<indicies_t, transport_const_t<methodparm_t>,
 
 // NUMERICAL SCHEME + EQNS TO SOLVE   (Euler/NS/Source)                 
 
-//typedef rhs_dt<riemann_t<false, ProbClosures>, no_diffusive_t, no_source_t > ProbRHS;
-//typedef rhs_dt<skew_t<skewparm_t,ProbClosures>, no_diffusive_t, no_source_t > ProbRHS;
 typedef rhs_dt<skew_t<skewparm_t,ProbClosures>, viscous_t<methodparm_t, ProbClosures>, no_source_t > ProbRHS;
-//typedef rhs_dt<riemann_t<false, ProbClosures>, viscous_t<methodparm_t, ProbClosures>, no_source_t > ProbRHS;
 
 
 // IBM templates

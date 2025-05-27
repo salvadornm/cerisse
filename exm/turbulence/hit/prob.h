@@ -114,7 +114,7 @@ AMREX_GPU_DEVICE AMREX_FORCE_INLINE void prob_initdata(
   // initial conditions rho P
   Real rhot = prob_parm.rho0;
   Real Pt   = prob_parm.p0;
-  Real u0   = prob_parm.p0;
+  Real u0   = prob_parm.u0;
 
   // read velocity field from datafile
   Real ut,vt,wt;

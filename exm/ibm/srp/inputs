@@ -5,7 +5,7 @@
 max_step  = 5000
 stop_time = 10.0
 #time_step = 1.0e-5
-cfl = 0.6
+cfl = 0.3
 
 cns.order_rk  = -2 // -2, 1, 2 or 3
 cns.stages_rk = 2 // 1, 2 or 3

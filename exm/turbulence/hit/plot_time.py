@@ -38,7 +38,7 @@ time = data[:, 0]
 quantity = data[:, col_index]
 
 # non-dimensional time
-t0 = 31.4159 # from screen L/Urms
+t0 = 62.8 # from screen L/Urms
 
 
 # Plot

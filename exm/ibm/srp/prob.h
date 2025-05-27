@@ -60,7 +60,7 @@ struct ProbParm
   // centre of probe (approx)
   static constexpr Real x0 = 1.0, y0 = 2.0, z0 = 2.0;
 
-  // SRP stagantion P and T
+  // SRP stagnation P and T
   static constexpr Real P0srp = P0;
   static constexpr Real T0srp = 5.0*T0;
   // compute conditions at throat
