@@ -154,7 +154,33 @@ $$
 \bar{\rho}  D_{sgs} = \frac{\mu_{sgs}}{\text{Sc}_{sgs}}
 $$
 
-with $$\text{Sc}_{sgs}$$ a constant often taken as 0.4-1.
+with $$\text{Sc}_{sgs}$$ a constant often taken as 0.4-1. All species diffuse at the smallest scales 
+*due to turbulence* at the same speed.
+
+
+
+$$
+\overline{\rho u_j (e_t + P/\rho )} = \bar{\rho} \widetilde{ u_j h_t}
+= \tilde{u}_j \tilde{h}_t   - \lambda_{sgs} \frac{\partial \tilde{T}{\partial x_j}
+$$
+
+where $$h_t /equiv e_t + P/\rho $$ is the specific total enthalpy and $\lambda_{sgs} $ a sub-grid
+conductivity
+
+$$
+\lambda_{sgs} = \frac{\mu_{sgs} C_p}{\text{Pr}_{sgs}} = \frac{\mu_{sgs} C_p}{\text{Pr}}} \frac{\text{Pr}}{\text{Pr}_{sgs}} 
+$$
+
+The ratio $$\text{Pr}/\text{Pr}_{sgs}$$ is often less than 1,  $$\approx 0.8 $$
+
+$$
+\frac{\lambda_{sgs}}{\lambda} = \frac{\mu_{sgs}}{\mu} \frac{\text{Pr}}{\text{Pr}_{sgs}} 
+$$
+
+In general, if $${\text{Pr}}{\text{Pr}_{sgs}} > 1 $$ sub-grid turbulent eddies transport momentum more efficiently than heat (vs. molecular case). If $${\text{Pr}}{\text{Pr}_{sgs}} < 1 $$ (common in gases),
+sub-grid turbulent eddies transport momentum more efficiently than heat (vs. molecular case).
+
+### Other unknowns
 
 In conventional LES, fluctuations of transport properties are assumed to be small within the filter width and therefore, molecular fluxes can be approximated by
 
@@ -163,6 +189,18 @@ $$
 $$
 
 Molecular fluxes scale with the inverse of Reynolds number, $$\text{Re}^{-1}$$, making them relatively small in turbulent flows. Consequently, errors associated with molecular transport properties often (but not always)  have a small  impact in the solution.
+
+### Subgrid kinetic energy
+
+$$
+\frac{1}{2}overline {u_j^2}  = \frac{1}{2} \bar{u}_j^2 +  k_{sgs}
+$$
+
+$$
+\frac{\partial \bar{\rho} k_{sgs}  }{\partial t} + 
+\frac{\partial \bar{\rho} \tilde{u}_j k_{sgs}}{\partial x_j} = \mathcal{P}_{sgs} - \epsilon_{sgs}
+$$
+
 
 #### References
 

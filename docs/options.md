@@ -1,0 +1,206 @@
+# Arguments
+
+
+This page explains the arguments of each class thare defined in `prob.h`.
+Most of these options are passed as an argument in set-up through
+a light struct. All arguments are defiend as `constexpr` so they are known and evaluated at compile time.
+This helps otimize the code (at compile time expense).
+A quick tip on checking the available options is not look in **defaultparm_t** in `NumParam.h`
+where all options are defined to avoid double names
+
+
+
+## closures_dt
+
+
+### transport_const_t
+
+Example use is
+```cpp
+typedef closures_dt<indicies_t, transport_const_t<viscparm_t>, ...  > ProbClosures;
+```
+where specifci values of conductivitu and viscosity are selected
+
+```cpp
+struct viscparm_t {
+
+  public:
+
+  static constexpr Real conductivity = 0.001;      // conductivity (for constant value)
+  static constexpr Real viscosity    = 1e-5;       // viscosity    (for constant value)
+};
+```
+
+
+### Smagorinsky_t / WALE_t
+
+Both **Smagorinsky** and **WALE** are sub-classes of **LES** and have the same parameters.
+
+Example use is
+
+```cpp
+typedef closures_dt< ... , Smagorinsky_t<LESparm_t,indicies_t> > ProbClosures;
+```
+with `LESparm_t` containing all parameters required for LES models. Some may not be used
+if specific models are used, but ALL have to be defined if one od these templates are used.
+
+```cpp
+struct LESparm_t {
+
+  public:
+
+  static constexpr int  order = 2;         
+  static constexpr Real Pr_o_Prsgs = 0.8;  
+  static constexpr Real Scsgs = 0.7;       
+  static constexpr Real Cs = 0.18;          
+  static constexpr Real CI = 0.08;        
+  static constexpr bool fixDelta = false;  
+  static constexpr Real Delta = 0.02;      
+};
+```
+
+| Variable Name       | Type          | Value  | Description                                             |
+|---------------------|---------------|--------|---------------------------------------------------------|
+| `order`             | `int`         | `2`    | Order of the numerical scheme used for gradient estimation. |
+| `Pr_o_Prsgs`        | `Real`        | `0.8`  | Ratio of molecular Prandtl number (Pr) to subgrid-scale Prandtl number (Pr<sub>sgs</sub>). |
+| `Scsgs`             | `Real`        | `0.7`  | Subgrid-scale Schmidt number (Sc<sub>sgs</sub>).         |
+| `Cs`                | `Real`        | `0.18`  | Smagorinsky constant; used in sgs models.       |
+| `CI`                | `Real`        | `0.08` | Yoshizawa constant; associated with isotropic sgs contibution.   |
+| `fixDelta`          | `bool`        | `false`| Flag to indicate whether the filter width is fixed.      |
+| `Delta`             | `Real`        | `0.02` | Filter width (only used if `fixDelta` is true)           |
+
+
+
+## rhs_dt
+
+### skew_t
+
+Example use is
+
+```cpp
+typedef rhs_dt<skew_t<methodparm_t, ProbClosures>,  .... > ProbRHS;
+```
+
+with
+
+```cpp
+struct methodparm_t {
+
+  public:
+
+  static constexpr bool dissipation = true;         
+  static constexpr int  order = 4;                  
+  static constexpr Real C2skew=0.1,C4skew=0.016;   
+
+};
+```
+
+
+| Variable Name | Type    | Value   | Description                                                   |
+|----------------|---------|---------|---------------------------------------------------------------|
+| `dissipation`  | `bool`  | `true`  | Flag indicating whether dissipation is applied (true = yes). |
+| `order`        | `int`   | `4`     | Order of the numerical scheme used 2/4/6.                    |
+| `C2skew`       | `Real`  | `0.1`   | Coefficient for 2nd-order skew-symmetric dissipation.        |
+| `C4skew`       | `Real`  | `0.016` | Coefficient for 4th-order skew-symmetric dissipation.        |
+
+
+### viscous_t
+
+Example use is
+```cpp
+typedef rhs_dt<skew_t<... viscous_t<methodparm_t, ProbClosures> ..  > ProbRHS;
+```
+
+```cpp
+struct methodparm_t {
+
+  public:
+
+  static constexpr int  order = 2;                  // order numerical scheme
+  static constexpr bool use_LES= false;             // LES model 
+};
+```
+
+| Variable Name | Type    | Value   | Description                                                   |
+|----------------|---------|---------|---------------------------------------------------------------|
+| `order`        | `int`   | `2`     | Order of the numerical scheme used 2/4/6.                    |
+| `use_LES`      | `bool`  | `false`   | Flag indicating sgs model used (true =yes).         |
+
+If  `use_LES = true`, sub-grid viscosty/conductivity/ect.. will be added to the viscosity  
+
+
+
+## IBM
+
+Example use is
+
+```cpp
+typedef eib_t<TypeWall,ibmparm_t,ProbClosures> ProbIB;
+```
+
+```cpp
+struct ibmparm_t {
+
+  public:
+
+  static constexpr int  interp_order = 1;
+  static constexpr int  extrap_order = 1;
+  static constexpr Real alpha= 0.6;      
+};
+```
+
+This controls IBM options, and it is needed to define stencils for extrapolation.
+Order is **interp_order+1**, in the above example the interpolation order is 2
+
+| Variable Name    | Type    | Value | Description                                                        |
+|------------------|---------|--------|--------------------------------------------------------------------|
+| `interp_order`   | `int`   | `1`    | Order of the interpolation scheme -1 used in IBM. |
+| `extrap_order`   | `int`   | `1`    | Order of the extrapolation scheme -1 used in IBM. |
+| `alpha`          | `Real`  | `0.6`  | Ratio between first IP and IB points (in mesh units) |
+
+
+## Default values
+
+The default options are (any struct can be replace by `defaultparm_t`)
+
+```cpp
+// default values 
+struct defaultparm_t {
+
+public:
+
+
+static constexpr int order = 2;                   // order of scheme (used in many options)
+
+static constexpr bool dissipation = false;        // use in some schemes to activate dissipation
+
+#ifdef AMREX_USE_GPIBM
+static constexpr bool ibm = true;
+#else
+static constexpr bool ibm = false;
+#endif
+
+//  Skew 
+static constexpr Real C2skew=0.1,C4skew=0.0016;   // Skew symmetric default
+
+// Transport properties
+static constexpr Real conductivity = 0.0262;      // conductivity (for constant value)
+static constexpr Real viscosity   = 1.85e-5;      // viscosity    (for constant value)
+
+// ebm/walls options
+static constexpr Real Twall = 300;              // wall temperature (for isothermal wall type)
+static constexpr bool solve_diffwall = false;   // do not solve viscous fluxes at teh wall (for ebm)
+
+// viscous options 
+static constexpr bool use_LES = false;
+
+// LES options
+static constexpr Real Pr_o_Prsgs = 1.0;          // Pr/Prsgs
+static constexpr Real Scsgs = 0.7;              // sgs Schmidt number
+static constexpr Real Cs = 0.1;                 // Smagorinsky constant
+static constexpr Real CI = 0.1;                 // Yoshizawa constant
+static constexpr bool fixDelta = false;         // (it will use local mesh size as filter width)
+static constexpr Real Delta = 0.01;             // Filter width  
+
+};
+```

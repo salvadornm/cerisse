@@ -1,6 +1,10 @@
 # Examples
 
 In the `exm/` folder, you will find several tests designed to compare numerical schemes, solution and in general validation and verification. These tests can also serve as prototypes for setting up more complex cases. While they generally run at a slower pace, they can be used for verifying the accuracy of the schemes and for benchmarking against test cases from the literature. Some of the examples use chemistry or in-line diagnostics (such as probes or statistics), or geometry (IBM or EB).
+There are many more examples in the folder than the ones listed here. 
+However, they may habe not been tested thoroughy. 
+Check the `./checkcompilation.sh` example list script to see
+which examples compile and build.
 
 ## One Dimensional Examples
 
@@ -14,6 +18,7 @@ In the `exm/` folder, you will find several tests designed to compare numerical 
 
 | Example                              | Folder         | Notes        | Notes                                      |
 | ------------------------------------ | -------------- | ------------ | ------------------------------------------ |
+| MMS                 | `mms/euler3d` | ALL         | Probe                                      |
 | _Taylor-Green Vortex_                | `numerics/tgv` | Skew         | Probe                                      |
 | _Turbulent Channel_                  | `turbulent`    | Skew         |                                            |
 | Sphere under supersonic flow         | `ibm/sphere`   | Skew/Rusanov | [IBM](theory/ibmeb.md#immersed-boundaries) |

@@ -14,6 +14,7 @@ nav:
       - BC: bc.md
       - CHEM: chemistry.md
       - Analysis: analysis.md
+      - Options: options.md
    - EXAMPLES:
       - Examples: examples.md
       - OneDim: onedim.md
@@ -35,6 +36,7 @@ nav:
       - ebm: code/ebm.md
       - ibm: code/ibm.md
       - diffusion: code/viscous.md
+      - LES: code/LES.md
       - bugs: code/bugs.md
       - performance: code/performance.md
 extra_javascript:

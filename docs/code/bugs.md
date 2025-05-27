@@ -2,11 +2,32 @@
 icon: bug
 ---
 
-# Bugs
+# TroubleShooting and Bugs
 
 ## Common errors
 
 This section outlines common errors, their possible causes, and suggested solutions.
+
+
+### installation errors
+
+```
+examples do not compile
+```
+
+**Fix:**
+
+* Check requirements by executing the `checreq.sh` script in  `cerisse/bin`
+
+
+```
+sundials not installed
+```
+
+**Fix:**
+
+* Ensure to do  `make TPL` the first time you prepara a simualytion involving reacting chemistry.
+
 
 ### input file
 
@@ -22,6 +43,31 @@ The mesh domain size is not divisible by the specified `blocking_factor`.
 
 * Ensure that each domain dimension is divisible by the `blocking_factor`.
 * If embedded boundaries (EB) are used, ensure the mesh is isotropic, i.e., `dx = dy = dz`.
+
+```
+SIGABRT
+AMR::checkInput bad_ref_ratios
+```
+
+**Cause:**\
+Probably a typo in  refinement `ref_ratio`, maybe is set to 1?
+
+**Fix:**
+
+* Ensure that ref_ratio is 2 or 4 (or similar number greater than 1)
+
+```
+SIGABRT
+amrex::Abort::0::Exiting because either max_step and/or stop_time is less than or equal to 0. !!!
+```
+**Cause:**\
+Probably input file not specified
+
+**Fix:**
+
+* Remember to run `./main3d.gnu.ex input` or similar
+
+
 
 ### IBM related
 

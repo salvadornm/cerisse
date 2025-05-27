@@ -34,7 +34,7 @@ You will need to do this to install python packages, such as *yt* and *markdown*
 
 ## Cerisse script
 
-The **cerisse** script can help to clean directories, create backups, create visit files for movies quickly. It is useful for day to day running and avoid file creep-up. The script is installed in `bin` and can be used by
+The **cerisse** script can help to clean directories, create backups, create visit files for movies quickly, check basic simulation paramenters. It is useful for day to day running and avoid file creep-up. The script is installed in `bin` and can be used by
 
 ```bash
 $ ../bin/cerisse [options]
@@ -46,13 +46,15 @@ or by setting the path in `.bashrc` or `.profile` by adding the line at the end
 PATH="/home/snm/work/cerisse/bin:$PATH"
 ```
 
-where `/home/snm/work/cerisse` corresponds to the installation directory. Current options are **clean** (_all_) to remove old results and temporary directories. **visit** to prepare data for input into Visit, **plot**, which will crete a snaphsot of the density, **backup** (_dirname_) will save simualytion data and main files into a backup directory
+where `/home/snm/work/cerisse` corresponds to the installation directory. 
+Type `cerisse help` or `cerisse` to view available options. 
+Clean files between runs and MPI run are the most common `ceriise clean` and `cerisse run`.
 
 ## Documentation Editing
 
-Althoigh the main documentation is onine in Gitbooks. It is possible to generate the documentation by locally typing in the parent directory: `$ mkdocs serve` and the point the browser to [127.0.0.1.8000](http://127.0.0.1:8000) in your browser. The formatting of this documentation may be off (inline equations in particular) and not all images wikk appear.
+Although the main documentation is onine in Gitbooks, it is possible to generate the documentation by locally typing in the parent directory: `$ mkdocs serve` and the point the browser to [127.0.0.1.8000](http://127.0.0.1:8000) in your browser. The formatting of this documentation may be off (inline equations in particular) and images will not appear.
 
-You may need to install the `python-markdown-math` extension for rendering equations and the `markdown-callouts` extension for correctly displaying the warning and note blocks. For help editing the documentation visit [mkdocs.org](https://www.mkdocs.org).
+You may need to install the `python-markdown-math` extension for rendering equations. For help visit [mkdocs.org](https://www.mkdocs.org). Extensions are listed in the file `mkdocs.yaml`
 
 
 ## Python environments (for poetry)

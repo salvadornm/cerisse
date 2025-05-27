@@ -16,6 +16,7 @@
   * [Boundaries](bc.md)
   * [Chemistry](chemistry.md)
   * [Data Analysis](analysis.md)
+  * [Options](options.md)
 
 ## EXAMPLES
 
@@ -43,6 +44,7 @@
   * [EBM Solver](code/ebm.md)
   * [IBM Solver](code/ibm.md)
   * [Viscous Solver](code/viscous.md)
+  * [LES models](code/LES.md)
   * [Bugs](code/bugs.md)
   * [Performance](code/performance.md)
 

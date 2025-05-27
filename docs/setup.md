@@ -13,7 +13,7 @@ When creating a new problem, it is best to set up a new directory (e.g., `wrk`) 
 
 ```bash
 $ls wrk
-GNUmakefile	inputs		prob.h
+GNUmakefile	inputs prob.h
 ```
 
 NOTE: is best to copy them from a similar example and then edit the file, this will ensure consistencty with examples. Nonetheless, the names of the `input` and `prob.h` files can change (but not the `GNUmakefile`). The configuration of the problem is splitted into three files.

@@ -29,7 +29,7 @@ template < typename param, typename cls_t> class ibm_user_t;
 The only parameter needed would be the class `cls_t`, the rest is user defined\
 
 
-2. Use this class as bc as usual
+2. Use this class as bc as usual (see example in `exm/ibm/srp`)
 
 ```cpp
 typedef ibm_user_t<ProbParm, ProbClosures> TypeWall;

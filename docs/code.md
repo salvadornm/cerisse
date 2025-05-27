@@ -70,4 +70,4 @@ In the `/bin` directory
 $ ./checkcompilation.sh
 ```
 This will test compilation across multiple examples. This will take up to 10 minutes and
-assumes third party libraries hav ebeen installed (PelePhysics and CGAL)
+assumes third party libraries have been installed (PelePhysics and CGAL)
