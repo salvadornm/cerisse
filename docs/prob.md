@@ -51,11 +51,9 @@ typedef closures_dt<indicies_t, visc_suth_t, cond_suth_t,
                     calorifically_perfect_gas_t<indicies_t>> ProbClosures;
 ```
 
-The line above selects a problem that uses the structure `indicies_t`, which variables to solve(and how are they stored) how many to solve. The above also selects the Sutherland viscosity model `visc_suth_t` and condictivity model `cond_suth_t`. As well as use a perdect ideal gas as thermodynamics model. All this is wrapped in the class \`\`\`ProbClosures\`\`, which will then pass to the equations. Some of the tranpsort model required input from the user, which can use default values (or probelem specific)
+The line above selects a problem that uses the structure `indicies_t`, which variables to solve(and how are they stored) how many to solve. The above also selects the Sutherland viscosity model `visc_suth_t` and condictivity model `cond_suth_t`. As well as use a perdect ideal gas as thermodynamics model. All this is wrapped in the class \`\`\`ProbClosures\`\`, which will then pass to the equations. Some of the tranpsort model required input from the user, which can use default values (or probelem specific). Options in _**closures\_dt**_, all units in SI
 
-Options in _**closures\_dt**_, all units in SI (October 2024)
-
-<table><thead><tr><th width="261">Closure</th><th width="146">Options</th><th width="193" align="center">defaults</th><th>Description</th></tr></thead><tbody><tr><td><code>visc_suth_t</code></td><td>no</td><td align="center"><br><span class="math">\mu =1.458\cdot 10^{-6}</span> at<br><span class="math">T=110.4</span></td><td>Sutherland Viscosity</td></tr><tr><td><code>cond_suth_t</code></td><td>no</td><td align="center"><br><span class="math">\lambda =2.495 \cdot 10^{-3}</span> at <span class="math">T=194</span></td><td>Sutherland Conductivity</td></tr><tr><td><code>visc_const_t</code></td><td>viscosity</td><td align="center"><span class="math">\mu= 1.85  \cdot 10^{-5}</span></td><td>Constant Viscosity</td></tr><tr><td><code>cond_const_t</code></td><td>conductivity</td><td align="center"><span class="math">\lambda = 0.0262</span></td><td>Constant Conductivity</td></tr><tr><td><code>transport_const_t</code></td><td>viscosity</td><td align="center"><span class="math">\mu = 1.85 \cdot 10^{-5}</span> and <span class="math">\lambda = 0.0262</span></td><td>Constant Viscosity and <a data-footnote-ref href="#user-content-fn-1">Conductivity</a></td></tr><tr><td><code>calorifically_perfect_gas_t</code></td><td>no</td><td align="center"><span class="math">\gamma =1.4</span> <span class="math">M=28.96 \cdot  10^{-3}</span></td><td>perfect <a data-footnote-ref href="#user-content-fn-2">gas</a></td></tr><tr><td><code>multispecies_perfect_gas_t</code></td><td>no</td><td align="center">PelePhysics</td><td>Used for <strong>PelePhsics</strong> options</td></tr></tbody></table>
+<table><thead><tr><th width="275">Closure</th><th width="146">Options</th><th width="193" align="center">defaults</th><th>Description</th></tr></thead><tbody><tr><td><code>visc_suth_t</code></td><td>no</td><td align="center"><br><span class="math">\mu =1.458\cdot 10^{-6}</span> at<br><span class="math">T=110.4</span></td><td>Sutherland Viscosity</td></tr><tr><td><code>cond_suth_t</code></td><td>no</td><td align="center"><br><span class="math">\lambda =2.495 \cdot 10^{-3}</span> at <span class="math">T=194</span></td><td>Sutherland Conductivity</td></tr><tr><td><code>visc_const_t</code></td><td>viscosity</td><td align="center"><span class="math">\mu= 1.85 \cdot 10^{-5}</span></td><td>Constant Viscosity</td></tr><tr><td><code>cond_const_t</code></td><td>conductivity</td><td align="center"><span class="math">\lambda = 0.0262</span></td><td>Constant Conductivity</td></tr><tr><td><code>transport_const_t</code></td><td>viscosity</td><td align="center"><span class="math">\mu = 1.85 \cdot 10^{-5}</span> and <span class="math">\lambda = 0.0262</span></td><td>Constant Viscosity and <a data-footnote-ref href="#user-content-fn-1">Conductivity</a></td></tr><tr><td><code>calorifically_perfect_gas_t</code></td><td>no</td><td align="center"><span class="math">\gamma =1.4</span> <span class="math">M=28.96 \cdot 10^{-3}</span></td><td>perfect <a data-footnote-ref href="#user-content-fn-2">gas</a></td></tr><tr><td><code>multispecies_perfect_gas_t</code></td><td>no</td><td align="center">PelePhysics</td><td>Used for <strong>PelePhysics</strong> options</td></tr><tr><td><code>Smagorinsky_t</code></td><td>yes</td><td align="center">none</td><td>Used for LES</td></tr></tbody></table>
 
 ### Passing Arguments
 
@@ -73,7 +71,7 @@ typedef closures_dt<indicies_t, visc_const_t<methodparm_t>, cond_const_t<default
                     calorifically_perfect_gas_t<indicies_t>> ProbClosures;
 ```
 
-The problem will use a vicosity of **2.85e-5** and a conductivity of **0.0262** (default values using the structure **defaultparm\_t** ).
+The problem will use a viscosity of **2.85e-5** and a conductivity of **0.0262** (default values using the structure **defaultparm\_t** ). Check [Options](options.md)  for detailed description on arguments.
 
 {% hint style="info" %}
 To use the default values, the line `#include <NumParam.h>` has to be included in the headers
@@ -87,7 +85,7 @@ $$
 \frac{\partial U}{\partial t} = \mbox{RHS}(U) = \mbox{Euler} + \mbox{Diffusive} + \mbox{Source}
 $$
 
-where the RHS includes the inviscid (Euler) terms viscous (for Navier-Stokes) and source terms. The C++ templete follows:
+where the RHS includes the inviscid (Euler) terms viscous (for Navier-Stokes) and source terms. The C++ template follows:
 
 ```cpp
 template <typename euler, typename diffusive, typename source>
@@ -105,9 +103,7 @@ $$
 \frac{\partial U}{\partial t} = F(U)
 $$
 
-corresponding to the Euler equations, with skew-symmetric numerical scheme (with order defined in `methodparm_t`, similar to **closures\_dt** .
-
-**euler** options in _**rhs\_dt**_ (October 2024)
+corresponding to the Euler equations, with skew-symmetric numerical scheme (with order defined in `methodparm_t`, similar to **closures\_dt**  (see  [Options](options.md)). Available options in _**rhs\_dt**_ are:
 
 <table><thead><tr><th width="208">euler</th><th width="90">Options</th><th width="87" align="center">IBM</th><th width="152" align="center">defaults</th><th>Description</th></tr></thead><tbody><tr><td><code>riemann_t</code></td><td>no</td><td align="center">no</td><td align="center">-</td><td><a href="theory/equations/numerical-methods.md#riemann-solver-with-muscl">Second TVD - HLLC Riemann solver</a></td></tr><tr><td><code>skew_t</code></td><td>yes</td><td align="center">yes</td><td align="center">4th order, no dissipation</td><td><a href="theory/equations/numerical-methods.md#skew-symmetric">2/4/6 order Skew-symmetric scheme</a></td></tr><tr><td><code>keep_euler_t</code></td><td>yes</td><td align="center">no</td><td align="center">no default</td><td><a href="theory/equations/numerical-methods.md#keep">2/4/6 order KEEP scheme</a></td></tr><tr><td><code>weno_t</code></td><td>yes</td><td align="center">no</td><td align="center">no default</td><td><a href="theory/equations/numerical-methods.md#weno">WENO</a> or <a href="theory/equations/numerical-methods.md#teno">TENO</a> 5th order scheme</td></tr><tr><td><code>rusanov_t</code></td><td>no</td><td align="center">yes</td><td align="center">-</td><td><a href="theory/equations/numerical-methods.md#rusanov-scheme">Rusanov 2nd order scheme</a></td></tr><tr><td><code>no_euler_t</code></td><td>no</td><td align="center">yes</td><td align="center">-</td><td>0 (not solving Euler)</td></tr></tbody></table>
 
@@ -123,9 +119,9 @@ Not all options available yet !!
 
 <table><thead><tr><th width="201">diffusive</th><th width="84">Options</th><th width="51" align="center">IBM</th><th align="center">defaults</th><th>Description</th></tr></thead><tbody><tr><td><code>reactor_t</code></td><td>yes</td><td align="center">yes</td><td align="center">-</td><td>PelePhysics chemcail raection</td></tr><tr><td><code>user_source_t</code></td><td>no</td><td align="center">yes</td><td align="center">-</td><td>user-given source term</td></tr><tr><td><code>no_source_t</code></td><td>no</td><td align="center">yes</td><td align="center">0</td><td>0 (no source term part)</td></tr></tbody></table>
 
-## Initial Condition
+## Initial Conditions
 
-The **prob\_initdata** function, this is function is called for every `i,j,k` cell
+The **prob\_initdata** function is called for every `i,j,k` cell
 
 ```cpp
 // initial condition
@@ -144,7 +140,7 @@ In most examples, a few auxiliar definitions follow that extract the size the do
   Real x = prob_lo[0] + (i + Real(0.5)) * dx[0];
 ```
 
-This allow to define, for example, different condition depending on the _x_ coordinate. The structure `prob_parm`of type **ProbParm** is used to recall problem parameters
+This allow to define, for example, different condition depending on the _x_ coordinate. The structure `prob_parm`of type **ProbParm** is used to recall generic problem parameters
 
 ```cpp
   Real Pt, rhot, uxt;
@@ -171,13 +167,11 @@ The function needs to fille the `state` array, where the conservative variables 
 }
 ```
 
-Since this is pure C++ code, it allows for the construction of complex initial conditions.
-Additionaly the utility class can be used to incorporporate 
-incorporate chemistry profiles, turbulent inflows etc, inspired in the utilty options
-in (PelePhysics)[https://pelephysics.readthedocs.io/en/latest/Utility.html]
+Since this is pure C++ code, it allows for the construction of complex initial conditions. Additionally the **Utility** class (see below) can be used to incorporate chemistry profiles, turbulent inflows, etc.
 
-NOTE: the most common variable labels are in the template `indicies_t`.**Cerisse**
-expects 3D labels UMY nd UMZ even in 1 or 2D. In 1D `state(i,j,k,cls.UMY)=0` amd `state(i,j,k,cls.UMZ)=0` and in 2D `state(i,j,k,cls.UMZ)=0`.
+{% hint style="warning" %}
+The most common variable labels are in the template `indicies_t`. **Cerisse** expects 3D labels **UMY** and **UMZ** even in 1 or 2D. In 1D `state(i,j,k,cls.UMY)=0` amd `state(i,j,k,cls.UMZ)=0` and in 2D `state(i,j,k,cls.UMZ)=0`.
+{% endhint %}
 
 ## Source
 
@@ -214,13 +208,8 @@ The `prob.h` can be used to implement user-specific boundary conditions (transie
 
 ## Utility
 
-The utility class can be used to incorporporate 
-chemistry profiles, turbulent inflows etc, in the initial and boundary coditions.
-It inspired in the utility options
-in (PelePhysics)[https://pelephysics.readthedocs.io/en/latest/Utility.html]
-and is a placeholder for complex interactions not specified in this file.
-For example new turbulent inflows, new data read from files, etc. As utility can access data from input and external files (condition defiend in PROB are compiled at run time).
-To use requires a line in GNU_Makefile and to change the `prob_initdata` to allow an additional argument
+The utility class can be used to incorporate chemistry profiles, turbulent inflows etc, in the initial and boundary conditions. It inspired in the Utility options in [PelePhysics](https://pelephysics.readthedocs.io/en/latest/Utility.html)  and is a placeholder for complex interactions not specified in this fie, such as  new data read from files. **Utility** can access data from `input` and external files.  Conditions and parameters  defined in PROB are known at compile time.\
+To use the Utility requires an additional line in `GNU_Makefile` and to change the `prob_initdata` to allow an additional argument
 
 ```cpp
 AMREX_GPU_DEVICE AMREX_FORCE_INLINE void prob_initdata(
@@ -229,10 +218,9 @@ AMREX_GPU_DEVICE AMREX_FORCE_INLINE void prob_initdata(
     ProbParm const &prob_parm, Utility* util = nullptr) {
 ```
 
-This class allows access to multiples functions (for example PMF in **PelePhysics**)
+This class allows access to multiples functions, for example PMF in **PelePhysics.**
 
-
-## Other
+## Other (optional)
 
 The names follow in the **cons\_var\_names** array
 
@@ -240,7 +228,7 @@ The names follow in the **cons\_var\_names** array
 inline Vector<std::string> cons_vars_names={"Xmom","Ymom","Zmom","Energy","Energy"};
 ```
 
-The type of variables, keep as it is, scalar ser 0 and vectors are given by their components
+The type of variables, keep as it is, scalars are 0 and vectors are given by their components
 
 ```cpp
 inline Vector<int> cons_vars_type={1,2,3,0,0};

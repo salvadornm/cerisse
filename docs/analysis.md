@@ -45,15 +45,19 @@ static constexpr int record_velocity   = 1;
 static constexpr int record_PTrho      = 1;
 ```
 
-Additionaly, the flag `cns.record_stats = 1` in the input must be set to 1 to enable the recording of statistics. If not, space for the statistics will be allocated, but no data will be written. See example Mixing Layer
+Additionaly, the flag `cns.record_stats = 1` in the input must be set to 1 to enable the recording of statistics. If not, space for the statistics will be allocated, but no data will be written.&#x20;
 
-Note, that new variables will appear in plot files, and storing statis will increase greatly the size of plotting and checkpoint files.
+{% hint style="info" %}
+New variables will appear in the plot files. Note that  storing statistical data will increase greatly the size of plotting and checkpoint files.
+{% endhint %}
 
-NOTE: user-specific statistics not ready yet
+{% hint style="danger" %}
+user-specific statistics in progress
+{% endhint %}
 
 ## Probes
 
-Probes are handled with the input files (see example in TGV).
+Probes record time-evolution of quantities . They are handled through the input files&#x20;
 
 ```
 # DIAGNOSTICS
@@ -76,6 +80,6 @@ PressurePoint.box_lo = 3.14159 3.14159 3.14159
 PressurePoint.box_hi = 3.19068 3.19068 3.19068
 ```
 
-In the example above, a file named `time_probe.log` is defined to store data, including four quantities: two derived ones—energy and enstrophy—and two direct ones—density and pressure. The first two are averaged over a box of size (0, 6.28), while the latter correspond to a much smaller box (a "point")
+In the example above, a file named `time_probe.log` is defined to store data, including four quantities: two derived ones—_energy_ and _enstrophy_—and two direct ones—_density_ and _pressure_. The first two are averaged over a box of size (0, 6.28), while the latter correspond to a much smaller box (a "point")
 
-The `cns.record_probe = 1` is needed to store the data. An example can be found in the [constant volume reactor ](onedim.md#constant-volume-reactor)where temperature is tracked over time
+The `cns.record_probe = 1` is needed to store the data. An example can be found in the [constant volume reactor ](onedim.md#constant-volume-reactor)where temperature is tracked over time. Results can then be plot with conventional python scripts.
