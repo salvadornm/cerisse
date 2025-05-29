@@ -45,13 +45,22 @@ void amrex_probinit(const int* /*init*/, const int* /*name*/, const int* /*namel
   trans_parm.viscosity_mu_ref = CNS::h_prob_parm->mu_w;
   trans_parm.viscosity_T_ref = CNS::h_prob_parm->T_w;
   trans_parm.viscosity_S =
-    CNS::h_prob_parm->T_w *
-    0.463; // use this to approximate mu ~ T^0.7 in T/Tw between 1 and 1.25
+    CNS::h_prob_parm->T_w * 0.29; // use this to approximate mu ~ T^0.7 in T/Tw between 1 and 1.25
   trans_parm.Prandtl_number = Pr;
   trans_parm.const_bulk_viscosity = 0.0;
   trans_parm.const_diffusivity = 0.0;
-
   CNS::trans_parms.sync_to_device();
+
+  // Print problem param
+  amrex::Print() << "==================================="
+                 << "\nrho_b = " << CNS::h_prob_parm->rho_b
+                 << "\nu_b = " << CNS::h_prob_parm->u_b
+                 << "\nmu_w = " << CNS::h_prob_parm->mu_w
+                 << "\nc_w = " << csw
+                 << "\nrho_w = " << CNS::h_prob_parm->rho_w
+                 << "\nu_tau = " << CNS::h_prob_parm->u_tau
+                 << "\nf_x = " << CNS::h_prob_parm->f_x
+                 << "\n===================================\n";
 }
 }
 
