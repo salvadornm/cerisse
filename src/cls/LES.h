@@ -46,7 +46,7 @@ class LES_t {
   }
 
   /**
-   * \brief calculates sub-grid bulk viscoisty 
+   * \brief calculates sub-grid bulk viscosity at FACE i+1/2??? CHECK 
    *  cell centred
    * \param[in]  i,j,k
    * \param[in]  q     primitive variables array 
@@ -54,9 +54,45 @@ class LES_t {
    * \param[in]  Delta
    * \param[out] xi_sgs
   */
+  // central in face (depending on idir)
+  AMREX_GPU_DEVICE AMREX_FORCE_INLINE Real xi_sgs_face(
+  const int i, const int j, const int k, const int d1,  const Array4<const Real>& q,
+  const GpuArray<Real, AMREX_SPACEDIM>& dxinv, const Real delta)
+  {
+    // Calculate derivatives at cell centers uisng  central differences at cell faces
+    const amrex::IntVect iv{AMREX_D_DECL(i, j, k)};
+    Real dUdx[3][3] = {{0.0}};
 
+    // directions
+    const int d2 = d1 == 0 ? 1 : 0;
+    const int d3 = d1 == 2 ? 1 : 2;
+    AMREX_D_TERM(const int QU1 = idx_t::QU + d1;, const int QU2 = idx_t::QU + d2;
+               , const int QU3 = idx_t::QU + d3;) 
 
+    dUdx[0][0]  = normal_diff<param::order>(iv, d1, QU1, q, dxinv);   // dudx00
+#if (AMREX_SPACEDIM >= 2)
+    dUdx[1][0]  = normal_diff<param::order>(iv, d1, QU2, q, dxinv);
+    dUdx[0][1]  = tangent_diff<param::order>(iv, d1, d2, QU1, q, dxinv);
+    dUdx[1][1]  = tangent_diff<param::order>(iv, d1, d2, QU2, q, dxinv);
+#endif
+#if (AMREX_SPACEDIM == 3)
+    dUdx[2][0]  = normal_diff<param::order>(iv, d1, QU3, q, dxinv);
+    dUdx[0][2]  = tangent_diff<param::order>(iv, d1, d3, QU1, q, dxinv);
+    dUdx[2][2]  = tangent_diff<param::order>(iv, d1, d3, QU3, q, dxinv);
+#endif  
 
+    // || Sij ||
+    Real Sijmag = 0.0;
+    for (int m = 0; m < AMREX_SPACEDIM; m++) {
+      for (int n = 0; n < AMREX_SPACEDIM; n++) {
+        Sijmag += (0.5 * (dUdx[m][n] + dUdx[n][m])) *
+                  (0.5 * (dUdx[m][n] + dUdx[n][m])); // Sij*Sij
+      }
+    }
+    //Sij2 = ||Sij||**2
+    const Real Sij2 = 2.0*Sijmag;
+    return( two_third*q(i, j, k, idx_t::QRHO) *param::CI  * delta * delta *Sij2);
+  }
 ////////////////////////////////////////////////////////////////
 };
 
