@@ -173,6 +173,7 @@ class viscous_t {
   // ----------------------------------------------------------------------------------------------  
   /**
   * @brief Compute diffusion fluxes (viscosity + heat + diffusion).
+  *        Calculates flux[i] which correspond to flux(i-1/2) between i and i-1
   *
   * @param i,j,k  x, y, z index.cls_t::CLAM
   * @param d1    direction, 0:x, 1:y, 2:z (dir)
