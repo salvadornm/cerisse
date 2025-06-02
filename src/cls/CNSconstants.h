@@ -24,6 +24,8 @@ constexpr amrex::Real min_euler_press = 1.0e-8;  // minimum pressure for Euler s
 
 constexpr amrex::Real one_half  = 1.0/2.0;   // 1/2
 constexpr amrex::Real one_third = 1.0/3.0;   // 1/3
+constexpr amrex::Real two_third = 2.0/3.0;   // 2/3
+
  
 }; // namespace CNSConstants
 

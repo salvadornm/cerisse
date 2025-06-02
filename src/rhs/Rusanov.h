@@ -17,17 +17,16 @@ class rusanov_t {
 
 
 #if (AMREX_USE_GPIBM || CNS_USE_EB )  
- void inline eflux_ibm(const Geometry& geom, const MFIter& mfi,
+ void inline eflux_ibm(const Geometry& /*geom*/, const MFIter& mfi,
                     const Array4<Real>& prims, std::array<FArrayBox*, AMREX_SPACEDIM> const &flxt,
                     const Array4<Real>& rhs, const cls_t* cls,const Array4<bool>& ibMarkers) {
 
 #else
-  void inline eflux(const Geometry& geom, const MFIter& mfi,
+  void inline eflux(const Geometry& /*geom*/, const MFIter& mfi,
                     const Array4<Real>& prims, std::array<FArrayBox*, AMREX_SPACEDIM> const &flxt,
                     const Array4<Real>& rhs, const cls_t* cls) {
 #endif
 
-    const Box& bx  = mfi.growntilebox(0);
     const Box& bxg = mfi.growntilebox(cls->NGHOST);
     const Box& bxgnodal = mfi.grownnodaltilebox(
         -1, 0);  // extent is 0,N_cell+1 in all directions -- -1 means for all
@@ -74,7 +73,7 @@ class rusanov_t {
 
   AMREX_GPU_DEVICE AMREX_FORCE_INLINE void flux_dir(
     int i, int j, int k, const GpuArray<int, 3>& vdir, const Array4<Real>& cons, const Array4<Real>& cell_flux, const Array4<Real>& lambda_max, const Array4<Real>& flx,
-    const cls_t* cls) const {
+    const cls_t* /*cls*/) const {
     
     int il= i-vdir[0]; int jl= j-vdir[1]; int kl= k-vdir[2];
 

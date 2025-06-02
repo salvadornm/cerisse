@@ -24,9 +24,9 @@ static constexpr bool ibm = false;
 //  Skew 
 static constexpr Real C2skew=0.1,C4skew=0.0016;   // Skew symmetric default
 
-// Transport properties
-static constexpr Real conductivity = 0.0262;      // conductivity (for constant value)
-static constexpr Real viscosity   = 1.85e-5;      // viscosity    (for constant value)
+// Transport properties (for constant value )
+static constexpr Real conductivity = 0.0262;      // conductivity [SI units]
+static constexpr Real viscosity   = 1.85e-5;      // viscosity    [SI units]
 
 // ebm/walls options
 static constexpr Real Twall = 300;              // wall temperature (for isothermal wall type)
@@ -36,12 +36,17 @@ static constexpr bool solve_diffwall = false;   // do not solve viscous fluxes a
 static constexpr bool use_LES = false;
 
 // LES options
-static constexpr Real Pr_o_Prsgs = 1.0;          // Pr/Prsgs
+static constexpr Real Pr_o_Prsgs = 1.0;         // Pr/Prsgs
 static constexpr Real Scsgs = 0.7;              // sgs Schmidt number
 static constexpr Real Cs = 0.1;                 // Smagorinsky constant
 static constexpr Real CI = 0.1;                 // Yoshizawa constant
 static constexpr bool fixDelta = false;         // (it will use local lmesh size as filter width)
-static constexpr Real Delta = 0.01;             // Filter width  L/20
+static constexpr Real Delta = 0.01;             // Filter width  
+
+// perfect gas options
+static constexpr Real gamma = 1.4;                      // adiabatic ration 
+static constexpr Real molecular_weight = 29.0/1000.0;   // molecular weight [kg/mol]
+
 
 };
 

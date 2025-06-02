@@ -42,6 +42,7 @@ class viscous_t {
 
     // mesh sizes
     const GpuArray<Real, AMREX_SPACEDIM> dxinv = geom.InvCellSizeArray();
+    const GpuArray<Real, AMREX_SPACEDIM> dx = geom.CellSizeArray(); 
 
     // grid
    // const Box& bx = mfi.tilebox();        
@@ -115,7 +116,6 @@ class viscous_t {
     // -------  LES Options  ----------- //
     if constexpr (param::use_LES)
     {
-      const GpuArray<Real, AMREX_SPACEDIM> dx = geom.CellSizeArray(); // mesh sizes
       Real Delta = cls->calc_delta(dx); // compute filter width
       Real mu_sgs,cond_sgs, diff_sgs;
       // loop over cells (including enough ghost to build stencil)  
@@ -133,7 +133,6 @@ class viscous_t {
         for (int n=0;n<NUM_SPECIES; n++){        
           rhoD_arr(i,j,k,n) += diff_sgs;
         }   
-       // xi_arr(i,j,k) += xi_sgs; 
       }); 
     }          
 
@@ -142,7 +141,17 @@ class viscous_t {
     for (int dir = 0; dir < AMREX_SPACEDIM; dir++) {
      // GpuArray<int, 3> vdir = {int(dir == 0), int(dir == 1), int(dir == 2)};
       auto const& flx = flxt[dir]->array(); 
-  
+
+      // Yosihizawa model  tau_kk
+      if constexpr (param::use_LES)
+      {
+        Real Delta = cls->calc_delta(dx); // compute filter width
+        amrex::ParallelFor(bxgnodal,
+                  [=,*this] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {                     
+                    flx(i,j,k,cls_t::UMX+dir) += cls->compute_xisgs(i,j,k,dir,prims, dxinv, Delta);
+                  });        
+      }
+
       // compute diffusion fluxes
 #if (AMREX_USE_GPIBM || CNS_USE_EB )   
       amrex::ParallelFor(bxgnodal,
@@ -164,6 +173,7 @@ class viscous_t {
   // ----------------------------------------------------------------------------------------------  
   /**
   * @brief Compute diffusion fluxes (viscosity + heat + diffusion).
+  *        Calculates flux[i] which correspond to flux(i-1/2) between i and i-1
   *
   * @param i,j,k  x, y, z index.cls_t::CLAM
   * @param d1    direction, 0:x, 1:y, 2:z (dir)
@@ -332,9 +342,9 @@ class viscous_t {
     constexpr int order_default = 2; 
     int order_local = (close_to_wall ? order_default : order_sch);   
 
-
+#if NUM_SPECIES > 1
     Real rhoD_f[NUM_SPECIES];
-
+#endif
     // reduce interpolation and differentiation to second order across the wall
     if (close_to_wall)
     {        
