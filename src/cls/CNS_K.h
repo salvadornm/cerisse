@@ -174,4 +174,35 @@ inline void derenstrophy(const Box& bx, FArrayBox& derfab, int dcomp, int /*ncom
     ens(i, j, k) = 0.5 * rho * vort(i, j, k) * vort(i, j, k);
   });
 }
+
+inline void derdissipation(const Box& bx, FArrayBox& derfab, int dcomp, int /*ncomp*/,
+                         const FArrayBox& datfab, const Geometry& geomdata,
+                         Real /*time*/, const int* /*bcrec*/,
+                         const int /*level*/) {
+  auto const dat = datfab.const_array();
+  auto dissip = derfab.array(dcomp);
+
+  amrex::FArrayBox vortfab(bx, 1, The_Async_Arena());
+  dermagvort(bx, vortfab, 0, 1, datfab, geomdata);
+  
+  PROB::ProbClosures const* cls = CNS::d_prob_closures;
+
+  auto vort = vortfab.const_array();
+
+  AMREX_D_TERM( const amrex::Real dx = geomdata.CellSize(0);
+              , const amrex::Real dy = geomdata.CellSize(1);
+              , const amrex::Real dz = geomdata.CellSize(2);)
+
+
+  amrex::ParallelFor(bx, [=] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {    
+    // compute div
+    const Real divu= 0.0; // TODO
+
+    dissip(i, j, k) =  vort(i, j, k) * vort(i, j, k) +    
+      4.0/3.0* divu*divu;
+  });
+
+}
+
+
 #endif

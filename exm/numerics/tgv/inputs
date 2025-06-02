@@ -3,11 +3,15 @@ amrex.fpe_trap_invalid=1
 
 # start time is assumed to be 0, unless re-starting
 max_step  = 100000
-stop_time = 0.4747963405
+stop_time = 0.56
 # One flow time @ M=0.1 = 0.04747963405s
 # One flow time @ M=1.0 = 4.74796e-3s
-#time_step = 0.20e-4 
+#time_step = 0.20e-4 	t0 = 0.02879768262
 cfl = 0.3
+
+cns.order_rk  = -2
+cns.stages_rk = 2
+
 
 # computational domain 
 geometry.is_periodic = 1 1 1
@@ -26,7 +30,7 @@ cns.nstep_screen_output = 1
 cns.verbose = 0       # 0=quiet, 1=verbose
 
 # REFINEMENT / REGRIDDING 
-amr.n_cell          = 128 128 128
+amr.n_cell          = 256 256 256
 amr.max_level       = 0       # maximum level number allowed
 amr.ref_ratio       = 2       # refinement ratio
 amr.regrid_int      = 5000    # how often to regrid
@@ -34,7 +38,7 @@ amr.blocking_factor = 8       # blocking factor
 amr.max_grid_size   = 64      # maximum size of any grid
 amr.n_error_buf     = 0 0 0 0 # number of buffer cells in error est
 amr.grid_eff        = 0.70    # what constitutes an efficient grid
-amr.v               = 0       # verbosity level 0=quiet, 1=verbose
+amr.v               = 1       # verbosity level 0=quiet, 1=verbose
 # amr.subcycling_mode = # None, Manual, Optimal (n_cycle[lev] is set dynamically), Auto (n_cycle[lev]=ref_ratio[lev])
 
 # CHECKPOINT FILES

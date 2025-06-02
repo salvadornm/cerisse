@@ -22,7 +22,7 @@ namespace PROB {
 
 static constexpr Real Reynolds = 3000.0;  // bulk Reynolds number
 static constexpr Real Mach     = 1.5;     // bulk Mach number
-static constexpr Real Rgas     = gas_constant*1000.0/28.96;  // bulk Mach number
+static constexpr Real Rgas     = gas_constant*1000.0/28.96; 
 static constexpr Real Ggas     = 1.4;      // gamma
 static constexpr Real Cv       = Rgas/(Ggas - 1.0);
 static constexpr Real Cp       = Ggas*Cv;

@@ -6,40 +6,101 @@
 #include <AMReX_ParmParse.H>
 #include <Closures.h>
 #include <RHS.h>
+#include <Constants.h>
 
 using namespace amrex;
 
 namespace PROB {
 
+static constexpr Real Reynolds = 400.0;//1600.0;
+static constexpr Real Mach     = 0.1;    
+static constexpr Real Prandtl  = 0.71;  
+static constexpr Real gam      = 1.4;  
+static constexpr Real Rgas     = gas_constant*1000.0/28.96;  
+static constexpr Real Cp       = Rgas*gam/(gam - 1.0) ;  
+
+struct viscparm_t {
+
+  public :
+
+  static constexpr int  order = 2;
+  static constexpr bool use_LES = false;
+
+  // constant viscosity and conductivity  (infinite Reynolds)
+  static constexpr Real viscosity    = 1.0/Reynolds;  
+  static constexpr Real conductivity = viscosity*Cp/Prandtl;
+
+};
+
+using ProbClosures = closures_dt<indicies_t, transport_const_t<viscparm_t>,
+                          calorifically_perfect_gas_t<indicies_t>>;
 //////////////////////////////DISCRETISATION////////////////////////////////////
-using ProbClosures = closures_dt<indicies_t, visc_suth_t, cond_suth_t,
-                                 calorifically_perfect_gas_t<indicies_t>>;
-using ProbRHS =
-    // rhs_dt<skew_t<defaultparm_t, ProbClosures>, no_diffusive_t, no_source_t>;
-    rhs_dt<riemann_t<false, ProbClosures>, no_diffusive_t, no_source_t>;
 
-// Numerical operators
-void inline inputs() {
-  ParmParse pp;
+// WENO/TENO
+//using ProbRHS      =   rhs_dt<weno_t<ReconScheme::Teno6, ProbClosures>,
+//                            viscous_t<viscparm_t, ProbClosures>,no_source_t>;
 
-  pp.add("cns.order_rk", -2);  // -2, 1, 2 or 3"
-  pp.add("cns.stages_rk", 2); // 1, 2 or 3
-}
-////////////////////////////////////////////////////////////////////////////////
+// KEEP
+using ProbRHS      =   rhs_dt<keep_euler_t<false,false,4, ProbClosures>,
+                            viscous_t<viscparm_t, ProbClosures>,no_source_t>;
+
+// SKEW
+// struct skewparm_t {
+
+//   public:
+
+//   static constexpr bool dissipation = true;         // no dissipation
+//   static constexpr int  order = 4;                  // order numerical scheme
+//   static constexpr Real C2skew=0.05,C4skew=0.016;   // Skew symmetric default
+
+// };
+
+// using ProbRHS      =   rhs_dt<skew_t<skewparm_t, ProbClosures>,
+//                             viscous_t<viscparm_t, ProbClosures>,no_source_t>;
+
+
+// CD
+//using ProbRHS      =   rhs_dt<centraldif_t<false,false,4, ProbClosures>,
+//                            viscous_t<viscparm_t, ProbClosures>,no_source_t>;
+
 
 // problem parameters
 struct ProbParm {
   bool convecting = false;
 
-  Real Re = Real(1600.0);
-  Real mach = Real(0.1);
-  Real prandtl = Real(0.71);
-  Real omega_x = Real(1.0); // [rad s^-1]
-  Real omega_y = Real(1.0); // [rad s^-1]
-  Real omega_z = Real(1.0); // [rad s^-1]
-  Real L = Real(1.0);       // [m]
-  Real T0 = Real(110.4);    // [K]
+  Real omega_x = Real(1.0);   // [rad s^-1]
+  Real omega_y = Real(1.0);   // [rad s^-1]
+  Real omega_z = Real(1.0);   // [rad s^-1]
+  Real L = Real(1.0);         // [m]
+  Real T0 = Real(300.0);        // [K]
+  Real c0 = std::sqrt(gam * Rgas*T0); // soud speed [m/s]
+  Real v0 = Mach*c0;            // ref velocity
+  Real mu0 = 1.0/Reynolds;
+  Real rho0 = Reynolds*mu0/(v0*L);  // density [kg/m3] (from Reynolds) 
+  Real time0 = L/v0;            // ref time [s]
+  Real p0 = rho0*Rgas*T0;       // pressure [Pa]   
 };
+///////////////////////////////////////////////////////////////////////
+void inline inputs() {
+  ProbParm data;
+
+
+  Real pref = data.rho0*data.v0*data.v0;
+
+  amrex::Print() << "**************  " << std::endl;
+  amrex::Print() << " Taylor Green  Test  " << std::endl;
+  amrex::Print() << " Ma  =  " << Mach << std::endl;
+  amrex::Print() << " Re (imposed)  =  " << Reynolds << std::endl;  
+  amrex::Print() << " Re (calc)     =  " << data.rho0*data.v0*data.L/data.mu0 << std::endl;  
+  amrex::Print() << " rho0 =  " << data.rho0 << " p0= " << data.p0 <<std::endl; 
+  amrex::Print() << " v0 =    " << data.v0   << " T0= " << data.T0 <<std::endl; 
+  amrex::Print() << " c0 (calc) =    " << sqrt(gam*data.p0/data.rho0)  << " c0= " << data.c0 <<std::endl; 
+  amrex::Print() << " rho0 v0^2/p0 =  " << pref/data.p0 << std::endl;
+  
+  amrex::Print() << " time0 =    " << data.time0   << std::endl; 
+  
+  amrex::Print() << "**************  " << std::endl;
+}
 
 // initial condition
 AMREX_GPU_DEVICE AMREX_FORCE_INLINE void
@@ -53,12 +114,10 @@ prob_initdata(int i, int j, int k, Array4<Real> const &state,
   const Real y = prob_lo[1] + (j + 0.5) * dx[1];
   const Real z = prob_lo[2] + (k + 0.5) * dx[2];
 
-  Real cs = std::sqrt(cls.gamma * cls.Rspec * pparm.T0);
-  Real v0 = pparm.mach * cs;
-  // density (rho0 = Re*mu0/(L*U0)
-  Real rho0 = pparm.Re * cls.visc(pparm.T0) / (pparm.L * v0);
-  // pressure (p0 = rho0*R*T0)
-  Real p0 = rho0 * cls.Rspec * pparm.T0;
+  // ref values
+  Real v0   = pparm.v0;  
+  Real rho0 = pparm.rho0;
+  Real p0   = pparm.p0;
 
   // TGV functions
   Real u[3] = {0.0};
@@ -66,16 +125,18 @@ prob_initdata(int i, int j, int k, Array4<Real> const &state,
          cos(pparm.omega_y * y / pparm.L) * cos(pparm.omega_z * z / pparm.L);
   u[1] = -v0 * cos(pparm.omega_x * x / pparm.L) *
          sin(pparm.omega_y * y / pparm.L) * cos(pparm.omega_z * z / pparm.L);
-  if (pparm.convecting) {
-    u[0] += v0;
-    u[1] += v0;
-  }
+  // if (pparm.convecting) {
+  //   u[0] += v0;
+  //   u[1] += v0;
+  // }
   const Real p = p0 + rho0 * v0 * v0 / Real(16.0) *
                           (cos(2.0 * pparm.omega_x * x / pparm.L) +
                            cos(2.0 * pparm.omega_y * y / pparm.L)) *
                           (cos(2.0 * pparm.omega_z * z / pparm.L) + Real(2.0));
   Real rho = p / (cls.Rspec * pparm.T0);
   Real eint = cls.cv * pparm.T0;
+
+
 
   // Set the state
   state(i, j, k, ProbClosures::URHO) = rho;
