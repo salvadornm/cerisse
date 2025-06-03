@@ -74,6 +74,7 @@ CNS::~CNS() {}
 // init ------------------------------------------------------------------------
 
 void CNS::read_params() {
+
   ParmParse pp("cns");
 
   pp.query("nstep_screen_output", nstep_screen_output);
@@ -171,6 +172,7 @@ void CNS::read_params() {
   // This communicates to the class (not very elegant)
   EBM::eb.eb_weight = eb_weight;
   EBM::eb.redistribution_type = eb_redistribution_type; 
+
 #endif
 
 
@@ -667,6 +669,8 @@ void CNS::errorEst(TagBoxArray &tags, int /*clearval*/, int /*tagval*/,
 void CNS::post_restart() {
 
 // recreate markers
+amrex::Print() << " recreate markers " << std::endl;
+
 
 #ifdef AMREX_USE_GPIBM
   IBM::ib.destroy_mf(level);
@@ -675,7 +679,41 @@ void CNS::post_restart() {
   IBM::ib.initialiseGPs(level);
 #endif
 
+#ifdef CNS_USE_EB
+  EBM::eb.destroy_mf(level);
+  EBM::eb.build_mf(grids, dmap, level);
 
+  // update volfrac and relevant EB data
+  const auto& ebfactory = dynamic_cast<EBFArrayBoxFactory const&>(Factory());
+
+  EBM::eb.volmf_a[level]  = &(ebfactory.getVolFrac()); 
+  EBM::eb.normmcf_a[level] = &(ebfactory.getBndryNormal());
+  EBM::eb.areamcf_a[level] = ebfactory.getAreaFrac();  
+  EBM::eb.ebflags_a[level] = &(ebfactory.getMultiEBCellFlagFab());
+  EBM::eb.bcareamcf_a[level] = &(ebfactory.getBndryArea());
+  EBM::eb.bndrycent_a[level] = &(ebfactory.getBndryCent());
+  EBM::eb.volcent_a[level] = &(ebfactory.getCentroid());
+  
+
+  // Level mask for redistribution (stored as object not pointer)
+  EBM::eb.level_mask_a[level].clear();
+  EBM::eb.level_mask_a[level].define(grids, dmap, 1, 3);
+  EBM::eb.level_mask_a[level].BuildMask(
+        geom.Domain(), geom.periodicity(), CNSConstants::level_mask_covered,
+        CNSConstants::level_mask_notcovered, CNSConstants::level_mask_physbnd,
+        CNSConstants::level_mask_interior);
+
+  // EBM::eb.facecent  = ebfactory.getFaceCent();
+
+  // Calculate markers  
+  EBM::eb.computeMarkers(level);
+
+#endif
+
+  // Set up diagnostics after restart
+  if (record_probe) {
+    setupTimeProbe();
+  }
 
 }
 

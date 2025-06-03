@@ -82,7 +82,7 @@ class adiabatic_wall_t
     static constexpr Real r13 = 1.0/3.0;
 
     // Eulerian flux
-    static void inline wall_flux(const auto &geomdata, int i, int j, int k, const Real norm[AMREX_SPACEDIM], 
+    static void inline wall_flux(const auto &geomdata, int /*i*/, int /*j*/, int /*k*/, const Real norm[AMREX_SPACEDIM], 
       amrex::GpuArray<amrex::Real, cls_t::NPRIM>& prims, amrex::GpuArray<amrex::Real, cls_t::NCONS>& fluxw,const cls_t* cls) {
 
       // printf(" oo Adiabatic wall \n ");

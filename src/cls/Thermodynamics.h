@@ -330,7 +330,7 @@ class calorifically_perfect_gas_t {
   * @param array of primitive variables (pass-by-pointer)
   */
   AMREX_GPU_DEVICE AMREX_FORCE_INLINE void cons2prims_point(
-    Real U[idx_t::NCONS], Real* Q) const {
+    const Real U[idx_t::NCONS], Real* Q) const {
 
     Real rho = U[idx_t::URHO];Real one_over_rho = 1.0/rho;
     Q[idx_t::QRHO] = rho;
@@ -685,7 +685,7 @@ class multispecies_pele_gas_t {
   * @param array of primitive variables [NPRIM]
   */
   AMREX_GPU_DEVICE AMREX_FORCE_INLINE void cons2prims_point(
-    Real U[idx_t::NCONS], Real* Q ) const {
+    const Real U[idx_t::NCONS], Real* Q ) const {
 
     Real rho=0.0;
     for (int n = 0; n < NUM_SPECIES; ++n){
