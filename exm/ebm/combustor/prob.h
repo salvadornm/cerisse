@@ -14,6 +14,9 @@
 #include <walltypes.h>
 #endif
 
+#include <bc_types.h>
+
+
 // NTU Combustor-type for demonstration purposes
 // created by S Dupre and S Navarro-Martinez (2025)
 
@@ -52,9 +55,14 @@ struct ProbParm {
   // volumetric flow rate
   static constexpr Real Q = 9.35;  // rho U   kg /m2 s
 
+  // species array
+  static constexpr Real Y_inflow[NUM_SPECIES] = {1.0};
+
 
   // geometry auxiliary
   Real zin = 0.01;
+  Real zexit = 0.135;
+  
 };
 
 
@@ -64,8 +72,8 @@ struct const_viscparm_t {
   public:
 
   //static constexpr bool dissipation = true;         // no dissipation
-  //static constexpr int  order = 5;                  // order numerical scheme   
-  //static constexpr Real C2skew=0.5,C4skew=0.0016;   // Skew symmetric default
+  //static constexpr int  order = 4;                  // order numerical scheme   
+  //static constexpr Real C2skew=0.5,C4skew=0.016;   // Skew symmetric default
   static constexpr Real viscosity = 1.846e-5;
   static constexpr Real conductivity = 0.02624;
 };
@@ -105,6 +113,9 @@ typedef rhs_dt<weno_t<ReconScheme::Teno5, ProbClosures>, viscous_t<viscous_param
 typedef adiabatic_wall_t<ProbClosures> TypeWall;
 typedef ebm_t<TypeWall,wall_param,ProbClosures> ProbEB;
 #endif
+
+typedef manual_bc_t<ProbClosures> GlobalBC;
+
 
 void inline inputs() {
   //	
@@ -154,81 +165,33 @@ bcnormal(const Real x[AMREX_SPACEDIM], Real dratio, const Real s_int[ProbClosure
          const int sgn, const Real time, GeometryData const & /*geomdata*/,
          ProbClosures const &closures, ProbParm const &prob_parm) {
 
-  const int URHO = ProbClosures::URHO;
-  const int UMX  = ProbClosures::UMX;
-  const int UMY  = ProbClosures::UMY;
-  const int UMZ  = ProbClosures::UMZ;
-  const int UET  = ProbClosures::UET;
-   
   const int face = (idir+1)*sgn; // +/-1 (1D) +/- 2 (2D) +/- 3 (3D)
 
   switch(face)
   {
     case  3:  // LEFT
-      // parameters from interior flow
-	    {
-      
-      Real q_int[ProbClosures::NPRIM]={0.0};      
-      closures.cons2prims_point(s_int,q_int); // convert to primitive
-
-      // pghost =pinterior      
-      const Real P = q_int[ProbClosures::QPRES];            
-      const Real rho  = s_int[URHO] * q_int[ProbClosures::QT]/ prob_parm.T_inflow;  
-      s_ext[URHO] = rho;
-
-      // ensure mass flow rate is constant - no acoustic reflection at inlet      
-      s_ext[UMX] = 0;
-      s_ext[UMY] = 0;
-      s_ext[UMZ] = prob_parm.Q;
-
-      // total energy per unit vol
-      Real e_ext = 0.0;
-      const Real Y[NUM_SPECIES] = {1.0};
-      closures.RYP2E(rho, Y, P, e_ext);      
-      s_ext[UET] = rho* e_ext + 0.5 * s_ext[UMZ] * s_ext[UMZ] /rho;
-      
-      /**  
-      s_ext[URHO] = prob_parm.rho_inflow;
-      s_ext[UMX]  = prob_parm.rhou_inflow;
-      s_ext[UMY]  = prob_parm.rhov_inflow;
-      s_ext[UMZ]  = prob_parm.rhow_inflow;
-      s_ext[UET]  = prob_parm.rhoe_inflow;
-      */
+	    {                  
+      GlobalBC::bc_inlet_fixmassflow(0.0,0.0,1.0,&closures,
+        prob_parm.Q,prob_parm.T_inflow,prob_parm.Y_inflow, s_int, s_ext);  
       break;
       }
     case  2:  // SOUTH
+      GlobalBC::bc_fixP(0.0,1.0,0.0,&closures,prob_parm.p_0, s_int, s_ext); 
       break;
     case  1:  // WEST
+      GlobalBC::bc_fixP(1.0,0.0,0.0,&closures,prob_parm.p_0, s_int, s_ext); 
       break;
     case -1:  // EAST
+      GlobalBC::bc_fixP(-1.0,0.0,0.0,&closures,prob_parm.p_0, s_int, s_ext);  
       break;
     case -2:  // NORTH
+      GlobalBC::bc_fixP(-1.0,0.0,0.0,&closures,prob_parm.p_0, s_int, s_ext); 
       break;
-    
     case -3:   //RIGHT 
       {
-      Real q_int[ProbClosures::NPRIM]={0.0};      
-      closures.cons2prims_point(s_int,q_int); // convert to primitive
-      // Pout -> P0  
-      const Real P = prob_parm.p_0; 
-    
-      // Tout = Tint  (dT/dz =0)
-      const Real T = q_int[ProbClosures::QT];
-      
-      Real Y[NUM_SPECIES] = {1.0};
-      Real rho = 0.0; Real e_ext=0.0;
-      closures.PYT2R(P,Y,T,rho);
-      closures.PYT2E(P,Y,T,e_ext);
+      GlobalBC::bc_fixP(0.0,0.0,-1.0,&closures,prob_parm.p_0, s_int, s_ext);  
 
-      s_ext[URHO] = rho;
-      s_ext[UMX]  = rho*q_int[ProbClosures::QU];
-      s_ext[UMY]  = rho*q_int[ProbClosures::QV];
-      s_ext[UMZ]  = rho*max(q_int[ProbClosures::QW],0.0);
-
-      const Real kin = 0.5*(s_ext[UMX] * s_ext[UMX] + s_ext[UMY] * s_ext[UMY] + s_ext[UMZ] * s_ext[UMZ]);
-
-      s_ext[UET] = rho* e_ext + kin/rho;
-
+      //GlobalBC::bc_subsonic_outflow_fixP(0.0,0.0,-1.0,&closures,prob_parm.p_0, s_int, s_ext);  
       break;  
       }
     default:
@@ -247,14 +210,14 @@ user_tagging(int i, int j, int k, int nt_level, auto &tagfab,
   Real x = prob_lo[0] + (i + Real(0.5)) * dx[0];
   Real y = prob_lo[1] + (j + Real(0.5)) * dx[1];
   Real z = prob_lo[2] + (k + Real(0.5)) * dx[2];
-
   Real r = sqrt(x*x + y*y);
 
-  // refine exit of injector
-  bool refine= (z > 0.035) && (z < 0.07);
-
-  // refine close to exit  (avoid corner problem)
-  refine= (z > 0.13) || refine;
+  bool refine = false;
+  
+  // // refine exit of injector
+  // refine= (z > 0.035) && (z < 0.07);
+  // // refine close to exit  (avoid corner problem)
+  // refine= (z > 0.13) || refine;
 
 
   //const int URHO= ProbClosures::URHO;
@@ -269,18 +232,18 @@ user_tagging(int i, int j, int k, int nt_level, auto &tagfab,
   // Real gradrho= Real(0.5)*sqrt(drhox*drhox+drhoy*drhoy)*o_over_rhot;        
 
 
-  // switch (level)
-  // {
-  //   case 0:
-  //     tagfab(i,j,k) = (gradrho > 0.1);        
-  //     break;
-  //   case 1:
-  //     tagfab(i,j,k) = (gradrho > 0.2);        
-  //     break;
-  //   default:
-  //     tagfab(i,j,k) = (gradrho > 0.3);        
-  //   break;
-  //  }
+  switch (level)
+  {
+    case 0:
+      refine = (z < prob_parm.zexit) && (r < 0.025) ;    // refine combustor    
+      break;
+    case 1:
+      //refine= (z > 0.035) && (z < 0.07);
+      break;      
+    default:
+
+    break;
+   }
     
 
   tagfab(i,j,k) = refine;
@@ -309,37 +272,36 @@ class user_source_t {
       [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept
       {
       
-      const Real z    = prob_lo[2] + (k + Real(0.5)) * dx[2];
+      const Real x = prob_lo[0] + (i + Real(0.5)) * dx[0];
+      const Real y = prob_lo[1] + (j + Real(0.5)) * dx[1];
+      const Real z = prob_lo[2] + (k + Real(0.5)) * dx[2];
+      const Real r = sqrt(x*x + y*y + (z-prob_parm.zexit)*(z-prob_parm.zexit));
       
-      const Real Lout =  0.5;
-      const Real fz =  (prims(i,j,k,cls.QPRES) - prob_parm.p_0)/Lout;  // dp/dx
-      // if P > P0 small aceleration
-
       // pressure relax  if P > P0  P drops and to keep T constant rho drops
-      const Real tau_relax = 25.0*dt;
-      const Real dP = (prob_parm.p_0- prims(i,j,k,cls.QPRES))*dt/tau_relax;
+      const Real tau_relax = 50.0*dt; const Real coef =dt/tau_relax;
 
-      //const Real Pnew = prims(i,j,k,cls.QPRES) + dP;
-      const Real Tnew = prims(i,j,k,cls.QT); // dT =0
+      const Real dP = (prob_parm.p_0- prims(i,j,k,cls.QPRES))*coef;
+      Real du = (0.0- prims(i,j,k,cls.QU))*coef;
+      Real dv = (0.0- prims(i,j,k,cls.QV))*coef;
+      // temp
+      du =0.0; dv=0.0;
+    
+      const Real T = prims(i,j,k,cls.QT); // dT =0
       const Real rho  = prims(i, j, k, cls.QRHO);
-      Real drho = 0.0; Real Y[NUM_SPECIES] = {1.0};
-      cls.PYT2R(dP,Y,Tnew,drho); 
-      Real drhodt = drho/dt;
-      const Real kin = prims(i,j,k,cls.QU)*prims(i,j,k,cls.QU) + 
-      prims(i,j,k,cls.QV)*prims(i,j,k,cls.QV) + prims(i,j,k,cls.QW)*prims(i,j,k,cls.QW);
-      const Real Et  = prims(i,j,k,cls.QEINT) + 0.5*kin;
-      Real edesired = 0.0;
-      cls.PYT2E(prob_parm.p_0,Y,300.0,edesired);
-      if (z > 0.125){        
+      Real drho = 0.0; const Real Y[NUM_SPECIES] = {1.0};
+      cls.PYT2R(dP,Y,T,drho);  Real drhodt = drho/dt;
+      Real kin = 0.5*(prims(i,j,k,cls.QU)*prims(i,j,k,cls.QU) + prims(i,j,k,cls.QV)*prims(i,j,k,cls.QV)
+                    + prims(i,j,k,cls.QW)*prims(i,j,k,cls.QW));
+      Real Et  = prims(i,j,k,cls.QEINT) + kin;
+
+      bool buffer = (z > prob_parm.zexit) && (r > 0.035);
+
+      if (buffer){        
         rhs(i,j,k,cls.URHO)+= drhodt;
-        //rhs(i,j,k,cls.UMX) += prims(i,j,k,cls.QU)*drhodt;
-        //rhs(i,j,k,cls.UMY) += prims(i,j,k,cls.QV)*drhodt;
-        rhs(i,j,k,cls.UMZ) += rho*fz;// + prims(i,j,k,cls.QW)*drhodt;
-        //rhs(i,j,k,cls.UET) += rho*fz*prims(i,j,k,cls.QW);//
-        rhs(i,j,k,cls.UET) += Et*drhodt;
-
-        rhs(i,j,k,cls.UET) += (edesired - prims(i,j,k,cls.QEINT))*dt/tau_relax;
-
+        rhs(i,j,k,cls.UMX) += prims(i,j,k,cls.QU)*drhodt + rho*du/dt;
+        rhs(i,j,k,cls.UMY) += prims(i,j,k,cls.QV)*drhodt + rho*dv/dt;        
+        rhs(i,j,k,cls.UET) += Et*drhodt + 
+                        rho*(prims(i,j,k,cls.QU)*du + prims(i,j,k,cls.QV)*dv)/dt;        
       }
 
 

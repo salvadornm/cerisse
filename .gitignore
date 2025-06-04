@@ -15,6 +15,7 @@
 **/results
 **/*.visit
 **/screen
+**/*.log
 build/
 # probe data
 **/probe.csv
