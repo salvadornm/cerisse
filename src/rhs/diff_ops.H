@@ -48,7 +48,6 @@ static constexpr Real int_fcw4_2 =  7.0 / 12.0;
 static constexpr Real int_fcw4_3 = -1.0 / 12.0; 
 
 // derivative coefficients face centred  6th order   (Finite Difference)
-//coef_fc6 = [-3/640, 25/384, -75/64, 75/64, -25/384, 3/640]
 static constexpr Real fd_fcw6_0 =    -3.0 / 640.0; 
 static constexpr Real fd_fcw6_1 =    25.0 / 384.0; 
 static constexpr Real fd_fcw6_2 =   -75.0 / 64.0; 
@@ -56,15 +55,15 @@ static constexpr Real fd_fcw6_3 =    75.0 / 64.0;
 static constexpr Real fd_fcw6_4 =   -25.0 / 384.0;
 static constexpr Real fd_fcw6_5 =     3.0 / 640.0;
 
-//derivative coefficients face centred  6th order   (Finite Volume) TOCHECK
-static constexpr Real fcw6_0 =  -1.0  / 60.0; 
-static constexpr Real fcw6_1 =  +9.0  / 60.0; 
-static constexpr Real fcw6_2 =  -45.0 / 60.0; 
-static constexpr Real fcw6_3 =  +45.0 / 60.0; 
-static constexpr Real fcw6_4 =  -9.0  / 60.0; 
+//derivative coefficients face centred  6th order   (Finite Volume) 
+static constexpr Real fcw6_0 =  -1.0  / 90.0; 
+static constexpr Real fcw6_1 =  +5.0  / 36.0; 
+static constexpr Real fcw6_2 =  -49.0 / 36.0; 
+static constexpr Real fcw6_3 =  +49.0 / 36.0; 
+static constexpr Real fcw6_4 =  -5.0  / 36.0; 
 static constexpr Real fcw6_5 =  +1.0  / 60.0; 
 
-// interpolation coefficients face centred 6th order  (Finite volume)
+// interpolation coefficients face centred 6th order  (Finite volume) 
 static constexpr Real int_fcw6_0 =  1.0  /  60.0; 
 static constexpr Real int_fcw6_1 =  -8.0 / 60.0; 
 static constexpr Real int_fcw6_2 =  37.0 / 60.0; 
