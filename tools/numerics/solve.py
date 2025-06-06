@@ -38,12 +38,26 @@ frac_arr = [Fraction(x).limit_denominator() for x in weight]
 print("As fractions:")
 print(frac_arr)
 
+# Define vector B
+Bint = np.array([1, 0, 0, 0], dtype=np.float64)
+# Solve AT weight = B
+weight_int = np.linalg.solve(AFD_T, Bint)
+
+print("Solution weight (INTERPOLATION FINITE DIFFERENCES 4th ORDER):")
+print(weight_int)
+
+frac_arr = [Fraction(x).limit_denominator() for x in weight_int]
+
+# Print the result
+print("As fractions:")
+print(frac_arr)
+
 #-----------------------------------------------------------------
 # Solve AT weight = B
 weight_fv = np.linalg.solve(AFV_T, B)
 
 # Print solution
-print("Solution weight (FINITE VOLUME 4th ORDER):")
+print("Solution weight (FIRST DERIVATIVE FINITE VOLUME 4th ORDER):")
 print(weight_fv)
 
 frac_arr_fv = [Fraction(x).limit_denominator() for x in weight_fv]
@@ -51,6 +65,21 @@ frac_arr_fv = [Fraction(x).limit_denominator() for x in weight_fv]
 # Print the result
 print("As fractions:")
 print(frac_arr_fv)
+
+
+# Define vector B
+Bint = np.array([1, 0, 0, 0], dtype=np.float64)
+# Solve AT weight = B
+weight_int = np.linalg.solve(AFV_T, Bint)
+
+print("Solution weight (INTERPOLATION FINITE VOLUME 4th ORDER):")
+print(weight_int)
+
+frac_arr = [Fraction(x).limit_denominator() for x in weight_int]
+
+# Print the result
+print("As fractions:")
+print(frac_arr)
 
 #------------------------------------------------------------------  6th order
 # Taylor series coefficents FD
@@ -65,14 +94,18 @@ AFD = np.array([
 
 AFD_T = AFD.T
 
-# AFV = np.array([
-#     [1, -3/2, 7/6, -15/24],
-#     [1, -1/2, 1/6, -1/24],
-#     [1,  1/2, 1/6,  1/24],
-#     [1,  3/2, 7/6,  15/24]
-# ], dtype=np.float64)
+# Taylor series coefficents FV
+AFV = np.array([
+    [1, -5/2, 19/6, -65/24, 211/120, -665/720],
+    [1, -3/2,  7/6, -15/24,  31/120,  -63/720],
+    [1, -1/2,  1/6,  -1/24,   1/120,   -1/720],
+    [1,  1/2,  1/6,   1/24,   1/120,    1/720],
+    [1,  3/2,  7/6,  15/24,  31/120,   63/720],
+    [1,  5/2, 19/6,  65/24, 211/120,  665/720]
+],  dtype=np.float64)
 
-# AFV_T = AFV.T
+
+AFV_T = AFV.T
 
 # Define vector B
 B = np.array([0, 1, 0, 0, 0, 0], dtype=np.float64)
@@ -82,10 +115,54 @@ weight = np.linalg.solve(AFD_T, B)
 
 # Print solution  
 # [Fraction(-3, 640), Fraction(25, 384), Fraction(-75, 64), Fraction(75, 64), Fraction(-25, 384), Fraction(3, 640)]
-print("Solution weight (FINITE DIFFERENCES 6th ORDER):")
+print("Solution weight (FIRST DERIVATIVE FINITE DIFFERENCES 6th ORDER):")
 print(weight)
 
 frac_arr = [Fraction(x).limit_denominator() for x in weight]
+
+# Print the result
+print("As fractions:")
+print(frac_arr)
+
+
+# Define vector B
+Bint = np.array([1, 0, 0, 0, 0, 0], dtype=np.float64)
+# Solve AT weight = B
+weight_int = np.linalg.solve(AFD_T, Bint)
+
+print("Solution weight (INTERPOLATION FINITE DIFFERENCES 6th ORDER):")
+print(weight_int)
+
+frac_arr = [Fraction(x).limit_denominator() for x in weight_int]
+
+# Print the result
+print("As fractions:") 
+print(frac_arr)
+
+
+#-----------------------------------------------------------------
+# Solve AT weight = B
+weight_fv = np.linalg.solve(AFV_T, B)
+
+# Print solution
+print("Solution weight (FIRST DERIVATIVE FINITE VOLUME 6th ORDER):")
+print(weight_fv)
+
+frac_arr_fv = [Fraction(x).limit_denominator() for x in weight_fv]
+
+# Print the result
+print("As fractions:")
+print(frac_arr_fv)
+
+# Define vector B
+Bint = np.array([1, 0, 0, 0, 0, 0], dtype=np.float64)
+# Solve AT weight = B
+weight_int = np.linalg.solve(AFV_T, Bint)
+
+print("Solution weight (INTERPOLATION FINITE VOLUME 6th ORDER):")
+print(weight_int)
+
+frac_arr = [Fraction(x).limit_denominator() for x in weight_int]
 
 # Print the result
 print("As fractions:")
