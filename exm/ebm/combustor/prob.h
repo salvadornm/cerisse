@@ -211,6 +211,9 @@ user_tagging(int i, int j, int k, int nt_level, auto &tagfab,
   Real y = prob_lo[1] + (j + Real(0.5)) * dx[1];
   Real z = prob_lo[2] + (k + Real(0.5)) * dx[2];
   Real r = sqrt(x*x + y*y);
+  const Real r2 = sqrt(x*x + y*y + (z-prob_parm.zexit)*(z-prob_parm.zexit));
+  
+
 
   bool refine = false;
   
@@ -235,7 +238,7 @@ user_tagging(int i, int j, int k, int nt_level, auto &tagfab,
   switch (level)
   {
     case 0:
-      refine = (z < prob_parm.zexit) && (r < 0.025) ;    // refine combustor    
+      refine = (((z < prob_parm.zexit) || (r2 < 0.025) ) && (r < 0.025) )  ;    // refine combustor    
       break;
     case 1:
       //refine= (z > 0.035) && (z < 0.07);
@@ -281,11 +284,7 @@ class user_source_t {
       const Real tau_relax = 50.0*dt; const Real coef =dt/tau_relax;
 
       const Real dP = (prob_parm.p_0- prims(i,j,k,cls.QPRES))*coef;
-      Real du = (0.0- prims(i,j,k,cls.QU))*coef;
-      Real dv = (0.0- prims(i,j,k,cls.QV))*coef;
-      // temp
-      du =0.0; dv=0.0;
-    
+      
       const Real T = prims(i,j,k,cls.QT); // dT =0
       const Real rho  = prims(i, j, k, cls.QRHO);
       Real drho = 0.0; const Real Y[NUM_SPECIES] = {1.0};
@@ -298,10 +297,10 @@ class user_source_t {
 
       if (buffer){        
         rhs(i,j,k,cls.URHO)+= drhodt;
-        rhs(i,j,k,cls.UMX) += prims(i,j,k,cls.QU)*drhodt + rho*du/dt;
-        rhs(i,j,k,cls.UMY) += prims(i,j,k,cls.QV)*drhodt + rho*dv/dt;        
-        rhs(i,j,k,cls.UET) += Et*drhodt + 
-                        rho*(prims(i,j,k,cls.QU)*du + prims(i,j,k,cls.QV)*dv)/dt;        
+        rhs(i,j,k,cls.UMX) += prims(i,j,k,cls.QU)*drhodt;
+        rhs(i,j,k,cls.UMY) += prims(i,j,k,cls.QV)*drhodt;  
+        rhs(i,j,k,cls.UMZ) += prims(i,j,k,cls.QW)*drhodt;                
+        rhs(i,j,k,cls.UET) += Et*drhodt;                        
       }
 
 

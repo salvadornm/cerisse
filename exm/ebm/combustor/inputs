@@ -41,12 +41,12 @@ amr.grid_eff          = 0.7    # what constitutes an efficient grid
 # Plot and checkpoint
 amr.checkpoint_files_output = 1
 amr.check_file              =chk     # root name of checkpoint file
-amr.check_int               = 2000   # number of timesteps betw.  checkpoints
+amr.check_int               = 5000   # number of timesteps betw.  checkpoints
 #amr.restart                 = /home/snm/work/Sebastien/bck8000_TENO
-#amr.restart = chk05000
+amr.restart = chk10000
 amr.plot_files_output = 1
 amr.plot_file         = ./plot/plt    # root name of plotfile
-amr.plot_int          = 500            # number of timesteps between plotfiles
+amr.plot_int          = 100           # number of timesteps between plotfiles
 amr.derive_plot_vars  = pressure velocity temperature
 
 eb2.geom_type = "custom"
