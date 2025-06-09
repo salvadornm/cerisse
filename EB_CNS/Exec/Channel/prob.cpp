@@ -74,3 +74,77 @@ void CNS::fill_ext_src(int i, int j, int k, amrex::Real time,
     ext_src(i, j, k, nf * NVAR + UEDEN) += state(i, j, k, nf * NVAR + UMX) * pp.f_x;
   }
 }
+
+#if USE_FULL_PROB_POST_TIMESTEP
+void CNS::full_prob_post_timestep(int /*iteration*/)
+{
+  // Sum bulk velcoity
+  int finest_level = parent->finestLevel();
+  amrex::Real bulk_u = 0.0;
+
+  if (level == 0) {
+    for (int lev = 0; lev <= finest_level; lev++) {
+      CNS& cns_lev = getLevel(lev);
+
+      amrex::MultiFab& S_new = cns_lev.get_new_data(State_Type);
+      amrex::iMultiFab ifine_mask(cns_lev.grids, cns_lev.dmap, 1, 0);
+      if (lev < parent->finestLevel()) {
+        // mask out fine covered cells, do not sum
+        ifine_mask =
+          makeFineMask(cns_lev.grids, cns_lev.dmap, parent->boxArray(lev + 1),
+                       cns_lev.fine_ratio, 1, 0);
+      } else {
+        ifine_mask.setVal(1);
+      }
+      amrex::MultiFab volume(cns_lev.grids, cns_lev.dmap, 1, 0);
+      cns_lev.geom.GetVolume(volume);
+      
+      // const auto geomdata = cns_lev.geom.data();
+      auto const& sarrs = S_new.const_arrays();
+      auto const& marrs = ifine_mask.const_arrays();
+      auto const& volarr = volume.const_arrays();
+
+      auto reduce_tuple = amrex::ParReduce(
+        TypeList<ReduceOpSum>{}, TypeList<Real>{}, S_new, IntVect(0),
+        [=] AMREX_GPU_DEVICE(int box_no, int i, int j, int k) -> Real {
+          const amrex::Real ux = sarrs[box_no](i, j, k, UMX) / sarrs[box_no](i, j, k, URHO);
+          const amrex::Real mask = amrex::Real(marrs[box_no](i, j, k));
+          const amrex::Real vol = volarr[box_no](i, j, k);
+          return mask * vol * ux;
+        });
+      bulk_u += reduce_tuple;
+    }
+    // Reduction bulk_u
+    amrex::ParallelDescriptor::ReduceRealSum(
+      &bulk_u, 1, amrex::ParallelDescriptor::IOProcessorNumber());
+    bulk_u /= (8.214 * 2.0 * 0.6845 * 2.0 * 1.369);  // / vol
+
+    // Compute fx
+    constexpr amrex::Real P = 0.1, D = 0.05;  // controller parameter
+    const amrex::Real newtime = state[State_Type].curTime();
+    const amrex::Real oldtime = state[State_Type].prevTime();
+    amrex::Real dfx;
+    if (amrex::ParallelDescriptor::IOProcessor()) {
+      dfx = P * (CNS::d_prob_parm->u_b - bulk_u) / (newtime - oldtime) 
+          + D * (CNS::d_prob_parm->bulk_u - bulk_u) / (newtime - oldtime);
+    }
+    amrex::ParallelDescriptor::Bcast(
+      &dfx, 1, amrex::ParallelDescriptor::IOProcessorNumber());
+
+    CNS::d_prob_parm->f_x += dfx;
+    CNS::d_prob_parm->bulk_u = bulk_u;
+
+    if (amrex::ParallelDescriptor::IOProcessor()) {
+      // Write the quantities at this time
+      const int log_index = 0;
+      std::ostream& data_log = parent->DataLog(log_index);
+      const int datwidth = 14;
+      const int datprecision = 6;
+      data_log << std::setw(datwidth) << newtime;
+      data_log << std::setw(datwidth) << std::setprecision(datprecision) << bulk_u;
+      data_log << std::setw(datwidth) << std::setprecision(datprecision) << CNS::d_prob_parm->f_x;
+      data_log << std::endl;
+    }
+  }
+}
+#endif

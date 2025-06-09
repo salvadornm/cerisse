@@ -21,6 +21,8 @@ struct ProbParm
   Real rho_b;
   Real f_x;
 
+  Real bulk_u = 0.0;
+
   GpuArray<Real, NUM_SPECIES> massfrac = {1.0};
 };
 

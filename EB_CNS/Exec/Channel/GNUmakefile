@@ -30,7 +30,10 @@ Custom_Chemistry_Model := ../../Source/chem/NullSutherland
 
 # CNS
 NUM_FIELD = 0
+USE_FULL_PROB_POST_TIMESTEP = TRUE
+#NUM_AUX = 10
 
 # GNU Make
-include ./Make.package
+CEXE_headers += prob.H prob_parm.H
+CEXE_sources += prob.cpp
 include ../../Source/Make.CNS

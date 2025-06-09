@@ -42,15 +42,13 @@ prob_initdata(int i, int j, int k, amrex::Array4<amrex::Real> const& state,
   // Turbulent fluctuations (Hamzehloo et al)
   amrex::Real M_turb = 0.1;
   const amrex::Real Lx = 12 * pp.H, Ly = 2 * pp.H, Lz = 4 * pp.H;
-  amrex::Real A =
-    M_turb / pp.M_b * 1.5 *
-    pp.u_b; // 0.1 * (2.5*log(pp.Re_tau * sqrt(pp.rho_b / pp.rho_w)) + 5.5);
-  amrex::Real cx = cos(4 * M_PI * x / Lx);
+  amrex::Real A = M_turb / pp.M_b * 1.5 * pp.u_b; // 0.1 * (2.5*log(pp.Re_tau * sqrt(pp.rho_b / pp.rho_w)) + 5.5);
+  amrex::Real cx = cos(8 * M_PI * x / Lx);
   amrex::Real cy = 1 + cos(2 * M_PI * y / Ly);
-  amrex::Real cz = cos(2 * M_PI * z / Lz);
-  amrex::Real sx = sin(4 * M_PI * x / Lx);
+  amrex::Real cz = cos(4 * M_PI * z / Lz);
+  amrex::Real sx = sin(8 * M_PI * x / Lx);
   amrex::Real sy = sin(2 * M_PI * y / Ly);
-  amrex::Real sz = sin(2 * M_PI * z / Lz);
+  amrex::Real sz = sin(4 * M_PI * z / Lz);
   amrex::Real u_turb = A * cx * sy * sz * (Lx / 2);
   amrex::Real v_turb = -A * sx * cy * sz * (Ly / 2);
   amrex::Real w_turb = -A * sx * sy * cz * (Lz / 2);
