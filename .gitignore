@@ -17,6 +17,7 @@
 **/screen
 **/*.log
 build/
+**/__pycache__
 # probe data
 **/probe.csv
 
