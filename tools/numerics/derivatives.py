@@ -1,6 +1,6 @@
 import numpy as np
 
-order = 2  #<============  2/4/6
+order = 4  #<============  2/4/6
 HALO = int(order/2)
 
 #  derivatives coefficients CELL centred  df(i)   ------------------------
@@ -135,6 +135,56 @@ def interp_fv(i,j,k,idir,nc,f):
     for n in range(0, stencil):   # i.e: order 4 looping n=[0,2]  n=0,1
         df += int_fv[n]*f[i1 + n*ii, j1 + n*jj, k1  +n*kk,nc]               
     return df
+# Interpolation  phi[i+1/2]= 0.5*(phi(i) + phi(i+1)) 
+# interpolation of phi in  face i+1/2  FINITE VOLUME style 
+def interp_fv_phi(i,j,k,idir,phi):
+    ii = iv[idir] 
+    jj = jv[idir] 
+    kk = kv[idir]
+    i1 = i - HALO*ii   # i.e:  idir=0  order = 4 (HALO=2) i1 = i-2
+    j1 = j - HALO*jj
+    k1 = k - HALO*kk
+
+    df = 0.0
+    for n in range(0, stencil):   # i.e: order 4 looping n=[0,2]  n=0,1
+        df += int_fv[n]*phi[i1 + n*ii, j1 + n*jj, k1  +n*kk]               
+    return df
+
+# Derivative  df[i+1/2]= f(i+1) - f(i)
+# deivative at face i+1/2  FINITE VOLUME style 
+# idir  : 0,1,2
+# i j k : cell
+# f: numpy 3D array
+def dfdx_fv(i,j,k,idir,f):
+    ii = iv[idir] 
+    jj = jv[idir] 
+    kk = kv[idir]
+    i1 = i - HALO*ii  
+    j1 = j - HALO*jj
+    k1 = k - HALO*kk
+
+    df = 0.0
+    for n in range(0, stencil):   
+        df += coef_fv[n]*f[i1 + n*ii, j1 + n*jj, k1  +n*kk]               
+    return df
+
+# Derivative  df[i+1/2]= f(j+1) - f(j)
+def dfcross_fv(i,j,k,idir,idir2,f):
+    ii = iv[idir] 
+    jj = jv[idir] 
+    kk = kv[idir]
+
+    i1 = i - HALO*ii  
+    j1 = j - HALO*jj
+    k1 = k - HALO*kk
+
+    # derivatives cell centred
+    df = 0
+    # loop over cells isten
+    for n in range(0, stencil): 
+        d1y =   dfdx_cc(i1 + n*ii,j1+ n*jj,k1+ n*kk,idir2,f)
+        df += int_fv[n]*d1y            
+    return df    
 
 
 def test(i,j,k,idir,f):
