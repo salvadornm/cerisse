@@ -12,6 +12,32 @@ namespace nozzle_functions {
   // they  are only to help 
   // (aditionally use nozzle_calculator in cerisse/tools to compute nozzle parameters)
 
+  static constexpr Real T_isen(const Real T0, const Real M, const Real gamma)
+  {
+    return T0 / (1.0 + 0.5 * (gamma - 1.0) * M * M);
+  }
+
+  static constexpr Real P_isen(const Real P0, const Real M, const Real gamma)
+  {
+    const Real factor = 1.0 + 0.5 * (gamma - 1.0) * M * M;
+    return P0 * std::pow(factor, -gamma / (gamma - 1.0));
+  }
+
+  static constexpr Real rho_isen(const Real P0, const Real T0, const Real M, const Real gamma)
+  {
+    const Real R = 287; // for air
+    const Real T = T_isen(T0, M, gamma);
+    const Real P = P_isen(P0, M, gamma);
+    return P / (R * T);
+  }
+
+  static constexpr Real nozzle_area_ratio(const Real M, const Real gamma)
+{
+    Real term1 = 1.0 / M;
+    Real term2 = (2.0 / (gamma + 1.0)) * (1.0 + 0.5 * (gamma - 1.0) * M * M);
+    Real exponent = (gamma + 1.0) / (2.0 * (gamma - 1.0));
+    return term1 * std::pow(term2, exponent);
+}
 
   // \brief computes stagnation pressure,function P,M,gamma
   // \param P:     pressure
@@ -69,6 +95,23 @@ namespace nozzle_functions {
   }
 
 }
+
+//// calculate nozzle location on a sphere cone
+static constexpr std::array<Real, 3> compute_srp_xyz(Real factor_y, Real theta_nz_deg, Real radius_cone, Real theta_cone_deg, Real R_nozzle_exit)
+{
+  Real theta_cone_rad = theta_cone_deg * (std::numbers::pi / 180.0);
+  Real theta_nz_rad   = theta_nz_deg * (std::numbers::pi / 180.0);
+
+  Real h_cone = radius_cone/std::tan(theta_cone_rad);
+  Real x0     = h_cone*R_nozzle_exit/radius_cone - h_cone;
+  Real y0     = factor_y * radius_cone;
+
+  Real x      = x0 + y0 / std::tan(theta_cone_rad);
+  Real y      = y0 * std::cos(theta_nz_rad);
+  Real z      = y0 * std::sin(theta_nz_rad);
+
+  return {x, y, z};
+} 
 
 #endif // NOZZLEFUNCTIONS_H
 
