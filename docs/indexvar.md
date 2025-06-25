@@ -12,7 +12,7 @@ static constexpr int UMY=1;
 ...
 ```
 
-Fore the primtive (derived) variables
+Fore the primitive (derived) variables
 
 ```cpp
 static constexpr int QRHO=0;
@@ -37,7 +37,7 @@ static constexpr int NGHOST=3; // TODO: make it an automatic parameter
 
 ### Global Variables description
 
-#### Primitve Variables Index
+#### Primitive Variables Index
 
 | Index   | Default | Description        |
 | ------- | ------- | ------------------ |
@@ -52,16 +52,16 @@ static constexpr int NGHOST=3; // TODO: make it an automatic parameter
 | `QEINT` | 8       | internal energy    |
 | `QFS`   | 9       | index first specie |
 
-#### Conservative
+#### Conservative Variables Index
 
-| Index  | Default | Description                                            |
-| ------ | ------- | ------------------------------------------------------ |
-| `UMX`  | 0       | x-momentum _rho u_                                     |
-| `UMY`  | 1       | y-momentum _rho v_                                     |
-| `UMZ`  | 2       | z-momentum _rho w_                                     |
-| `UET`  | 3       | total energy _rho e_                                   |
-| `URHO` | 4       | density                                                |
-| `UFS`  | 4       | first spec index, replace density when solving species |
+| Index  | Default | Description                                                |
+| ------ | ------- | ---------------------------------------------------------- |
+| `UMX`  | 0       | x-momentum _rho u_                                         |
+| `UMY`  | 1       | y-momentum _rho v_                                         |
+| `UMZ`  | 2       | z-momentum _rho w_                                         |
+| `UET`  | 3       | total energy _rho e_                                       |
+| `URHO` | 4       | density                                                    |
+| `UFS`  | 4       | first spec index, it replaces density when solving species |
 
 #### Transport Properties
 

@@ -71,9 +71,61 @@ If the boundary is not defined, the code will use the one specified in the input
 Boundary conditions are specified for the _conserved_ variables so appropiate conversion rules may be required.
 {% endhint %}
 
+### Quick boundary conditions
+
+Nearly any boundary condition can be expressed by modifying accordingly the **bcnormal** subroutine.\
+There is a set  of pre-implemeneted BC to ease implementation. To access them add the header in prob.h:
+
+```cpp
+#include <bc_types.h>
+```
+
+This will include  subroutines that implement **boundary condition (BC) treatments** for compressible flow. Among them:
+
+```cpp
+// Sets inlet boundary conditions where mass flow rate, temperature, 
+// and composition are fixed, and pressure is extrapolated 
+// from the interior (ghost pressure = inner pressure).
+// nx,ny,nz : normal face  pointing into domain
+// rhoUfix  : fixed mass flow rate per unit area [kg / m2 s] 
+// Tfix     : fixed Temperature  [K]
+// Yfix     : fixed composition (mass fraction array)
+void bc_inlet_fixmassflow(nx,ny,nz, cls, rhoUfix,Tfix,Yfix,Uinner,Ughost)
+
+// Applies a fixed pressure boundary condition (e.g.,  subsonic outflow where pressure is known and steady).
+// nx,ny,nz : normal face  pointing into domain
+// P0      : fix pressure [Pa]
+void bc_fixP(nx,ny,nz,cls,P0,Uinner,Ughost)
+
+// Implements non-reflecting subsonic outlet BC with fixed outlet pressure, 
+// based on a linearized theory (Whitfield et al., AIAA 1984). 
+// Adjusts density and velocity in the ghost cell using a linear acoustic relation
+// nx,ny,nz : normal face  pointing into domain
+// P0      : fix pressure [Pa]
+void bc_subsonic_outflow_fixP((nx,ny,nz,cls,P0,Uinner,Ughost)
+```
+
+Example of use (see `exm/ebm/combustor`):
+
+```cpp
+  const int face = (idir+1)*sgn; // +/-1 (1D) +/- 2 (2D) +/- 3 (3D)
+
+  switch(face)
+  {
+    case  3:  // LEFT
+	    {                  
+      GlobalBC::bc_inlet_fixmassflow(0.0,0.0,1.0,&closures,
+        prob_parm.Q,prob_parm.T_inflow,prob_parm.Y_inflow, s_int, s_ext);  
+      break;
+      }
+  ...    
+```
+
+This will use in the left BC, a  fix flow rate inflow (defined as Q from the `prob_parm` structure) with fix temperature and composition given the internal value allowing the pressure to fluctuate
+
 ## Immersed Boundaries
 
-In **Immersed Boundary Methods** (IBM), boundary conditions on the surface are enforced by interpolating the influence of the boundary onto the fluid flow. This is achieved by assigning specific values at _ghost points_ (GP). These values are extrapolated from the surrounding fluid points, taking into account the surface normal and the imposed boundary conditions (see theory). IBM requires installation of CGAL by:
+In **Immersed Boundary Methods** (IBM), boundary conditions on the surface are enforced by interpolating the influence of the boundary onto the fluid flow. This is achieved by assigning specific values at _ghost points_ (GP). These values are extrapolated from the surrounding fluid points, taking into account the surface normal and the imposed boundary conditions (see theory). IBM requires installation of CGAL (check [installation](quickstart.md)) by:
 
 ```bash
 cd lib/

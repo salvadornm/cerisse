@@ -105,8 +105,7 @@ The flow, albeit simple, has density and pressure variation in three directions.
 
 ### Taylor Green Vortex
 
-The Taylor-Green vortex is a classical benchmark problem used to test and validate numerical methods for simulating turbulent flows. Basically to study vortex dynamics, turbulent transition, turbulent decay and the energy dissipation process (proposed AIAA First International Workshop on High-Order Methods in Computational Fluid Dynamics.)\
-The simulations are performed in a cube of non-dimensional length $$2 \pi$$, with periodic boundary conditions in all The Mach number, Prandtl number and Reynolds number of the flow are set  as **0.1**, **0.71** and **1600** based on data from [ Jammy et al. (2016)](http://dx.doi.org/10.5258/SOTON/401892)
+The Taylor-Green vortex is a classical benchmark problem used to test and validate numerical methods for simulating turbulent flows. Basically to study vortex dynamics, turbulent transition, turbulent decay and the energy dissipation process (proposed AIAA First International Workshop on High-Order Methods in Computational Fluid Dynamics.) The simulations are performed in a cube of non-dimensional length $$2 \pi$$, with periodic boundary conditions in all The Mach number, Prandtl number and Reynolds number of the flow are set  as **0.1**, **0.71** and **1600** based on data from [ Jammy et al. (2016)](http://dx.doi.org/10.5258/SOTON/401892)
 
 The initial conditions are
 

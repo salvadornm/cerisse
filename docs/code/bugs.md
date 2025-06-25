@@ -2,12 +2,11 @@
 icon: bug
 ---
 
-# TroubleShooting and Bugs
+# Bugs
 
 ## Common errors
 
 This section outlines common errors, their possible causes, and suggested solutions.
-
 
 ### installation errors
 
@@ -17,8 +16,7 @@ examples do not compile
 
 **Fix:**
 
-* Check requirements by executing the `checreq.sh` script in  `cerisse/bin`
-
+* Check requirements by executing the `checreq.sh` script in `cerisse/bin`
 
 ```
 sundials not installed
@@ -26,8 +24,7 @@ sundials not installed
 
 **Fix:**
 
-* Ensure to do  `make TPL` the first time you prepara a simualytion involving reacting chemistry.
-
+* Ensure to do `make TPL` the first time you prepara a simualytion involving reacting chemistry.
 
 ### input file
 
@@ -50,24 +47,23 @@ AMR::checkInput bad_ref_ratios
 ```
 
 **Cause:**\
-Probably a typo in  refinement `ref_ratio`, maybe is set to 1?
+Probably a typo in refinement `ref_ratio`, maybe is set to 1?
 
 **Fix:**
 
-* Ensure that ref_ratio is 2 or 4 (or similar number greater than 1)
+* Ensure that ref\_ratio is 2 or 4 (or similar number greater than 1)
 
 ```
 SIGABRT
 amrex::Abort::0::Exiting because either max_step and/or stop_time is less than or equal to 0. !!!
 ```
+
 **Cause:**\
 Probably input file not specified
 
 **Fix:**
 
 * Remember to run `./main3d.gnu.ex input` or similar
-
-
 
 ### IBM related
 
@@ -77,7 +73,7 @@ Interpolation point weights do not sum to 1
 ```
 
 **Cause:**\
-Presence of extremely thin surfaces prevents valid grid points (GP) from being placed in solid regions.
+Presence of extremely thin surfaces prevents valid interpolation grid points from being placed in solid regions.
 
 **Fix:**
 
@@ -110,7 +106,7 @@ The geometry is too detailed relative to the mesh resolution.
 * Refine the mesh in that region
 
 {% hint style="warning" %}
-This is a warning, but the simulation will probably crash in theaffected areas.
+This is a warning, but the simulation will probably crash in the affected areas.
 {% endhint %}
 
 ### Chemistry related

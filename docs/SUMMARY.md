@@ -2,8 +2,8 @@
 
 ## GETTING STARTED
 
-* [🍒 Welcome](README.md)
-  * [⚡ QuickStart](quickstart.md)
+* [Welcome](README.md)
+  * [QuickStart](quickstart.md)
   * [Tutorial](tutorial.md)
   * [Tips](tips.md)
 
@@ -47,4 +47,3 @@
   * [LES models](code/LES.md)
   * [Bugs](code/bugs.md)
   * [Performance](code/performance.md)
-

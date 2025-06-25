@@ -12,7 +12,7 @@ layout:
     visible: true
 ---
 
-# 🍒 Welcome
+# Welcome
 
 <div align="center"><img src=".gitbook/assets/Intro.png" alt=""></div>
 

@@ -1,14 +1,14 @@
 # Examples
 
-In the `exm/` folder, you will find several tests designed to compare numerical schemes, solution and in general validation and verification. These tests can also serve as prototypes for setting up more complex cases. While they generally run at a slower pace, they can be used for verifying the accuracy of the schemes and for benchmarking against test cases from the literature. Some of the examples use chemistry or in-line diagnostics (such as probes or statistics), or geometry (IBM or EB).
-There are many more examples in the folder than the ones listed here. 
-However, they may habe not been tested thoroughy. 
-Check the `./checkcompilation.sh` example list script to see
+In the `exm/` folder, you will find several tests designed to compare numerical schemes, solution and in general validation and verification. These tests can also serve as prototypes for setting up more complex cases. While they generally run at a slower pace, they can be used for verifying the accuracy of the schemes and for benchmarking against test cases from the literature. Some of the examples use chemistry or in-line diagnostics (such as probes or statistics), or geometry (IBM or EB).\
+There are many more examples in the folder than the ones listed here.\
+However, they may habe not been tested thoroughy.\
+Check the `./checkcompilation.sh` example list script to see\
 which examples compile and build.
 
 ## One Dimensional Examples
 
-<table><thead><tr><th>Example</th><th width="213">Folder </th><th>Numerics</th><th>Notes</th></tr></thead><tbody><tr><td><a href="onedim.md#sods-shock-tube">Shock-Tube</a></td><td><code>numerics/riemann</code></td><td><a href="theory/equations/numerical-methods.md#riemann-solver-with-muscl">Riemann</a> <a href="theory/equations/numerical-methods.md#skew-symmetric">Skew</a></td><td></td></tr><tr><td><a href="onedim.md#shu-osher-problem">Shu-Osher</a></td><td><code>numerics/shu</code></td><td><a href="theory/equations/numerical-methods.md#riemann-solver-with-muscl">Riemann</a> <a href="theory/equations/numerical-methods.md#skew-symmetric">Skew</a></td><td></td></tr><tr><td><em>Reactive Shock</em></td><td><code>reactive_sod</code></td><td><a href="theory/equations/numerical-methods.md#teno">TENO</a></td><td><a href="chemistry.md">Chemistry</a></td></tr><tr><td><a href="onedim.md#constant-volume-reactor">Constant volume reactor</a></td><td><code>auto_ignition</code></td><td>N/A</td><td><a href="chemistry.md">Chemistry</a></td></tr><tr><td><a href="onedim.md#mms">MMS</a></td><td><code>exm/mms/euler1d</code></td><td>ALL </td><td>Spatial convergence</td></tr></tbody></table>
+<table><thead><tr><th>Example</th><th width="213">Folder</th><th>Numerics</th><th>Notes</th></tr></thead><tbody><tr><td><a href="onedim.md#sods-shock-tube">Shock-Tube</a></td><td><code>numerics/riemann</code></td><td><a href="theory/equations/numerical-methods.md#riemann-solver-with-muscl">Riemann</a> <a href="theory/equations/numerical-methods.md#skew-symmetric">Skew</a></td><td></td></tr><tr><td><a href="onedim.md#shu-osher-problem">Shu-Osher</a></td><td><code>numerics/shu</code></td><td><a href="theory/equations/numerical-methods.md#riemann-solver-with-muscl">Riemann</a> <a href="theory/equations/numerical-methods.md#skew-symmetric">Skew</a></td><td></td></tr><tr><td><em>Reactive Shock</em></td><td><code>reactive_sod</code></td><td><a href="theory/equations/numerical-methods.md#teno">TENO</a></td><td><a href="chemistry.md">Chemistry</a></td></tr><tr><td><a href="onedim.md#constant-volume-reactor">Constant volume reactor</a></td><td><code>auto_ignition</code></td><td>N/A</td><td><a href="chemistry.md">Chemistry</a></td></tr><tr><td><a href="onedim.md#mms">MMS</a></td><td><code>exm/mms/euler1d</code></td><td>ALL</td><td>Spatial convergence</td></tr></tbody></table>
 
 ## Two Dimensional Examples
 
@@ -18,9 +18,8 @@ which examples compile and build.
 
 | Example                              | Folder         | Notes        | Notes                                      |
 | ------------------------------------ | -------------- | ------------ | ------------------------------------------ |
-| MMS                 | `mms/euler3d` | ALL         | Probe                                      |
+| MMS                                  | `mms/euler3d`  | ALL          | Probe                                      |
 | _Taylor-Green Vortex_                | `numerics/tgv` | Skew         | Probe                                      |
 | _Turbulent Channel_                  | `turbulent`    | Skew         |                                            |
 | Sphere under supersonic flow         | `ibm/sphere`   | Skew/Rusanov | [IBM](theory/ibmeb.md#immersed-boundaries) |
 | Probe under supersonic flow with SRP | `ibm/srp`      | Riemann      | IBM (generic BC), Chemistry (manual)       |
-

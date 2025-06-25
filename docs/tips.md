@@ -4,13 +4,11 @@ icon: info
 
 # Tips
 
-This page shos some small tips reagarding installation of auxiliary files and scripts,
-that may help with the workflow of the simulatiom.
-It is also wseful to check the Errors page (CHECK) for common mistakes.
+This page provides a few helpful tips for installing auxiliary files and scripts that can streamline your simulation workflow. You may also find it useful to visit the [Errors ](code/bugs.md)page for common mistakes and troubleshooting guidance.
 
 ## yt
 
-[yt](https://yt-project.org) is an open-source python package for analyzing and visualizing volumetric data. It us highly recomended if Python is used for postprocessing and analysis of simulations data. To install
+[yt](https://yt-project.org) is an open-source python package for analyzing and visualizing volumetric data. It is highly recommended if Python is used for postprocessing and analysis of simulations data. To install
 
 ```bash
 $ python -m pip install --user yt
@@ -22,15 +20,15 @@ or using conda environments
 $ conda install --channel conda-forge yt
 ```
 
-Beware of the combination Python **3.9** and **yt**. It is recommended to use newer Python, **>3.11** recommended. Check [yt Website](https://yt-project.org) for details and tutorials. Most of the examples in the manual use it for quick analysis and plotting in a `plot.py` script.
+Beware of the combination Python **3.9** and **yt**. It is recommended to use newer Python, **>3.11** recommended. Check [yt Website](https://yt-project.org) for details and tutorials. Most of the examples in the manual use it for quick analysis and plotting in a (usually named) `plot.py` script.
 
-In recent systems (for example Ubuntu 24), the use of virtual environments is enforced and the above lines will not work unless a virtual environment is used (or altenative ways created). For example, if the ```virtual``` environment exist, to activate it type:
+In recent systems (for example Ubuntu 24), the use of virtual environments is enforced and the above lines will not work unless a [virtual environment](https://docs.python.org/3/library/venv.html) is created. For example, if the `virtual` environment exist, to activate it type:
 
 ```bash
 $ source ~/virtual/bin/activate
 ```
 
-You will need to do this to install python packages, such as *yt* and *markdown*, required for postprocessing or managing the documentation.
+You will need to do this to install python packages, such as _yt_ and _markdown_, required for postprocessing or managing the documentation.
 
 ## Cerisse script
 
@@ -46,16 +44,14 @@ or by setting the path in `.bashrc` or `.profile` by adding the line at the end
 PATH="/home/snm/work/cerisse/bin:$PATH"
 ```
 
-where `/home/snm/work/cerisse` corresponds to the installation directory. 
-Type `cerisse help` or `cerisse` to view available options. 
-Clean files between runs and MPI run are the most common `ceriise clean` and `cerisse run`.
+where `/home/snm/work/cerisse` corresponds to the installation directory.\
+Type `cerisse help` or `cerisse` to view available options. The script is often used to  clean files between runs and maximise  MPI run  `cerisse clean` and `cerisse run`.
 
 ## Documentation Editing
 
 Although the main documentation is onine in Gitbooks, it is possible to generate the documentation by locally typing in the parent directory: `$ mkdocs serve` and the point the browser to [127.0.0.1.8000](http://127.0.0.1:8000) in your browser. The formatting of this documentation may be off (inline equations in particular) and images will not appear.
 
 You may need to install the `python-markdown-math` extension for rendering equations. For help visit [mkdocs.org](https://www.mkdocs.org). Extensions are listed in the file `mkdocs.yaml`
-
 
 ## Python environments (for poetry)
 
@@ -79,7 +75,7 @@ eval "$(pyenv init --path)"
 eval "$(pyenv init -)"
 ```
 
-4-Install a specific python version (<3.11 is required for *ceptr*, see chemistry)
+4-Install a specific python version (<3.11 is required for _ceptr_, see chemistry)
 
 ```bash
 $ pyenv install 3.10
@@ -98,13 +94,11 @@ To use
 $ source ~/myenv-310/bin/activate
 ```
 
-Install packages as usual  (for example cantera)
+Install packages as usual (for example cantera)
 
 ```bash
 $ pip install  cantera 
 ```
-
-
 
 ### Running on Imperial HPC
 
@@ -134,7 +128,6 @@ mpirun ./Cerisse3d.gnu.MPI.ex inputs
 ```
 
 NOTE: There is an issue with MPI version >2020b on CX3 that causes deadlocks when writing chk or plt files.
-
 
 **Legacy (intel-2019.8.254)**
 
