@@ -4,11 +4,10 @@ icon: function
 
 # Numerical Methods
 
-## Numerical Methods
 
 Cerisse has implemented several numerical methods within the finite volume framework. While most of these methods are designed for high-speed flows, not all are limited to such cases. The method discussed here specifically addresses the Euler (convective) term of the equations. In compressible flows, high-frequency noise can accumulate when physical scales are not adequately resolved, especially near discontinuities. To mitigate this, many methods either directly filter or dissipate the noise, or use upwind-type stencils that indirectly introduce dissipation. It is important to note that no perfect numerical scheme exists; a compromise must be made between accuracy, speed, and stability. In the sections below, a brief overview of the rationale behind the numerical methods is provided. This description is not exhaustive, and the reader is encouraged to refer to the original papers for a more comprehensive explanation.
 
-### HLLC Riemann Solver
+## HLLC Riemann Solver
 
 Cerisse employs the Harten-Lax-van Leer Contact (HLLC) solver, developed by [Toro et al. (1994)](numerical-methods.md#references). The HLLC solver enhances approximate Riemann Solvers by incorporating the intermediate contact wave, a feature that is particularly crucial for accurate modelling in reactive flows applications.
 
@@ -28,7 +27,7 @@ $$
 
 The corresponding flux $$F_{RP}$$ is just $$F_{RP}=F(U_{RP})$$.
 
-#### The Average State
+### The Average State
 
 Assuming the sonic waves speeds, $$S_L$$ and $$S_R$$ are known, we need $$S_M$$ to estimate the intermediate average states $$U^\ast$$. The normal velocity and the pressure do not change across a contact discontinuity (mechanical equilbrium) and therefore the normal velocity is the contact wave speed
 
@@ -78,7 +77,7 @@ $$
 F_{i+1/2}= F(U_{RP})
 $$
 
-#### The Sonic Wave Speed Estimates
+### The Sonic Wave Speed Estimates
 
 To compute the intermediate states the sonic wave speeds ($$S_L,S_R$$) are needed. Following Batten, the wave speeds can be obtained from
 
@@ -116,7 +115,7 @@ $$
 r_{\rho}=\sqrt{\rho_r/\rho_l}
 $$
 
-#### High order extension
+### High order extension
 
 The above scheme is formally first-order, a high order extension can be build by using a Total Variation Diminishing (TVD) reconstruction
 
@@ -124,7 +123,7 @@ The above scheme is formally first-order, a high order extension can be build by
 Under construction
 {% endhint %}
 
-### Rusanov Scheme
+## Rusanov Scheme
 
 The[ Rusanov](numerical-methods.md#references) flux is a simple upwind flux that requires a single wave-speed estimate. In the current implementation, it is very compact and can be used to perform quick tests. The numerical flux function is typically given by:
 
@@ -134,9 +133,378 @@ $$
 
 where $$\lambda_i$$ ​ is the local characteristic speed at the i-th cell (often taken as the maximum eigenvalue of the Jacobian of the flux function).
 
-#### Skew-symmetric
 
-Numerical errors associated with discretisation can be categorised into truncation and aliasing errors ([Kravchenko and Moin, 1997](numerical-methods.md#references); [Lilly, 1965](numerical-methods.md#references)). Therefore, the concept of numerical order alone is insufficient to fully characterize performance. Key properties such as dissipation, dispersion, and conservation are strongly influenced by the discretization scheme used for the convective term. To illustrate this, consider a one-dimensional scalar equation and three possible formulations for the nonlinear, hyperbolic term:
+## Central differences
+
+The simplest approach is to create a central interpolation based on values of the fluxes
+evaluated at cell points
+
+$$
+F_{i+1/2}=  \mathcal{L} \left ( .. F_{i-1}, F_{i}, F_{i+1}, F_{i+2} .. \right) = \sum_{k= -H}^{H} F_{i-k} \alpha_{k+H}
+$$
+
+where H would be the number of cells in the stencil, which woud correspond to the order.
+For example, for a 4th order estimate, H  would be 2 and the formulation would be:
+
+$$
+F_{i+1/2}= \alpha_0 F_{i-1} +  \alpha_1 F_{i}  +  \alpha_2 F_{i+1}  +  \alpha_3 F_{i+2} 
+$$
+
+where $$F_i \equiv F(U_i))$$.
+The interpolation coefficents can be obtained from Taylor series around the cell face $$i+1/2$$,
+see below
+
+
+### Coefficents for interpolation and first derivatives (finite differences)
+
+To obtain the coefficients, we evaluate the function from an expansion around cell face $$i+1/2$$,
+which corresponds to $$x=0$$
+
+$$
+\phi(x) \approx \phi_{i+1/2}   +  x  f' + \frac{x^2}{2!}  f'' 
++ \frac{x^3}{3!} f''' + \frac{x^4}{4!}  f''''
++ \frac{x^5}{5!} f''''' + \mathcal{O}(x^6)
+$$
+
+for simplicity  $$ f' \equiv  {d \phi}/{dx} $$, all derivatives
+evaluated at cell face $$i+1/2$$.
+For symmetric interpolation of  order 2, we need 2 points sym, for order 4 , 4 points, etc.
+Evaliating the above expression at node points:
+$$x_{i+1}= \Delta x/2$$, $$x_{i+2}= 3 \Delta x/2$$ and so on.
+
+For example at $$x_{i-2}= -5 \Delta x/2$$, we get
+$$
+\phi_{i-2} \approx \phi_{i+1/2}   -  \frac{5 \Delta x}{2}  f' + \frac{(5/2 \Delta x) ^2}{2!}  f'' 
+- \frac{(5/2 \Delta x)^3}{3!} f''' + \frac{(5/2 \Delta x)^4}{4!}  f''''
+- \frac{(5/2 \Delta x)^5}{5!} f''''' +  \mathcal{O}(\Delta x^6)
+$$
+Rearranging coefficents and remove truncation error for clarity, we obatin
+the six points
+
+$$
+\phi_{i-2} = \phi_{i+1/2}   -  \frac{5}{2} \Delta x f' + \frac{25}{8}  (\Delta x)^2 f'' 
+- \frac{125 }{48} (\Delta x)^3 f''' + \frac{625}{384}  (\Delta x)^4f''''
+- \frac{3125}{3840} (\Delta x)^5 f''''' 
+$$
+
+$$
+\phi_{i-1} = \phi_{i+1/2}   -  \frac{3}{2} \Delta x f' + \frac{9}{8}  (\Delta x)^2 f'' 
+- \frac{27}{48} (\Delta x)^3 f''' + \frac{81}{384}  (\Delta x)^4f''''
+- \frac{243}{3840} (\Delta x)^5 f''''' 
+$$
+
+$$
+\phi_{i} = \phi_{i+1/2}   -  \frac{1}{2} \Delta x f' + \frac{1}{8}  (\Delta x)^2 f'' 
+- \frac{1}{48} (\Delta x)^3 f''' + \frac{1}{384}  (\Delta x)^4f''''
+- \frac{1}{3840} (\Delta x)^5 f''''' 
+$$
+
+$$
+\phi_{i+1} = \phi_{i+1/2}   +  \frac{1}{2} \Delta x f' + \frac{1}{8}  (\Delta x)^2 f'' 
++ \frac{1}{48} (\Delta x)^3 f''' + \frac{1}{384}  (\Delta x)^4f''''
++ \frac{1}{3840} (\Delta x)^5 f''''' 
+$$
+
+$$
+\phi_{i+2} = \phi_{i+1/2}   +  \frac{3}{2} \Delta x f' + \frac{9}{8}  (\Delta x)^2 f'' 
++ \frac{27}{48} (\Delta x)^3 f''' + \frac{81}{384}  (\Delta x)^4f''''
++ \frac{243}{3840} (\Delta x)^5 f''''' 
+$$
+
+$$
+\phi_{i+3} = \phi_{i+1/2}   +  \frac{5}{2} \Delta x f' + \frac{25}{8}  (\Delta x)^2 f'' 
++ \frac{125}{48} (\Delta x)^3 f''' + \frac{625}{384}  (\Delta x)^4f''''
++ \frac{3125}{3840} (\Delta x)^5 f'''''
+$$
+
+
+This can be arranged in a matrix system
+
+$$
+A f = \Phi
+$$
+
+$$
+A = 
+\left(
+\begin{array}{cccccc}
+1 & -5/2 & 25/8 & -125/8 & 625/384 & -3125/3840 \\
+1 & -3/2 & 9/8  & -27/48 &  81/384 & -243/3840 \\
+1 & -1/2 & 1/8  &  -1/48 &  1/384  &   -1/3840 \\
+1 & 1/2  & 1/8  &   1/48 &  1/384  &    1/3840 \\
+1 & 3/2  & 9/8  &  27/48 &  81/384 &  243/3840 \\
+1 & 5/2  & 25/8 & 125/48 & 625/384 &  3125/3840
+\end{array}
+\right)
+$$
+
+with the unknown array
+$$
+f=
+\left(
+\begin{array}{c}
+\phi_{i+1/2}        \\
+\Delta x f'         \\
+(\Delta x)^2 f''    \\
+(\Delta x)^3 f'''   \\
+(\Delta x)^4 f''''  \\
+(\Delta x)^5 f''''' \\
+\end{array}
+\right)
+$$
+
+and the knwon information at nodes
+
+$$
+\Phi = 
+\left(
+\begin{array}{c}
+\phi_{i-2}        \\
+\phi_{i-1}         \\
+\phi_{i}     \\
+\phi_{i+1}    \\
+\phi_{i+2}   \\
+\phi_{i+3}  \\
+\end{array}
+\right)
+$$
+
+
+We look for a vector of weights $$\underline{\alpha} = (\alpha_0, \alpha_1, ... \alpha_5 ) $$ such that
+that $$ \underline{\alpha} \cdot  \Phi^T = f_{desired} $$
+provides desired approximation for interpolation $$\phi_{i+1/2}$$ or gradients at the interface.
+For example to get the first derivative, all terms 
+should cancelled except the terms involving $$\Delta x f' $$ that should be 1, 
+$$ f_{desired} =( 0,  1,  0, 0, 0 ) $$
+
+
+
+The system to solve is this
+$$
+\underline{\alpha} A^T = f_{desired}
+$$
+
+which can be solved directly (check script `solve.py` in `tools/numerics`) and the 
+resultant coefficients are the required coefficents (expressed as fractions).
+For example, fourth and six order derivatives evaluated at cell faces are:
+
+$$
+\left.{\frac{d\phi}{dx}} \right|_{i+1/2} = \frac{1}{\Delta x } \left( \frac{-1}{24}\phi_{i+2}  + \frac{9}{8} \phi_{i+1} -
+ \frac{9}{8} \phi_{i} + \frac{1}{24} \phi_{i-1}\right)  + \mathcal{O}(\Delta x)^4
+$$
+
+$$
+\left.{\frac{d\phi}{dx}} \right|_{i+1/2} = \frac{1}{\Delta x } \left( 
+ \frac{3}{640} \phi_{i+3}   -  \frac{25}{384}\phi_{i+2}  + \frac{75}{64} \phi_{i+1} -
+ \frac{75}{64} \phi_{i} .   + \frac{25}{384} \phi_{i-1}  -  \frac{3}{640} \phi_{i-2} \right)    + \mathcal{O}(\Delta x)^6
+$$
+
+To obtain symmetrical intetrpolations, set $$f_{desired} = (1,0,0,0,0,0)$$
+and we will get
+
+$$
+\phi_{i+1/2} =  -  \frac{1}{16}\phi_{i+2}  + \frac{9}{16} \phi_{i+1} +
+                   \frac{9}{16} \phi_{i}   - \frac{1}{16} \phi_{i-1}     + \mathcal{O}(\Delta x)^4
+$$
+
+$$
+\phi_{i+1/2} =  
+ \frac{3}{256} \phi_{i+3}   -  \frac{25}{256}\phi_{i+2}  + \frac{75}{128} \phi_{i+1} +
+ \frac{75}{128} \phi_{i}    - \frac{25}{256} \phi_{i-1}  +  \frac{3}{256} \phi_{i-2}    + \mathcal{O}(\Delta x)^6
+$$
+
+### Coefficents for interpolation and first derivatives (finite volume)
+
+The above coeffiencts are base in a finite difference, where
+
+$$
+\phi_{i+1} = \phi(x_{i+1})
+$$
+
+However, **cerisse** uses the finite volume approach, where
+
+$$
+\hat{\phi}_{i}  = \frac{1}{\Delta x} \int_{x_{i-1/2}}^{x_{i+1/2}} \phi(x) dx
+$$
+
+In a finite difference, we will aim for
+$$
+\phi_{i+1/2}= \alpha_0 \phi_{i-1} +  \alpha_1 \phi_{i}  +  \alpha_2 \phi_{i+1}  +  \alpha_3 \phi_{i+2} 
+$$
+while in a *finite volume*, the aim would be
+$$
+\phi_{i+1/2}= \alpha_0 \hat{\phi}_{i-1} +  \alpha_1 \hat{\phi}_{i}  +  \alpha_2 \hat{\phi}_{i+1}  +  \alpha_3 \hat{\phi}_{i+2} 
+$$
+
+In a common second order method approach, the coefficents are the same. Howeverm this change in high orders.
+
+To build the matrix of coefficients, we re-use the Taylor expansion of the previous section,
+expanding from the face 
+
+$$
+\phi(x) \approx \phi_{i+1/2}   +  x  f' + \frac{x^2}{2!}  f'' 
++ \frac{x^3}{3!} f''' + \frac{x^4}{4!}  f''''
++ \frac{x^5}{5!} f''''' + \mathcal{O}(x^6)
+$$
+
+We integrate
+
+$$
+I = \int \phi(x) dx  = \phi_{i+1/2} x  +  \frac{x^2}{2}  f' + \frac{x^3}{3!}  f'' 
++ \frac{x^4}{4!} f''' + \frac{x^5}{5!}  f''''
++ \frac{x^6}{6!} f''''' 
+$$
+
+The finite volume representations (en 1D) are just differences of the above, for example
+
+For example to obtain the value at $$i-2$$, we get
+
+$$
+\hat{\phi}_{i-2} = \frac{1}{\Delta x } \left[ I(x_{i-3/2}) - I(x_{i-5/2}) \right]
+=\phi_{i+1/2}   +  \frac{1}{2}\left[ (3/2)^2 - (5/2)^2 \right] \Delta x  f' - \frac{1}{3!} \left[ (3/2)^3 - (5/2)^3 \right]  (\Delta x)^2 f'' \\ 
++ \frac{1}{4!} \left[ (3/2)^4 - (5/2)^4 \right] (\Delta x)^3 f''' - \frac{1}{5!} \left[ (3/2)^5 - (5/2)^5 \right]  (\Delta x)^4  f''''
++ \frac{1}{6!}  \left[ (3/2)^6 - (5/2)^6 \right](\Delta x)^5 f'''''
+$$
+
+
+Rearranging coefficents we obtain the six points based on cell values
+
+$$
+\hat{\phi}_{i-2} =
+\phi_{i+1/2}   - \frac{5}{2}  (\Delta x) f' + \frac{19}{6}  (\Delta x)^2 f'' 
+ - \frac{65}{24} (\Delta x)^3 f''' + 
+ \frac{211}{120} (\Delta x)^4 f'''' - \frac{665}{720} (\Delta x)^5 f''''' 
+$$
+
+$$
+\hat{\phi}_{i-1} =
+\phi_{i+1/2}   - \frac{3}{2}  (\Delta x) f' + \frac{7}{6}  (\Delta x)^2 f''  
+- \frac{15}{24} (\Delta x)^3 f''' +  \frac{31}{120} (\Delta x)^4 f''''
+- \frac{63}{720} (\Delta x)^5 f''''' 
+$$
+
+$$
+\hat{\phi}_{i} =
+\phi_{i+1/2}   -  \frac{1}{2}\Delta x  f' + \frac{1}{6}  (\Delta x)^2 f'' 
+- \frac{1}{24} (\Delta x)^3 f''' + \frac{1}{120} (\Delta x)^4  f''''
+- \frac{1}{720}  (\Delta x)^5 f''''' 
+$$
+
+$$
+\hat{\phi}_{i+1} =
+\phi_{i+1/2}   +  \frac{1}{2}\Delta x  f' + \frac{1}{6}  (\Delta x)^2 f'' 
++ \frac{1}{24} (\Delta x)^3 f''' + \frac{1}{120} (\Delta x)^4  f''''
++ \frac{1}{720}  (\Delta x)^5 f''''' 
+$$
+
+$$
+\hat{\phi}_{i+2} = \phi_{i+1/2}   + \frac{3}{2}  (\Delta x) f' + \frac{7}{6}  (\Delta x)^2 f''  + \frac{15}{24} (\Delta x)^3 f''' + 
+ \frac{31}{120} (\Delta x)^4 f'''' + \frac{63}{720} (\Delta x)^5 f''''' 
+$$
+
+$$
+\hat{\phi}_{i+3} = \phi_{i+1/2}   + \frac{5}{2}  (\Delta x) f' + \frac{19}{6}  (\Delta x)^2 f''  + \frac{65}{24} (\Delta x)^3 f''' + 
+ \frac{211}{120} (\Delta x)^4 f'''' + \frac{665}{720} (\Delta x)^5 f''''' 
+$$
+
+
+Following the same process as with finite difference we obtain the matrix coefficents
+
+$$
+A = 
+\left(
+\begin{array}{cccccc}
+1 & -5/2 & 19/6 &  -65/24 & 211/120 & -665/720 \\
+1 & -3/2  & 7/6 &  -15/24 &  31/120 &  -63/720 \\
+1 & -1/2  & 1/6  &  -1/24 &   1/120 &   -1/720 \\
+1 & 1/2   & 1/6  &   1/24 &   1/120 &    1/720 \\
+1 & 3/2   & 7/6 &   15/24 &  31/120 &   63/720 \\
+1 & 5/2  & 19/6 &   65/24 & 211/120 &  665/720
+\end{array}
+\right)
+$$
+
+and we obtain the coefficients solving the same system  
+$$
+\underline{\alpha} A^T = f_{desired}
+$$
+The derivatives in the face are 
+
+$$
+\left.{\frac{d\phi}{dx}} \right|_{i+1/2} = \frac{1}{\Delta x } \left( \frac{-1}{12}\hat{\phi}_{i+2}  + \frac{5}{4} \hat{\phi}_{i+1} -
+ \frac{5}{4} \hat{\phi}_{i} + \frac{1}{12} \hat{\phi}_{i-1}\right)  + \mathcal{O}(\Delta x)^4
+$$
+
+$$
+\left.{\frac{d\phi}{dx}} \right|_{i+1/2} = \frac{1}{\Delta x } \left( 
+ \frac{1}{90} \hat{\phi}_{i+3}   -  \frac{5}{36}\hat{\phi}_{i+2}  + \frac{49}{36} \hat{\phi}_{i+1} -
+ \frac{49}{36} \hat{\phi}_{i}    + \frac{5}{36} \hat{\phi}_{i-1}  -  \frac{1}{90} \hat{\phi}_{i-2} \right)    + \mathcal{O}(\Delta x)^6
+$$
+
+Interpolation schemes are similarly found by setting $$f_{desired} = (1,0,0,0,0,0)$$
+
+and we will get
+
+$$
+\phi_{i+1/2} =  -  \frac{1}{12}\hat{\phi}_{i+2}  + \frac{7}{12} \hat{\phi}_{i+1} +
+                   \frac{7}{12}\hat{\phi}_{i}   - \frac{1}{12} \hat{\phi}_{i-1}     + \mathcal{O}(\Delta x)^4
+$$
+
+$$
+\phi_{i+1/2} =  
+ \frac{1}{60} \hat{\phi}_{i+3}   -  \frac{2}{15} \hat{\phi}_{i+2}  + \frac{37}{60} \hat{\phi}_{i+1} +
+ \frac{37}{60} \hat{\phi}_{i}     - \frac{2}{15} \hat{\phi}_{i-1}  + \frac{1}{60} \hat{\phi}_{i-2}    + \mathcal{O}(\Delta x)^6
+$$
+
+
+These formulas are used to evaluate derivatives in the cell faces for viscous terms 
+in the direction
+
+### Cross-derivatives
+
+In  the viscous terms, the derivative in the y direction gas to be compute in the x-face 
+
+$$
+\left.{\frac{\partial \phi }{\partial y}} \right|_{i+1/2}
+$$
+
+To achieve high order, an interpolation is built from node values.
+A fourth order interpolation, for example
+
+$$
+\left.{\frac{\partial \phi}{\partial y}} \right|_{i+1/2} =
+\alpha_0 \left.{\frac{\partial \phi}{\partial y}} \right|_{i-1}
++ \alpha_1 \left.{\frac{\partial \phi}{\partial y}} \right|_{i}
++ \alpha_2  \left.{\frac{\partial \phi}{\partial y}} \right|_{i+2}
+\alpha_3  \left.{\frac{\partial \phi}{\partial y}} \right|_{i+2})
+$$
+
+The deritatives are obtained by conventional cell-centred central derivatives at $$i-1$$,$$i$$..  etc.
+For example for second order, the derivative would be a combination of:
+
+$$
+\left.{\frac{\partial \phi}{\partial y}} \right|_{i-1} = \frac{ \phi_{i-1,j+1} - \phi_{i-1,j-1} }{\Delta y}
+$$
+
+
+FIGURE
+
+### Method of Manufactured Solutions
+
+Using the Method of Manufactured Solutions (MMS), it is possible to calculate the convergence of a numerical method implmentation. By introducing a known analytical solution, $$ \phi_e$$ and calculating the corresponding source term, the theoretical convergence can be evaluated within both finite difference and finite volume frameworks.
+If the solution is sufficiently smooth, convergence is observed in the finite volume approach even when a quadrature method is not used for flux integration. This is consistent with [Motheau and Wakefield, 1965](numerical-methods.md#references)
+The order of convergence remains robust across a wide range of Reynolds numbers, from 0.01 to 100.
+As a note, in the finite volume context the analtycal solution and the source term have to be integrated:
+
+$$
+\hat{S}_\rho = \frac{1}{V} \int S_\rho dV
+$$
+
+As the finite volume solution converges to $$ \hat{\phi} \rightarrow  \hat{\phi}_e$$, otherwise the convergence is limited to second order.
+
+## Skew-symmetric
+
+Numerical errors associated with discretisation can be categorised into truncation and aliasing errors ([Kravchenko and Moin, 1997](numerical-methods.md#references); [Lilly, 1965](numerical-methods.md#references)). The concept of numerical order alone is insufficient to fully characterize performance. Key properties such as dissipation, dispersion, and conservation are strongly influenced by the discretization scheme used for the convective term. To illustrate this, consider a one-dimensional scalar equation and three possible formulations for the nonlinear, hyperbolic term:
 
 $$
 \frac{\partial U}{\partial t} + \frac{\partial H U}{\partial x} = 0
@@ -459,5 +827,7 @@ To ensure strong stability preservation, the method must satisfy:
 
 \[11] Shu, C-W. (1988). Total-Variation-Diminishing Time Discretizations. [SIAM Journal of Scientific and Statistical Computing, 9(6):1073-1084](https://epubs.siam.org/doi/abs/10.1137/0909073)
 
-\[12] Rusanov, V. V. E. (1962). The calculation of the interaction of non-stationary shock waves and obstacles. [_USSR Computational Mathematics and Mathematical Physics_, _1_(2), 304-320.](https://doi.org/10.1016/0041-5553\(62\)90062-9)
+\[12] Rusanov, V. V. E. (1962). The calculation of the interaction of non-stationary shock waves and obstacles. [_USSR Computational Mathematics and Mathematical Physics_, 1(2), 304-320.](https://doi.org/10.1016/0041-5553\(62\)90062-9)
+
+\[13] Motheau E, Wakefield J. (2021). On the numerical accuracy in finite-volume methods to accurately capture turbulence in compressible flows. [_Int J Numer Meth Fluids_, 93, 3020–3033.](https://doi.org/10.1002/fld.5021)
 
