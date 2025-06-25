@@ -1,5 +1,5 @@
 # Simulation time
-max_step  =  20000
+max_step  =  5000
 stop_time =  100.0
 #time_step =  2.0e-8 
 cfl  = 0.3
@@ -20,7 +20,7 @@ cns.verbose = 0       # 0=quiet, 1=verbose
 amr.v               = 1
 
 # Refinement and regridding 
-amr.n_cell            = 384 64 128
+amr.n_cell            = 192 32 64
 amr.max_level         = 0       # maximum level number allowed
 amr.ref_ratio         = 2     # refinement ratio per level
 amr.regrid_int        = 5    # how often to regrid per level
@@ -37,5 +37,5 @@ amr.check_file              = chk     # root name of checkpoint file
 amr.check_int               = 10000   # number of timesteps between checkpoints
 amr.plot_files_output = 1
 amr.plot_file         = ./plot/plt    # root name of plotfile
-amr.plot_int          = 200           # number of timesteps between plotfiles
+amr.plot_int          = 500           # number of timesteps between plotfiles
 amr.derive_plot_vars  = pressure velocity temperature

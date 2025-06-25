@@ -15,6 +15,8 @@
 #include <NozzleFunctions.h>
 #include <ib_walltypes.h>
 
+#include <numbers>
+
 using namespace amrex;
 using namespace universal_constants;
 
@@ -54,25 +56,23 @@ struct ProbParm
   static constexpr Real  Yar_oo  = 0.04; //  4% Argon
   
   // stagnation pressure and temperature
-  static constexpr Real P0  = nozzle_functions::Pstag(p_oo,Mach,gam);
-  static constexpr Real T0  = nozzle_functions::Tstag(T_oo,Mach,gam);
+  const Real P0  = nozzle_functions::Pstag(p_oo,Mach,gam);
+  const Real T0  = nozzle_functions::Tstag(T_oo,Mach,gam);
 
   // centre of probe (approx)
   static constexpr Real x0 = 1.0, y0 = 2.0, z0 = 2.0;
 
   // SRP stagnation P and T
-  static constexpr Real P0srp = P0;
-  static constexpr Real T0srp = 5.0*T0;
+  const Real P0srp = P0;
+  const Real T0srp = 5.0*T0;
   // compute conditions at throat
-  static constexpr Real Pt = nozzle_functions::Pchok(P0srp,gam_srp);
-  static constexpr Real Tt = nozzle_functions::Pchok(T0srp,gam_srp);
+  const Real Pt = nozzle_functions::Pchok(P0srp,gam_srp);
+  const Real Tt = nozzle_functions::Pchok(T0srp,gam_srp);
   // sonic conditions at the throat
-  static constexpr Real u_srp    = sqrt(gam_srp*gas_constant*Tt/28.e-3);
-  
-
-  static constexpr Real xsrp= 0.6225,ysrp = 0.75, zsrp=0.75;
-  static constexpr Real Rsrp= 0.008; // nozzle radius
-  static constexpr Real Asrp= std::numbers::pi*Rsrp*Rsrp;  
+  const Real u_srp    = sqrt(gam_srp*gas_constant*Tt/28.e-3);
+  const Real xsrp= 0.6225,ysrp = 0.75, zsrp=0.75;
+  const Real Rsrp= 0.008; // nozzle radius
+  const Real Asrp= std::numbers::pi*Rsrp*Rsrp;  
 };
 
 //  parameters for viscous solver and conductivity/viscosity
@@ -119,7 +119,7 @@ typedef rhs_dt<riemann_t<false, ProbClosures>, no_diffusive_t, no_source_t > Pro
 template < typename param, typename cls_t > class ibm_user_t; 
 
 // IBM templates
-typedef ibm_user_t<ProbParm,ProbClosures> TypeWall;
+typedef ibm_user_t<ibmparm_t,ProbClosures> TypeWall;
 typedef eib_t<TypeWall,ibmparm_t,ProbClosures> ProbIB;
 
 
@@ -256,6 +256,8 @@ template < typename param, typename cls_t>
 class ibm_user_t
 {
   private:
+
+    ProbParm  param2; // parameters for the problem (in gcc  no need to do)
   
   public:
 
@@ -289,17 +291,17 @@ class ibm_user_t
      
       // locate the SRP
       
-      const Real xjet = xyz(0) - param::xsrp;
-      const Real yjet = xyz(1) - param::ysrp;
-      const Real zjet = xyz(2) - param::zsrp;
+      const Real xjet = xyz(0) - param2.xsrp;
+      const Real yjet = xyz(1) - param2.ysrp;
+      const Real zjet = xyz(2) - param2.zsrp;
       const Real Rjet=sqrt(yjet*yjet + zjet*zjet);
 
-      bool isjet = (std::fabs(xjet) < 0.01) && (Rjet < param::Rsrp);
+      bool isjet = (std::fabs(xjet) < 0.01) && (Rjet < param2.Rsrp);
       if (isjet)
       {
-        q(1,cls_t::QU)    = param::u_srp; 
-        q(1,cls_t::QPRES) = param::Pt; 
-        q(1,cls_t::QT)    = param::Tt;         
+        q(1,cls_t::QU)    = param2.u_srp; 
+        q(1,cls_t::QPRES) = param2.Pt; 
+        q(1,cls_t::QT)    = param2.Tt;         
         // SRP-jet composition  (pure Nitrogen)
         Real Yjet[NUM_SPECIES] ={0.0};
         Yjet[N2_ID] = 1.0; 

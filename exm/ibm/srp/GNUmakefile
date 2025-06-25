@@ -10,7 +10,7 @@ TINY_PROFILE = FALSE
 CLIP_MINTEMP = FALSE
 
 # parallelization
-USE_MPI = TRUE
+USE_MPI = FALSE
 USE_CUDA = FALSE
 USE_OMP = FALSE
 
@@ -32,6 +32,8 @@ CUDA_ARCH=8.0
 AMR_SOLVER = $(abspath ../../../)
 AMREX_HOME = $(abspath ../../../lib/amrex)
 PELE_PHYSICS_HOME = $(abspath ../../../lib/PelePhysics)
+
+# Boost and CGAL
 
 
 CEXE_headers += prob.h

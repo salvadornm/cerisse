@@ -21,8 +21,6 @@ struct ProbParm {
   Real u_r = 0.0;
 };
 
-inline Vector<std::string> cons_vars_names={"Xmom","Ymom","Zmom","Energy","Density"};
-inline Vector<int> cons_vars_type={1,2,3,0,0};
 
 typedef closures_dt<indicies_t, visc_suth_t, cond_suth_t,
                     calorifically_perfect_gas_t<indicies_t>>

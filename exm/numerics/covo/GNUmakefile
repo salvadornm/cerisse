@@ -1,8 +1,9 @@
 TINY_PROFILE = FALSE
 
-DEBUG   = FALSE
-DIM     = 2
+DEBUG    = FALSE
+DIM      = 2
 COMP     = gcc
+CXXSTD   = c++20
 
 USE_MPI = TRUE
 USE_CUDA = FALSE

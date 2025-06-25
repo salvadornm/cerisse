@@ -160,9 +160,21 @@ class diffusiveheat_t {
     }  
     fx(i, j, k, cls_t::UET) +=   -lam* dTdr*dxinv[dir];
   }
+  // ............................................................. 
+  AMREX_GPU_DEVICE AMREX_FORCE_INLINE void flux_diffdir_ibm(
+      int i, int j, int k, int dir,const GpuArray<int, 3>& vdir,
+      amrex::Array4<amrex::Real> const& fx,
+      amrex::Array4<const amrex::Real> const& prims,
+      amrex::Array4<const amrex::Real> const& /* mu_arr */,
+      amrex::Array4<const amrex::Real> const& lam_arr,
+      amrex::GpuArray<amrex::Real, amrex::SpaceDim> const& dxinv,
+      const cls_t* /* cls */,const Array4<bool>& ibMarkers) const {
+    
+      // NOT IMPLEMENTED YET  
+      fx(i, j, k, cls_t::UET) += 0.0;
+  }
+  // ............................................................. 
 };
-
-
 
 
 #endif
