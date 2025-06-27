@@ -85,7 +85,7 @@ class manual_bc_t
 #endif
     // compute density and internal energy
     Real rho = 0.0; Real e_ext=0.0;
-    cls->PYT2R(P,Y,T,rho); cls->PYT2E(P,Y,T,e_ext);
+    cls->PYT2R(P,Y,T,rho); cls->RYP2E(rho,Y,P,e_ext);
   
     // assign rho
 #if NUM_SPECIES > 1      

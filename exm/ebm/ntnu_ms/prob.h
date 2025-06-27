@@ -157,7 +157,7 @@ prob_initdata(int i, int j, int k, Array4<Real> const &state,
   state(i, j, k, cls.UMX)  = rhot * u[0];
   state(i, j, k, cls.UMY)  = rhot * u[1];
   state(i, j, k, cls.UMZ)  = rhot * u[2];  
-  state(i, j, k, cls.UET)  = eint + kin;    
+  state(i, j, k, cls.UET)  = rhot*eint + kin;    
   for (int n = 0; n < NUM_SPECIES; ++n) {
     state(i, j, k, cls.UFS + n) = rhot * y_sp[n];
 }
@@ -312,58 +312,13 @@ class user_source_t {
       bool buffer = (z > prob_parm.zexit) && (r > 0.035);
 
       if (buffer){        
-        rhs(i,j,k,cls.URHO)+= drhodt;
         rhs(i,j,k,cls.UMX) += prims(i,j,k,cls.QU)*drhodt;
         rhs(i,j,k,cls.UMY) += prims(i,j,k,cls.QV)*drhodt; 
         rhs(i,j,k,cls.UMZ) += prims(i,j,k,cls.QW)*drhodt;
         rhs(i,j,k,cls.UET) += Et*drhodt;
         for (int sp = 0; sp < NUM_SPECIES; sp++) {
           rhs(i,j,k, cls.UFS + sp) += prims(i,j,k, cls.QFS + sp) * drhodt;  
-        }
-        
-        /** 
-        std::cout << " i " << i << " j " << j << " k " << k << std::endl; 
-        std::cout << "URHO  " << rhs(i,j,k,cls.URHO) << " drhodt " << drhodt << " drho " << drho << "\n";
-        
-        std::cout << "UMX " << rhs(i,j,k,cls.UMX) << "\n";
-        std::cout << "UMY " << rhs(i,j,k,cls.UMY) << "\n";
-        std::cout << "UMZ " << rhs(i,j,k,cls.UMZ) << "\n";
-        std::cout << "UET " << rhs(i,j,k,cls.UET) << " et before " << Et * rho << "\n";
-        std::cout << " rhs uet before " << rhs(i,j,k,cls.UET) - Et*drhodt << std::endl;
-
-        ProbClosures fortemp;
-        Real primitivess[cls.NPRIM]; 
-        fortemp.cons2prims_point(&rhs(i,j,k,0), primitivess);
-        std::cout << "pressure post change " << primitivess[cls.QPRES] << std::endl;
-        std::cout << "pressure pre change " << prims(i,j,k,cls.QPRES) << " dP " << dP << std::endl;
-
-
-        
-        if ( isnan(rhs(i,j,k,cls.URHO)) || isnan(rhs(i,j,k,cls.UMX)) || isnan(rhs(i,j,k,cls.UMY)) || isnan(rhs(i,j,k,cls.UMZ)) || isnan(rhs(i,j,k,cls.UET)) ) {
-          std::cout << "dp " << dP << " fixed prob_parm pbc" << prob_parm.p_bc << " T " << T << " p inside " << prims(i,j,k,cls.QPRES) << std::endl;
-          std::cout << "rho  before update " << rhs(i,j,k,cls.URHO) - drhodt << std::endl;
-          std::cout << " i " << i << " j " << j << " k " << k << std::endl; 
-          std::cout << "drho/dt " << drhodt << " dt " << dt << " drho " << drho <<std::endl;
-          if (isnan(rhs(i,j,k,cls.URHO))) {
-            std::cout << "URHO is nan " << rhs(i,j,k,cls.URHO) << "\n";
-          }
-          if (isnan(rhs(i,j,k,cls.UMX))) {
-            std::cout << "UMX is nan " << rhs(i,j,k,cls.UMX) << "\n";
-          }
-          if (isnan(rhs(i,j,k,cls.UMY))) {
-            std::cout << "UMY is nan: " << rhs(i,j,k,cls.UMY) << "\n";
-          }
-          if (isnan(rhs(i,j,k,cls.UMZ))) {
-            std::cout << "UMZ is nan " << rhs(i,j,k,cls.UMZ) << "\n";
-          }
-          if (isnan(rhs(i,j,k,cls.UET))) {
-            std::cout << "UET is nan " << rhs(i,j,k,cls.UET) << "\n";
-          }
-
-        } 
-        */
-    
-        
+        }                        
       }
 
 

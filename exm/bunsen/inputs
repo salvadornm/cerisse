@@ -1,0 +1,70 @@
+# Simulation time
+# start time is assumed to be 0, unless re-starting
+max_step  = 5000
+stop_time = 0.1
+cfl = 0.3
+#time_step =1e-9
+
+# Geometry 
+geometry.is_periodic = 0 0 
+geometry.coord_sys   = 0  # 0 => cart, 1 => RZ  2=>spherical
+geometry.prob_lo     = 0.000  -0.004
+geometry.prob_hi     = 0.001  0.008
+
+# -1 = N/A (Incase of periodic)
+# 0 = Interior           3 = Symmetry
+# 1 = Inflow             4 = SlipWall
+# 2 = Outflow            5 = NoSlipWall
+# 6 = user defined
+cns.lo_bc = 3  1 
+cns.hi_bc = 3  1 
+
+# Verbose/screen output 
+cns.verbose          = 1    # Cerisse output    0=quiet, 1=verbose
+amr.v                = 1    # AMReX   output    0=quiet, 1=verbose
+
+# Refinement and regridding 
+amr.n_cell          = 64 768 # 4:3  64:48
+amr.max_level       = 0     # maximum level number allowed
+amr.ref_ratio       = 2 2   # refinement ratio per level
+amr.regrid_int      = 50     # how often to regrid per level
+amr.blocking_factor_x = 8   # blocking factor in x per level
+amr.blocking_factor_y = 8   # blocking factor in y per level
+amr.max_grid_size_x   = 64  # maximum grid size in x per level
+amr.max_grid_size_y   = 64  # maximum grid size in y per level
+amr.n_error_buf     = 4 4   # number of buffer cells in error est
+amr.grid_eff        = 0.8   # what constitutes an efficient grid
+
+# Plot and checkpoint
+amr.checkpoint_files_output = 0
+amr.check_file              = chk    # root name of checkpoint file
+amr.check_int               = 20000    # number of timesteps between checkpoints
+amr.plot_files_output = 1
+amr.plot_file         = plot/plt # root name of plotfile
+amr.derive_plot_vars  = pressure velocity temperature
+amr.plot_int          = 500          # number of timesteps between plotfiles
+
+cns.order_rk  = -2 # original -2 2
+cns.stages_rk = 2
+
+# Boundaries
+eb2.eb_weight  = 1.0
+eb2.redistribution_type = "FluxRedist"
+eb2.geom_type = box
+eb2.box_lo = 0.00025 0.0000
+eb2.box_hi = 0.003  0.00061
+eb2.box_has_fluid_inside = 0
+
+
+# Utilities
+cns.use_utility = 1
+# Premixed flame initialisation 
+util.use_PMF = 1
+pmf.datafile = pmf.dat
+pmf.do_cellAverage = 1
+pmf.v = 1
+
+# Chemical Options
+cns.reactor_type = "ReactorCvode"
+cvode.solve_type =  "dense_direct"
+ode.clean_init_massfrac = 1
