@@ -1,7 +1,7 @@
 DEBUG   = FALSE
 DIM     = 3
 COMP     = gcc
-CXXSTD    = c++20
+CXXSTD    = c++23
 PRECISION = DOUBLE
 
 TINY_PROFILE = FALSE
@@ -28,6 +28,11 @@ AMR_SOLVER = $(abspath ../../../)
 AMREX_HOME = $(abspath ../../../lib/amrex)
 PELE_PHYSICS_HOME = $(abspath ../../../lib/PelePhysics)
 
+# Boost and CGAL locations (MacOS example)
+BOOST_HOME=/opt/homebrew/opt/boost
+CGAL_HOME=/opt/homebrew/opt/cgal
+GMP_HOME=/opt/homebrew/opt/gmp
+MPFR_HOME=/opt/homebrew/opt/mpfr
 
 CEXE_headers += prob.h
 include $(AMR_SOLVER)/src/Make.CNS

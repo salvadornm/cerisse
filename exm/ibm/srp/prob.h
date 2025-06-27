@@ -14,7 +14,6 @@
 #include <Constants.h>
 #include <NozzleFunctions.h>
 #include <ib_walltypes.h>
-
 #include <numbers>
 
 using namespace amrex;
@@ -41,38 +40,37 @@ static constexpr int ibm_eorder=1;
 struct ProbParm
 { 
 
-  // freee-stream conditions  (roughly 10 km Mars entry)
-  static constexpr Real p_oo    = 284.0; //[Pa] free-stream pressure   
-  static constexpr Real T_oo    = 227.0;    //[K]  free-stream temperature 
-
-  // density, energy, speeed of sound (using script propertie.py)
-  static constexpr Real rho_oo  = 0.0065954;  // [kg/m3] 
-  static constexpr Real c_oo    = 239.720;    // [m/s]
-  static constexpr Real u_oo    = c_oo*Mach;  
-  static constexpr Real eint_oo = -8.6835e+06; // [J/kg]
-  static constexpr Real kin_oo  = 0.5*rho_oo*u_oo*u_oo;
+  //------ values obtained from ./properties.py  (SI units)---------
+  // based on Mach number 2.0 and gamma 1.334533782996543
+  // and free-stream conditions P_oo = 284.0 [Pa] and T_oo = 227.0 [K]
+  // Staganation conditions
+  static constexpr Real P0  =  2191.8913255191455 ;
+  static constexpr Real T0  =  378.8783374804305 ;
+  // Free-stream conditions
+  static constexpr Real p_oo  =  284.0 ;
+  static constexpr Real T_oo  =  227.0 ;
+  static constexpr Real rho_oo  =  0.00659535789648574 ;
+  static constexpr Real c_oo  =  239.7202778419921 ;
+  static constexpr Real u_oo  =  479.4405556839842 ;
+  static constexpr Real eint_oo  =  -8683464.706718355 ;
+  static constexpr Real kin_oo  =  758.0151887420365 ;
+  // SRP Staganation conditions
+  static constexpr Real P0srp  =  2191.8913255191455 ;
+  static constexpr Real T0srp  =  1894.3916874021525 ;
+  // SRP throat conditions (choked flow)
+  static constexpr Real Pt  =  1195.1513931292714 ;
+  static constexpr Real Tt  =  1645.445074309705 ;
+  static constexpr Real u_srp  =  855.7917341280771 ;
+  //-----------------------------------------------------------------
   
   static constexpr Real  Yco2_oo = 0.96; // 96% CO2
   static constexpr Real  Yar_oo  = 0.04; //  4% Argon
   
-  // stagnation pressure and temperature
-  const Real P0  = nozzle_functions::Pstag(p_oo,Mach,gam);
-  const Real T0  = nozzle_functions::Tstag(T_oo,Mach,gam);
-
   // centre of probe (approx)
   static constexpr Real x0 = 1.0, y0 = 2.0, z0 = 2.0;
-
-  // SRP stagnation P and T
-  const Real P0srp = P0;
-  const Real T0srp = 5.0*T0;
-  // compute conditions at throat
-  const Real Pt = nozzle_functions::Pchok(P0srp,gam_srp);
-  const Real Tt = nozzle_functions::Pchok(T0srp,gam_srp);
-  // sonic conditions at the throat
-  const Real u_srp    = sqrt(gam_srp*gas_constant*Tt/28.e-3);
-  const Real xsrp= 0.6225,ysrp = 0.75, zsrp=0.75;
-  const Real Rsrp= 0.008; // nozzle radius
-  const Real Asrp= std::numbers::pi*Rsrp*Rsrp;  
+  static constexpr Real xsrp= 0.6225,ysrp = 0.75, zsrp=0.75;
+  static constexpr Real Rsrp= 0.008; // nozzle radius
+  static constexpr Real Asrp= std::numbers::pi*Rsrp*Rsrp;  
 };
 
 //  parameters for viscous solver and conductivity/viscosity
@@ -119,7 +117,7 @@ typedef rhs_dt<riemann_t<false, ProbClosures>, no_diffusive_t, no_source_t > Pro
 template < typename param, typename cls_t > class ibm_user_t; 
 
 // IBM templates
-typedef ibm_user_t<ibmparm_t,ProbClosures> TypeWall;
+typedef ibm_user_t<ProbParm,ProbClosures> TypeWall;
 typedef eib_t<TypeWall,ibmparm_t,ProbClosures> ProbIB;
 
 
@@ -256,8 +254,6 @@ template < typename param, typename cls_t>
 class ibm_user_t
 {
   private:
-
-    ProbParm  param2; // parameters for the problem (in gcc  no need to do)
   
   public:
 
@@ -291,17 +287,17 @@ class ibm_user_t
      
       // locate the SRP
       
-      const Real xjet = xyz(0) - param2.xsrp;
-      const Real yjet = xyz(1) - param2.ysrp;
-      const Real zjet = xyz(2) - param2.zsrp;
+      const Real xjet = xyz(0) - param::xsrp;
+      const Real yjet = xyz(1) - param::ysrp;
+      const Real zjet = xyz(2) - param::zsrp;
       const Real Rjet=sqrt(yjet*yjet + zjet*zjet);
 
-      bool isjet = (std::fabs(xjet) < 0.01) && (Rjet < param2.Rsrp);
+      bool isjet = (std::fabs(xjet) < 0.01) && (Rjet < param::Rsrp);
       if (isjet)
       {
-        q(1,cls_t::QU)    = param2.u_srp; 
-        q(1,cls_t::QPRES) = param2.Pt; 
-        q(1,cls_t::QT)    = param2.Tt;         
+        q(1,cls_t::QU)    = param::u_srp; 
+        q(1,cls_t::QPRES) = param::Pt; 
+        q(1,cls_t::QT)    = param::Tt;         
         // SRP-jet composition  (pure Nitrogen)
         Real Yjet[NUM_SPECIES] ={0.0};
         Yjet[N2_ID] = 1.0; 

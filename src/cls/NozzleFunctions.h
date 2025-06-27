@@ -8,8 +8,9 @@ using namespace amrex;
 
 namespace nozzle_functions {
   // Set of useful functions to set-up nozzle cases
-  // These are not use for any calculations within Cerisse 
-  // they  are only to help (required constexpr)
+  // These are not used in any calculations within Cerisse 
+  // they  are only to help 
+  // (aditionally use nozzle_calculator in cerisse/tools to compute nozzle parameters)
 
 
   // \brief computes stagnation pressure,function P,M,gamma

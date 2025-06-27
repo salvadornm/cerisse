@@ -49,6 +49,7 @@ case  $1 in
         mv cgal-$CGALVERSION cgal
         rm v$CGALVERSION.zip
         echo -e "\\033[1;32m CGAL download \\033[0m"
+        rm -rf boost
         echo " downloading boost release version .." $BOOSTVERSION
         wget https://github.com/boostorg/boost/releases/download/boost-$BOOSTVERSION/boost-$BOOSTVERSION.zip
         unzip boost-$BOOSTVERSION.zip

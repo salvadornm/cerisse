@@ -36,14 +36,10 @@ INCLUDE_LOCATIONS += $(AMR_SOLVER)/src/cls/
 VPATH_LOCATIONS   += $(AMR_SOLVER)/src/cls/
 
 # ---------   IBM  -------------------- 
-ifeq ($(USE_GPIBM),TRUE)  
-  BOOST_HOME=/opt/homebrew/opt/boost
-  CGAL_HOME=/opt/homebrew/opt/cgal
-  GMP_HOME=/opt/homebrew/opt/gmp
-  MPFR_HOME=/opt/homebrew/opt/mpfr
-
-  #BOOST_HOME= $(AMR_SOLVER)/lib/install/boost
-  #CGAL_HOME = $(AMR_SOLVER)/lib/install/cgal
+ifeq ($(USE_GPIBM),TRUE)    
+  #  default options for libray
+  BOOST_HOME ?= $(AMR_SOLVER)/lib/install/boost
+  CGAL_HOME ?= $(AMR_SOLVER)/lib/install/cgal
 
   # BOOST and CGAL
   INCLUDE_LOCATIONS  += $(BOOST_HOME)/include
