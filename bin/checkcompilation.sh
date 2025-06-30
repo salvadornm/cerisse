@@ -22,7 +22,7 @@ MAKE_DIRS=(
 	"../exm/planar_flame/"	
 	"../exm/ibm/sphere/"
 	"../exm/ibm/srp/"
-	"../exm/mms/euler3d/"
+	"../exm/mms/navsto3d/"
 	"../tst/tutorial/"
 )
 	
