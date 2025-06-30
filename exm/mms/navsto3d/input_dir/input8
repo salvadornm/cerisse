@@ -2,11 +2,11 @@
 # start time is assumed to be 0, unless re-starting
 max_step  = 1
 stop_time = 0.2
-#time_step = 0.001 
-cfl= 0.01
+time_step = 1.e-6 
+#cfl= 0.01
 
-cns.order_rk  = -2 
-cns.stages_rk = 2
+cns.order_rk  = 1 
+cns.stages_rk = 1
 
 # Geometry 
 geometry.is_periodic = 1 1 1
@@ -25,7 +25,7 @@ cns.screen_output = 1 # 0=quiet, 1=verbose
 cns.verbose = 1       # 0=quiet, 1=verbose
 
 # Refinement and regridding 
-amr.n_cell          = 128 128 128
+amr.n_cell          = 8 8 8
 amr.max_level       = 0     # maximum level number allowed
 amr.ref_ratio       = 2  # refinement ratio per level
 amr.regrid_int      = 2  # how often to regrid per level
@@ -37,7 +37,7 @@ amr.max_grid_size_y   = 64  # maximum grid size in y per level
 amr.max_grid_size_z   = 64  # maximum grid size in z per level
 amr.n_error_buf     = 0  # number of buffer cells in error est
 amr.grid_eff        = 0.7     # what constitutes an efficient grid
-amr.v               = 1
+amr.v               = 0
 fabarray.mfiter_tile_size = 8 8 8
 
 # Plot and checkpoint
