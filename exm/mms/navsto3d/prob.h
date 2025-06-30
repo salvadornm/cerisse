@@ -18,6 +18,8 @@ namespace PROB {
   static constexpr Real mmw  = 29.0/1000.0;
   static constexpr Real Rgas = gas_constant/mmw;
   static constexpr Real Cp = Rgas*gam/(gam - 1.0);
+
+   static constexpr int ordernum   = 6;
   
   // problem parameters
   struct ProbParm {
@@ -28,11 +30,15 @@ namespace PROB {
 
   struct viscparm_t {
 
-    static constexpr int order   = 6;
-    static constexpr bool use_LES = false;
+    static constexpr int order   = ordernum;
     
+    static constexpr bool use_LES = false;
+    //static constexpr Real viscosity     =  1.7632;   // from python file (to get Re=100)
+    //static constexpr Real conductivity  =  2457.38561825418; //
     static constexpr Real viscosity     = 176.32;            // from python file (to get Re=1)
     static constexpr Real conductivity  = 245738.561825418;  // from python file (and Pr=0.72)
+    //static constexpr Real viscosity     = 17632.0;            // from python file (to get Re=0.01)
+    //static constexpr Real conductivity  = 24573856.1825418;  // from python file (and Pr=0.72)
   };
 
   struct gasparm_t {
@@ -46,7 +52,7 @@ namespace PROB {
     public:
 
     static constexpr bool dissipation = false;         // no dissipation
-    static constexpr int  order = 2;                  // order numerical scheme
+    static constexpr int  order =  ordernum;                  // order numerical scheme
     static constexpr Real C2skew=0.1,C4skew=0.0016;   // Skew symmetric default
 
   };
@@ -67,10 +73,17 @@ template <typename cls_t > class user_source_t;
 // KEEP 2/4/6
 //typedef rhs_dt<keep_euler_t<false,false,4, ProbClosures>, viscous_t<viscparm_t,ProbClosures>, user_source_t <ProbClosures> > ProbRHS;
 // CD 2/4/6
-typedef rhs_dt<centraldif_t<false,false,6, ProbClosures>, viscous_t<viscparm_t,ProbClosures>, user_source_t <ProbClosures> > ProbRHS;
+//typedef rhs_dt<centraldif_t<false,false, ordernum, ProbClosures>, viscous_t<viscparm_t,ProbClosures>, user_source_t <ProbClosures> > ProbRHS;
+//typedef rhs_dt<no_euler_t, viscous_t<viscparm_t,ProbClosures>, user_source_t <ProbClosures> > ProbRHS;
+
+
+typedef rhs_dt<centraldif_t<false,false,ordernum, ProbClosures>, viscous_t<viscparm_t,ProbClosures>, user_source_t <ProbClosures> > ProbRHS;
+//typedef rhs_dt<keep_euler_t<false,false,6, ProbClosures>, no_diffusive_t, user_source_t <ProbClosures> > ProbRHS;
+//typedef rhs_dt<weno_t<ReconScheme::Teno6, ProbClosures>, viscous_t<viscparm_t,ProbClosures>, user_source_t <ProbClosures> > ProbRHS;
+
 
 void inline inputs() {
-  amrex::Print() << " MMS Euler " << std::endl;
+  amrex::Print() << " General MMS Euler/NavSto " << std::endl;
 }
 
 // initial condition
@@ -85,13 +98,10 @@ prob_initdata(int i, int j, int k, Array4<Real> const &state,
   Real y = prob_lo[1] + (j + Real(0.5)) * dx[1];
   Real z = prob_lo[2] + (k + Real(0.5)) * dx[2];
   
-  const Real pi = 3.14159265358979323846; // in C++20 std::numbers::pi
-
   // initial conditions from mms
   Real rhot,ut,vt,wt,Pt;
-  mms_exact(x, y, z, rhot, ut, vt, wt, Pt);
+  mms_exact(x, y, z, rhot, ut, vt, wt, Pt, dx[0], dx[1], dx[2]);
 
-  
   state(i, j, k, cls.URHO) = rhot;
   state(i, j, k, cls.UMX)  = rhot * ut;
   state(i, j, k, cls.UMY)  = rhot * vt;
@@ -137,14 +147,16 @@ class user_source_t {
 
         // source terms from mms
         Real Srho,Srhou,Srhov,Srhow,Srhoe;
-        mms_source(x, y, z, Srho,Srhou,Srhov,Srhow,Srhoe);
+        mms_source(x, y, z, Srho,Srhou,Srhov,Srhow,Srhoe,dx[0],dx[1],dx[2]);
       
+
         //  MMS Source           
         rhs(i,j,k,cls_t::URHO) += Srho;
         rhs(i,j,k,cls_t::UMX)  += Srhou;
         rhs(i,j,k,cls_t::UMY)  += Srhov;
         rhs(i,j,k,cls_t::UMZ)  += Srhow;
         rhs(i,j,k,cls_t::UET)  += Srhoe;
+
        });
   };
 };

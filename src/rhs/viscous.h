@@ -229,12 +229,19 @@ class viscous_t {
 
     // momentum
     AMREX_D_TERM(flx(iv, UM1) -= tau11;, flx(iv, UM2) -= tau12;, flx(iv, UM3) -= tau13;)
-   
+
+    // interpolate velocity
+    // note: this is the velocity at the face, not at the cell center
+    const Real u1    = interp<param::order>(iv, d1, QU1, q);
+#if (AMREX_SPACEDIM >= 2)    
+    const Real u2    = interp<param::order>(iv, d1, QU2, q);
+#endif    
+#if (AMREX_SPACEDIM == 3)
+    const Real u3    = interp<param::order>(iv, d1, QU3, q);
+#endif
+
     // energy
-    flx(iv, cls_t::UET) -= 0.5 * (AMREX_D_TERM((q(iv, QU1) + q(ivm, QU1)) * tau11,
-                                              +(q(iv, QU2) + q(ivm, QU2)) * tau12,
-                                              +(q(iv, QU3) + q(ivm, QU3)) * tau13))
-                                              + lamf* dTdn;
+    flx(iv, cls_t::UET) -= AMREX_D_TERM(u1 * tau11, +u2 * tau12, +u3 * tau13) + lamf* dTdn;
     
 #if NUM_SPECIES > 1    
     // --------------------------------------------------------------------------

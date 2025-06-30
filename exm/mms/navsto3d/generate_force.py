@@ -12,9 +12,14 @@ Rgas =  8.31446261815324 / molweight
 Cp   = gamma*Rgas / (gamma-1)
 
 L_oo = 1
-Re  = 1
+Re  = 1.0
 Ma = 0.1
 Pr = 0.72
+
+NavierStokes   = 1  # if 1 solve Navier Stokes
+EulerFlux      = 1  # 1:fluxes are on, otherwise off
+FVintegration  = 1  # if 1 use FV integration, otherwise FD
+Simple = 1          # if 1 use constant rho and P
 
 rho_oo = 1.16
 u_oo   = 152
@@ -34,19 +39,31 @@ print(" visc = ", visc, " cond= ", cond)
 
 print(" p_oo = ", p_oo, " T_oo = ",T_oo)
 
-
 print(" Mach      = ", u_oo/csound)
 print(" Reynolds  = ", rho_oo*u_oo*L_oo/visc)
 
 
-
 # Manufactured solution
 # steady
-rho = rho_oo + 0.1 * sp.sin(2*sp.pi * x)  + 0.15 * sp.cos(2*sp.pi*y) + 0.2 * sp.sin(6*sp.pi*z) 
-u = u_oo+ 27.0 * sp.sin(4*sp.pi * x) - 17.0 * sp.cos(2*sp.pi*y) +0.0 * sp.sin(4*sp.pi*z) 
-v = v_oo + 69 *sp.sin(4*sp.pi*x)   + 0.0 * sp.cos(4*sp.pi*y)  + +0.0 * sp.sin(2*sp.pi*z) 
-w = w_oo *sp.sin(4*sp.pi*x)   +0.0 * sp.cos(4*sp.pi*y)  + +0.0 * sp.sin(2*sp.pi*z)  
-p = p_oo - 350 * sp.sin(2*sp.pi * x) + 60 * sp.cos(4*sp.pi *y) + 25 * sp.sin(6*sp.pi*z) 
+# rho = rho_oo + 0.1 * sp.sin(2*sp.pi * x)  + 0.15 * sp.cos(2*sp.pi*y) + 0.2 * sp.sin(6*sp.pi*z) 
+# u = u_oo+ 27.0 * sp.sin(4*sp.pi * x) - 17.0 * sp.cos(2*sp.pi*y) +0.0 * sp.sin(4*sp.pi*z) 
+# v = v_oo + 69 *sp.sin(4*sp.pi*x)   + 0.0 * sp.cos(4*sp.pi*y)  + +0.0 * sp.sin(2*sp.pi*z) 
+# w = w_oo *sp.sin(4*sp.pi*x)   +0.0 * sp.cos(4*sp.pi*y)  + +0.0 * sp.sin(2*sp.pi*z)  
+# p = p_oo - 350 * sp.sin(2*sp.pi * x) + 60 * sp.cos(4*sp.pi *y) + 25 * sp.sin(6*sp.pi*z) 
+
+
+rho = rho_oo + 0.1 * rho_oo* sp.sin(2*sp.pi * x)
+u   = u_oo +  0.1*u_oo*sp.sin(2*sp.pi * y) + 0.01*u_oo*sp.sin(2*sp.pi * z) 
+v   = 0.01*u_oo *sp.sin(4*sp.pi*x)  
+w   = 0.0
+p   = p_oo  + 0.1*p_oo * sp.sin(2*sp.pi * x) 
+
+# simpler for NS
+if Simple==1:
+    rho = rho_oo
+    p = p_oo
+    v = 0.0
+    u = u_oo +  0.1*u_oo*sp.sin(2*sp.pi * y)
 
 
 # functions
@@ -104,7 +121,7 @@ csound = np.sqrt(gamma * p0 / rho0)
 
 print( " u0 v0 w0 ",u0,v0,w0)
 print( " rho0 p0 ",rho0,p0)
-print( " ufluc vfluc wfluc ",(u_max-u0)/u0,(v_max-v0)/v0,(w_max-w0)/(w0 + 0.000001) )
+print( " ufluc vfluc wfluc ",(u_max-u0)/u0,(v_max-v0)/u0,(w_max-w0)/u0 )
 print( " rhofluc pfluc ",(rho_max-rho0)/rho0,(p_max-p0)/p0)
 print( " csound=",csound, " vel=",vel)
 print( " Mach= ",vel/csound)
@@ -140,47 +157,96 @@ tau_yy = visc*(2*dvdy - 2/3*divu)
 tau_yz = visc*(dvdz + dwdy)
 tau_zz = visc*(2*dwdz - 2/3*divu) 
 
-# Euler Fluxes x
-F1x = rho_u
-F2x = rho * u**2 + p
-F3x = rho * u*v 
-F4x = rho * u*w
-F5x = u * (E + p)
+if (EulerFlux ==1):
+    # Euler Fluxes x
+    F1x = rho_u
+    F2x = rho * u**2 + p
+    F3x = rho * u*v 
+    F4x = rho * u*w
+    F5x = u * (E + p)
+    # Euler Fluxes y
+    F1y = rho_v
+    F2y = rho * v*u
+    F3y = rho * v**2 + p 
+    F4y = rho * v*w
+    F5y = v * (E + p)
+    # Euler Fluxes z
+    F1z = rho_w
+    F2z = rho * w*u
+    F3z = rho * w*v
+    F4z = rho * w**2 + p
+    F5z = w * (E + p)
+else:
+    F1x = 0
+    F2x = 0
+    F3x = 0
+    F4x = 0
+    F5x = 0
+    F1y = 0
+    F2y = 0
+    F3y = 0
+    F4y = 0
+    F5y = 0
+    F1z = 0
+    F2z = 0
+    F3z = 0
+    F4z = 0
+    F5z = 0 
 
-# Visc Fluxes x
-F1viscx = 0
-F2viscx = tau_xx
-F3viscx = tau_xy
-F4viscx = tau_xz
-F5viscx = cond*sp.diff(T, x) + u*tau_xx + v*tau_xy + w*tau_xz
-
-# Euler Fluxes y
-F1y = rho_v
-F2y = rho * v*u
-F3y = rho * v**2 + p 
-F4y = rho * v*w
-F5y = v * (E + p)
-
-# Visc Fluxes y
-F1viscy = 0
-F2viscy = tau_xy
-F3viscy = tau_yy
-F4viscy = tau_yz
-F5viscy = cond*sp.diff(T, y) + u*tau_xy + v*tau_yy + w*tau_yz
-
-# Euler Fluxes z
-F1z = rho_w
-F2z = rho * w*u
-F3z = rho * w*v
-F4z = rho * w**2 + p
-F5z = w * (E + p)
-
-# Visc Fluxes y
-F1viscz = 0
-F2viscz = tau_xz
-F3viscz = tau_yz
-F4viscz = tau_zz
-F5viscz = cond*sp.diff(T, z) + u*tau_xz + v*tau_yz + w*tau_zz
+if NavierStokes  >0:
+    # Visc Fluxes x
+    F1viscx = 0
+    F2viscx = tau_xx
+    F3viscx = tau_xy
+    F4viscx = tau_xz
+    F5viscx = cond*sp.diff(T, x) + u*tau_xx + v*tau_xy + w*tau_xz
+    # Visc Fluxes y
+    F1viscy = 0
+    F2viscy = tau_xy
+    F3viscy = tau_yy
+    F4viscy = tau_yz
+    F5viscy = cond*sp.diff(T, y) + u*tau_xy + v*tau_yy + w*tau_yz
+    # Visc Fluxes z
+    F1viscz = 0
+    F2viscz = tau_xz
+    F3viscz = tau_yz
+    F4viscz = tau_zz
+    F5viscz = cond*sp.diff(T, z) + u*tau_xz + v*tau_yz + w*tau_zz
+else:
+    F1viscx = 0
+    F2viscx = 0
+    F3viscx = 0
+    F4viscx = 0
+    F5viscx = 0
+    F1viscy = 0
+    F2viscy = 0
+    F3viscy = 0
+    F4viscy = 0
+    F5viscy = 0
+    F1viscz = 0
+    F2viscz = 0
+    F3viscz = 0
+    F4viscz = 0
+    F5viscz = 0
+    
+# Total fuxes x
+Ft1x = F1x - F1viscx
+Ft2x = F2x - F2viscx
+Ft3x = F3x - F3viscx
+Ft4x = F4x - F4viscx
+Ft5x = F5x - F5viscx
+# Total fuxes y
+Ft1y = F1y - F1viscy
+Ft2y = F2y - F2viscy
+Ft3y = F3y - F3viscy
+Ft4y = F4y - F4viscy
+Ft5y = F5y - F5viscy
+# Total fuxes z
+Ft1z = F1z - F1viscz
+Ft2z = F2z - F2viscz
+Ft3z = F3z - F3viscz
+Ft4z = F4z - F4viscz
+Ft5z = F5z - F5viscz
 
 # Total fuxes x
 Ft1x = F1x - F1viscx
@@ -216,93 +282,173 @@ S3 = dF3
 S4 = dF4
 S5 = dF5
 
-# Simplify
-#S1_simplified = sp.simplify(S1)
-#S2_simplified = sp.simplify(S2)
-#S3_simplified = sp.simplify(S3)
-#S4_simplified = sp.simplify(S4)
-#S5_simplified = sp.simplify(S5)
+
+dx, dy, dz = sp.symbols('dx dy dz', positive=True)
+# Define integration bounds
+x_bounds = (x, x - dx/2, x + dx/2)
+y_bounds = (y, y - dy/2, y + dy/2)
+z_bounds = (z, z - dz/2, z + dz/2)
+
+if (FVintegration == 1):
+  print(" FV integration")
+  rhoI = sp.integrate(rho, z_bounds, y_bounds, x_bounds)
+  uI   = sp.integrate(u  , z_bounds, y_bounds, x_bounds)
+  vI   = sp.integrate(v  , z_bounds, y_bounds, x_bounds)
+  wI   = sp.integrate(w  , z_bounds, y_bounds, x_bounds)
+  pI   = sp.integrate(p  , z_bounds, y_bounds, x_bounds)
+
+  # Integrate source terms 
+  print(" Computing integrals of source terms..")
+  S1I   = sp.integrate(S1 , z_bounds, y_bounds, x_bounds)
+  print(" S1 ... DONE")
+  S2I   = sp.integrate(S2 , z_bounds, y_bounds, x_bounds)
+  print(" S2 ... DONE")
+  S3I   = sp.integrate(S3 , z_bounds, y_bounds, x_bounds)
+  print(" S3 ... DONE")
+  S4I   = sp.integrate(S4 , z_bounds, y_bounds, x_bounds)
+  print(" S4 ... DONE")   
+  S5I   = sp.integrate(S5, z_bounds, y_bounds, x_bounds)
+  print(" S5 ... DONE")
 
 
 # Output
 print("rho :")
 print(sp.latex(rho))
 
-print("u :")
-print(sp.latex(u))
+# print("u :")
+# print(sp.latex(u))
 
-print("v :")
-print(sp.latex(v))
+# print("v :")
+# print(sp.latex(v))
 
-print("w :")
-print(sp.latex(w))
+# print("w :")
+# print(sp.latex(w))
 
-print("p :")
-print(sp.latex(p))
+# print("p :")
+# print(sp.latex(p))
+
+# print("pI :")
+# print(sp.latex(pI))
 
 
 print("-----------------------\n")
 
 
 # Output forcing terms
-print("S_rho (mass equation: \n")
-#sp.pprint(S1_simplified)
-print(sp.latex(S1))
+# print("S_rho (mass equation: \n")
+# #sp.pprint(S1_simplified)
+# print(sp.latex(S1))
 
-print("Sx_momentum (momentum equation): \n")
-#sp.pprint(S2_simplified)
-print(sp.latex(S2))
+# print("Sx_momentum (momentum equation): \n")
+# #sp.pprint(S2_simplified)
+# print(sp.latex(S2))
 
-print("Sy_momentum (momentum equation): \n")
-#sp.pprint(S3_simplified)
-print(sp.latex(S3))
+# print("Sy_momentum (momentum equation): \n")
+# #sp.pprint(S3_simplified)
+# print(sp.latex(S3))
 
-print("Sz_momentum (momentum equation): \n")
-#sp.pprint(S4_simplified)
-print(sp.latex(S4))
+# print("Sz_momentum (momentum equation): \n")
+# #sp.pprint(S4_simplified)
+# print(sp.latex(S4))
 
-print("S_energy (energy equation):  \n")
-#sp.pprint(S5_simplified)
-print(sp.latex(S5))
+# print("S_energy (energy equation):  \n")
+# #sp.pprint(S5_simplified)
+# print(sp.latex(S5))
 
 
 print("-----------------------\n")
 
 print(" Export to C++ \n")
 
-# Write C++ header
-hpp_content = f"""// This file is automatically generated
-// Last update: {datetime.now().strftime("%d/%m/%Y %H:%M:%S")}
-#ifndef MMS_HPP
-#define MMS_HPP
+if (FVintegration == 1):
 
-#include <cmath>
-#include <AMReX_REAL.H>
+  print(" FV approach\n")
 
-// Exact MMS solution //
-AMREX_GPU_DEVICE AMREX_FORCE_INLINE
-void mms_exact(const amrex::Real x, const amrex::Real y, const amrex::Real z, 
-         amrex::Real& rho, amrex::Real& u, amrex::Real& v, amrex::Real& w, amrex::Real& p) {{
-rho = {cxxcode(rho, standard='C++11')};
-u = {cxxcode(u, standard='C++11')};
-v = {cxxcode(v, standard='C++11')};
-w = {cxxcode(w, standard='C++11')};
-p = {cxxcode(p, standard='C++11')};
-}}
+  # Write C++ header
+  hpp_content = f"""// This file is automatically generated
+  // Last update: {datetime.now().strftime("%d/%m/%Y %H:%M:%S")}
+  #ifndef MMS_HPP
+  #define MMS_HPP
 
-// Source terms for the Euler equations //
-AMREX_GPU_DEVICE AMREX_FORCE_INLINE
-void mms_source(const amrex::Real x, const amrex::Real y, const amrex::Real z, 
-         amrex::Real& Srho, amrex::Real& Srhou, amrex::Real& Srhov, amrex::Real& Srhow, amrex::Real& Srhoe) {{
-Srho  = {cxxcode(S1, standard='C++11')};
-Srhou = {cxxcode(S2, standard='C++11')};
-Srhov = {cxxcode(S3, standard='C++11')};
-Srhow = {cxxcode(S4, standard='C++11')};
-Srhoe = {cxxcode(S5, standard='C++11')};
-}}
+  #include <cmath>
+  #include <AMReX_REAL.H>
 
+  // Exact MMS solution //
+  AMREX_GPU_DEVICE AMREX_FORCE_INLINE
+  void mms_exact(const amrex::Real x, const amrex::Real y, const amrex::Real z, 
+         amrex::Real& rho, amrex::Real& u, amrex::Real& v, amrex::Real& w, amrex::Real& p,
+         const amrex::Real dx, const amrex::Real dy, const amrex::Real dz) {{
+  rho = {cxxcode(rhoI, standard='C++11')};
+  u = {cxxcode(uI, standard='C++11')};
+  v = {cxxcode(vI, standard='C++11')};
+  w = {cxxcode(wI, standard='C++11')};
+  p = {cxxcode(pI, standard='C++11')};
+ 
+  rho /= (dx*dy*dz);
+  u   /= (dx*dy*dz);
+  v   /= (dx*dy*dz);  
+  w   /= (dx*dy*dz);
+  p   /= (dx*dy*dz);
 
-#endif"""
+  }}
+
+  // Source terms for the Euler equations //
+  AMREX_GPU_DEVICE AMREX_FORCE_INLINE
+  void mms_source(const amrex::Real x, const amrex::Real y, const amrex::Real z, 
+         amrex::Real& Srho, amrex::Real& Srhou, amrex::Real& Srhov, amrex::Real& Srhow, amrex::Real& Srhoe,
+         const amrex::Real dx, const amrex::Real dy, const amrex::Real dz) {{
+  Srho  = {cxxcode(S1I, standard='C++11')};
+  Srhou = {cxxcode(S2I, standard='C++11')};
+  Srhov = {cxxcode(S3I, standard='C++11')};
+  Srhow = {cxxcode(S4I, standard='C++11')};
+  Srhoe = {cxxcode(S5I, standard='C++11')};
+
+  Srho  /= (dx*dy*dz);
+  Srhou /= (dx*dy*dz);
+  Srhov /= (dx*dy*dz);
+  Srhow /= (dx*dy*dz);
+  Srhoe /= (dx*dy*dz);
+
+  }}
+  #endif"""
+else:
+
+  print(" FD approach\n")
+
+  # Write C++ header
+  hpp_content = f"""// This file is automatically generated
+  // Last update: {datetime.now().strftime("%d/%m/%Y %H:%M:%S")}
+  #ifndef MMS_HPP
+  #define MMS_HPP
+
+  #include <cmath>
+  #include <AMReX_REAL.H>
+
+  // Exact MMS solution //
+  AMREX_GPU_DEVICE AMREX_FORCE_INLINE
+  void mms_exact(const amrex::Real x, const amrex::Real y, const amrex::Real z, 
+         amrex::Real& rho, amrex::Real& u, amrex::Real& v, amrex::Real& w, amrex::Real& p,
+         const amrex::Real dx, const amrex::Real dy, const amrex::Real dz) {{
+  rho = {cxxcode(rho, standard='C++11')};
+  u = {cxxcode(u, standard='C++11')};
+  v = {cxxcode(v, standard='C++11')};
+  w = {cxxcode(w, standard='C++11')};
+  p = {cxxcode(p, standard='C++11')};
+  }}
+
+  // Source terms for the Euler equations //
+  AMREX_GPU_DEVICE AMREX_FORCE_INLINE
+  void mms_source(const amrex::Real x, const amrex::Real y, const amrex::Real z, 
+         amrex::Real& Srho, amrex::Real& Srhou, amrex::Real& Srhov, amrex::Real& Srhow, amrex::Real& Srhoe,
+         const amrex::Real dx, const amrex::Real dy, const amrex::Real dz) {{
+  Srho  = {cxxcode(S1, standard='C++11')};
+  Srhou = {cxxcode(S2, standard='C++11')};
+  Srhov = {cxxcode(S3, standard='C++11')};
+  Srhow = {cxxcode(S4, standard='C++11')};
+  Srhoe = {cxxcode(S5, standard='C++11')};
+  }}
+  #endif"""
+
 
 with open("mms.h", "w") as file:
   file.write(hpp_content)

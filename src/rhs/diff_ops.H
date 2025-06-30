@@ -189,8 +189,8 @@ AMREX_GPU_DEVICE AMREX_FORCE_INLINE amrex::Real normal_diff<6>(
   using amrex::Real;
   const auto ivn = amrex::IntVect::TheDimensionVector(idir);
 
-  return (fcw6_5*q(iv + 2*ivn, comp) +  fcw6_4 * q(iv + ivn, comp) + fcw6_3 * q(iv, comp) + 
-          fcw6_2 * q(iv - ivn, comp) +  fcw6_1 * q(iv - 2 * ivn, comp)  + 
+  return (fcw6_5 * q(iv + 2 * ivn, comp) + fcw6_4 * q(iv +     ivn, comp) + fcw6_3 * q(iv, comp) + 
+          fcw6_2 * q(iv -     ivn, comp) + fcw6_1 * q(iv - 2 * ivn, comp)  + 
           fcw6_0 * q(iv - 3 * ivn, comp)) * dxinv[idir];
 }
 
@@ -259,9 +259,16 @@ tangent_diff<2>(amrex::IntVect iv, int idir, int tdir, int comp,
 {
   const auto ivn = amrex::IntVect::TheDimensionVector(idir);
   const auto ivt = amrex::IntVect::TheDimensionVector(tdir);
+
+  // const auto ivm1 = iv - ivn;
+  // const Real d2 = ccw2_1*q(iv + ivt, comp)     + ccw2_0*q(iv - ivt, comp);
+  // const Real d1 = ccw2_1*q(ivm1   + ivt, comp) + ccw2_0*q(ivm1 - ivt, comp);
+  // return( (d2*int_fcw2_1 + d1*int_fcw2_0) * dxinv[tdir]);
+
   return (q(iv + ivt, comp) - q(iv - ivt, comp) + q(iv - ivn + ivt, comp) -
-          q(iv - ivn - ivt, comp)) *
-         0.25 * dxinv[tdir];
+          q(iv - ivn - ivt, comp)) * 0.25 * dxinv[tdir];
+     
+
 }
 
 /// @brief 4th order central difference. d/d(tdir) on face normal to idir.
@@ -307,7 +314,7 @@ tangent_diff<6>(amrex::IntVect iv, int idir, int tdir, int comp,
   const auto ip2 =  iv + 2*ivn; //i + 2
   const auto ip1 =  iv +   ivn; //i + 1
   const auto im1 =  iv -   ivn; //i - 1
-  const auto im2 =  iv -   ivn; //i - 2
+  const auto im2 =  iv - 2*ivn; //i - 2
   const auto im3 =  iv - 3*ivn; //i - 3
   
 
@@ -316,28 +323,28 @@ tangent_diff<6>(amrex::IntVect iv, int idir, int tdir, int comp,
   // dqdy (at i+2) using cell-centred derivatives(using j+3,j+2,j+1,j-1,j-2,j-3)
   const Real d5 = ccw6_5 * q(ip2 + 3 * ivt, comp) + ccw6_4 * q(ip2 + 2 * ivt, comp) +
                   ccw6_3 * q(ip2 +     ivt, comp) + ccw6_2 * q(ip2 -     ivt, comp) +
-                  ccw6_1 * q(ip2 -   2*ivt, comp) + ccw6_0 * q(ip2 - 3 * ivt, comp);
+                  ccw6_1 * q(ip2 - 2 * ivt, comp) + ccw6_0 * q(ip2 - 3 * ivt, comp);
   // dqdy (at i+1) using cell-centred derivatives
   const Real d4 = ccw6_5 * q(ip1 + 3 * ivt, comp) + ccw6_4 * q(ip1 + 2 * ivt, comp) +
                   ccw6_3 * q(ip1 +     ivt, comp) + ccw6_2 * q(ip1 -     ivt, comp) +
-                  ccw6_1 * q(ip1 -   2*ivt, comp) + ccw6_0 * q(ip1 - 3 * ivt, comp);
+                  ccw6_1 * q(ip1 - 2 * ivt, comp) + ccw6_0 * q(ip1 - 3 * ivt, comp);
   // dqdy (at i)          
   const Real d3 = ccw6_5 * q(iv  + 3 * ivt, comp) + ccw6_4 * q(iv  + 2 * ivt, comp) +
                   ccw6_3 * q(iv  +     ivt, comp) + ccw6_2 * q(iv  -     ivt, comp) +
-                  ccw6_1 * q(iv  -   2*ivt, comp) + ccw6_0 * q(iv  - 3 * ivt, comp);
+                  ccw6_1 * q(iv  - 2 * ivt, comp) + ccw6_0 * q(iv  - 3 * ivt, comp);
   // dqdy (at i -1)          
   const Real d2 = ccw6_5 * q(im1 + 3 * ivt, comp) + ccw6_4 * q(im1 + 2 * ivt, comp) +
                   ccw6_3 * q(im1 +     ivt, comp) + ccw6_2 * q(im1 -     ivt, comp) +
-                  ccw6_1 * q(im1 -   2*ivt, comp) + ccw6_0 * q(im1 - 3 * ivt, comp);
+                  ccw6_1 * q(im1 - 2 * ivt, comp) + ccw6_0 * q(im1 - 3 * ivt, comp);
   // dqdy (at i -2) 
   const Real d1 = ccw6_5 * q(im2 + 3 * ivt, comp) + ccw6_4 * q(im2 + 2 * ivt, comp) +
                   ccw6_3 * q(im2 +     ivt, comp) + ccw6_2 * q(im2 -     ivt, comp) +
-                  ccw6_1 * q(im2 -   2*ivt, comp) + ccw6_0 * q(im2 - 3 * ivt, comp);
+                  ccw6_1 * q(im2 - 2 * ivt, comp) + ccw6_0 * q(im2 - 3 * ivt, comp);
 
   // dqdy (at i -3)
   const Real d0 = ccw6_5 * q(im3 + 3 * ivt, comp) + ccw6_4 * q(im3 + 2 * ivt, comp) +
                   ccw6_3 * q(im3 +     ivt, comp) + ccw6_2 * q(im3 -     ivt, comp) +
-                  ccw6_1 * q(im3 -   2*ivt, comp) + ccw6_0 * q(im3 - 3 * ivt, comp);
+                  ccw6_1 * q(im3 - 2 * ivt, comp) + ccw6_0 * q(im3 - 3 * ivt, comp);
           
   // Interpolate derivatives using face-centred weights 
   return (d5 * int_fcw6_5 + d4 * int_fcw6_4 + d3 * int_fcw6_3 + 

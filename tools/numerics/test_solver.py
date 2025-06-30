@@ -9,7 +9,7 @@ import visco_solver
 FU = sp.FU
 
 
-NavierStokes = 0  # if 1 solve Navier Stokes
+NavierStokes = 1  # if 1 solve Navier Stokes
 Model        = 2  # 0:central  1:conservative flux/FD  2:conservative flux/FV
 FiniteVolume = 1  # 0:FD      1: FV
 ErrorMeasure   = 2  # 1:L1  2:L2  otherse Loo
@@ -25,7 +25,7 @@ Cp   = gamma*Rgas / (gamma-1)
 o_Rgas = 1.0/Rgas
 
 L_oo = 1
-Re  = 100 #
+Re  = 0.01 #
 Ma = 0.1
 Pr = 0.72
 
@@ -228,19 +228,19 @@ if NavierStokes  >0:
     F2viscx = tau_xx
     F3viscx = tau_xy
     F4viscx = tau_xz
-    F5viscx = cond*sp.diff(T, x) + u*tau_xx + v*tau_xy #+ w*tau_xz
+    F5viscx = cond*sp.diff(T, x) + u*tau_xx + v*tau_xy + w*tau_xz
     # Visc Fluxes y
     F1viscy = 0
     F2viscy = tau_xy
     F3viscy = tau_yy
     F4viscy = tau_yz
-    F5viscy = cond*sp.diff(T, y) + u*tau_xy + v*tau_yy #+ w*tau_yz
+    F5viscy = cond*sp.diff(T, y) + u*tau_xy + v*tau_yy + w*tau_yz
     # Visc Fluxes z
     F1viscz = 0
     F2viscz = tau_xz
     F3viscz = tau_yz
     F4viscz = tau_zz
-    F5viscz = cond*sp.diff(T, z) + u*tau_xz + v*tau_yz #+ w*tau_zz
+    F5viscz = cond*sp.diff(T, z) + u*tau_xz + v*tau_yz + w*tau_zz
 else:
     F1viscx = 0
     F2viscx = 0
@@ -313,18 +313,8 @@ if (FiniteVolume==1):
     S3I   = sp.integrate(S3  , z_bounds, y_bounds, x_bounds)
     print(" S3 ... DONE")
     S4I   = sp.integrate(S4  , z_bounds, y_bounds, x_bounds)
-    print(" S4 ... DONE")
-
-   # S5aux = FU['TR8'](S5)
-
-    # print(" FU... DONE")
-    # print(sp.latex(S5aux ))
-
+    print(" S4 ... DONE")   
     S5I   = sp.integrate( S5, z_bounds, y_bounds, x_bounds)
-    #S5I = S5 #temp snm
-
-    #S5_simplified = sp.simplify(S5)
-    #print(sp.latex(S5_simplified)
     
     print(" S5 ... DONE")
 
@@ -334,14 +324,6 @@ if (FiniteVolume==1):
     S3I_func = sp.lambdify((x, y, z, dx, dy, dz), S3I, modules=["numpy"])
     S4I_func = sp.lambdify((x, y, z, dx, dy, dz), S4I, modules=["numpy"])
     S5I_func = sp.lambdify((x, y, z, dx, dy, dz), S5I, modules=["numpy"])
-
-    # S1I_func = sp.lambdify((x, y, z, dx, dy, dz), S1, modules=["numpy"])
-    # S2I_func = sp.lambdify((x, y, z, dx, dy, dz), S2, modules=["numpy"])
-    # S3I_func = sp.lambdify((x, y, z, dx, dy, dz), S3, modules=["numpy"])
-    # S4I_func = sp.lambdify((x, y, z, dx, dy, dz), S4, modules=["numpy"])
-    # S5I_func = sp.lambdify((x, y, z, dx, dy, dz), S5, modules=["numpy"])
-
-
 
 
 
