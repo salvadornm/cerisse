@@ -36,12 +36,22 @@ INCLUDE_LOCATIONS += $(AMR_SOLVER)/src/cls/
 VPATH_LOCATIONS   += $(AMR_SOLVER)/src/cls/
 
 # ---------   IBM  -------------------- 
-ifeq ($(USE_GPIBM),TRUE)
-  INCLUDE_LOCATIONS += $(AMR_SOLVER)/lib/install/boost/include
-  LIBRARY_LOCATIONS += $(AMR_SOLVER)/lib/install/boost/lib
+ifeq ($(USE_GPIBM),TRUE)    
+  #  default options for libray
+  BOOST_HOME ?= $(AMR_SOLVER)/lib/install/boost
+  CGAL_HOME ?= $(AMR_SOLVER)/lib/install/cgal
 
-  INCLUDE_LOCATIONS += $(AMR_SOLVER)/lib/install/cgal/include
-  LIBRARY_LOCATIONS += $(AMR_SOLVER)/lib/install/cgal/lib/cmake/CGAL
+  # BOOST and CGAL
+  INCLUDE_LOCATIONS  += $(BOOST_HOME)/include
+  LIBRARY_LOCATIONS  += $(BOOST_HOME)/lib
+  INCLUDE_LOCATIONS  += $(CGAL_HOME)/include
+  # GMP
+  INCLUDE_LOCATIONS  += $(GMP_HOME)/include
+  LIBRARY_LOCATIONS  += $(GMP_HOME)/lib
+  # MPFR
+  INCLUDE_LOCATIONS  += $(MPFR_HOME)/include
+  LIBRARY_LOCATIONS  += $(MPFR_HOME)/lib
+
 #  LIBRARIES += -lgmp
 
   include $(AMR_SOLVER)/src/ibm/Make.package

@@ -2,11 +2,11 @@
 
 # List of meshes to run
 MESH=( 
+	"8"
 	"16"
 	"32"
 	"64"
 	"128"
-	"256"
 )
 
 RUN="./main3d.gnu.ex"

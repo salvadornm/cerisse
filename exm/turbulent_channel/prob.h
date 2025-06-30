@@ -58,6 +58,8 @@ struct methodparm_t {
   static constexpr int  order = 2;                   // order numerical scheme viscous
   static constexpr Real conductivity = lambda;       // conductivity (for constant value)
   static constexpr Real viscosity    = viscos;       // viscosity    (for constant value)  
+  static constexpr bool use_LES = false;          // use LES model
+
 };
 
 struct skewparm_t {

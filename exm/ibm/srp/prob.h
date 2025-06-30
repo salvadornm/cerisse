@@ -14,6 +14,7 @@
 #include <Constants.h>
 #include <NozzleFunctions.h>
 #include <ib_walltypes.h>
+#include <numbers>
 
 using namespace amrex;
 using namespace universal_constants;
@@ -39,37 +40,34 @@ static constexpr int ibm_eorder=1;
 struct ProbParm
 { 
 
-  // freee-stream conditions  (roughly 10 km Mars entry)
-  static constexpr Real p_oo    = 284.0; //[Pa] free-stream pressure   
-  static constexpr Real T_oo    = 227.0;    //[K]  free-stream temperature 
-
-  // density, energy, speeed of sound (using script propertie.py)
-  static constexpr Real rho_oo  = 0.0065954;  // [kg/m3] 
-  static constexpr Real c_oo    = 239.720;    // [m/s]
-  static constexpr Real u_oo    = c_oo*Mach;  
-  static constexpr Real eint_oo = -8.6835e+06; // [J/kg]
-  static constexpr Real kin_oo  = 0.5*rho_oo*u_oo*u_oo;
+  //------ values obtained from ./properties.py  (SI units)---------
+  // based on Mach number 2.0 and gamma 1.334533782996543
+  // and free-stream conditions P_oo = 284.0 [Pa] and T_oo = 227.0 [K]
+  // Staganation conditions
+  static constexpr Real P0  =  2191.8913255191455 ;
+  static constexpr Real T0  =  378.8783374804305 ;
+  // Free-stream conditions
+  static constexpr Real p_oo  =  284.0 ;
+  static constexpr Real T_oo  =  227.0 ;
+  static constexpr Real rho_oo  =  0.00659535789648574 ;
+  static constexpr Real c_oo  =  239.7202778419921 ;
+  static constexpr Real u_oo  =  479.4405556839842 ;
+  static constexpr Real eint_oo  =  -8683464.706718355 ;
+  static constexpr Real kin_oo  =  758.0151887420365 ;
+  // SRP Staganation conditions
+  static constexpr Real P0srp  =  2191.8913255191455 ;
+  static constexpr Real T0srp  =  1894.3916874021525 ;
+  // SRP throat conditions (choked flow)
+  static constexpr Real Pt  =  1195.1513931292714 ;
+  static constexpr Real Tt  =  1645.445074309705 ;
+  static constexpr Real u_srp  =  855.7917341280771 ;
+  //-----------------------------------------------------------------
   
   static constexpr Real  Yco2_oo = 0.96; // 96% CO2
   static constexpr Real  Yar_oo  = 0.04; //  4% Argon
   
-  // stagnation pressure and temperature
-  static constexpr Real P0  = nozzle_functions::Pstag(p_oo,Mach,gam);
-  static constexpr Real T0  = nozzle_functions::Tstag(T_oo,Mach,gam);
-
   // centre of probe (approx)
   static constexpr Real x0 = 1.0, y0 = 2.0, z0 = 2.0;
-
-  // SRP stagnation P and T
-  static constexpr Real P0srp = P0;
-  static constexpr Real T0srp = 5.0*T0;
-  // compute conditions at throat
-  static constexpr Real Pt = nozzle_functions::Pchok(P0srp,gam_srp);
-  static constexpr Real Tt = nozzle_functions::Pchok(T0srp,gam_srp);
-  // sonic conditions at the throat
-  static constexpr Real u_srp    = sqrt(gam_srp*gas_constant*Tt/28.e-3);
-  
-
   static constexpr Real xsrp= 0.6225,ysrp = 0.75, zsrp=0.75;
   static constexpr Real Rsrp= 0.008; // nozzle radius
   static constexpr Real Asrp= std::numbers::pi*Rsrp*Rsrp;  
