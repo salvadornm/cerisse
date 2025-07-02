@@ -25,7 +25,7 @@ class viscous_t {
   ~viscous_t() {}
 
   // vars accessed by functions 
-  int order_sch=param::order;  
+  //int order_sch=param::order;  
   typedef Array1D<Real, 0, param::order> arrayNumCoef;
   arrayNumCoef CDcoef,INTcoef;
   int halfsten = param::order / 2;
@@ -246,14 +246,14 @@ class viscous_t {
 #if NUM_SPECIES > 1    
     // --------------------------------------------------------------------------
     // diffusion species  
-    Real ymass[order_sch][NUM_SPECIES],xmole[order_sch][NUM_SPECIES];
-    Real hi[order_sch][NUM_SPECIES];
+    Real ymass[param::order][NUM_SPECIES],xmole[param::order][NUM_SPECIES];
+    Real hi[param::order][NUM_SPECIES];
     Real yaux[NUM_SPECIES],xaux[NUM_SPECIES],haux[NUM_SPECIES];
 
     auto thermo = typename cls_t::multispecies_pele_gas_t();
     
     amrex::IntVect ivp(iv -halfsten*amrex::IntVect::TheDimensionVector(d1));
-    for (int l = 0; l < order_sch; l++) {
+    for (int l = 0; l < param::order; l++) {
       ivp +=  amrex::IntVect::TheDimensionVector(d1);
       for (int n = 0; n < NUM_SPECIES; ++n) { 
         yaux[n] = q(ivp,  cls_t::QFS + n); 
@@ -347,7 +347,7 @@ class viscous_t {
     Real u11,dTdn,u21,u12,u22,u31,u13,u33,muf,xif,lamf;
     
     constexpr int order_default = 2; 
-    int order_local = (close_to_wall ? order_default : order_sch);   
+    int order_local = (close_to_wall ? order_default : param::order);   
 
 #if NUM_SPECIES > 1
     Real rhoD_f[NUM_SPECIES];
@@ -419,8 +419,8 @@ class viscous_t {
 #if NUM_SPECIES > 1    
     // --------------------------------------------------------------------------
     // diffusion species  (this array should be order_local)
-    Real ymass[order_sch][NUM_SPECIES],xmole[order_sch][NUM_SPECIES];
-    Real hi[order_sch][NUM_SPECIES];
+    Real ymass[param::order][NUM_SPECIES],xmole[param::order][NUM_SPECIES];
+    Real hi[param::order][NUM_SPECIES];
     Real yaux[NUM_SPECIES],xaux[NUM_SPECIES],haux[NUM_SPECIES];
 
     auto thermo = typename cls_t::multispecies_pele_gas_t();

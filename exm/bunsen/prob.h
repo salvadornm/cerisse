@@ -136,8 +136,8 @@ struct wall_param {
 
   public:
 
-  static constexpr Real Twall = 285.5;           // wall temperature (if isothermal used)
-  static constexpr bool solve_diffwall = false;   // solve viscous effects at walls
+  static constexpr Real Twall = 800.0;           // wall temperature (if isothermal used)
+  static constexpr bool solve_diffwall = true;   // solve viscous effects at walls
   
 };
 
@@ -153,7 +153,11 @@ using ProbRHS = rhs_dt< riemann_t<false, ProbClosures>, viscous_t<methodparm_t, 
 
 // define type of wall and EBM class
 #if CNS_USE_EB    
-typedef adiabatic_wall_t<ProbClosures> TypeWall;
+
+//typedef adiabatic_wall_t<ProbClosures> TypeWall;
+
+typedef isothermal_wall_t<wall_param,ProbClosures> TypeWall;
+
 typedef ebm_t<TypeWall,wall_param,ProbClosures> ProbEB;
 #endif
 
@@ -220,6 +224,7 @@ AMREX_GPU_DEVICE AMREX_FORCE_INLINE void prob_initdata(
 
   
   // Tt  = prob_parm.T_u;
+  // Tt = 800.0; // isothermal wall
   // vxt = prob_parm.u_u;
   // Real sumrhoY = 0.0;
   // for (int n = 0; n < NUM_SPECIES; ++n) {

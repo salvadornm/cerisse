@@ -20,6 +20,11 @@ static pele::physics::transport::TransportParams<
 class transport_Pele_t {
 
   private:
+
+  // default values (not to be used)
+  Real visc_ref = 1.458e-6;
+  Real cond_ref = 2.495e-3;
+  Real xi_ref = 0.0;
   
   public:
 
@@ -33,16 +38,17 @@ class transport_Pele_t {
 
 
   // These are dummy calls, Cerisse not expected to call these functions directly using PelePhsyics
+  // WARNING !! This will cause a problem if you use EBM+PelePhysics
   AMREX_GPU_DEVICE AMREX_FORCE_INLINE Real visc(const Real& T) const {
-    return (T);
+    return (visc_ref);
   }
 
-  AMREX_GPU_DEVICE AMREX_FORCE_INLINE Real cond(Real& T) const {
-    return (T);
+  AMREX_GPU_DEVICE AMREX_FORCE_INLINE Real cond(const Real& T) const {
+    return (cond_ref);
   }
 
-  AMREX_GPU_DEVICE AMREX_FORCE_INLINE Real xi(Real& T) const {
-    return (T);
+  AMREX_GPU_DEVICE AMREX_FORCE_INLINE Real xi(const Real& T) const {
+    return (xi_ref);
   }
 
 #ifdef USE_PELEPHYSICS

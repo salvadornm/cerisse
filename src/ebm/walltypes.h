@@ -10,6 +10,9 @@
 
 #include <EBMultiFab.h>
 
+#ifdef USE_PELEPHYSICS
+#include <TransPele.h>
+#endif
 
 ////////////////////////////////////////////////////////////////////////////
 // test wall
@@ -115,7 +118,28 @@ class adiabatic_wall_t
       }   
 
       // compute viscosity at the wall
+#ifdef USE_PELEPHYSICS
+      Real mu_w,cond_w,xi_w;
+      const Real Tw = prims_w[cls_t::QT];
+      // P,rho,Y
+      //const Real P  = prims_w[cls_t::QPRES];
+      const Real rho= prims_w[cls_t::QRHO];
+      Real Y[NUM_SPECIES];
+      for (int n = 0; n < NUM_SPECIES; ++n) { Y[n] = prims_w[cls_t::QFS + n]; }
+      const bool get_xi = true, get_mu = true, get_lam = false;
+      const bool get_Ddiag = false, get_chi = false;
+      // pepelephysics 
+      auto trans = pele::physics::PhysicsType::transport();
+      trans_parms.allocate(); 
+      auto const* ltransparm = trans_parms.device_trans_parm();
+      trans.transport(get_xi, get_mu, get_lam, get_Ddiag, get_chi, Tw, rho,
+                     Y, nullptr, nullptr, mu_w, xi_w, cond_w, ltransparm);
+      mu_w = mu_w*visc_cgs2si; // convert to SI units
+#else
       Real mu_w  = cls->visc(prims_w[cls_t::QT]);
+#endif
+      // printf(" oo Adiabatic Viscous wall mu_w = %e  \n",mu_w);
+
       
       // coordinate transformation
 #if AMREX_SPACEDIM==2      
@@ -197,10 +221,33 @@ class isothermal_wall_t
       constexpr Real Tw = param::Twall;
      
       Real dTdn = (q(i,j,k,cls_t::QT) - Tw)*dis_inv;
-      // compute viscosity and conductivity at the wall      
-      Real mu_w   = cls->visc(Tw);
-      Real cond_w = cls->cond(Tw);
+      // compute viscosity and conductivity at the wall            
+#ifdef USE_PELEPHYSICS
+      Real mu_w,cond_w,xi_w;
+      // P,rho,Y
+      //const Real P  = prims_w[cls_t::QPRES];
+      const Real rho= prims_w[cls_t::QRHO];
+      Real Y[NUM_SPECIES];
+      for (int n = 0; n < NUM_SPECIES; ++n) { Y[n] = prims_w[cls_t::QFS + n]; }
+      const bool get_xi = true, get_mu = true, get_lam = true;
+      const bool get_Ddiag = false, get_chi = false;
+      // pepelephysics 
+      auto trans = pele::physics::PhysicsType::transport();
+      trans_parms.allocate(); 
+      auto const* ltransparm = trans_parms.device_trans_parm();
+      trans.transport(get_xi, get_mu, get_lam, get_Ddiag, get_chi, Tw, rho,
+                     Y, nullptr, nullptr, mu_w, xi_w, cond_w, ltransparm);
+      mu_w = mu_w*visc_cgs2si; // convert to SI units
+      cond_w = cond_w*cond_cgs2si; // convert to SI units
+     // xi_w = xi_w*visc_cgs2si; // convert to SI units                     
+#else                     
+      const Real mu_w   = cls->visc(Tw);
+      const Real cond_w = cls->cond(Tw); 
+#endif
       
+      //printf(" oo Isothermal Viscous wall mu_w = %e cond_w = %e \n",mu_w,cond_w);
+
+
       // coordinate transformation
 #if AMREX_SPACEDIM==2      
       Real a1 = r43*norm[0]*norm[0] + norm[1]*norm[1];

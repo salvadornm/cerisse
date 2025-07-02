@@ -18,9 +18,10 @@ inline void derpres(const Box& bx, FArrayBox& derfab, int dcomp, int /*ncomp*/,
 
   amrex::ParallelFor(bx, [=] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {
 
-    Real Q[cls->NPRIM],U[cls->NCONS];
+    Real Q[PROB::ProbClosures::NPRIM],U[PROB::ProbClosures::NCONS];
+
     
-    for (int n = 0; n < cls->NCONS; ++n) {
+    for (int n = 0; n < PROB::ProbClosures::NCONS; ++n) {
       U[n] = dat(i,j,k,n);
     }  
     cls->cons2prims_point(U,Q);
@@ -37,8 +38,12 @@ inline void dertemp(const Box& bx, FArrayBox& derfab, int dcomp, int /*ncomp*/,
 
   amrex::ParallelFor(bx, [=] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {
 
-    Real Q[cls->NPRIM],U[cls->NCONS];
-    for (int n = 0; n < cls->NCONS; ++n) {
+    Real Q[PROB::ProbClosures::NPRIM],U[PROB::ProbClosures::NCONS];
+
+    // GpuArray<Real, PROB::ProbClosures::NPRIM> Q;
+    // GpuArray<Real, PROB::ProbClosures::NCONS> U;
+
+    for (int n = 0; n < PROB::ProbClosures::NCONS; ++n) {
       U[n] = dat(i,j,k,n);
     }  
     cls->cons2prims_point(U,Q);

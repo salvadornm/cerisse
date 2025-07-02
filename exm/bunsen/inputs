@@ -1,8 +1,8 @@
 # Simulation time
 # start time is assumed to be 0, unless re-starting
-max_step  = 5000
+max_step  = 50000
 stop_time = 0.1
-cfl = 0.3
+cfl = 0.4
 #time_step =1e-9
 
 # Geometry 
@@ -24,7 +24,7 @@ cns.verbose          = 1    # Cerisse output    0=quiet, 1=verbose
 amr.v                = 1    # AMReX   output    0=quiet, 1=verbose
 
 # Refinement and regridding 
-amr.n_cell          = 64 768 # 4:3  64:48
+amr.n_cell          = 32 384 # 4:3  64:48
 amr.max_level       = 0     # maximum level number allowed
 amr.ref_ratio       = 2 2   # refinement ratio per level
 amr.regrid_int      = 50     # how often to regrid per level
@@ -36,7 +36,7 @@ amr.n_error_buf     = 4 4   # number of buffer cells in error est
 amr.grid_eff        = 0.8   # what constitutes an efficient grid
 
 # Plot and checkpoint
-amr.checkpoint_files_output = 0
+amr.checkpoint_files_output = 1
 amr.check_file              = chk    # root name of checkpoint file
 amr.check_int               = 20000    # number of timesteps between checkpoints
 amr.plot_files_output = 1
@@ -51,8 +51,8 @@ cns.stages_rk = 2
 eb2.eb_weight  = 1.0
 eb2.redistribution_type = "FluxRedist"
 eb2.geom_type = box
-eb2.box_lo = 0.00025 0.0000
-eb2.box_hi = 0.003  0.00061
+eb2.box_lo = 0.0004 0.0000
+eb2.box_hi = 0.003  0.0006
 eb2.box_has_fluid_inside = 0
 
 
