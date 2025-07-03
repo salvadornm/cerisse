@@ -14,7 +14,8 @@
 #include <CGAL/Polyhedron_3.h>
 // CGAL headers for AABB tree for closest point
 #include <CGAL/AABB_face_graph_triangle_primitive.h>
-#include <CGAL/AABB_traits.h>
+#include <CGAL/AABB_traits.h> // deprecated
+//#include <CGAL/AABB_traits_3.h>
 #include <CGAL/AABB_tree.h>
 #include <CGAL/Simple_cartesian.h>
 // CGAL headers for AABB tree for surface data
@@ -133,8 +134,12 @@ public:
   // std::map<face_descriptor,Vector_CGAL> fnormals;
   Vector<std::map<face_descriptor, Vector_CGAL>> fnorm_a;
 
-  // face state data map
-  // std::map<face_descriptor,surfdata> face2state;
+  // store surface data (needs to be filled)
+  Vector<std::map<face_descriptor, double>> fpressure_a;     // per geometry
+
+
+  // face state data map 
+  //std::map<face_descriptor,surfdata> face2state;
   // std::map stores information in a binary tree, it has log(N) complexity for
   // key-value pair insertion and value retrieval for a key. could also fit
   // normals into this -- however might need to modify compute_normals routine
@@ -213,7 +218,8 @@ public:
       //   for (int j = lo[1] - cls_t::NGHOST; j <= hi[1] + cls_t::NGHOST; ++j) {
       //     for (int i = lo[0] - cls_t::NGHOST; i <= hi[0] + cls_t::NGHOST; ++i) {
       amrex::LoopOnCpu(amrex::grow(bx, cls_t::NGHOST), [&](int i, int j, int k) {
-            // NOTE: ibMarkers are accessed on CPU here always. This relies on amrex.the_arena_is_managed=1 option in the inputs. TODO: remove this and transfer bool for all i for given j,k to GPU in async arrays.
+            // NOTE: ibMarkers are accessed on CPU here always. This relies on amrex.the_arena_is_managed=1 option in the inputs. 
+            // TODO: remove this and transfer bool for all i for given j,k to GPU in async arrays.
 
             // initialise to false
             ibMarkers(i, j, k, 0) = false;
@@ -448,8 +454,38 @@ void initialiseGPs(int lev) {
   });
 }
 }
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// \brief compute surface properties for each surface face
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+void compute_surface_props(int lev) {
+  for (int ii = 0; ii < ngeom; ii++) {    
+    const Polyhedron& mesh   = geom_a[ii];
+    //
+    int aux=0;
+    for (auto fd : faces(mesh)) {
+      aux++;
 
-// called per fab
+      // extract face normal norm[] <--
+
+      // compute closest fluid point i,j,k  imp_ip_ijk
+
+      // compute intrpolation weights imp_ipweights
+
+      // interpolateIMs(imp_ip_ijk,imp_ipweights,prims0,primsNormal);
+
+      // extract surface coordinates surf_xyz  <---
+
+      // wallmodel::compute_surfIB(surf_xyz,norm[ii],primsNormal,cls);   
+
+      // P = primsNormal(1,cls_t::QPRESS)
+
+      fpressure_a[ii][fd] = aux;      
+    }
+  }
+}
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// \brief computeGPs computes ghost points (GPs) for each fab
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 void computeGPs(const MFIter& mfi, const Array4<Real>& cons, const Array4<Real>& prims, const cls_t* cls, int& lev) {
   
   auto& mfab = *bmf_a[lev];
@@ -483,7 +519,6 @@ void computeGPs(const MFIter& mfi, const Array4<Real>& cons, const Array4<Real>&
     });
   //
   
-
 
   ParallelFor(ibFab.gpData.ngps, [=,copy=this] AMREX_GPU_DEVICE (int ii)
   {
@@ -544,52 +579,92 @@ void computeGPs(const MFIter& mfi, const Array4<Real>& cons, const Array4<Real>&
       Real uy =  primsNormal(0,cls_t::QV);
       Real uz =  primsNormal(0,cls_t::QW);
             
-      // ensure Thermodynamic consistency and that the prims array is filled
-      Real Q[cls->NPRIM];
+      // ensure Thermodynamic consistency and that the prims array is filled      
+      Real Q[cls_t::NPRIM];
       cls->ensurePTYfillq(P, T, Y, ux,uy,uz,Q); 
             
       // insert primitive variables into primsFab
       int i=gp_ijk[ii](0); int j=gp_ijk[ii](1); int k = gp_ijk[ii](2);
       for (int nn=0; nn<cls_t::NPRIM; nn++) {
         prims(i,j,k,nn) = Q[nn];       
-      }
-
-      //snm CHECK
-      // for (int nn=0; nn<cls_t::NPRIM; nn++) {      
-      //    Real aux = Q[nn];
-      //   if (amrex::isnan(aux) || (aux > 1e10 ) )
-      //   {
-      //   std::cout << "  ------------------------------------- \n";
-      //   std::cout << " NaN detected  in: \n";
-      //   std::cout << " i j k " << i << "," << j << "," << k << "(n=" << nn << "): " << "\n";        
-      //   std::cout << "   array:  \n";
-      //   for (int m = 0; m < cls_t::NPRIM; m++) {
-      //     std::cout << "( " << m << " )" << " = " << prims(i,j,k,m) << " \n";          
-      //   }        
-      //   std::cout << "  ------------------------------------- \n";
-      //   printf(" GP ii=%d \n ", ii);
-      //   printf(" P=%f T=%f \n ", P,T);
-      //   printf(" xyz=%f %f %f\n ",ib_xyz[ii](0),ib_xyz[ii](1),ib_xyz[ii](2) );
-
-      //   printf(" norm =%f %f %f \n",norm[ii](0),norm[ii](1),norm[ii](2));
-      //   printf(" norm =%f %f %f \n",norm[ii](0),norm[ii](1),norm[ii](2));
-      //   printf(" tan1 =%f %f %f \n",tan1[ii](0),tan1[ii](1),tan1[ii](2));
-      //   printf(" tan2 =%f %f %f \n",tan2[ii](0),tan2[ii](1),tan2[ii](2));
-      //   for (int iip=0; iip<8; iip++){
-      //   printf(" imp_ipweights(iip) =%f  \n",iip,imp_ipweights[ii](0,iip));
-      //   }
-                
-      //   for (int m = 0; m < cls_t::NPRIM; m++) {
-      //     printf(" %d GP=%f IB=%f IP=%f\n",m,primsNormal(0,m),primsNormal(1,m),primsNormal(2,m));
-      //   }
-      //   amrex::Abort();
-      //   }
-      // }
-      // snm
-
+      }      
     });
 };
 
+
+  ////////////////////////////////////////////////////////////////
+  //  \brief plot surface mesh to file
+  //  \param igeom geometry index
+  //  \param filename output file name
+  //  \note uses CGAL Polygon_mesh_processing IO functions
+  void plot_surface(const int igeom, const std::string& filename) {
+    const Polyhedron& mesh   = geom_a[igeom];
+    const auto& face_normals = fnorm_a[igeom];
+
+    std::ofstream out(filename);
+    out << "# vtk DataFile Version 3.0\n";
+    out << "CGAL Polyhedron\n";
+    out << "ASCII\n";
+    out << "DATASET POLYDATA\n";
+
+    // Step 1: Write vertices
+    std::map<Polyhedron::Vertex_const_handle, int> vmap;
+    int vidx = 0;
+    out << "POINTS " << mesh.size_of_vertices() << " float\n";
+    for (auto vit = mesh.vertices_begin(); vit != mesh.vertices_end(); ++vit) {
+        const auto& p = vit->point();
+        out << p.x() << " " << p.y() << " " << p.z() << "\n";
+        vmap[vit] = vidx++;
+    }
+
+    // Step 2: Write faces
+    int num_faces = mesh.size_of_facets();
+    out << "POLYGONS " << num_faces << " " << num_faces * 4 << "\n";
+    for (auto fit = mesh.facets_begin(); fit != mesh.facets_end(); ++fit) {
+        auto h = fit->halfedge();
+        out << "3 "
+            << vmap[h->vertex()]
+            << " " << vmap[h->next()->vertex()]
+            << " " << vmap[h->next()->next()->vertex()] << "\n";
+    }
+
+    out << "CELL_DATA " << num_faces << "\n";
+    
+    // Step 3: Write surfdata as CELL_DATA
+    // out << "VECTORS face_normals float\n";
+    // for (auto fit = mesh.facets_begin(); fit != mesh.facets_end(); ++fit) {
+    //   auto it = face_normals.find(*fit);
+    //   if (it != face_normals.end()) {
+    //     const auto& n = it->second;
+    //     out << n.x() << " " << n.y() << " " << n.z() << "\n";
+    //   } else {
+    //     out << "0.0 0.0 0.0\n";  // or some fallback value
+    //   }
+    // }
+
+    // SCALAR: face area
+    // out << "SCALARS face_area float 1\n";
+    // out << "LOOKUP_TABLE default\n";
+    // for (auto fit = mesh.facets_begin(); fit != mesh.facets_end(); ++fit) {
+    //   double area = PMP::face_area(*fit, mesh);
+    //   out << area << "\n";
+    // }
+
+    // SCALAR: pressure (are filled in compute surf_prop)
+    const auto& face_pressure = fpressure_a[igeom];
+    out << "SCALARS pressure float 1\n";
+    out << "LOOKUP_TABLE default\n";    
+    for (auto fd : faces(mesh)) {      
+      out << fpressure_a[igeom][fd] << "\n";
+    }
+
+
+    out.close();
+    amrex::Print() << "----------------------------------\n";
+    amrex::Print() << "Surface mesh plotted to " << filename << "\n";
+    amrex::Print() << "----------------------------------\n";
+  }
+  //////////////////////////////////////////////////////////////////
 
 private:
     // Taylor expansion around IB point (only up to QLS)
@@ -799,6 +874,10 @@ private:
     eib_t::tree_pa.resize(ngeom);
     eib_t::fnorm_a.resize(ngeom);
     eib_t::inout_fa.resize(ngeom);
+    
+    // surface properties P,T
+    eib_t::fpressure_a.resize(ngeom);
+
 
     namespace PMP = CGAL::Polygon_mesh_processing;
     Print() << "----------------------------------" << std::endl;
@@ -842,14 +921,16 @@ private:
       //   // std::cout << "face plane " << f->plane() << "\n";
       // }
 
-      // create face to surfdata map //
+      // create face to surfdata map //  SNM
       // auto map = boost::make_assoc_property_map(face2state);
-      // for(face_descriptor f : faces(geom))
-      // {
-      //   surfdata data;
-      //   put(map, f, data);
-      //   // std::cout << "face plane" << f->plane() << "\n";
-      // }
+      //  for(face_descriptor f : faces(geom))
+      //  {
+      //    surfdata data;
+      //    put(map, f, data);
+      //    // std::cout << "face plane" << f->plane() << "\n";
+      //  }
+      // SNM
+
     }
     Print() << "----------------------------------" << std::endl;
     Print() << "----------------------------------" << std::endl;
@@ -864,6 +945,7 @@ private:
       Polyhedron::Plane_3(h->opposite()->vertex()->point(), h->vertex()->point(),
                           h->next()->vertex()->point());
   };
+
 
 };
 #endif

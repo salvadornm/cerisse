@@ -996,7 +996,15 @@ void CNS::writePlotFilePost(const std::string &dir, std::ostream &os) {
   // IBM::ib.computeSurf(this->level); // computed at each level. From low to
   // high. Print() << "Computed surface data" << std::endl;
 
-  // Print() << "Writing surface data" << std::endl;
+  if (plot_surf){
+
+    Print() << "Computing surface properties" << std::endl;
+    IBM::ib.compute_surface_props(this->level); // computed at each level. From low to high.
+
+    Print() << "Writing surface data" << std::endl;
+    IBM::ib.plot_surface(0,"surf.vtk"); 
+  }
+
   // if (ioproc=0) ib.writeSurf()
   // }
 #endif
