@@ -28,14 +28,14 @@ using namespace amrex;
 
 namespace PROB {
 
-typedef closures_dt<indicies_t, visc_suth_t,cond_suth_t ,  multispecies_pele_gas_t<indicies_t>> ProbClosures;
+typedef closures_dt<indicies_t, transport_Pele_t , multispecies_pele_gas_t<indicies_t>> ProbClosures;
 
 // problem parameters 
 
 struct ProbParm {  
   // inflow state for initialisation
   //const Real p_inflow    = pres_atm2si; //[Pa] inflow pressure (1 atm)  
-  const Real T_inflow    = 291.7;  //[K]  
+  const Real T_inflow    = 285.5; //[K]  
   Real Y_inflow[NUM_SPECIES] = {1.0};
   ProbClosures pp_pc;
 
@@ -65,7 +65,6 @@ struct ProbParm {
   
   // inside combustor state/exit
   const Real p_0     = pres_atm2si; //[Pa] inflow pressure (1 atm) 
-  const Real p_bc    = p_0;
   const Real T_0     = 285.5;  //[K]  
   Real rho_0, eint_0;
 
@@ -161,6 +160,7 @@ prob_initdata(int i, int j, int k, Array4<Real> const &state,
   for(int idim=0;idim < AMREX_SPACEDIM;idim++) {u[idim]=prob_parm.vel_0[idim];}
   eint =  prob_parm.eint_0;
 
+  /**
   const Real r = sqrt(x*x + y*y + (z-0.1)*(z-0.1));
   if (r< 0.01)
   {   
@@ -168,7 +168,8 @@ prob_initdata(int i, int j, int k, Array4<Real> const &state,
     cls.PYT2R(prob_parm.p_0,y_sp, Tspark, rhot);
     cls.RYP2E(rhot, y_sp, prob_parm.p_0, eint); 
   }
-  
+  */
+
   Real kin = Real(0.5) * rhot * (u[0] * u[0] + u[1] * u[1] + u[2]*u[2]);
   //state(i, j, k, cls.URHO) = rhot;
   state(i, j, k, cls.UMX)  = rhot * u[0];
@@ -197,20 +198,20 @@ bcnormal(const Real x[AMREX_SPACEDIM], Real dratio, const Real s_int[ProbClosure
       break;
       }
     case  2:  // SOUTH
-      GlobalBC::bc_fixP(0.0,1.0,0.0,&closures,prob_parm.p_bc, s_int, s_ext); 
+      GlobalBC::bc_fixP(0.0,1.0,0.0,&closures,prob_parm.p_0, s_int, s_ext); 
       break;
     case  1:  // WEST
-      GlobalBC::bc_fixP(1.0,0.0,0.0,&closures,prob_parm.p_bc, s_int, s_ext); 
+      GlobalBC::bc_fixP(1.0,0.0,0.0,&closures,prob_parm.p_0, s_int, s_ext); 
       break;
     case -1:  // EAST
-      GlobalBC::bc_fixP(-1.0,0.0,0.0,&closures,prob_parm.p_bc, s_int, s_ext);  
+      GlobalBC::bc_fixP(-1.0,0.0,0.0,&closures,prob_parm.p_0, s_int, s_ext);  
       break;
     case -2:  // NORTH
-      GlobalBC::bc_fixP(-1.0,0.0,0.0,&closures,prob_parm.p_bc, s_int, s_ext); 
+      GlobalBC::bc_fixP(-1.0,0.0,0.0,&closures,prob_parm.p_0, s_int, s_ext); 
       break;
     case -3:   //RIGHT 
       {
-      GlobalBC::bc_fixP(0.0,0.0,-1.0,&closures,prob_parm.p_bc, s_int, s_ext);  
+      GlobalBC::bc_fixP(0.0,0.0,-1.0,&closures,prob_parm.p_0, s_int, s_ext);  
 
       //GlobalBC::bc_subsonic_outflow_fixP(0.0,0.0,-1.0,&closures,prob_parm.p_0, s_int, s_ext);  
       break;  
@@ -256,7 +257,7 @@ user_tagging(int i, int j, int k, int nt_level, auto &tagfab,
   switch (level)
   {
     case 0:
-      refine = (z < prob_parm.zexit) && (r < 0.025) ;    // refine combustor    
+      //refine = (z < prob_parm.zexit) && (r < 0.025) ;    // refine combustor    
       break;
     case 1:
       //refine= (z > 0.035) && (z < 0.07);
@@ -312,7 +313,7 @@ class user_source_t {
       const Real tau_relax = 100.0*dt; 
       const Real coef =dt/tau_relax;
 
-      const Real dP = (prob_parm.p_bc- prims(i,j,k,cls.QPRES))*coef;
+      const Real dP = (prob_parm.p_0- prims(i,j,k,cls.QPRES))*coef;
     
       const Real T = prims(i,j,k,cls.QT); // dT =0
       const Real rho  = prims(i, j, k, cls.QRHO);

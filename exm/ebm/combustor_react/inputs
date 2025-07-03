@@ -10,8 +10,8 @@ cns.stages_rk = 2
 # Geometry 
 geometry.is_periodic = 0 0 0
 geometry.coord_sys   = 0  
-geometry.prob_lo     = -0.045 -0.045  0.0   
-geometry.prob_hi     =  0.045  0.045  0.18        
+geometry.prob_lo     = -0.04 -0.04  0.0   
+geometry.prob_hi     =  0.04  0.04  0.19        
 
 # BC
 cns.lo_bc = 1 1 1
@@ -24,7 +24,7 @@ cns.verbose       = 1 # 0=quiet, 1=verbose
 amr.v             = 1 # 0=quiet,1= verbose
 
 # Refinement and regridding 
-amr.n_cell            = 80 80 160 
+amr.n_cell            = 80 80 190 
 amr.max_level         = 0      # maximum level number allowed
 amr.ref_ratio         = 2      # refinement ratio per level
 amr.regrid_int        = 50     # how often to regrid per level
@@ -38,11 +38,11 @@ amr.grid_eff          = 0.7    # what constitutes an efficient grid
 
 # Plot and checkpoint
 amr.checkpoint_files_output = 1
-amr.check_file              = chk     # root name of checkpoint file
+amr.check_file              = ./reactornull/chk     # root name of checkpoint file
 amr.check_int               = 5000   # number of timesteps betw.  checkpoints
 #amr.restart = chk05000
 amr.plot_files_output = 1
-amr.plot_file         = plot/plt    # root name of plotfile
+amr.plot_file         = ./reactornull/plt    # root name of plotfile
 amr.plot_int          = 50           # number of timesteps between plotfiles
 amr.derive_plot_vars  = pressure velocity temperature
 
@@ -62,7 +62,8 @@ eb2.redistribution_type = "FluxRedist"
 #PressurePoint.box_hi = 0.001 0.001 0.13
 
 # Chemical Options
-cns.reactor_type = "ReactorCvode"
+cns.reactor_type = "ReactorNull"
+#cns.reactor_type = "ReactorCvode"
 cvode.solve_type =  "dense_direct"
 ode.clean_init_massfrac = 1
 
