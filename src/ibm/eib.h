@@ -135,8 +135,12 @@ public:
   Vector<std::map<face_descriptor, Vector_CGAL>> fnorm_a;
 
   // store surface data (needs to be filled)
-  Vector<std::map<face_descriptor, double>> fpressure_a;     // per geometry
-
+  Vector<std::map<face_descriptor, double>> fpressure_a;      // per geometry
+  Vector<std::map<face_descriptor, double>> ftemperature_a;   
+  Vector<std::map<face_descriptor, double>> fheat_a;  
+  Vector<std::map<face_descriptor, double>> fstress_a;   
+  Vector<std::map<face_descriptor, int>> fill_point_a;   
+  
 
   // face state data map 
   //std::map<face_descriptor,surfdata> face2state;
@@ -457,31 +461,116 @@ void initialiseGPs(int lev) {
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // \brief compute surface properties for each surface face
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-void compute_surface_props(int lev) {
-  for (int ii = 0; ii < ngeom; ii++) {    
-    const Polyhedron& mesh   = geom_a[ii];
-    //
-    int aux=0;
-    for (auto fd : faces(mesh)) {
-      aux++;
+void compute_surface_props(MultiFab& stateprops,const cls_t* cls,int lev) {
+  
 
-      // extract face normal norm[] <--
+  // loop over mfi
+  auto& mfab = *bmf_a[lev];
+  GpuArray<Real, AMREX_SPACEDIM> prob_lo = amr_p->Geom(lev).ProbLoArray();
+  for (MFIter mfi(mfab, false); mfi.isValid(); ++mfi) { 
+    
+    const int ifab= mfi.index();
+    auto& ibFab = mfab.get(mfi);                
+    const Box& bx = mfi.tilebox();
+    const Box& bxg = mfi.growntilebox(cls_t::NGHOST);
+    auto const ibMarkers = mfab.array(mfi);  // boolean array
 
-      // compute closest fluid point i,j,k  imp_ip_ijk
+    // pointer to  U
+    Array4<Real> const& cons = stateprops.array(mfi);
+    // primitives array (store a local copy)
+    FArrayBox primf(bxg, cls_t::NPRIM, The_Async_Arena());
+    Array4<Real> const& prims= primf.array();
+    // convert to Q
+    cls->cons2prims(mfi, cons, prims); //<--------------------
 
-      // compute intrpolation weights imp_ipweights
+    for (int ii = 0; ii < ngeom; ii++) {    
+      const Polyhedron& mesh   = geom_a[ii];
+    
+      // aux vars
+      Real qgradient[cls_t::NPRIM];         
+      int aux=0;
+      
+      // loop over the faces of geometry
+      for (auto fd : faces(mesh)) {
+        aux++;
 
-      // interpolateIMs(imp_ip_ijk,imp_ipweights,prims0,primsNormal);
+        fill_point_a[ii][fd] = 0; // surface point not calculated
 
-      // extract surface coordinates surf_xyz  <---
+        // extract face normal norm
+        Array1D<Real, 0, AMREX_SPACEDIM - 1> norm = {
+                fnorm_a[ii][fd][0], fnorm_a[ii][fd][1],
+                fnorm_a[ii][fd][2]};
 
-      // wallmodel::compute_surfIB(surf_xyz,norm[ii],primsNormal,cls);   
+        // extract face center point
+        Point face_center = CGAL::centroid(fd->halfedge()->vertex()->point(), 
+                                         fd->halfedge()->next()->vertex()->point(),
+                                         fd->halfedge()->next()->next()->vertex()->point());
+                                         
+        Array1D<Real, 0, AMREX_SPACEDIM - 1> ib_xyz = {face_center[0],face_center[1],face_center[2]};
 
-      // P = primsNormal(1,cls_t::QPRESS)
+        // find closest fluid point i,j,k  to the face_center
+        const int i = int((face_center.x() - amr_p->Geom(lev).ProbLo()[0]) / dx_a[lev][0] - 0.5_rt);
+        const int j = int((face_center.y() - amr_p->Geom(lev).ProbLo()[1]) / dx_a[lev][1] - 0.5_rt);
+        const int k = int((face_center.z() - amr_p->Geom(lev).ProbLo()[2]) / dx_a[lev][2] - 0.5_rt);
 
-      fpressure_a[ii][fd] = aux;      
-    }
-  }
+        // is the face inside the domain?
+        const bool is_inside = amr_p->Geom(lev).Domain().contains(i, j, k);
+
+        if (!is_inside) {
+          amrex::Print() << "closest point to face center outside domain at level " << lev;
+          amrex::Abort();
+        }
+         
+        
+
+        // check if the point is inside the fab
+        if (bx.contains(i, j, k)) {          
+          // compute intrpolation weights imp_ipweights
+          Array2D<Real, 0, eorder_tparm - 1, 0, AMREX_SPACEDIM - 1> imp_xyz;
+          Array2D<int, 0, eorder_tparm - 1, 0, AMREX_SPACEDIM - 1> imp_ijk;
+
+          // find mirror point and the bottom left point closest to the image
+          Real o_dis = 0.0;
+          const int jj = 0;
+          for (int kk = 0; kk < AMREX_SPACEDIM; kk++) {
+            imp_xyz(jj, kk) = face_center[kk] + Real(jj + 1) * di_a[lev] * norm(kk);
+            imp_ijk(jj, kk) = floor((imp_xyz(jj, kk) - prob_lo[kk]) / dx_a[lev][kk] - 0.5_rt);        
+            o_dis += (face_center[kk] - imp_xyz(jj, kk))*(face_center[kk] - imp_xyz(jj, kk));
+          }                  
+          o_dis = 1.0/sqrt(o_dis);
+
+          // Interpolation points' (ips) weights for each image point
+          Array2D<Real,0,eorder_tparm-1,0,7> ipweights;
+          Array3D<int,0,eorder_tparm-1,0,7,0,AMREX_SPACEDIM-1> ip_ijk;
+          computeIPweights(ipweights,ip_ijk,imp_xyz, imp_ijk, prob_lo, dx_a[lev], ibMarkers);
+                                
+    
+          Array2D<Real,0,eorder_tparm+1,0,cls_t::NPRIM-1> primsNormal={0.0};
+ 
+          interpolateIMs(ip_ijk,ipweights,prims,primsNormal);
+    
+          wallmodel::compute_surfIB(ib_xyz,norm,primsNormal,cls);   
+
+          // compute one-sided gradients dT/dn du/dn
+          Real dTdn = (primsNormal(2,cls_t::QT) - primsNormal(1,cls_t::QT))*o_dis;
+
+          // store values
+          fpressure_a[ii][fd] = primsNormal(1,cls_t::QPRES); 
+          ftemperature_a[ii][fd]= primsNormal(1,cls_t::QT);
+
+          fill_point_a[ii][fd] = 1; // point calculated (RECHeCK THIS) -------
+ 
+        }
+
+        
+
+      } //end loop faces
+      
+      //ftemp_a[ii][fd] = qsurface[cls_t::QT];
+      //ftemp_a[ii][fd] = dTdn;
+
+    } //end loop geometry 
+  } // end looping mfi
 }
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // \brief computeGPs computes ghost points (GPs) for each fab
@@ -651,12 +740,26 @@ void computeGPs(const MFIter& mfi, const Array4<Real>& cons, const Array4<Real>&
     // }
 
     // SCALAR: pressure (are filled in compute surf_prop)
-    const auto& face_pressure = fpressure_a[igeom];
+   // const auto& face_pressure = fpressure_a[igeom];
     out << "SCALARS pressure float 1\n";
     out << "LOOKUP_TABLE default\n";    
     for (auto fd : faces(mesh)) {      
       out << fpressure_a[igeom][fd] << "\n";
     }
+    //const auto& face_temperature = fpressure_a[igeom];
+    out << "SCALARS temperature float 1\n";
+    out << "LOOKUP_TABLE default\n";    
+    for (auto fd : faces(mesh)) {      
+      out << ftemperature_a[igeom][fd] << "\n";
+    }
+
+    //const auto& face_calc =filled_point_a[igeom];
+    out << "SCALARS calculated int 1\n";
+    out << "LOOKUP_TABLE default\n";    
+    for (auto fd : faces(mesh)) {      
+      out << fill_point_a[igeom][fd] << "\n";
+    }
+
 
 
     out.close();
@@ -875,8 +978,15 @@ private:
     eib_t::fnorm_a.resize(ngeom);
     eib_t::inout_fa.resize(ngeom);
     
-    // surface properties P,T
+    // surface properties P,T,heat,stress
     eib_t::fpressure_a.resize(ngeom);
+    eib_t::ftemperature_a.resize(ngeom);
+    eib_t::fheat_a.resize(ngeom);
+    eib_t::fstress_a.resize(ngeom);
+    eib_t::fill_point_a.resize(ngeom);
+    
+    
+    
 
 
     namespace PMP = CGAL::Polygon_mesh_processing;

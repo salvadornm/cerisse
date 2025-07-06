@@ -157,6 +157,9 @@ void CNS::read_params() {
   if (!ppib.query("plot_surf", plot_surf)) {
     amrex::Abort("ib.plot_surf not specified (0=false, 1=true)");
   }
+
+  // name surface plot
+
 #endif
   
 #if CNS_USE_EB 
@@ -232,8 +235,6 @@ void CNS::initData() {
   PROB::ProbParm const *lprobparm = d_prob_parm;
 
   //amrex::Print( ) << "  calling  prob_init in prob.h ...  " << std::endl; 
-
-  // SNM: placeholder to initialise with random variables the flow field   
 
   // Initialise problem by calling user-given prob.h
 #if USE_UTILITY
@@ -998,8 +999,13 @@ void CNS::writePlotFilePost(const std::string &dir, std::ostream &os) {
 
   if (plot_surf){
 
+    Print() << "Extract Sdata " << std::endl;
+    
+    MultiFab& Sdata = get_new_data(State_Type);
+    const PROB::ProbClosures* cls_d = CNS::d_prob_closures;
+
     Print() << "Computing surface properties" << std::endl;
-    IBM::ib.compute_surface_props(this->level); // computed at each level. From low to high.
+    IBM::ib.compute_surface_props(Sdata,cls_d,this->level); // computed at each level. From low to high.
 
     Print() << "Writing surface data" << std::endl;
     IBM::ib.plot_surface(0,"surf.vtk"); 
