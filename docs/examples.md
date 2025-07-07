@@ -1,10 +1,10 @@
 # Examples
 
-In the `exm/` folder, you will find several tests designed to compare numerical schemes, solution and in general validation and verification. These tests can also serve as prototypes for setting up more complex cases. While they generally run at a slower pace, they can be used for verifying the accuracy of the schemes and for benchmarking against test cases from the literature. Some of the examples use chemistry or in-line diagnostics (such as probes or statistics), or geometry (IBM or EB).\
-There are many more examples in the folder than the ones listed here.\
-However, they may habe not been tested thoroughy.\
-Check the `./checkcompilation.sh` example list script to see\
-which examples compile and build.
+The `exm/` folder contains a variety of test cases designed for comparing numerical schemes, validating solutions, and supporting general verification and validation efforts. These examples can also serve as prototypes for setting up more complex simulations. While they typically run at a slower pace, they are useful for assessing the accuracy of numerical methods and benchmarking against reference cases from the literature.
+
+Some examples include chemistry, in-line diagnostics (e.g., probes or statistical outputs), or geometric features such as immersed boundary methods (IBM) or embedded boundaries (EB).
+
+Note that the folder contains more examples than are listed here, but not all have been thoroughly tested. To check which examples compile successfully, run the `./checkcompilation.sh` script in `./bin`.
 
 ## One Dimensional Examples
 
@@ -16,10 +16,10 @@ which examples compile and build.
 
 ## Three Dimensional Examples
 
-| Example                              | Folder         | Notes        | Notes                                      |
-| ------------------------------------ | -------------- | ------------ | ------------------------------------------ |
-| MMS                                  | `mms/euler3d`  | ALL          | Probe                                      |
-| _Taylor-Green Vortex_                | `numerics/tgv` | Skew         | Probe                                      |
-| _Turbulent Channel_                  | `turbulent`    | Skew         |                                            |
-| Sphere under supersonic flow         | `ibm/sphere`   | Skew/Rusanov | [IBM](theory/ibmeb.md#immersed-boundaries) |
-| Probe under supersonic flow with SRP | `ibm/srp`      | Riemann      | IBM (generic BC), Chemistry (manual)       |
+| Example                                                                        | Folder         | Numerics     | Notes                                      |
+| ------------------------------------------------------------------------------ | -------------- | ------------ | ------------------------------------------ |
+| [MMS](threedim.md#mms)                                                         | `mms/navsto3d` | Various      | Order convergence                          |
+| _Taylor-Green Vortex_                                                          | `numerics/tgv` | Skew         | Probe                                      |
+| _Turbulent Channel_                                                            | `turbulent`    | Skew         |                                            |
+| Sphere under supersonic flow                                                   | `ibm/sphere`   | Skew/Rusanov | [IBM](theory/ibmeb.md#immersed-boundaries) |
+| [Probe under supersonic flow with SRP](threedim.md#supersonic-retropropulsion) | `ibm/srp`      | Riemann      | IBM (generic BC), Chemistry (manual)       |

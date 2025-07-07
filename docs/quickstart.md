@@ -1,20 +1,6 @@
 ---
 cover: .gitbook/assets/cover2.png
 coverY: 0
-layout:
-  cover:
-    visible: true
-    size: full
-  title:
-    visible: true
-  description:
-    visible: true
-  tableOfContents:
-    visible: true
-  outline:
-    visible: true
-  pagination:
-    visible: true
 ---
 
 # QuickStart
@@ -44,13 +30,13 @@ The code can be obtained in the usual way
 
 ### Pre-requisites
 
-1. **C++ compiler** A compiler with [C++17](https://en.wikipedia.org/wiki/C%2B%2B17) standard is required. Examples include **gcc > 8**. Beware that the **clang** compiler (MacOS) is not supported.
+1. **C++ compiler** A compiler with C++20 standard is required. Examples include **gcc version 8** and above  and **Clang  version  10** and above (both compilers may need `-std=c++20` flag)
 2. **GNU Makefile** It will usually be installed by default in most systems (MacOS/Linux)
 3. **MPI libraries** (optional) required for parallel simulations. Similarly CUDA/OpenMPI may be required for more advanced parallelization strategies.
 4. **cmake** (optional) required for some installation options, mostly related to GPU and chemistry. Easy to install, version required **>3.2**
 5. **AMReX** AMR libraries [AMREX](https://amrex-codes.github.io/amrex/) This is the AMR library that controls grid generation/IO/parallelization. Required for the code, see [Installation AMREX and PelePhysics](quickstart.md#installation-amrex-and-pelephysics)
-6. **PelePhysics** Is a repository of physics databases [PelePhysics](https://github.com/AMReX-Combustion/PelePhysics) It is required for complex chemistry and transport properties. Includig stiff chemcial sytems integration. It also has, spray , soot and radiation modules as well as many support utilities for Pele suite of codes that can also be used in Cerisse. To install see [Installation AMREX and PelePhysics](quickstart.md#installation-amrex-and-pelephysics) If the chemistry solvers are used, the **SUNDIAL** library will need to be installed as well [Installation SUNDIALS](quickstart.md#installation-sundials)
-7. **CGAL** This is the Computational Geometry Algorithms Library [CGAL](https://www.cgal.org), required to do the needed geometric computation in the case of immersed boundaries. To install see [Installation CGAL](quickstart.md#installation-cgal)
+6. **PelePhysics** (optional)  Is a repository of physics databases [PelePhysics](https://github.com/AMReX-Combustion/PelePhysics) It is required for complex chemistry and transport properties. Includig stiff chemcial sytems integration. It also has, spray , soot and radiation modules as well as many support utilities for Pele suite of codes that can also be used in Cerisse. To install see [Installation AMREX and PelePhysics](quickstart.md#installation-amrex-and-pelephysics) If the chemistry solvers are used, the **SUNDIAL** library will need to be installed as well [Installation SUNDIALS](quickstart.md#installation-sundials)
+7. **CGAL** (optional) This is the Computational Geometry Algorithms Library [CGAL](https://www.cgal.org), required to do the needed geometric computation in the case of [immersed boundaries](theory/ibmeb.md#immersed-boundaries). To install see [Installation CGAL](quickstart.md#installation-cgal)
 8. **Visualization** Cerisse/AMREx/PeleC format is supported by [VisIt](https://visit-dav.github.io/visit-website/), [Paraview](https://www.paraview.org), [yt](https://yt-project.org) (allows Python) and check for more options [AMReX Visualization](https://amrex-codes.github.io/amrex/docs_html/Visualization.html)
 
 #### Installation AMREX and PelePhysics
@@ -62,30 +48,45 @@ $ cd cerisse/lib/
 $ ./install.sh safe
 ```
 
-It will connect to Github and download the required packages. `$ ./install git`, will install latest release commit in the **development** branch of AMReX. The install **safe** option will install version **23.11** of **AMReX** and **23.03** of **PelePhysics**. Downloads are fast with 27 and 30 M respectively. All installation files will live under `./lib`
+It will connect to Github and download the required packages. `$ ./install git`, will install latest release commit in the **development** branch of AMReX. The install **safe** option will install versions\
+&#x20;**23.11** of **AMReX** and **23.03** of **PelePhysics**. Downloads are fast with 27 and 30 Mb respectively. All installation files will live under `cerisse/lib`
+
+{% hint style="danger" %}
+Note that the latest version may not yet be fully compatible.
+{% endhint %}
 
 #### Installation CGAL
 
-To install CGAL libraries go to folder
+There are two ways to  install CGAL libraries. \
+In **Linux systems** go to folder
 
 ```bash
 $ cd cerisse/lib/
-$ ./install.sh test
-$ ./install.sh cgal
+$ ./install.sh cgal download
+$ ./install.sh cgal install
 ```
 
-This will install **5.6.1** CGAL version as well as **boost** folder. All installation files will live under `./lib`.
+This will install the **CGAL** version **6.0.1** as well as [**BOOST**](https://www.boost.org/)  version **1.81.0**. All installation files will live under `cerisse/lib`.
+
+Alternatively, CGAL may have already been installed in the machine. For example in MacOS  using  [homebrew](https://brew.sh/)
+
+```bash
+$ brew install boost
+$ brew install cgal
+```
+
+The key idea is that the Boost and CGAL libraries must be compatible with the compiler used to build the code. Installing CGAL via Homebrew on macOS defaults to the Clang compiler, so Cerisse should also be compiled using Clang to ensure compatibility.
 
 #### Installation SUNDIALS
 
-SUNDIALS is a libary of differential and algebraic equation solvers used by PelePhysics for CVODE to integrate the chemistry. To install go to an example involving chemistry (`tst/test2`) and execute
+SUNDIALS is a libary of differential and algebraic equation solvers used by PelePhysics for CVODE to integrate the chemistry. To install go to an example involving chemistry (for example `tst/test2`) and execute
 
 ```bash
 $ cd tst/test2
 $ make TPL
 ```
 
-This will download and install version **6.5** if not present. Sundials cannot be installed before compiling as some options (such as GPU) require re-compiling. All sundials files will live under `./lib`.
+This will download and install version **6.5** if not present. Sundials cannot be installed before compiling as some options (such as GPU) require re-compiling. All sundials files will live under`cerisse/lib`.
 
 ## Quick Example
 
@@ -103,8 +104,7 @@ The directory contains the following files
 
 ```bash
 $ ls
-GNUmakefile	    README.md	inputs		prob.h
-Make.package	exact.dat	plot.py
+exact.dat	GNUmakefile	inputs		prob.h
 ```
 
 A detailed explanation of the files is in tutorial [Tutorial](tutorial.md), but basically `inputs` is the simulation control file (mesh size, number of steps, etc...), while `prob.h` determines the problem to solve.
@@ -185,4 +185,4 @@ which should show something like
 
 ![test1plot](images/test1.png)
 
-You need to have the Python module **yt** installed Check [Tips](tips.md) for installation. For a more in-depth check the [Tutorial](tutorial.md)
+You need to have the Python module **yt** installed to visualise this. Refer to the [Tips](tips.md) section for  installation guidance . For a more in-depth walkthrough, see  the [Tutorial](tutorial.md)

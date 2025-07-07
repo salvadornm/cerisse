@@ -6,12 +6,7 @@ icon: cube
 
 ## MMS
 
-Similar to the [1D case](onedim.md#mms), there are several examples, located under `exm/mms`
-
-### Subsonic Euler
-
-Located in `exm/mms/euler3d`. The selected solution is steady and does not depend on time.\
-The selected solution is sub-sonic with small pressure variations. The average Mach number is **0.51** and with maximum fluctuations of density and pressure of 0.228 and 0.003. The exact solution is:
+Similar to the [1D case](onedim.md#mms), where an artifiical solution is created and appropriate source terms are generated. The  examples are all located under `exm/mms/navsto3d` Euler and Navier-Stokes  simulatiosn are run by selecting the appropiate options in the generation of the source terms and equations. The selected solution is sub-sonic with small pressure variations. The exact solution is:
 
 $$
 \rho = 0.1 \sin{\left(2 \pi x \right)} + 0.2 \sin{\left(6 \pi z \right)} + 0.15 \cos{\left(2 \pi y \right)} + 1.16
@@ -65,45 +60,25 @@ For example in the `src( ..)` function:
        });
 ```
 
-The numerical solution is compared after a single time step using a small CFL number of 0.01 to minimize temporal errors. Since the exact solution is time-independent, any observed error arises solely from the spatial discretization.
+The numerical solution is compared after a single time step using a fixed very small time-step to minimize temporal errors. Since the exact solution is time-independent, any observed error arises solely from the spatial discretization.
 
 The L2 error in the density field is used to assess the accuracy of each scheme. A local script, `checkorder.sh`, is provided to automate the generation of solution directories and convergence plots. It runs simulations on meshes with 16, 32, 64, and 128 grid points. The estimated order of convergence can be obtained by
 
 ```bash
-$ python python checkorder.py
+$ python checkorder.py
 ```
 
-The order of 14 different numerical schemes in Cerisse is shown in Table 1
+<figure><img src=".gitbook/assets/Eulermms3d_diffschemes.png" alt=""><figcaption><p>Convergence plots comparing three different numerical schemes for solving the Euler equations.</p></figcaption></figure>
 
-| Scheme    | Order | Absolute L2 Error (coarsest mesh) |
-| --------- | ----- | --------------------------------- |
-| Riemann   | 2.550 | 7.62365e-05                       |
-| Skew 2    | 2.988 | 2.80296e-05                       |
-| Skew 4    | 3.932 | 3.42864e-06                       |
-| Skew 6    | -     | (under construction)              |
-| Rusanov   | 1.966 | 5.12657e-04                       |
-| Central 2 | 2.998 | 2.81674e-05                       |
-| Central 4 | 4.965 | 3.42617e-06                       |
-| Central 6 | 6.926 | 4.89130e-07                       |
-| WenoZ5 5  | 5.520 | 2.73535e-05                       |
-| TENO 5    | 5.298 | 2.68980e-05 (\*)                  |
-| TENO 6    | 4.636 | 9.31208e-06 (\*)                  |
-| KEEP 2    | 2.988 | 2.80296e-05                       |
-| KEEP 4    | 4.967 | 3.33370e-06                       |
-| KEEP 6    | 6.940 | 4.37193e-07                       |
-
-When the forcing term is not included, the convergence rate appears to be first-order. This is because only a single time step is executed, and the time step size ( $$\Delta t$$ ) is proportional to ( $$\Delta x$$ ) due to a constant CFL condition. As a rough approximation, the observed order matches the values listed in the **Table** minus 1. For example, Rusanov is first order (2-1) , second order central schemes appear as 1.998, six-order as 5.987, etc.
-
-(\*) The TENO schemes do not perform as well as expected, given the relatively smooth conditions,\
-The flow, albeit simple, has density and pressure variation in three directions.
+The results demonstrate that theoretical convergence is achieved for all primitive variables in smooth flows. The method is compared to the finite volume solution with source term integration—see the [Numerical Methods](theory/equations/numerical-methods.md) section for details.
 
 
 
-<figure><img src=".gitbook/assets/mms_16_euler.png" alt="" width="188"><figcaption><p>Exact solution with 16 x 16 x 16</p></figcaption></figure>
+<figure><img src=".gitbook/assets/NavStommsRE.png" alt=""><figcaption><p>Convergence plots using a 4th-order central difference scheme at three different Reynolds numbers to test the Navier-Stokes solver. Density was held constant to facilitate the convergence of the analytical functions in SymPy.</p></figcaption></figure>
 
-<figure><img src=".gitbook/assets/mms_128_euler.png" alt="" width="188"><figcaption><p>Exact solution with 128 x 128 x 128</p></figcaption></figure>
 
-### Taylor Green Vortex
+
+## Taylor Green Vortex
 
 The Taylor-Green vortex is a classical benchmark problem used to test and validate numerical methods for simulating turbulent flows. Basically to study vortex dynamics, turbulent transition, turbulent decay and the energy dissipation process (proposed AIAA First International Workshop on High-Order Methods in Computational Fluid Dynamics.) The simulations are performed in a cube of non-dimensional length $$2 \pi$$, with periodic boundary conditions in all The Mach number, Prandtl number and Reynolds number of the flow are set  as **0.1**, **0.71** and **1600** based on data from [ Jammy et al. (2016)](http://dx.doi.org/10.5258/SOTON/401892)
 

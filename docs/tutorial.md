@@ -4,12 +4,10 @@ icon: person-carry-box
 
 # Tutorial
 
-This page will explain the set-up, run and visualization of a typical case. For a quick overview of running the code, see [Quickrun](quickstart.md). At a glance, domain dimension and control parameters are handled in file `inputs` (or similar name) while problem description is in \* `prob.h`
-
-
+This page will explain the set-up, run and visualization of a typical case. For a quick overview of running the code, see [Quickrun](quickstart.md). At a glance, domain dimension and control parameters are handled in the file `inputs` (or similar name) while the problem description is in  `prob.h`
 
 {% hint style="warning" %}
-It is recommended to cp the tutorial into a `wrk` or `exm/tmp` directory. Is not neccesary, but if the code is cloned, changes in mian files will register as to commit. The previous directories will always be ignored by **git**.
+It is recommended to cp the tutorial into a `wrk` or `exm/tmp` directory. Is not neccesary, but if the code is cloned, changes in the  files will register as to commit. The previous directories will always be ignored by **git**.
 {% endhint %}
 
 
@@ -96,14 +94,14 @@ to initialise the problem.
 
 ### Solvers
 
-The solvers is selected in the line
+The solvers are selected in the line
 
 ```cpp
 typedef rhs_dt<riemann_t<false, ProbClosures>, no_diffusive_t, user_source_t<ProbClosures>>
     ProbRHS;
 ```
 
-which defines which problem to solve
+which defines the problem to solve
 
 ### Source Term
 
@@ -143,7 +141,7 @@ user_tagging(int i, int j, int k, int nt_level, auto &tagfab,
              const ProbParm &prob_parm, int level) {
 ```
 
-The actual tagging is produced in the follwoing lines, where the array `tagfab(i,j,k)` is set ot true or false based on the value of density.
+The actual tagging is produced in the follwoing lines, where the array `tagfab(i,j,k)` is set to true or false based on the value of density.
 
 ```cpp
   Real rhot = sdatafab(i,j,k,ProbClosures::URHO);
@@ -177,12 +175,14 @@ cfl = 0.3
 
 ### Boundary conditions
 
-The boudantry conditions are defined More complex boudnarty conditions can be defined
+The boundary conditions are defined in the following lines. More complex configurations can be specified—see the [boundaries set-up ](tutorial.md#boundary-conditions)section for details.
 
 ```
 cns.lo_bc = -1 5
 cns.hi_bc = -1 5
 ```
+
+The boundary conditions above specify periodic boundaries at both ends of the x-direction and no-slip walls along the y-direction.
 
 ### Mesh and refinement
 
@@ -192,7 +192,7 @@ amr.max_level       = 1     # maximum level number allowed
 amr.regrid_int      = 2 2 # how often to regrid per level
 ```
 
-These lines will select size of the mesh and how often to regrid
+These lines will select the size of the mesh and how often to regrid
 
 ## Compile and Running
 
@@ -233,7 +233,7 @@ In the following sectionsm we will show how to visualize the results using Pytho
 
 ### Python
 
-The following assumes that **yt** is installed. Check [Tips](tips.md) for installation. A Python script for easy of use,by invoking
+The following assumes that `yt` is installed. See the [Tips](tips.md) section for installation instructions. A Python script has been set up for ease of use and can be run with:
 
 ```bash
 $ python plot.py
@@ -289,7 +289,8 @@ And the final plot should look like, where the solid lines are the limits of ref
 
 <figure><img src=".gitbook/assets/tutorial_Visit7.png" alt=""><figcaption></figcaption></figure>
 
-There is no need to open the complete database and tiem steps can be opened individually by open the individual header files (for example opening directly `plot/plt02600/Header`) VisIt is good for exploring the data interactively, Visit can also be scripted with Python. For a VisIt tutorial check (http://visitusers.org/index.php?title=VisIt\_Tutorial)
+There is no need to load the entire database—individual time steps can be opened by accessing their respective header files (e.g., `plot/plt02600/Header`).\
+**VisIt** is well-suited for interactive data exploration and also supports Python scripting. For a VisIt tutorial, see the  VisIt users in [VisIt tutorial](http://visitusers.org/index.php?title=VisIt_Tutorial)
 
 ### Paraview
 
@@ -313,4 +314,4 @@ And then use the final time to show the final plot (with default options)
 
 <figure><img src=".gitbook/assets/tutorial_Paraview5.png" alt=""><figcaption></figcaption></figure>
 
-Similar to Visit, Paraview is good for exploring the data interactively. can also be scripted with Python. Both softwares are similar and can use HPC, remote visualization and support large number of points (billions) A Paraview Tutorial manual can be found in [Paraview Manual](https://www.paraview.org/Wiki/images/5/5d/ParaViewTutorial41.pdf)
+Like VisIt, **ParaView** is well-suited for interactive data exploration and supports Python scripting. Both tools offer similar capabilities, including HPC integration, remote visualization, and efficient handling of large datasets—with support for billions of data points. A **Paraview** Tutorial and manual can be found in [Paraview Manual](https://www.paraview.org/Wiki/images/5/5d/ParaViewTutorial41.pdf)
