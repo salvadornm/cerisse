@@ -25,7 +25,7 @@ amr.v             = 1 # 0=quiet,1= verbose
 
 # Refinement and regridding 
 amr.n_cell            = 80 80 160 
-amr.max_level         = 0      # maximum level number allowed
+amr.max_level         = 1      # maximum level number allowed
 amr.ref_ratio         = 2      # refinement ratio per level
 amr.regrid_int        = 50     # how often to regrid per level
 amr.blocking_factor_x = 1      # blocking factor in x per level

@@ -78,6 +78,60 @@ struct gpData_t {
 
 };
 
+///
+/// \brief Class to store surface data
+/// \param eorder_tparm Number of image points (integer) 
+///
+template <int eorder_tparm>
+struct surfData_t{
+  surfData_t() {}
+
+  Array2D<Real, 0, eorder_tparm - 1, 0, AMREX_SPACEDIM - 1> imp_xyz;
+  Array2D< int, 0, eorder_tparm - 1, 0, AMREX_SPACEDIM - 1> imp_ijk;
+  Array2D<Real,0,eorder_tparm-1,0,7> ipweights;
+  Array3D<int,0,eorder_tparm-1,0,7,0,AMREX_SPACEDIM-1> ip_ijk;
+  Array1D<Real, 0, AMREX_SPACEDIM - 1> ib_xyz;
+  Array1D<Real, 0, AMREX_SPACEDIM - 1> norm;
+
+  int  ifab,core,lev,iface,igeom;
+  amrex::Real area;
+  amrex::Real o_dis,pressure, temperature, dTdn;
+  bool pointfound;
+
+};
+
+
+/// 
+template <typename FacetHandle>
+double compute_face_area(FacetHandle fd) {
+    //using Point = typename FacetHandle::value_type::Point_3;
+    using Point = CGAL::Simple_cartesian<double>::Point_3;
+    using FT = typename Point::FT;
+
+    auto h = fd->facet_begin();
+    std::vector<Point> vertices;
+
+    auto end = h;
+    do {
+        vertices.push_back(h->vertex()->point());
+        ++h;
+    } while (h != end);
+
+    // Use first vertex as fan origin
+    const Point& origin = vertices[0];
+    FT total_area = FT(0);
+
+    for (size_t i = 1; i + 1 < vertices.size(); ++i) {
+        const Point& p1 = vertices[i];
+        const Point& p2 = vertices[i + 1];
+        total_area += CGAL::sqrt(CGAL::squared_area(origin, p1, p2));
+    }
+
+    return CGAL::to_double(total_area);
+}
+//
+
+
 // main class ------------------------------------------------------------------
 
 ///
@@ -134,13 +188,19 @@ public:
   // std::map<face_descriptor,Vector_CGAL> fnormals;
   Vector<std::map<face_descriptor, Vector_CGAL>> fnorm_a;
 
-  // store surface data (needs to be filled)
-  Vector<std::map<face_descriptor, double>> fpressure_a;      // per geometry
-  Vector<std::map<face_descriptor, double>> ftemperature_a;   
-  Vector<std::map<face_descriptor, double>> fheat_a;  
-  Vector<std::map<face_descriptor, double>> fstress_a;   
-  Vector<std::map<face_descriptor, int>> fill_point_a;   
-  
+  // surface data (independent of number of geometries)
+  //Vector<std::map<face_descriptor,  surfData_t<iorder_tparm> >> surfdata_a;
+  Vector<surfData_t<iorder_tparm> > surfdata_a;
+  // Faces stored in per fab
+  Vector<Vector<Polyhedron::Facet_const_handle>> faces_in_fab;
+  // faces integers per fab and per level
+  Vector<Vector<int>> intfaces_in_fab;
+  Vector<Vector<int>> intfaces_in_lev;
+  int ntotalfaces=0; //across all geometries
+
+
+  //----
+
 
   // face state data map 
   //std::map<face_descriptor,surfdata> face2state;
@@ -162,6 +222,10 @@ public:
     for (int ii = 0; ii < ngeom; ii++) {
       delete tree_pa.at(ii);
       delete inout_fa.at(ii);
+
+      //delete fnorm_a.at(ii);
+      //delete surfdata_a.at(ii); 
+
     };
   }
 
@@ -319,7 +383,7 @@ void initialiseGPs(int lev) {
             // closest element and searching all trees.
 
             // in out test for each geometry
-            int igeom;
+            int igeom = 0 ;
             for (int ii = 0; ii < eib_t::ngeom; ii++) {
               inside_t& inside = *inout_fa[ii];
               CGAL::Bounded_side result = inside(gp);
@@ -458,11 +522,173 @@ void initialiseGPs(int lev) {
   });
 }
 }
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// \brief compute surface indexes and store them (core, fab, lev)
+// is independet of geomenries, it will store faces 
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+void compute_surface_index(int lev) {
+
+  amrex::Print() << " Compute Surface Index at LEVEL " << lev << std::endl;
+
+  printf(" dx_a[lev] = %f \n ",dx_a[lev][0]);
+
+  auto& mfab = *bmf_a[lev];
+  GpuArray<Real, AMREX_SPACEDIM> prob_lo = amr_p->Geom(lev).ProbLoArray();
+
+  int faces_notfound=0;
+  
+  ntotalfaces=0;
+
+  int iface = -1;    // face counter
+
+  // clear surfdata??
+
+  for (int ii = 0; ii < ngeom; ii++) {    
+    const Polyhedron& mesh   = geom_a[ii];
+
+    // loop over the faces of geometry
+      for (auto fd : faces(mesh)) {
+        iface++;ntotalfaces++;
+
+        // create a surface point if first level (otherwise get the surfdata)
+
+        surfData_t<iorder_tparm> surf_dat; 
+
+
+        if (lev==0)
+        {
+          surf_dat.pointfound = false;
+        }
+        else 
+        { 
+          auto& surf_dat = surfdata_a[iface];
+        }
+  
+        // extract face normal norm
+        Array1D<Real, 0, AMREX_SPACEDIM - 1> norm = {
+                fnorm_a[ii][fd][0], fnorm_a[ii][fd][1],
+                fnorm_a[ii][fd][2]};
+
+        // extract face center point
+        Point face_center = CGAL::centroid(fd->halfedge()->vertex()->point(), 
+                                         fd->halfedge()->next()->vertex()->point(),
+                                         fd->halfedge()->next()->next()->vertex()->point());
+                                         
+        Array1D<Real, 0, AMREX_SPACEDIM - 1> ib_xyz = {face_center[0],face_center[1],face_center[2]};
+
+        // is the face inside the domain?
+        // find closest  point i,j,k  to the face_center
+        //const int i1 = int((face_center.x() - amr_p->Geom(lev).ProbLo()[0]) / dx_a[lev][0] - 0.5_rt);
+        //const int j1 = int((face_center.y() - amr_p->Geom(lev).ProbLo()[1]) / dx_a[lev][1] - 0.5_rt);
+        //const int k1 = int((face_center.z() - amr_p->Geom(lev).ProbLo()[2]) / dx_a[lev][2] - 0.5_rt);
+
+        const int i1 = int((face_center.x() - prob_lo[0]) / dx_a[lev][0] - 0.5_rt);
+        const int j1 = int((face_center.y() - prob_lo[1]) / dx_a[lev][1] - 0.5_rt);
+        const int k1 = int((face_center.z() - prob_lo[2]) / dx_a[lev][2] - 0.5_rt);
+         
+        const bool is_inside = amr_p->Geom(lev).Domain().contains(i1, j1, k1);
+
+       /// printf(" ifac=%d closest point i1 j1 k1 = %d %d %d \n",iface,i1,j1,k1);
+        
+        if (is_inside)
+        {
+
+          // compute interpolation weights imp_ipweights
+          Array2D<Real, 0, eorder_tparm - 1, 0, AMREX_SPACEDIM - 1> imp_xyz;
+          Array2D<int, 0, eorder_tparm - 1, 0, AMREX_SPACEDIM - 1> imp_ijk;
+
+          // find mirror point and the bottom left point closest to the image
+          Real o_dis = 0.0;
+          const int jj = 0;
+          for (int kk = 0; kk < AMREX_SPACEDIM; kk++) {
+            imp_xyz(jj, kk) = face_center[kk] + Real(jj + 1) * di_a[lev] * norm(kk);
+            imp_ijk(jj, kk) = floor((imp_xyz(jj, kk) - prob_lo[kk]) / dx_a[lev][kk] - 0.5_rt);        
+            o_dis += (face_center[kk] - imp_xyz(jj, kk))*(face_center[kk] - imp_xyz(jj, kk));          
+          }                  
+          o_dis = 1.0/sqrt(o_dis);
+
+        
+          double area = compute_face_area(fd);
+         
+          
+          // mirror point 
+          int i =  imp_ijk(jj, 0);int j =  imp_ijk(jj, 1);int k = imp_ijk(jj, 2);
+                            
+          int nfab = mfab.local_size(); 
+          faces_in_fab.resize(nfab);  // resize fab Vector to store faces
+
+          intfaces_in_fab.resize(nfab); 
+
+          // locate the mirror points, loop over fabs
+          bool face_present_core = false; 
+          for (MFIter mfi(mfab, false); mfi.isValid(); ++mfi) {             
+    
+            const int ifab= mfi.index();
+            auto& ibFab = mfab.get(mfi);                
+            const Box& bx = mfi.tilebox();
+            const Box& bxg = mfi.growntilebox(cls_t::NGHOST);
+
+            // point located
+            if (bx.contains(i, j, k)) {
+
+              auto const ibMarkers = mfab.array(mfi);
+              // Interpolation points' (ips) weights for each image point
+              Array2D<Real,0,eorder_tparm-1,0,7> ipweights;
+              Array3D<int,0,eorder_tparm-1,0,7,0,AMREX_SPACEDIM-1> ip_ijk;
+
+              computeIPweights(ipweights,ip_ijk,imp_xyz, imp_ijk, prob_lo, dx_a[lev], ibMarkers);
+
+              face_present_core = true; 
+              // store ip_ijk, ipweights, ifab, core  <------
+                                
+              surf_dat.pointfound = true; 
+              // 
+              if (surf_dat.pointfound)
+              {                
+                surf_dat.ip_ijk= ip_ijk;
+                surf_dat.ipweights= ipweights;              
+                surf_dat.ifab = ifab;
+                surf_dat.lev= lev;    
+                surf_dat.iface = iface;
+                surf_dat.igeom = ii;      
+                surf_dat.o_dis   = o_dis;
+                surf_dat.imp_xyz = imp_xyz;
+                surf_dat.imp_ijk = imp_ijk;
+                surf_dat.ib_xyz  = ib_xyz;
+                surf_dat.norm    = norm;   
+                surf_dat.area  = area;        
+                // push into arrays
+                faces_in_fab[ifab].push_back(fd);             // Store face for fab index
+                intfaces_in_fab[ifab].push_back(iface);       // Store face number for fab index              
+                surfdata_a.emplace_back(surf_dat);             // store surface data 
+              }  
+            
+              
+            }
+          } // end loop over fabs
+
+          if (!face_present_core) faces_notfound++;
+
+        }
+        else // face outside domain
+        {
+          // stoes 0
+          faces_notfound++;
+        }
+      }  // end loop faces
+  } // end loop geometries
+
+  amrex::Print() << " Faces not found  (outside domain/lost) " << faces_notfound << " out of " << ntotalfaces << std::endl;
+
+}
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // \brief compute surface properties for each surface face
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 void compute_surface_props(MultiFab& stateprops,const cls_t* cls,int lev) {
   
+
+  amrex::Print() << " Compute Surface Properties at LEVEL" << lev << std::endl;
 
   // loop over mfi
   auto& mfab = *bmf_a[lev];
@@ -480,96 +706,82 @@ void compute_surface_props(MultiFab& stateprops,const cls_t* cls,int lev) {
     // primitives array (store a local copy)
     FArrayBox primf(bxg, cls_t::NPRIM, The_Async_Arena());
     Array4<Real> const& prims= primf.array();
-    // convert to Q
-    cls->cons2prims(mfi, cons, prims); //<--------------------
-
+    // convert to Q (local copy)
+    cls->cons2prims(mfi, cons, prims); 
+    // ........................................
     for (int ii = 0; ii < ngeom; ii++) {    
+
+      //
       const Polyhedron& mesh   = geom_a[ii];
-    
-      // aux vars
-      Real qgradient[cls_t::NPRIM];         
-      int aux=0;
-      
-      // loop over the faces of geometry
-      for (auto fd : faces(mesh)) {
-        aux++;
-
-        fill_point_a[ii][fd] = 0; // surface point not calculated
-
-        // extract face normal norm
-        Array1D<Real, 0, AMREX_SPACEDIM - 1> norm = {
-                fnorm_a[ii][fd][0], fnorm_a[ii][fd][1],
-                fnorm_a[ii][fd][2]};
-
-        // extract face center point
-        Point face_center = CGAL::centroid(fd->halfedge()->vertex()->point(), 
-                                         fd->halfedge()->next()->vertex()->point(),
-                                         fd->halfedge()->next()->next()->vertex()->point());
-                                         
-        Array1D<Real, 0, AMREX_SPACEDIM - 1> ib_xyz = {face_center[0],face_center[1],face_center[2]};
-
-        // find closest fluid point i,j,k  to the face_center
-        const int i = int((face_center.x() - amr_p->Geom(lev).ProbLo()[0]) / dx_a[lev][0] - 0.5_rt);
-        const int j = int((face_center.y() - amr_p->Geom(lev).ProbLo()[1]) / dx_a[lev][1] - 0.5_rt);
-        const int k = int((face_center.z() - amr_p->Geom(lev).ProbLo()[2]) / dx_a[lev][2] - 0.5_rt);
-
-        // is the face inside the domain?
-        const bool is_inside = amr_p->Geom(lev).Domain().contains(i, j, k);
-
-        if (!is_inside) {
-          amrex::Print() << "closest point to face center outside domain at level " << lev;
-          amrex::Abort();
-        }
-         
+            
+      //for (auto fd : faces_in_fab[ifab]){
+      for (int j = 0; j < intfaces_in_fab[ifab].size(); ++j){
+       // const auto& fd = faces_in_fab[ifab][j];
         
+        int iface =  intfaces_in_fab[ifab][j];
 
-        // check if the point is inside the fab
-        if (bx.contains(i, j, k)) {          
-          // compute intrpolation weights imp_ipweights
-          Array2D<Real, 0, eorder_tparm - 1, 0, AMREX_SPACEDIM - 1> imp_xyz;
-          Array2D<int, 0, eorder_tparm - 1, 0, AMREX_SPACEDIM - 1> imp_ijk;
+        auto& surf_dat = surfdata_a[iface];
 
-          // find mirror point and the bottom left point closest to the image
-          Real o_dis = 0.0;
-          const int jj = 0;
-          for (int kk = 0; kk < AMREX_SPACEDIM; kk++) {
-            imp_xyz(jj, kk) = face_center[kk] + Real(jj + 1) * di_a[lev] * norm(kk);
-            imp_ijk(jj, kk) = floor((imp_xyz(jj, kk) - prob_lo[kk]) / dx_a[lev][kk] - 0.5_rt);        
-            o_dis += (face_center[kk] - imp_xyz(jj, kk))*(face_center[kk] - imp_xyz(jj, kk));
-          }                  
-          o_dis = 1.0/sqrt(o_dis);
+        // extract arrays from surface data
+        auto const norm      = surf_dat.norm;
+        auto const ip_ijk    = surf_dat.ip_ijk;
+        auto const ipweights = surf_dat.ipweights;
+        auto const ib_xyz    = surf_dat.ib_xyz;     
+        auto const o_dis     = surf_dat.o_dis;
+                      
+        Array2D<Real,0,eorder_tparm+1,0,cls_t::NPRIM-1> primsNormal={0.0};                
 
-          // Interpolation points' (ips) weights for each image point
-          Array2D<Real,0,eorder_tparm-1,0,7> ipweights;
-          Array3D<int,0,eorder_tparm-1,0,7,0,AMREX_SPACEDIM-1> ip_ijk;
-          computeIPweights(ipweights,ip_ijk,imp_xyz, imp_ijk, prob_lo, dx_a[lev], ibMarkers);
-                                
+        // calculate surface properties    
+        interpolateIMs(ip_ijk,ipweights,prims,primsNormal);
     
-          Array2D<Real,0,eorder_tparm+1,0,cls_t::NPRIM-1> primsNormal={0.0};
- 
-          interpolateIMs(ip_ijk,ipweights,prims,primsNormal);
+        wallmodel::compute_surfIB(ib_xyz,norm,primsNormal,cls);   
+
+        // compute one-sided gradients dT/dn du/dn
+        Real dTdn = (primsNormal(2,cls_t::QT) - primsNormal(1,cls_t::QT))*o_dis;
+
+        // store values
+        surf_dat.pressure       = primsNormal(1,cls_t::QPRES); 
+        surf_dat.temperature    = primsNormal(1,cls_t::QT); 
+        surf_dat.dTdn           = dTdn;
+
+
+        // if (isnan(surf_dat.pressure)  ) {
+        // //if (surf_dat.temperature > 5000) {
+
+        //   printf(" iface= %d ifab=%d\n",iface,ifab);
+        //   printf(" TEMP prims1= %f prims2= %f \n",primsNormal(1,cls_t::QT),primsNormal(2,cls_t::QT));
+        //   printf(" PRES prims1= %f prims2= %f \n",primsNormal(1,cls_t::QPRES),primsNormal(2,cls_t::QPRES));
+        //   printf(" QT=%d QPRES=%d \n",cls_t::QT,cls_t::QPRES);
+        //   printf(" norm= %f %f %f \n",norm(0),norm(1),norm(2));
+
+
+        //   for (int iip=0;iip<8;iip++) {
+        //     int i1 = ip_ijk(0,iip,0);
+        //     int j1 = ip_ijk(0,iip,1);
+        //     int k1 = ip_ijk(0,iip,2);
+           
+        //     printf(" iip=%d i=%d j=%d k=%d  \n", iip,i1,j1,k1);
+        //     printf(" weights= %f\n ibMarker0 =%d ",ipweights(0,iip),ibMarkers(i1,j1,k1,0));
+            
+        //     printf(" --------------------- PRIMS \n");
+        //     for (int nv=0;nv<cls_t::NPRIM;nv++){
+        //       printf(" nv= %d Q =%f \n",nv,prims(i1,j1,k1,nv));
+        //     }
+        //     printf(" --------------------- CONS \n");
+        //     for (int nv=0;nv<cls_t::NCONS;nv++){
+        //       printf(" nv= %d U =%f \n",nv,cons(i1,j1,k1,nv));
+        //     }
+        //     printf(" ------------------------- \n");
+
+        //   }
+
+        //   amrex::Abort();
+        // } 
+
     
-          wallmodel::compute_surfIB(ib_xyz,norm,primsNormal,cls);   
-
-          // compute one-sided gradients dT/dn du/dn
-          Real dTdn = (primsNormal(2,cls_t::QT) - primsNormal(1,cls_t::QT))*o_dis;
-
-          // store values
-          fpressure_a[ii][fd] = primsNormal(1,cls_t::QPRES); 
-          ftemperature_a[ii][fd]= primsNormal(1,cls_t::QT);
-
-          fill_point_a[ii][fd] = 1; // point calculated (RECHeCK THIS) -------
- 
-        }
-
-        
-
-      } //end loop faces
-      
-      //ftemp_a[ii][fd] = qsurface[cls_t::QT];
-      //ftemp_a[ii][fd] = dTdn;
-
+      } //end loop faces          
     } //end loop geometry 
+    //...........................................
   } // end looping mfi
 }
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -731,36 +943,42 @@ void computeGPs(const MFIter& mfi, const Array4<Real>& cons, const Array4<Real>&
     //   }
     // }
 
-    // SCALAR: face area
-    // out << "SCALARS face_area float 1\n";
-    // out << "LOOKUP_TABLE default\n";
-    // for (auto fit = mesh.facets_begin(); fit != mesh.facets_end(); ++fit) {
-    //   double area = PMP::face_area(*fit, mesh);
-    //   out << area << "\n";
-    // }
+    // SCALARS
 
-    // SCALAR: pressure (are filled in compute surf_prop)
-   // const auto& face_pressure = fpressure_a[igeom];
+    out << "SCALARS face_area float 1\n";
+    out << "LOOKUP_TABLE default\n";
+    for (int iface=0;iface<num_faces;iface++) {     
+      out << static_cast<float>(surfdata_a[iface].area) << "\n";
+    }
+
     out << "SCALARS pressure float 1\n";
     out << "LOOKUP_TABLE default\n";    
-    for (auto fd : faces(mesh)) {      
-      out << fpressure_a[igeom][fd] << "\n";
+    for (int iface=0;iface<num_faces;iface++) {             
+      out << static_cast<float>(surfdata_a[iface].pressure) << "\n";
     }
-    //const auto& face_temperature = fpressure_a[igeom];
     out << "SCALARS temperature float 1\n";
     out << "LOOKUP_TABLE default\n";    
-    for (auto fd : faces(mesh)) {      
-      out << ftemperature_a[igeom][fd] << "\n";
+    for (int iface=0;iface<ntotalfaces;iface++) {      
+      out << static_cast<float>(surfdata_a[iface].temperature) << "\n";
     }
-
-    //const auto& face_calc =filled_point_a[igeom];
-    out << "SCALARS calculated int 1\n";
+    out << "SCALARS gradT float 1\n";
     out << "LOOKUP_TABLE default\n";    
-    for (auto fd : faces(mesh)) {      
-      out << fill_point_a[igeom][fd] << "\n";
+    for (int iface=0;iface<ntotalfaces;iface++) {      
+      out << static_cast<float>(surfdata_a[iface].dTdn) << "\n";
     }
 
+    out << "SCALARS calculated float 1\n";
+    out << "LOOKUP_TABLE default\n";    
+    for (int iface=0;iface<num_faces;iface++) { 
+      if (surfdata_a[iface].pointfound) {
+        out << 1.0 << "\n";
+      }
+      else
+      {
+        out << 0.0 << "\n";
+      }
 
+    }
 
     out.close();
     amrex::Print() << "----------------------------------\n";
@@ -816,6 +1034,7 @@ private:
       jj = j + 1;
       kk = k + 0;
       iip= 1;
+
       fluid = !ibFab(ii,jj,kk, 0);
       weights(iim,iip) = (1.0_rt - xd) *yd*(1.0_rt-zd)*fluid;
       ip_ijk(iim,iip,0) = ii; ip_ijk(iim,iip,1) = jj; ip_ijk(iim,iip,2) = kk;
@@ -977,18 +1196,8 @@ private:
     eib_t::tree_pa.resize(ngeom);
     eib_t::fnorm_a.resize(ngeom);
     eib_t::inout_fa.resize(ngeom);
+        
     
-    // surface properties P,T,heat,stress
-    eib_t::fpressure_a.resize(ngeom);
-    eib_t::ftemperature_a.resize(ngeom);
-    eib_t::fheat_a.resize(ngeom);
-    eib_t::fstress_a.resize(ngeom);
-    eib_t::fill_point_a.resize(ngeom);
-    
-    
-    
-
-
     namespace PMP = CGAL::Polygon_mesh_processing;
     Print() << "----------------------------------" << std::endl;
     for (int i = 0; i < ngeom; i++) {
@@ -1055,7 +1264,6 @@ private:
       Polyhedron::Plane_3(h->opposite()->vertex()->point(), h->vertex()->point(),
                           h->next()->vertex()->point());
   };
-
 
 };
 #endif

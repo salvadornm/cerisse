@@ -152,6 +152,8 @@ void prob_initdata (int i, int j, int k, amrex::Array4<amrex::Real> const& state
 
 }
 
+
+
 AMREX_GPU_DEVICE AMREX_FORCE_INLINE 
 void user_tagging(int i, int j, int k, int nt, auto& tagfab, const auto &sdatafab, 
                   const Array4<bool>&ibfab, const auto& geomdata, 
@@ -173,7 +175,10 @@ void user_tagging(int i, int j, int k, int nt, auto& tagfab, const auto &sdatafa
   if ( nt==0) {
     
     if (level==0 ) {    
-      tagfab(i,j,k) = (radius < Rmax ) && (radius > Rmin);
+      // tagfab(i,j,k) = (radius < Rmax ) && (radius > Rmin);
+
+      tagfab(i,j,k) = x > 1.0; 
+
     }
 
   }

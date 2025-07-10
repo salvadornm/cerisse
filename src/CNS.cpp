@@ -580,6 +580,7 @@ void CNS::post_regrid(int lbase, int new_finest) {
   IBM::ib.build_mf(grids, dmap, level);
   IBM::ib.computeMarkers(level);
   IBM::ib.initialiseGPs(level);
+  if (plot_surf) IBM::ib.compute_surface_index(level);
 #endif
 
 #ifdef CNS_USE_EB
@@ -678,6 +679,7 @@ amrex::Print() << " recreate markers " << std::endl;
   IBM::ib.build_mf(grids, dmap, level);
   IBM::ib.computeMarkers(level);
   IBM::ib.initialiseGPs(level);
+  if (plot_surf) IBM::ib.compute_surface_index(level);
 #endif
 
 #ifdef CNS_USE_EB
@@ -998,17 +1000,22 @@ void CNS::writePlotFilePost(const std::string &dir, std::ostream &os) {
   // high. Print() << "Computed surface data" << std::endl;
 
   if (plot_surf){
-
-    Print() << "Extract Sdata " << std::endl;
     
-    MultiFab& Sdata = get_new_data(State_Type);
+    MultiFab& Sdata = get_new_data(State_Type);  // ghost poinst are not correct?
+
+    int ncons = CNS::d_prob_closures->NCONS;
+    int nghost= CNS::d_prob_closures->NGHOST;
+    Real time =0.0; // temp
+    FillPatch(*this, Sdata, nghost, time, State_Type, 0, ncons);
+
     const PROB::ProbClosures* cls_d = CNS::d_prob_closures;
 
     Print() << "Computing surface properties" << std::endl;
-    IBM::ib.compute_surface_props(Sdata,cls_d,this->level); // computed at each level. From low to high.
+   // IBM::ib.compute_surface_props(Sdata,cls_d,this->level); // computed at each level. From low to high.
 
     Print() << "Writing surface data" << std::endl;
-    IBM::ib.plot_surface(0,"surf.vtk"); 
+   // IBM::ib.plot_surface(0,"surf.vtk"); 
+
   }
 
   // if (ioproc=0) ib.writeSurf()
