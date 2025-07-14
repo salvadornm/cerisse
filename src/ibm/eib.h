@@ -640,12 +640,11 @@ void compute_surface_index(int lev) {
               computeIPweights(ipweights,ip_ijk,imp_xyz, imp_ijk, prob_lo, dx_a[lev], ibMarkers);
 
               face_present_core = true; 
-              // store ip_ijk, ipweights, ifab, core  <------
-                                
-              surf_dat.pointfound = true; 
-              // 
-              if (surf_dat.pointfound)
-              {                
+                                                          
+              // if point not found previously store it
+              if (!surf_dat.pointfound)
+              {               
+                surf_dat.pointfound = true;  
                 surf_dat.ip_ijk= ip_ijk;
                 surf_dat.ipweights= ipweights;              
                 surf_dat.ifab = ifab;
@@ -728,55 +727,27 @@ void compute_surface_props(MultiFab& stateprops,const cls_t* cls,int lev) {
         auto const ipweights = surf_dat.ipweights;
         auto const ib_xyz    = surf_dat.ib_xyz;     
         auto const o_dis     = surf_dat.o_dis;
+
+
+        if (surf_dat.lev == lev) {
                       
-        Array2D<Real,0,eorder_tparm+1,0,cls_t::NPRIM-1> primsNormal={0.0};                
+          Array2D<Real,0,eorder_tparm+1,0,cls_t::NPRIM-1> primsNormal={0.0};                
 
-        // calculate surface properties    
-        interpolateIMs(ip_ijk,ipweights,prims,primsNormal);
+          // calculate surface properties    
+          interpolateIMs(ip_ijk,ipweights,prims,primsNormal);
     
-        wallmodel::compute_surfIB(ib_xyz,norm,primsNormal,cls);   
+          wallmodel::compute_surfIB(ib_xyz,norm,primsNormal,cls);   
 
-        // compute one-sided gradients dT/dn du/dn
-        Real dTdn = (primsNormal(2,cls_t::QT) - primsNormal(1,cls_t::QT))*o_dis;
+          // compute one-sided gradients dT/dn du/dn
+          Real dTdn = (primsNormal(2,cls_t::QT) - primsNormal(1,cls_t::QT))*o_dis;
 
-        // store values
-        surf_dat.pressure       = primsNormal(1,cls_t::QPRES); 
-        surf_dat.temperature    = primsNormal(1,cls_t::QT); 
-        surf_dat.dTdn           = dTdn;
+          // store values
+          surf_dat.pressure       = primsNormal(1,cls_t::QPRES); 
+          surf_dat.temperature    = primsNormal(1,cls_t::QT); 
+          surf_dat.dTdn           = dTdn;
 
-
-        // if (isnan(surf_dat.pressure)  ) {
-        // //if (surf_dat.temperature > 5000) {
-
-        //   printf(" iface= %d ifab=%d\n",iface,ifab);
-        //   printf(" TEMP prims1= %f prims2= %f \n",primsNormal(1,cls_t::QT),primsNormal(2,cls_t::QT));
-        //   printf(" PRES prims1= %f prims2= %f \n",primsNormal(1,cls_t::QPRES),primsNormal(2,cls_t::QPRES));
-        //   printf(" QT=%d QPRES=%d \n",cls_t::QT,cls_t::QPRES);
-        //   printf(" norm= %f %f %f \n",norm(0),norm(1),norm(2));
-
-
-        //   for (int iip=0;iip<8;iip++) {
-        //     int i1 = ip_ijk(0,iip,0);
-        //     int j1 = ip_ijk(0,iip,1);
-        //     int k1 = ip_ijk(0,iip,2);
-           
-        //     printf(" iip=%d i=%d j=%d k=%d  \n", iip,i1,j1,k1);
-        //     printf(" weights= %f\n ibMarker0 =%d ",ipweights(0,iip),ibMarkers(i1,j1,k1,0));
-            
-        //     printf(" --------------------- PRIMS \n");
-        //     for (int nv=0;nv<cls_t::NPRIM;nv++){
-        //       printf(" nv= %d Q =%f \n",nv,prims(i1,j1,k1,nv));
-        //     }
-        //     printf(" --------------------- CONS \n");
-        //     for (int nv=0;nv<cls_t::NCONS;nv++){
-        //       printf(" nv= %d U =%f \n",nv,cons(i1,j1,k1,nv));
-        //     }
-        //     printf(" ------------------------- \n");
-
-        //   }
-
-        //   amrex::Abort();
-        // } 
+        }
+        
 
     
       } //end loop faces          

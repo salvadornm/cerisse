@@ -1011,10 +1011,10 @@ void CNS::writePlotFilePost(const std::string &dir, std::ostream &os) {
     const PROB::ProbClosures* cls_d = CNS::d_prob_closures;
 
     Print() << "Computing surface properties" << std::endl;
-   // IBM::ib.compute_surface_props(Sdata,cls_d,this->level); // computed at each level. From low to high.
+    IBM::ib.compute_surface_props(Sdata,cls_d,this->level); // computed at each level. From low to high.
 
     Print() << "Writing surface data" << std::endl;
-   // IBM::ib.plot_surface(0,"surf.vtk"); 
+    if (this->level==1) IBM::ib.plot_surface(0,"surf.vtk"); 
 
   }
 
