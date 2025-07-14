@@ -869,7 +869,7 @@ void computeGPs(const MFIter& mfi, const Array4<Real>& cons, const Array4<Real>&
   //  \param igeom geometry index
   //  \param filename output file name
   //  \note uses CGAL Polygon_mesh_processing IO functions
-  void plot_surface(const int igeom, const std::string& filename) {
+  void plot_surface(const amrex::Real time,const int igeom, const std::string& filename) {
     const Polyhedron& mesh   = geom_a[igeom];
     const auto& face_normals = fnorm_a[igeom];
 

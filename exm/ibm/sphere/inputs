@@ -2,7 +2,7 @@
 #                                 INPUT FILE
 #------------------------------------------------------------------------------#
 # start time is assumed to be 0, unless re-starting
-max_step  = 1
+max_step  = 3
 stop_time = 10.0
 #time_step = 1.0e-5
 cfl = 0.3
@@ -24,17 +24,19 @@ cns.verbose = 0       # 0=quiet, 1=verbose
 ib.filename = sphere.stl
 ib.move = 0
 ib.plot_surf = 1
+ib.surf_file = plot/surf
+ib.surf_int  = 2
 #-------------------------------- COMPUTATIONAL DOMAIN ------------------------#
 geometry.is_periodic = 0 0 0
 geometry.coord_sys   = 0  # 0 => cart, 1 => RZ  2=>spherical
 geometry.prob_lo     =   0.5     1.0     1.0
 geometry.prob_hi     =   2.0     3.0     3.0
-amr.n_cell           =   96    128     128
+amr.n_cell           =   48    64     64
 
 #-------------------------------- REFINEMENT / REGRIDDING ---------------------#
 amr.max_level        = 1       # maximum level number allowed
 amr.ref_ratio       = 2  # refinement ratio
-amr.regrid_int      = 10   # how often to regrid
+amr.regrid_int      = 2   # how often to regrid
 amr.blocking_factor_x = 8  # blocking factor in x per level
 amr.blocking_factor_y = 8  # blocking factor in x per level
 amr.blocking_factor_z = 8  # blocking factor in x per level
@@ -47,7 +49,7 @@ amr.grid_eff        = 0.8     # what constitutes an efficient grid
 #-------------------------------- PLOTFILES -----------------------------------#
 amr.plot_files_output = 1
 amr.plot_file         = ./plot/plt # root name of plotfile
-amr.plot_int          = 100     # number of timesteps between plotfiles
+amr.plot_int          = 1     # number of timesteps between plotfiles
 amr.derive_plot_vars  = pressure velocity temperature
 amr.v = 1 # 0=quiet, 1=verbose
 

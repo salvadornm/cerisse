@@ -12,6 +12,9 @@ bool CNS::dt_dynamic = false;
 bool CNS::ib_move = false;
 bool CNS::plot_surf = false;
 
+int CNS::surf_int = 10000000;
+std::string CNS::surf_filename = "surfplot";
+
 // utilities
 bool CNS::use_utility = false; 
 Utility CNS::utilidades;
@@ -158,7 +161,11 @@ void CNS::read_params() {
     amrex::Abort("ib.plot_surf not specified (0=false, 1=true)");
   }
 
-  // name surface plot
+  // surface plot options
+  if (plot_surf) {
+    ppib.query("surf_int", surf_int);
+    ppib.query("surf_file", surf_filename);
+  }
 
 #endif
   
@@ -991,35 +998,46 @@ void CNS::writePlotFile(const std::string &dir, std::ostream &os,
 
 // This is called once per level on write timestep.
 void CNS::writePlotFilePost(const std::string &dir, std::ostream &os) {
+
 #if AMREX_USE_GPIBM
-  // write geometry -- each proc holds same geom, even with ib_move, so no
-  // communication is required. if (plot_surf) { Print() << "Writing surface
-  // data" << std::endl; if (ioproc=0) ib.writeGeom()
+  // claculate and  write surface data  
+  int istep = parent->levelSteps(0);
 
-  // IBM::ib.computeSurf(this->level); // computed at each level. From low to
-  // high. Print() << "Computed surface data" << std::endl;
-
-  if (plot_surf){
-    
-    MultiFab& Sdata = get_new_data(State_Type);  // ghost poinst are not correct?
+  if (plot_surf && (istep % surf_int == 0))  {
+     
+    MultiFab& Sdata = get_new_data(State_Type); 
 
     int ncons = CNS::d_prob_closures->NCONS;
     int nghost= CNS::d_prob_closures->NGHOST;
-    Real time =0.0; // temp
+
+    Real time = parent->cumTime();
+
+    Print() << "Computing surface properties " << std::endl;
+    Print() << " at time= " << time << " and step= " << istep << std::endl;
+
+    
     FillPatch(*this, Sdata, nghost, time, State_Type, 0, ncons);
 
     const PROB::ProbClosures* cls_d = CNS::d_prob_closures;
 
-    Print() << "Computing surface properties" << std::endl;
     IBM::ib.compute_surface_props(Sdata,cls_d,this->level); // computed at each level. From low to high.
 
-    Print() << "Writing surface data" << std::endl;
-    if (this->level==1) IBM::ib.plot_surface(0,"surf.vtk"); 
+    const int igeom=0; // put in a loop
+
+    
+    std::ostringstream sname;
+    sname << surf_filename << igeom << "_"
+          << std::setw(3) << std::setfill('0') << istep
+          << ".vtk";
+    std::string surf_name = sname.str();
+
+    // the line below should be written  only by ioproc 
+    if (this->level == parent->maxLevel() && amrex::ParallelDescriptor::IOProcessor()){
+      IBM::ib.plot_surface(time,igeom,surf_name);  
+    }
 
   }
 
-  // if (ioproc=0) ib.writeSurf()
-  // }
 #endif
 
 }

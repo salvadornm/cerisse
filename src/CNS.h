@@ -162,6 +162,8 @@ class CNS : public amrex::AmrLevel {
   // IBM-specific keywords
   static bool ib_move;
   static bool plot_surf;
+  static int  surf_int;
+  static std::string surf_filename;
 
   // EB-specific keywords
   static amrex::Real eb_weight;
