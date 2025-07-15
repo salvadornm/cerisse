@@ -15,9 +15,9 @@ void Custom::build(const Geometry& geom, const int max_coarsening_level)
 
   // big chamber
   const Real R_chamber = 2.2*cm2m;
-  const Real L_chamber = 9.0*cm2m;
+  const Real L_chamber = 10.0*cm2m;
   const int  dir_chamber=2; // points to  Z
-  const Real zchamber = 9*cm2m; //
+  const Real zchamber = 9.5*cm2m; //
   
   // injector
   const Real R_inj = 0.95*cm2m;

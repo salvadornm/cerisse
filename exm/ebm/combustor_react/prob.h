@@ -116,7 +116,7 @@ template <typename cls_t > class user_source_t;
 
 // define nuemrical scheme comment/uncomment to set up 
 //typedef rhs_dt<weno_t<ReconScheme::Teno5, ProbClosures>, viscous_t<viscous_param_t, ProbClosures>, user_source_t<ProbClosures> > ProbRHS;
-//typedef rhs_dt<weno_t<ReconScheme::Teno5, ProbClosures>, viscous_t<viscous_param_t, ProbClosures>, no_source_t> ProbRHS;
+//typedef rhs_dt<weno_t<ReconScheme::Teno5, ProbClosures>, viscous_t<viscous_param_t, ProbClosures>, reactor_source_t<user_source_t<ProbClosures>,ProbClosures >> ProbRHS;
 
 //typedef rhs_dt<riemann_t<false, ProbClosures>, viscous_t<viscous_param_t, ProbClosures>, user_source_t<ProbClosures> > ProbRHS;
 
@@ -161,14 +161,18 @@ prob_initdata(int i, int j, int k, Array4<Real> const &state,
   eint =  prob_parm.eint_0;
 
   /**
-  const Real r = sqrt(x*x + y*y + (z-0.1)*(z-0.1));
-  if (r< 0.01)
+  // const Real r = sqrt(x*x + y*y + (z-0.1)*(z-0.1));
+  const Real r = sqrt(x*x + y*y);
+  const Real z_low = 0.045;
+  const Real z_hi = 0.055;
+  if (r <= 0.0095 && z >= z_low && z <= z_hi)
   {   
     Real Tspark = 1000.0;
     cls.PYT2R(prob_parm.p_0,y_sp, Tspark, rhot);
     cls.RYP2E(rhot, y_sp, prob_parm.p_0, eint); 
   }
   */
+  
 
   Real kin = Real(0.5) * rhot * (u[0] * u[0] + u[1] * u[1] + u[2]*u[2]);
   //state(i, j, k, cls.URHO) = rhot;
@@ -254,19 +258,25 @@ user_tagging(int i, int j, int k, int nt_level, auto &tagfab,
   // Real gradrho= Real(0.5)*sqrt(drhox*drhox+drhoy*drhoy)*o_over_rhot;        
 
 
-  switch (level)
+ switch (level)
   {
     case 0:
+      refine= (z > 0.035) && (z < 0.07);
+      //refine = (z < prob_parm.zexit); 
       //refine = (z < prob_parm.zexit) && (r < 0.025) ;    // refine combustor    
       break;
     case 1:
-      //refine= (z > 0.035) && (z < 0.07);
-      break;      
+      refine= (z > 0.035) && (z < 0.07);    
+      // refine = (z < prob_parm.zexit); 
+      break;
+    case 2:
+      // refine= (z > 0.035) && (z < 0.07);    
+      break;  
+      
     default:
 
     break;
    }
-    
 
   tagfab(i,j,k) = refine;
 
@@ -289,16 +299,17 @@ class user_source_t {
   void inline rsrc(const Geometry& geomdata, const amrex::MFIter &mfi,
                   const amrex::Array4<const amrex::Real> &prims,
                   const amrex::Array4<amrex::Real> &rhs, const cls_t *cls_d,
-                  amrex::Real dt){
+                  amrex::Real dt, amrex::Real real_time){
 
     const Box& bxg = mfi.tilebox();
     // const Box& bxg = mfi.growntilebox(cls_t::NGHOST);
     const Real *prob_lo = geomdata.ProbLo();
     const Real *dx = geomdata.CellSize();
 
+    Real timestep = real_time / dt;
+
     ProbParm const prob_parm;
     const auto& cls = *cls_d;
-
 
     amrex::ParallelFor(bxg,
       [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept
@@ -310,10 +321,11 @@ class user_source_t {
       const Real r = sqrt(x*x + y*y + (z-prob_parm.zexit)*(z-prob_parm.zexit));
       
       // pressure relax  if P > P0  P drops and to keep T constant rho drops
-      const Real tau_relax = 100.0*dt; 
+      const Real tau_relax = 50.0*dt; 
       const Real coef =dt/tau_relax;
+      Real pres = prims(i,j,k,cls.QPRES);
 
-      const Real dP = (prob_parm.p_0- prims(i,j,k,cls.QPRES))*coef;
+      const Real dP = (prob_parm.p_0- pres)*coef;
     
       const Real T = prims(i,j,k,cls.QT); // dT =0
       const Real rho  = prims(i, j, k, cls.QRHO);
@@ -332,7 +344,7 @@ class user_source_t {
                     + prims(i,j,k,cls.QW)*prims(i,j,k,cls.QW));
       Real Et  = prims(i,j,k,cls.QEINT) + kin;
     
-      bool buffer = (z > prob_parm.zexit) && (r > 0.035);
+      bool buffer = (z > prob_parm.zexit) && (r > 0.05);
 
       if (buffer){        
         rhs(i,j,k,cls.UMX) += prims(i,j,k,cls.QU)*drhodt;
@@ -345,6 +357,27 @@ class user_source_t {
       }
 
 
+      /// igniting flow through source term in energy equation
+
+      if (timestep < 1000) {
+
+          const Real r_cylinder = sqrt(x*x + y*y);
+          const Real z_low = 0.048;
+          const Real z_hi = 0.060;
+          if (r_cylinder <= 0.0095 && z >= z_low && z <= z_hi) {
+
+            const Real T_ignite = 1000;
+            Real rho_ignite, eint_ignite, rel_eint, releint_dt;
+            cls.PYT2R(pres, Y, T_ignite, rho_ignite);
+            cls.RYP2E(rho_ignite, Y, pres, eint_ignite);
+            rel_eint = eint_ignite - prims(i,j,k,cls.QEINT);
+            releint_dt = rel_eint / dt;
+            releint_dt /= 1000 ;
+            rhs(i,j,k,cls.UET) += rho * releint_dt;
+          }
+      }
+      
+    
       });
 
   };
