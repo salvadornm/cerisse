@@ -25,101 +25,109 @@
 
 namespace PROB {
 
+// executing python equil_from_equivalenceratio.py  
 
-static constexpr Real Phi   = 0.5;    // Equivalence Ratio
-static combustion_functions::Moles_Mixture mix = combustion_functions::compute_MixMol_fromEquivalenceRatio_H2Air(Phi);    // mixture from equivalence Ratio
+//  Initial Conditions  Mixture
+//     P=  101325.0 [Pa] amd T =  298.0 [K]
+//     Equivalence Ratio=  0.8
+//  Unburn Mixture ...
+// ************ Phase gas ************
+// Moles:  1.0
 
+//   gas:
 
-// SPECIES  (Li and Dryer mechanism)
-// H2 O2 H2O H O OH HO2 H2O2 N2
-// Fresh gases
-//
-//       temperature   298 K
-//          pressure   1.0132e+05 Pa
-//           density   0.98933 kg/m^3
-//  mean mol. weight   24.192 kg/kmol
-//
-//                          1 kg             1 kmol     
-//                     ---------------   ---------------
-//          enthalpy           -130.24           -3150.7  J
-//   internal energy       -1.0255e+05       -2.4809e+06  J
-//           entropy            7880.3        1.9064e+05  J/K
-//
-//                      mass frac. Y      mole frac. X     chem. pot. / RT
-//                     ---------------   ---------------   ---------------
-//                H2          0.014468           0.17361           -16.827
-//                O2           0.22963           0.17361           -25.822
-//                N2            0.7559           0.65278           -22.838
+//        temperature   298 K
+//           pressure   1.0132e+05 Pa
+//            density   0.90377 kg/m^3
+//   mean mol. weight   22.1 kg/kmol
+//    phase of matter   gas
 
+//                           1 kg             1 kmol     
+//                      ---------------   ---------------
+//           enthalpy           -137.15             -3031  J
+//    internal energy       -1.1225e+05       -2.4807e+06  J
+//            entropy            8424.8        1.8619e+05  J/K
+//     Gibbs function       -2.5107e+06       -5.5487e+07  J
+//  heat capacity c_p            1314.9             29059  J/K
+//  heat capacity c_v            938.65             20744  J/K
 
-// Burning composition obtained with Cantera equivalence ratio 0.5
-// using  cerisse/tools/combustion/equil_from_equivalenceratio.py
-// 
-//       temperature   1644.8 K
-//          pressure   1.0132e+05 Pa
-//           density   0.19626 kg/m^3
-//  mean mol. weight   26.489 kg/kmol
-//
-//                         1 kg             1 kmol     
-//                     ---------------   ---------------
-//          enthalpy           -130.24           -3449.9  J
-//   internal energy       -5.1641e+05       -1.3679e+07  J
-//           entropy            9624.9        2.5496e+05  J/K
-//
-//                      mass frac. Y      mole frac. X     chem. pot. / RT
-//                     ---------------   ---------------   ---------------
-//                H2        5.1557e-07        6.7744e-06           -30.764
-//                O2           0.11471          0.094966           -30.432
-//               H2O           0.12917           0.18993            -45.98
-//                 H        8.5022e-09        2.2343e-07           -15.382
-//                 O        4.5034e-06        7.4562e-06           -15.216
-//                OH        0.00021046        0.00032781           -30.598
-//               HO2        4.7965e-07        3.8495e-07           -45.814
-//              H2O2        3.3189e-08        2.5847e-08           -61.196
-//                N2            0.7559           0.71477           -26.626
+//                       mass frac. Y      mole frac. X     chem. pot. / RT
+//                      ---------------   ---------------   ---------------
+//                 H2          0.022949           0.25157           -17.086
+//                 O2           0.22765           0.15723           -26.512
+//                 N2            0.7494           0.59119           -23.559
+//      [   +6 minor]                 0                 0  
 
+//  Burn Mixture ...
+// ************ Phase gas ************
+// Moles:  0.8763651682839297
 
+//   gas:
+
+//        temperature   2175.1 K
+//           pressure   1.0133e+05 Pa
+//            density   0.14129 kg/m^3
+//   mean mol. weight   25.218 kg/kmol
+//    phase of matter   gas
+
+//                           1 kg             1 kmol     
+//                      ---------------   ---------------
+//           enthalpy           -137.15           -3458.6  J
+//    internal energy       -7.1729e+05       -1.8089e+07  J
+//            entropy             10544         2.659e+05  J/K
+//     Gibbs function       -2.2935e+07       -5.7836e+08  J
+//  heat capacity c_p            1619.1             40830  J/K
+//  heat capacity c_v            1289.4             32515  J/K
+
+//                       mass frac. Y      mole frac. X     chem. pot. / RT
+//                      ---------------   ---------------   ---------------
+//                 H2         0.0001171         0.0014648           -26.263
+//                 O2          0.044507          0.035076           -32.406
+//                H2O             0.202           0.28276           -42.466
+//                  H         7.435e-06        0.00018601           -13.131
+//                  O        0.00027133        0.00042768           -16.203
+//                 OH         0.0036952         0.0054792           -29.335
+//                HO2        3.1809e-06        2.4303e-06           -45.538
+//               H2O2        2.3096e-07        1.7123e-07           -58.669
+//                 N2            0.7494            0.6746           -27.612
 // problem parameters
 struct ProbParm {
 
   // unburn gases
-  Real rho_u = 0.98933;               // density  [kg/m^3]
+  Real rho_u = 0.90377;               // density  [kg/m^3]
   Real T_u   = 298;                   // temperature [K] 
   Real p_u   = 1.0132e+05;            // pressure [Pa]  (5 atm)
-  Real e_u   = -1.0255e+05;           // internal energy [J/kg]  
-  GpuArray<Real, NUM_SPECIES> Y_u = { 0.014468, 0.22963 , 0.,0., 0., 0., 0.,0., 0.7559};  // mass fractions [-] 
+  Real e_u   = -1.1225e+05;           // internal energy [J/kg]  
 
   // burn gases
-  Real rho_b = 0.19626;                 // density  [kg/m^3]
-  Real T_b   = 1644.8;                  // temperature [K]  
+  Real rho_b = 0.14129;                 // density  [kg/m^3]
+  Real T_b   = 2175.1;                  // temperature [K]  
   Real p_b   = p_u;                     // pressure [Pa]  (1 atm)   
-  Real e_b   = -5.1641e+05 ;            // internal energy [J/kg]
-  GpuArray<Real, NUM_SPECIES> Y_b = {5.1557e-07,0.11471,0.12917,8.5022e-09,4.5034e-06,0.00021046,4.7965e-07,3.3189e-08,0.7559};
+  Real e_b   = -7.1729e+05 ;            // internal energy [J/kg]
+  GpuArray<Real, NUM_SPECIES> Y_b = {0.0001171,0.044507,0.202 ,7.435e-06,0.00027133,0.0036952,3.1809e-06,2.3096e-07,0.7559};
 
   Real Y_0[NUM_SPECIES] = {0.0};
   ProbParm(){
-    Y_0[H2_ID] = 0.014468;
-    Y_0[O2_ID] = 0.22963;
-    Y_0[N2_ID] = 0.7559;
+    Y_0[H2_ID] = 0.022949 ;
+    Y_0[O2_ID] = 0.22765;
+    Y_0[N2_ID] = 1.0 - Y_0[O2_ID] - Y_0[H2_ID];
   }
   
+  GpuArray<Real, NUM_SPECIES> Y_u = { Y_0[H2_ID] ,Y_0[O2_ID] , 0.,0., 0., 0., 0.,0., Y_0[N2_ID]};  // mass fractions [-] 
+
 
   // geometrical parameters                                     
   Real Lx     =   0.04;  // half-width domain
   Real Ly     =   0.04;
   Real Yflame =   0.5*Ly;
 
-  Real pertur = 0.04; // perturbation of flame front based on flame thickness (0.1*lf)  
-
-  Real SL     =  0.49; // estimated burning velocity
-  Real lf     =  417e-6; // estimated flame thickness  (417 microns) Using Cantera and 1d-flame-plot.py
   // unburn gases velocity
-  Real u_u     = 0.534292484155303; // inflow velocity (unburn)
+  Real u_u     = 3.2; // inflow velocity (unburn) IMPOSED [m/s]
+
   
   Real Q =  rho_u*u_u;  // flow rate (per area)
 
   
-
 };
 
 // numerical method parameters
@@ -149,6 +157,7 @@ using ProbClosures = closures_dt< indicies_t, transport_Pele_t, multispecies_pel
 
 using ProbRHS = rhs_dt< riemann_t<false, ProbClosures>, viscous_t<methodparm_t, ProbClosures>, reactor_t<ProbClosures> >;
 //using ProbRHS = rhs_dt< riemann_t<false, ProbClosures>, viscous_t<methodparm_t, ProbClosures>, no_source_t >;
+//using ProbRHS = rhs_dt< no_euler_t, viscous_t<methodparm_t, ProbClosures>, no_source_t >;
 
 
 // define type of wall and EBM class
@@ -192,45 +201,34 @@ AMREX_GPU_DEVICE AMREX_FORCE_INLINE void prob_initdata(
   // Constant Pressure 
   Pt = prob_parm.p_u ;
   
-  //--- Initialise 1D flame from data -------------------------------------------------------------------
-  // PMF data from 0...to 0.04 (Flame front position: 0.015634 m) obtained from tools/combustion/1d-flame-plot.py
-  Real yflame_front = 0.015634;
-  // upper and lower position of the cell (relative to flame)
-
-  Real yinterf=0.8/1000.; // initial position flame (domain coordinates)
-  Real y1  = y - 0.5*dx[1]- yinterf;
-  Real y2  = y + 0.5*dx[1]- yinterf;
-  // shift to flame_front
-  y1 += yflame_front;
-  y2 += yflame_front;
-
-  // read from PMF profile ----> pmf_vals
-  //--------------------------------------------------------------------------------------
-  // pmf_vals[0] =T  pmf_vals[1]= Velocity  pmf_vals[2] = rho pmf_vals[3+k] = Y[k];
-  GpuArray<Real, NUM_SPECIES + 4 > pmf_vals = {0.0}; 
-
-  pele::physics::PMF::PmfData::DataContainer *pmf_data = util->pmfData.getDeviceData();
-  pele::physics::PMF::pmf(pmf_data,y1,y2,pmf_vals);
-
-  // PMF--> T,u and Y (P is assumed constant)
-  Tt  = pmf_vals[0];
-  vxt = pmf_vals[1];
-  Real sumrhoY = 0.0;
-  for (int n = 0; n < NUM_SPECIES; ++n) {
-    Yt[n]   = pmf_vals[3+n];    
-    sumrhoY += Yt[n];
-  }
-
+  // initial position flame (domain coordinates)
+  Real yinterf= -0.1/1000.0; // [m]
 
   
-  // Tt  = prob_parm.T_u;
-  // Tt = 800.0; // isothermal wall
-  // vxt = prob_parm.u_u;
-  // Real sumrhoY = 0.0;
-  // for (int n = 0; n < NUM_SPECIES; ++n) {
-  //   Yt[n]   = prob_parm.Y_0[n];    
-  //   sumrhoY += Yt[n];
-  // }
+  Yu  = prob_parm.Y_u.data();
+  Yb  = prob_parm.Y_b.data();
+
+  vxt = prob_parm.u_u;
+  Real sumrhoY = 0.0;
+
+  if (y > yinterf)
+  { // burn
+    Tt = prob_parm.T_b;
+    for (int n = 0; n < NUM_SPECIES; ++n) {
+      Yt[n]    = Yb[n];    
+      sumrhoY += Yt[n];
+    }
+  }
+  else
+  { // unburn
+    Tt  = prob_parm.T_u;
+    for (int n = 0; n < NUM_SPECIES; ++n) {
+      Yt[n]   = prob_parm.Y_0[n];    
+      sumrhoY += Yt[n];
+    }
+
+  }
+
   
 
   // ensure sumY =1

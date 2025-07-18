@@ -517,7 +517,8 @@ class multispecies_pele_gas_t {
   AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE void RTY2Hi(const Real rho, const Real T,const Real Y[NUM_SPECIES],
     Real (&hk)[NUM_SPECIES]) {
     auto eos = pele::physics::PhysicsType::eos();
-    eos.RTY2Hi(rho, T, Y, hk);
+    eos.RTY2Hi(rho*rho_si2cgs, T, Y, hk); 
+    for (int n = 0; n < NUM_SPECIES; n++) { hk[n] = hk[n]*specenergy_cgs2si;}
   }
   //------------------------------------------------------------------------------------- 
   AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE void ensurePTYfillq(
@@ -649,9 +650,18 @@ class multispecies_pele_gas_t {
       Real rhoke = Real(0.5) * rho * (ux * ux + uy * uy + uz * uz);
       Real ei = (cons(i, j, k, idx.UET) - rhoke) * rhoinv;
       Real Y[NUM_SPECIES];
+
       for (int n = 0; n < NUM_SPECIES; ++n) {
         Y[n] = cons(i, j, k, idx.UFS + n) * rhoinv;
       }
+#if ENSURE_MASSFRACSUM_ONE
+      Real sumY = Real(0.0);
+      for (int n = 0; n < NUM_SPECIES; ++n) {
+        Y[n] = max(Y[n],Real(0.0) ); sumY += Y[n];
+      }
+      for (int n = 0; n < NUM_SPECIES; ++n) {Y[n] /= sumY;}
+#endif
+
       Real T, p, cs, gamma;
       this->RYE2TPCsG(rho, Y, ei, T, p, cs, gamma);
 
@@ -701,6 +711,14 @@ class multispecies_pele_gas_t {
     for (int n = 0; n < NUM_SPECIES; ++n) {
       Y[n] = U[idx.UFS + n] * rhoinv;
     }
+#if ENSURE_MASSFRACSUM_ONE
+      Real sumY = Real(0.0);
+      for (int n = 0; n < NUM_SPECIES; ++n) {
+        Y[n] = max(Y[n],Real(0.0) ); sumY += Y[n];
+      }
+      for (int n = 0; n < NUM_SPECIES; ++n) {Y[n] /= sumY;}
+#endif
+    
     Real T, p, cs, gamma;
     this->RYE2TPCsG(rho, Y, ei, T, p, cs, gamma);
     Q[idx.QRHO] = rho;

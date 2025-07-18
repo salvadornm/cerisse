@@ -199,6 +199,9 @@ class isothermal_wall_t
 #if AMREX_SPACEDIM==3          
       fluxw[cls_t::UMZ] =  P*norm[2];
 #endif        
+ 
+      // species fluxes are 0
+
     }
 
     // Viscous flux (stress and heat)  
@@ -243,11 +246,7 @@ class isothermal_wall_t
 #else                     
       const Real mu_w   = cls->visc(Tw);
       const Real cond_w = cls->cond(Tw); 
-#endif
-      
-      //printf(" oo Isothermal Viscous wall mu_w = %e cond_w = %e \n",mu_w,cond_w);
-
-
+#endif      
       // coordinate transformation
 #if AMREX_SPACEDIM==2      
       Real a1 = r43*norm[0]*norm[0] + norm[1]*norm[1];
@@ -275,6 +274,8 @@ class isothermal_wall_t
       exit(1);              
 #endif                
       fluxw[cls_t::UET] -=  cond_w*dTdn;
+
+      // all species fluxes are 0 ! 
         
     }    
 

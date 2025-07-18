@@ -252,9 +252,23 @@ class viscous_t {
 
     auto thermo = typename cls_t::multispecies_pele_gas_t();
     
+    // Declare clipping arrays unconditionally
+    Real maxy[NUM_SPECIES], maxx[NUM_SPECIES], miny[NUM_SPECIES], minx[NUM_SPECIES];
+
+    // Initialize only if needed
+    if constexpr(param::order > 2)
+    {
+      for (int n = 0; n < NUM_SPECIES; ++n) {
+        maxy[n] = 0.0;
+        maxx[n] = 0.0;
+        miny[n] = 1.0;
+        minx[n] = 1.0;
+      }
+    }
+
     amrex::IntVect ivp(iv -halfsten*amrex::IntVect::TheDimensionVector(d1));
     for (int l = 0; l < param::order; l++) {
-      ivp +=  amrex::IntVect::TheDimensionVector(d1);
+      
       for (int n = 0; n < NUM_SPECIES; ++n) { 
         yaux[n] = q(ivp,  cls_t::QFS + n); 
       }
@@ -268,13 +282,27 @@ class viscous_t {
         ymass[l][n] = yaux[n]; 
         hi[l][n]    = haux[n];
       }
-     
+      // clip
+      //
+      ivp +=  amrex::IntVect::TheDimensionVector(d1);  
+      
+      // calculate max and min to clip reconstruction (high-order)
+      if constexpr(param::order > 2)
+      {
+        for (int n = 0; n < NUM_SPECIES; ++n) { 
+          maxx[n] = max(maxx[n],xaux[n]);
+          maxy[n] = max(maxy[n],yaux[n]);
+          minx[n] = min(minx[n],xaux[n]);
+          miny[n] = min(miny[n],yaux[n]); 
+        }
+      }
+
     }
     
-    // const Real dpdx  = normal_diff<param::order>(iv, d1, cls_t::QPRES, q, dxinv); 
-    // const Real pface = interp<param::order>(iv, d1, cls_t::QPRES, q);
-    // const Real dlnp = dpdx/pface;
-    Real dlnp = 0.0;  
+    const Real dpdx  = normal_diff<param::order>(iv, d1, cls_t::QPRES, q, dxinv); 
+    const Real pface = interp<param::order>(iv, d1, cls_t::QPRES, q);
+    const Real dlnp = dpdx/pface;
+    //Real dlnp = 0.0;  
      
     Real Vc = 0.0;    
     Real Yf[NUM_SPECIES],hf[NUM_SPECIES];
@@ -286,7 +314,13 @@ class viscous_t {
         hface += hi[l][n]*INTcoef(l);
         dXdx  += xmole[l][n]*CDcoef(l);
       }      
-      dXdx  /= dxinv[d1];
+      dXdx  *= dxinv[d1];      
+      // prevent extrema in high-order
+      if constexpr(param::order > 2)
+      {      
+        Xface = min( max(Xface,minx[n]) ,maxx[n]);
+        Yface = min( max(Yface,miny[n]) ,maxy[n]);
+      }
       Yf[n] = Yface; hf[n] = hface;
 
       const Real rhoD_f = interp<param::order>(iv, d1, cls_t::CRHOD + n, coeffs); 
@@ -425,9 +459,25 @@ class viscous_t {
 
     auto thermo = typename cls_t::multispecies_pele_gas_t();
 
+
     amrex::IntVect ivp(iv -halfsten*amrex::IntVect::TheDimensionVector(d1));
-    for (int l = 0; l < order_local; l++) {
-      ivp +=  amrex::IntVect::TheDimensionVector(d1);
+
+    // Declare clipping arrays unconditionally
+    Real maxy[NUM_SPECIES], maxx[NUM_SPECIES], miny[NUM_SPECIES], minx[NUM_SPECIES];
+
+    // Initialize only if needed
+    if constexpr(param::order > 2)
+    {
+      for (int n = 0; n < NUM_SPECIES; ++n) {
+        maxy[n] = 0.0;
+        maxx[n] = 0.0;
+        miny[n] = 1.0;
+        minx[n] = 1.0;
+      }
+    }
+
+    for (int l = 0; l < param::order; l++) {
+ 
       for (int n = 0; n < NUM_SPECIES; ++n) { 
         yaux[n] = q(ivp,  cls_t::QFS + n); 
       }
@@ -441,35 +491,59 @@ class viscous_t {
         ymass[l][n] = yaux[n]; 
         hi[l][n]    = haux[n];
       }
-     
-    }
-    // const Real dpdx  = normal_diff<order_runtime>(iv, d1, cls_t::QPRES, q, dxinv); 
-    // const Real pface = interp<order_runtime>(iv, d1, cls_t::QPRES, q);
-    // const Real dlnp = dpdx/pface;
-    Real dlnp = 0.0;  
+
+      ivp +=  amrex::IntVect::TheDimensionVector(d1);
+       
+      // calculate max and min to clip reconstruction (high-order)
+      if constexpr(param::order > 2)
+      {
+        for (int n = 0; n < NUM_SPECIES; ++n) { 
+          maxx[n] = max(maxx[n],xaux[n]);
+          maxy[n] = max(maxy[n],yaux[n]);
+          minx[n] = min(minx[n],xaux[n]);
+          miny[n] = min(miny[n],yaux[n]); 
+        }
+      }
+
+    } // end l arrays
+
+    const Real dpdx  = normal_diff<param::order>(iv, d1, cls_t::QPRES, q, dxinv);     
+    const Real pface = interp<param::order>(iv, d1, cls_t::QPRES, q);
+    const Real dlnp = dpdx/pface; 
+    //const Real dlnp = 0.0; 
      
     Real Vc = 0.0;    
     Real Yf[NUM_SPECIES],hf[NUM_SPECIES];
     for (int n = 0; n < NUM_SPECIES; n++) {
       Real Xface = 0.0, Yface = 0.0, hface = 0.0, dXdx = 0.0;
-      for (int l = 0; l <order_local; l++) {
+      for (int l = 0; l < param::order; l++) {
         Xface += xmole[l][n]*INTcoef(l);
         Yface += ymass[l][n]*INTcoef(l);
         hface += hi[l][n]*INTcoef(l);
         dXdx  += xmole[l][n]*CDcoef(l);
       }      
-      dXdx  /= dxinv[d1];
+      dXdx  *= dxinv[d1];  //<<<<<<<<<<<-  BUG Fixed (should be dXdx*dxinv)     
+
+      // prevent extrema in high-order
+      if constexpr(param::order > 2)
+      {      
+        Xface = min( max(Xface,minx[n]) ,maxx[n]);
+        Yface = min( max(Yface,miny[n]) ,maxy[n]);
+      }
+      
       Yf[n] = Yface; hf[n] = hface;
       const Real Vd = -rhoD_f[n] * (dXdx + (Xface - Yface) * dlnp);
       Vc += Vd;
       flx(iv, cls_t::UFS + n) += Vd; 
-      flx(iv, cls_t::UET)     += Vd * hface;
+      flx(iv, cls_t::UET)     += Vd * hface;    
      }
+
     // Add correction velocity to fluxes so sum(Vd) = 0
     for (int n = 0; n < NUM_SPECIES; ++n) {       
       flx(iv, cls_t::UFS + n)-= Yf[n] * Vc;
       flx(iv, cls_t::UET)    -= Yf[n] * hf[n] * Vc;
-    }
+    } 
+
   // --------------------------------------------------------------------------
 #endif 
 

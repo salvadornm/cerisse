@@ -541,6 +541,9 @@ void CNS::post_timestep(int /* iteration*/) {
     time_stat_level[level] += parent->dtLevel(level);
     computeStats();
   }
+
+
+  
     
 }
 
@@ -559,6 +562,10 @@ void CNS::postCoarseTimeStep(Real time) {
   //   }
   // }
 #endif
+
+   // make sure species sum to 1??
+
+
 
   if (verbose && ((this->nStep() % nstep_screen_output) == 0)) {
     printTotal();

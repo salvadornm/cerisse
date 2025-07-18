@@ -21,7 +21,7 @@ import csv
 
 T = 298.0
 P = 101325.0
-phi = 0.5
+phi = 0.8
 print(" --------------------- ")
 print(" Initial Conditions  Mixture")
 print("    P= ",P, "[Pa] amd T = ",T, "[K]")

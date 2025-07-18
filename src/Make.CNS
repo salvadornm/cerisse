@@ -73,6 +73,14 @@ else
   USE_UTILITIES := FALSE
 endif
 
+ifeq ($(ENSURE_MASSFRACSUM), TRUE)
+  DEFINES += -DENSURE_MASSFRACSUM_ONE=1
+else
+  ENSURE_MASSFRACSUM := FALSE
+endif
+
+
+
 # ---------   EB  -------------------- 
 ifeq ($(USE_EB), TRUE)
   DEFINES += -DCNS_USE_EB=1
