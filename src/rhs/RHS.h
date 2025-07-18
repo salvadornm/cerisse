@@ -18,6 +18,7 @@
 
 #ifdef USE_PELEPHYSICS
 #include "react.h"
+#include "react_source.h"
 #endif
 
 // _dt stands for derived type

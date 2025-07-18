@@ -1,19 +1,19 @@
-#ifndef REACT_H
-#define REACT_H
+#ifndef REACT_SOURCE_H
+#define REACT_SOURCE_H
 
 #include <PelePhysics.H>
 #include <ReactorBase.H>
 #include <Constants.h>
 #include <CNSconstants.h>
 
-// template <int reactor_type, typename cls_t>
-template <typename cls_t>
-class reactor_t {
+// use ::  .., reactor_source<user_source_t, ProbClosures> >;
+template <typename source_t, typename cls_t >
+class reactor_source_t {
  public:
   bool m_initialized = false;
   std::unique_ptr<pele::physics::reactions::ReactorBase> m_reactor;
 
-  reactor_t() {
+  reactor_source_t() {
     std::string reactor_type;
     {
       amrex::ParmParse pp("cns");
@@ -24,13 +24,13 @@ class reactor_t {
     m_initialized = true;
   };
 
-  ~reactor_t() {
+  ~reactor_source_t() {
     if (m_initialized) m_reactor->close();
   }
 
   /**
    * @brief Calculate chemical reaction source term, adding to the
-   * right-hand-side (rhs) array.
+   * right-hand-side (rhs) array, as well as calling the pass source term (defiend in prob)
    *
    * @tparam cls_t The problem closure class typename.
    * @param mfi    The MFIter object representing the current grid patch.
@@ -41,7 +41,7 @@ class reactor_t {
    * @param dt     The time step size. (react() requires it to be non-const)
    */
   // https://www.codeproject.com/Articles/48575/How-to-Define-a-Template-Class-in-a-h-File-and-Imp
-  void inline src(const Geometry& /*geomdata*/, const amrex::MFIter& mfi,
+  void inline src(const Geometry& geomdata, const amrex::MFIter& mfi,
                   const amrex::Array4<const amrex::Real>& prims,
                   const amrex::Array4<amrex::Real>& rhs, const cls_t* cls_d,
                   amrex::Real dt) {
@@ -125,7 +125,7 @@ class reactor_t {
     amrex::Gpu::Device::streamSynchronize();  // Important
 
 
-    /// Compet LES properties
+    /// Compute LES properties
     // if (LES)
     // {
     //   // do stuff compute taus sgs, Efficiency ...
@@ -168,10 +168,10 @@ class reactor_t {
      // if LES multiply by something
 
 
-    // TODO: Record runtime for load balancing
-  
-    // Real sum_fc = tempf.sum<RunOn::Device>(2 * NUM_SPECIES + 3, 1);
-    // amrex::Print() << " # RHS eval = " << sum_fc << "\n";
+    // call user source term (passed as argument)
+    //  - assume source_t is a user_source_t is lightweight (no persistent state, just logic),
+    source_t{}.rsrc(geomdata,mfi, prims, rhs, cls_d, dt);
+
   }
 };
 
