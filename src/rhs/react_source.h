@@ -107,8 +107,8 @@ class reactor_source_t {
       // AMREX_ALWAYS_ASSERT(T(i, j, k) > 0.0);
 
       // fill mask      
-      //mask(i, j, k) = (T(i, j, k) > CNSConstants::min_react_temp) ? 1 : -1; // temp snm 
-      mask(i, j, k) = (T(i, j, k) > 500) ? 1 : -1; // temp snm 
+      mask(i, j, k) = (T(i, j, k) > CNSConstants::min_react_temp) ? 1 : -1; // temp snm 
+      //mask(i, j, k) = (T(i, j, k) > 500) ? 1 : -1; // temp snm 
     });
 
     // Not necessary to start a stream here, however pelePhysics function only takes a stream. Practically, launch and execution overhead determines  efficiency effect -- https://stackoverflow.com/questions/27038162/how-bad-is-it-to-launch-many-small-kernels-in-cuda#:~:text=Launch%20overhead%3A%20The%20overhead%20of,as%20the%20kernel%20in%20question. Seems unlikely this kernel launch cost will outweigh execution costs.
