@@ -1031,9 +1031,12 @@ void CNS::writePlotFilePost(const std::string &dir, std::ostream &os) {
           << ".vtk";
     std::string surf_name = sname.str();
 
-    // the line below should be written  only by ioproc 
-    if (this->level == parent->maxLevel() && amrex::ParallelDescriptor::IOProcessor()){
-      IBM::ib.plot_surface(time,igeom,surf_name);  
+    // if maximum level gather surfac data & plot
+    if (this->level == parent->maxLevel()){
+      IBM::ib.gather_surfdata_to_rank0(); 
+      if (amrex::ParallelDescriptor::IOProcessor()){
+        IBM::ib.plot_surface(time,igeom,surf_name); 
+      } 
     }
 
   }

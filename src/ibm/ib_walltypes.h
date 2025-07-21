@@ -32,7 +32,7 @@ class ibm_isothermal_slip_wall_t
   
   AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
   static void compute_surfIB(const Array1D<Real,0,AMREX_SPACEDIM-1>& /*xyz*/,const Array1D<Real,0,AMREX_SPACEDIM-1>& /*norm*/,
-                      Array2D<Real,0,eorder_tparm+1,0,cls_t::NPRIM-1>& q, const cls_t* cls) {
+                      Array2D<Real,0,eorder_tparm+1,0,cls_t::NPRIM-1>& q, const cls_t* /*cls*/) {
     
     // slip velocity (in local coordinates)
     q(1,cls_t::QU) = 0.0_rt; // un
@@ -71,7 +71,7 @@ class ibm_isothermal_noslip_wall_t
 
     AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
     static void compute_surfIB(const Array1D<Real,0,AMREX_SPACEDIM-1>& /*xyz*/,const Array1D<Real,0,AMREX_SPACEDIM-1>& /*norm*/,
-      Array2D<Real,0,eorder_tparm+1,0,cls_t::NPRIM-1>& q, const cls_t* cls) {
+      Array2D<Real,0,eorder_tparm+1,0,cls_t::NPRIM-1>& q, const cls_t* /*cls*/) {
 
       // slip velocity (in local coordinates)
       q(1,cls_t::QU) = 0.0; // un
@@ -109,7 +109,7 @@ class ibm_adiabatic_slip_wall_t
 
     AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
     static void compute_surfIB(const Array1D<Real,0,AMREX_SPACEDIM-1>& /*xyz*/,const Array1D<Real,0,AMREX_SPACEDIM-1>& /*norm*/,
-      Array2D<Real,0,eorder_tparm+1,0,cls_t::NPRIM-1>& q, const cls_t* cls) {
+      Array2D<Real,0,eorder_tparm+1,0,cls_t::NPRIM-1>& q, const cls_t* /*cls*/) {
 
       // slip velocity (in local coordinates)
       q(1,cls_t::QU) = 0.0_rt; // un
@@ -147,7 +147,7 @@ class ibm_adiabatic_noslip_wall_t
 
     AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
     static void compute_surfIB(const Array1D<Real,0,AMREX_SPACEDIM-1>& /*xyz*/,const Array1D<Real,0,AMREX_SPACEDIM-1>& /*norm*/,
-      Array2D<Real,0,eorder_tparm+1,0,cls_t::NPRIM-1>& q, const cls_t* cls) {
+      Array2D<Real,0,eorder_tparm+1,0,cls_t::NPRIM-1>& q, const cls_t* /*cls*/) {
 
       // slip velocity (in local coordinates)
       q(1,cls_t::QU) = 0.0_rt; // un
@@ -190,7 +190,7 @@ class ibm_general_wall_t
 
     AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
     static void compute_surfIB(const Array1D<Real,0,AMREX_SPACEDIM-1>& /*xyz*/,const Array1D<Real,0,AMREX_SPACEDIM-1>& /*norm*/,
-      Array2D<Real,0,eorder_tparm+1,0,cls_t::NPRIM-1>& q, const cls_t* cls) {
+      Array2D<Real,0,eorder_tparm+1,0,cls_t::NPRIM-1>& q, const cls_t* /*cls*/) {
 
       for (int n = 0; n <= cls_t::QLS; ++n) {
        q(1,n) = param::alpha[n]*q(2,n) + param::beta[n]; 

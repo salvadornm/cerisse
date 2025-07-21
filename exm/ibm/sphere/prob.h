@@ -170,44 +170,32 @@ void user_tagging(int i, int j, int k, int nt, auto& tagfab, const auto &sdatafa
   Real radius = sqrt(xrel[0]*xrel[0] + xrel[1]*xrel[1] + xrel[2]*xrel[2]);
   const Real Rmax = 0.5_rt;const Real Rmin = 0.2_rt;
   // initialize thresholds at all levels
-  // Real rhofluc_threshold[6] = {0.3_rt,0.6_rt,0.9_rt,1000_rt,1000_rt,1000_rt};
+  Real rhofluc_threshold[6] = {0.3_rt,0.6_rt,0.9_rt,1000_rt,1000_rt,1000_rt};
 
 
-  //tagfab(i,j,k) = x > 1.0; 
-
-  // refinement first step
-  // if ( nt==0) {
-    
-  //   if (level==0 ) {    
   tagfab(i,j,k) = (radius < Rmax ) && (radius > Rmin);
+  
+  // refine close to grads of density 
+  int URHO = ProbClosures::URHO; 
+  Real drhox = std::abs(sdatafab(i+1,j,k,URHO) - sdatafab(i-1,j,k,URHO));
+  Real drhoy = std::abs(sdatafab(i,j+1,k,URHO) - sdatafab(i,j-1,k,URHO));
+  Real drhoz = std::abs(sdatafab(i,j,k+1,URHO) - sdatafab(i,j,k-1,URHO));  
+  Real rhop  = sdatafab(i,j,k,URHO);
+  Real rhofluc = std::sqrt(drhox*drhox + drhoy*drhoy  + drhoz*drhoz)/rhop ;
 
-  //     tagfab(i,j,k) = x > 1.0; 
+  tagfab(i,j,k) = (rhofluc > rhofluc_threshold[level]);
 
-  //   }
+   // refine close to body (at all levels)
+    if (ibfab(i,j,k,1)) {
+      for (int ii = -1; ii <= 1; ii++) {
+        for (int jj = -1; jj <= 1; jj++) {
+          for (int kk = -1; kk <= 1; kk++) {
+            tagfab(i+ii,j+jj,k+kk) = true;
+          }
+        }
+      }
+    }
 
-  // }
-  // else
-  // {
-  //   int URHO = ProbClosures::URHO; 
-  //   // refine close to grads of density 
-  //   Real drhox = std::abs(sdatafab(i+1,j,k,URHO) - sdatafab(i-1,j,k,URHO));
-  //   Real drhoy = std::abs(sdatafab(i,j+1,k,URHO) - sdatafab(i,j-1,k,URHO));
-  //   Real rhop  = sdatafab(i,j,k,URHO);
-  //   Real rhofluc = std::sqrt(drhox*drhox + drhoy*drhoy)/rhop ;
-
-  //   tagfab(i,j,k) = (rhofluc > rhofluc_threshold[level]);
-
-  //   // always refine close to body (at all levels)
-  //   if (ibfab(i,j,k,1)) {
-  //     for (int ii = -1; ii <= 1; ii++) {
-  //       for (int jj = -1; jj <= 1; jj++) {
-  //         for (int kk = -1; kk <= 1; kk++) {
-  //           tagfab(i+ii,j+jj,k+kk) = true;
-  //         }
-  //       }
-  //     }
-  //   }
-  // }
 
 }
 //////////////////////////// Boundary conditions ///////////////////////////////
