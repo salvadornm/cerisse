@@ -26,7 +26,7 @@ G(\mathbf{x}-\mathbf{x}',\Delta) =
 \right.
 $$
 
-Other filter kernels are possible (see [Pope's book](https://www.cambridge.org/highereducation/books/turbulent-flows/C58EFF59AF9B81AE6CFAC9ED16486B3A#overview) for more detail on LES filters). In the finite volume method, when the filter width matches the local cell size , _i.e._, $$\Delta= h$$ and the filter used is the box filter; the _cell-averaged_ value of a variable is equivalent to its _filtered_ value.
+Other filter kernels are possible (see [Pope's book](https://www.cambridge.org/highereducation/books/turbulent-flows/C58EFF59AF9B81AE6CFAC9ED16486B3A#overview) for more detail on LES filters). In the finite volume method, when the **filter width matches the local cell size** , _i.e._, $$\Delta= h$$ and the **filter used is the box filte**r; the _cell-averaged_ value of a variable is equivalent to its _filtered_ value.
 
 For variable density flows it is convenient to introduce the mass-weighted Favre filtering operation :
 
@@ -115,13 +115,14 @@ A sub-grid viscosity is introduced, similar to turbulent viscosity in RANS-type 
 
 #### Smagorinsky Model
 
-The Smagorinsky model [\[3\]](les.md#references) assumes that small, unresolved turbulent eddies behave like an **eddy viscosity**, enhancing momentum diffusion.&#x20;
+The Smagorinsky model [\[3\]](les.md#references) assumes that small, unresolved turbulent eddies behave like an **eddy viscosity**, enhancing momentum diffusion, with a characteristic length scale $$\ell_{sgs}$$.&#x20;
 
 $$
 \mu_{sgs}  = \bar{\rho} (C_S \Delta) ^2 || \tilde{S}_{ij} ||
 $$
 
-with $$\tilde{S}_{ij}$$represents the filtered strain tensor and $$C_S$$ the Smagorinsky constant, with values between **0.1-0.2**. $$||\tilde{S}_{ij}|| = \sqrt{2 \tilde{S}_{ij} \tilde{S}_{ij} }$$ is the Frobenius norm of the filtered strain tensor.  The length scale $$l_{sgs}= C_S \Delta$$ is a sub-grid length scale, which can be consider proportional to the integral lenght-scale $$\ell$$. The model assumes that small scales are isotropic
+with $$\tilde{S}_{ij}$$represents the filtered strain tensor and $$C_S$$ the **Smagorinsky constant,** with values between **0.1** and **0.2**.\
+&#x20;$$||\tilde{S}_{ij}|| = \sqrt{2 \tilde{S}_{ij} \tilde{S}_{ij} }$$ is the Frobenius norm of the filtered strain tensor. The length scale $$l_{sgs}= C_S \Delta$$ is a sub-grid length scale, which can be consider proportional to the integral length-scale $$\ell$$. The Smagorinsky model (and most gradeint models) assumes that small sub-grid scales are isotropic.
 
 #### WALE Model
 
@@ -154,7 +155,7 @@ $$
 \bar{\rho}  D_{sgs} = \frac{\mu_{sgs}}{\text{Sc}_{sgs}}
 $$
 
-with $$\text{Sc}_{sgs}$$ is a constant often taken as **0.4-1**. All species diffuse at the smallest scales _due to turbulence_ at the same speed.
+with $$\text{Sc}_{sgs}$$ is a constant often taken  between **0.4** and **1**, or found using a dynamic procedure. All species diffuse at the smallest scales _due to turbulence_ at the same speed.
 
 $$
 \overline{\rho u_j (e_t + P/\rho )}  = \bar{\rho} \widetilde{ u_j h_t} = \bar{\rho}\tilde{u}_j \tilde{h}_t - \lambda_{sgs} \frac{\partial \tilde{T}}{\partial x_j}
@@ -186,7 +187,13 @@ $$
 k_{sgs} =\frac{3}{2} \tau_{kk}  = C_Y \Delta^2 ||\tilde{S}_{ij}||^2
 $$
 
-with $$C_Y$$ taken as **0.0066**
+with $$C_Y$$ taken as **0.0066** .
+
+### Other LES  stategies
+
+Other LES approaches do not use gradient-type models. For example, **Implicit Large Eddy Simulation** (ILES) is a class of turbulence modelling techniques where **no explicit sub-grid scale  model is added**. Instead, the **numerical discretisation itself acts as the turbulence model**. ILES assumes that a carefully chosen numerical scheme (e.g., monotonicity-preserving, shock-capturing, or flux-limited) can do this naturally. ILES is very sensitive to mesh and numerics,  and it may show more numerical dissipation at small scales[\[4\]](les.md#references). However, with  appropriate schemes,  they can recover the correct total energy decay rate. Similarly, using explicit sub-grid models close to shocks is not recommended.\
+To select this model in Cerisse  ran DNS with appropiate numerics (for example [WENO-type schemes](numerical-methods.md)).\
+Alternatively, joint velocity LES-PDF models [\[5\]](les.md#references) do not need gradient-type sub-grid models (see [Turbulent Combustion modelling](turbcomb.md) for a more detailed description)
 
 ### Other unknowns
 
@@ -196,13 +203,17 @@ $$
 \overline{q}_j \approx - \lambda (\tilde{T}) \frac{\partial \tilde{T}}{\partial x_j}
 $$
 
-Molecular fluxes scale with the inverse of Reynolds number, $$\text{Re}^{-1}$$, making them relatively small in turbulent flows. Consequently, errors associated with molecular transport properties often (but not always) have a small impact in the solution.
+Molecular fluxes scale with the inverse of Reynolds number, $$\text{Re}^{-1}$$, making them relatively small in turbulent flows. Consequently, errors associated with molecular transport properties often (but not always) have a small impact in the solution of turbulent flows. &#x20;
 
 #### References
 
-\[1] Nicoud, F., Ducros, F. Subgrid-Scale Stress Modelling Based on the Square of the Velocity Gradient Tensor. [_Flow, Turbulence and Combustion_ 62, 183–200 (1999).](https://doi.org/10.1023/A:1009995426001)\
-\[2] Yoshizawa, A.   Horiuti,  K A Statistically-Derived Subgrid-Scale Kinetic Energy Model for the Large-Eddy Simulation of Turbulent Flows.[ _Journal of the Physical Society of Japan, 54, 2834-2839 (1985)_](https://doi.org/10.1143/JPSJ.54.2834)\
+\[1] Nicoud, F., Ducros, F. (1999) Subgrid-Scale Stress Modelling Based on the Square of the Velocity Gradient Tensor. [_Flow, Turbulence and Combustion_ 62, 183–200](https://doi.org/10.1023/A:1009995426001)\
+\[2] Yoshizawa, A.   Horiuti,  K. A. (1985) Statistically-Derived Subgrid-Scale Kinetic Energy Model for the Large-Eddy Simulation of Turbulent Flows.[ _Journal of the Physical Society of Japan, 54, 2834-2839_](https://doi.org/10.1143/JPSJ.54.2834)\
 \[3] Smagorinsky, J. (1963). General circulation experiments with the primitive equations. [_Monthly Weather Review, 91(3):99–164._](https://doi.org/10.1175/1520-0493\(1963\)091%3C0099:GCEWTP%3E2.3.CO;2)\
+\[4] Garnier, E , Mossi, M , Sagaut , P, Comte, P, Deville, M (1999) On the Use of Shock-Capturing Schemes for Large-Eddy Simulation. [_Journal of Computational Physics 153(2): 273-311_](https://doi.org/10.1006/jcph.1999.6268)\
+\[5] Un, T-H, Navarro-Martinez, S. Stochastic fields with adaptive mesh refinement for high-speed turbulent combustion, [_Combustion and  Flame_, 272, 113897 (2025)](https://doi.org/10.1016/j.combustflame.2024.113897) \
+\[6] Boris J. P, Grinstein, F. F. , Oran, E. S. Kolbe, R. S. (1992) New insights into large eddy simulation. [_Fluid Dynamics Research 10(4): 199-228_](https://doi.org/10.1016/0169-5983\(92\)90023-P)
+
 
 
 \

@@ -49,7 +49,7 @@ Embedded Boundaries are **AMReX** native, while Immersed Boundaries are **Ceriss
 If PelePhysics selected, the GNU Makefile specifies the thermodynamics, transport, and chemistry mechanisms. It uses the [PelePhysics](https://pelephysics.readthedocs.io/en/latest/index.html) style.
 
 {% hint style="warning" %}
-The first time preparing  PelePhysics simulation do `make TPL` to download and compile third-party libraries
+The first time preparing PelePhysics simulation do `make TPL` to download and compile third-party libraries
 {% endhint %}
 
 ```makefile
@@ -80,22 +80,30 @@ include $(AMR_SOLVER)/src/Make.CNS
 
 ## Other Flags
 
-The most common in the option to use the utilities class
+Is possible to define specific pre-processing flags that are passed to the compiler, these are all **optional**.  The most common is the option to use the utilities class, which links with PelePhysics and other utilities .
 
 ```makefile
 USE_UTILITIES = TRUE
 ```
-which allow use the utilities class (see SET-UP).
 
-Is possible to define specific pre-processing flags that are passed to the compiler. An example is the flag
+Other specific flags include
 
 ```
 CLIP_MINTEMP = TRUE
 ```
 
-which limits the minimum temperature in the system to 10 K (this number can be changed in `CNSConstants.h`). The above line will pass the flag `-DCLIP_TEMPERATURE_MIN=1`  to the compiler. The actual process is defined in `Make.CNS.`&#x20;
+which limits the minimum temperature in the system to 10 K (this number can be changed manually in `CNSConstants.h`). The above line will pass the flag `-DCLIP_TEMPERATURE_MIN=1` to the compiler (the actual process is defined in `Make.CNS` )
 
+```
+ENSURE_MASSFRACSUM = TRUE
+```
+
+Which ensures that the sum of mass fractions defined is equal to 1. Only matrers when using  multi-species chemistry. It will set the compiler flag `-DENSURE_MASSFRACSUM_ONE=1`
 
 {% hint style="warning" %}
 Creating new flags is simple, although is generally **not** recomended as they need to be hard-coded.
+{% endhint %}
+
+{% hint style="danger" %}
+By default the flags in the **GNUMakefile** are set to `FALSE`
 {% endhint %}

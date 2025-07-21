@@ -39,6 +39,10 @@ The code can be obtained in the usual way
 7. **CGAL** (optional) This is the Computational Geometry Algorithms Library [CGAL](https://www.cgal.org), required to do the needed geometric computation in the case of [immersed boundaries](theory/ibmeb.md#immersed-boundaries). To install see [Installation CGAL](quickstart.md#installation-cgal)
 8. **Visualization** Cerisse/AMREx/PeleC format is supported by [VisIt](https://visit-dav.github.io/visit-website/), [Paraview](https://www.paraview.org), [yt](https://yt-project.org) (allows Python) and check for more options [AMReX Visualization](https://amrex-codes.github.io/amrex/docs_html/Visualization.html)
 
+{% hint style="success" %}
+There is a bash script in `bin/checkreq.sh` that will check if basic requirements are met in your local machine.
+{% endhint %}
+
 #### Installation AMREX and PelePhysics
 
 To install auxiliar packages, **AMReX** and **PelePhysics**

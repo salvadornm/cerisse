@@ -117,7 +117,7 @@ $$
 E(k) \propto k^{4} exp(-2 k/k_0)
 $$
 
-with $$k_0=2$$, following [Garnier et al](https://doi.org/10.1006/jcph.1999.6268) This  ensures a large scale turbulence with most energy in the large scales around wavenumber 2. The solution will decay into homogeneous isotropic turbulence, increasing enstropy and then followed a conventional decay. The domain is a cube of size  $$2 \pi$$, velocity   $$2 \phi$ , with reference values of$$$$u_0 = u_{rms} = 1$$ and $$T_0=1$$, with $$\gamma=1.4$$ and a reference pressure of $$p_0=17.86$$. The simulations are run until non-dimensional time of $$t^\ast=10$$
+with $$k_0=2$$, following [Garnier et al](https://doi.org/10.1006/jcph.1999.6268) This  ensures a large scale turbulence with most energy in the large scales around wavenumber 2. The solution will decay into homogeneous isotropic turbulence, increasing enstropy and then followed a conventional decay. The domain is a cube of size  $$2 \pi$$,  with velocity   $$u_0 = u_{rms} = 1$$ and $$T_0=1$$, with $$\gamma=1.4$$ and a reference pressure of $$p_0=17.86$$. The simulations are run until non-dimensional time of $$t^\ast=10$$
 
 To generate the initial turbulent spectra, the provided python script can be used
 

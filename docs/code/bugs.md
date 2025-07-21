@@ -16,7 +16,7 @@ examples do not compile
 
 **Fix:**
 
-* Check requirements by executing the `checreq.sh` script in `cerisse/bin`
+* Check requirements by executing the `checkreq.sh` script in `cerisse/bin`
 
 ```
 sundials not installed
@@ -24,7 +24,7 @@ sundials not installed
 
 **Fix:**
 
-* Ensure to do `make TPL` the first time you prepara a simualytion involving reacting chemistry.
+* Ensure to do `make TPL` the first time you prepare a simulation involving reacting chemistry.
 
 ### input file
 
@@ -127,17 +127,31 @@ fatal error: mechanism.H
 * Check whether the mechanism is supported in your PelePhysics version (e.g., v25).
 * Alternatively, convert your chemistry input from CHEMKIN or YAML format using available tools
 
+## Warnings
+
+Running using **clang** compiler
+
+```
+clang++: warning: argument unused during compilation: '-rdynamic' [-Wunused-command-line-argument]
+```
+
+This flag (-rdynamic) is used mostly on Linux to export all symbols for use with runtime libraries. On **macOS**, it is unused and ignored by clang++. You can safely ignore this warning.
+
+{% hint style="danger" %}
+**DEBUG** mode can generate many warnings, particularly from libraries like CGAL, which are usually harmless. Still, warnings in files like `prob.h` may point to real issues or inefficiencies and should be reviewed. It is good practice to keep the code warning-free.
+{% endhint %}
+
 ## Known bugs
 
 ### Skew
 
 {% hint style="danger" %}
 **Issue:**\
-6th order Skew-symmetric scheme does not work. Cause unknown, probably a big in coefficients.
+6<sup>th</sup> order Skew-symmetric scheme does not work.  The cause is currently unknown, probably a bug in the coefficients.
 {% endhint %}
 
 **Workaround:**\
-NRY, use different scheme
+Use a different scheme, it will be fixed soon (2025)
 
 ### IBM-Specific
 
@@ -147,7 +161,7 @@ Mesh refinement fails near the immersed body at simulation step 0.
 {% endhint %}
 
 **Workaround:**\
-Apply solid marker-based refinement only after time step 0 using a condition like:
+Apply solid marker-based refinement only after time step 0, or consider using a refinement condition based on geometric criteria — for example, refine regions where `x < 1`, or where the distance to a specific point exceeds a threshold..&#x20;
 
 {% hint style="danger" %}
 **Issue:**\
@@ -155,7 +169,7 @@ Restarts using checkpoints and IBM must have the same number of levels.
 {% endhint %}
 
 **Workaround:**\
-NRY
+This is a bug to be fixed, hopefully soon (2025)
 
 ## Features missing
 

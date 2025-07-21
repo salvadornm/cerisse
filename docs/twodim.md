@@ -231,7 +231,7 @@ This test is highly sensitive to the flux redistribution algorithm (see [availab
 
 This implies that, without any form of redistribution, the CFL number may need to be reduced to below **0.006** to maintain stability. The exact threshold is strongly dependent on the numerical scheme being used. High-order schemes—such as TENO—are particularly susceptible to instabilities in the presence of very small fluid volumes.
 
-<figure><img src=".gitbook/assets/cylindernumerics.png" alt=""><figcaption><p>Figure 5: Snaphost using dofferent nuemrical methods. Base mesh 80 x 160 using 2 levels of refinement next to cylinder and density gradients</p></figcaption></figure>
+<figure><img src=".gitbook/assets/cylindernumerics.png" alt=""><figcaption><p>Figure 5: Snapshot using different numerical methods. The base mesh is 80 × 160, with two levels of refinement applied near the cylinder and in regions of strong density gradients</p></figcaption></figure>
 
 ## Von-Karmann vortex behind a square cylinder
 
@@ -241,7 +241,7 @@ Skew-symmetric 4th order, using dissipation, with constants **C2=0.5** and **C4=
 
 <figure><img src=".gitbook/assets/VonKarmann0000.png" alt=""><figcaption><p>Figure 6: Vorticity plots, showing the Von-Karmman sheet after the square cylinder. <br>Dimensions scaled with the half width of the square </p></figcaption></figure>
 
-Density contour plots can be seen by (Figrue 6 obtained with Visit)
+Density contour plots can be seen by (Figure 6 obtained with Visit)
 
 ```bash
 $ python plot.py

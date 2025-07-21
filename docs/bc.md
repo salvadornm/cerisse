@@ -151,6 +151,20 @@ ib.filename = sphere_fine_20k.stl
 
 <figure><img src=".gitbook/assets/plane.png" alt=""><figcaption><p>Example of STL file</p></figcaption></figure>
 
+Additional  options in IBM include
+
+```
+#-------------------------------- IMMERSED BOUNDARY ---------------------------#
+ib.move = 0
+ib.plot_surf = 1
+ib.surf_file = plot/surf
+ib.surf_int  = 100
+```
+
+with explanation below. These are optional when using IBM
+
+<table><thead><tr><th width="209">Options</th><th width="125">Type</th><th>Description</th></tr></thead><tbody><tr><td><strong>ib.move</strong></td><td>Int </td><td>(0/1) placeholder for moving geometries (a movement template has to be specified)</td></tr><tr><td><strong>ib.plot_surf</strong></td><td>Int </td><td>(0/) Calculate surface properties and output to a VTK file </td></tr><tr><td><strong>ib.suf_file</strong></td><td>String</td><td>Prefix of  surface plot output</td></tr><tr><td><strong>ib_surf_int</strong></td><td>Int</td><td>Frequency of surface plot output</td></tr></tbody></table>
+
 ### prob.h
 
 A IBM header needs to be included in the file.
@@ -219,7 +233,9 @@ USE_EB=TRUE
 
 ### input
 
-In the `input` file, users should specify the geometry of the embedded boundary with `eb2.geom_type`, then supply the required parameters in the format of `eb2.{geom_param}`. (see input for detail). This allow to define completely the geometry.
+In the `input` file, users should specify the geometry of the embedded boundary with `eb2.geom_type`, then supply the required parameters in the format of `eb2.{geom_param}` (see [input ](bc.md#input-1)for detail). This allows to define completely the geometry.
+
+<table><thead><tr><th width="209">Options</th><th width="125">Type</th><th>Description</th></tr></thead><tbody><tr><td><strong>eb2.geom_type</strong></td><td>String</td><td>Type of geometry  (see <a href="bc.md#input-1">input </a>for detail)</td></tr><tr><td><strong>eb2.eb_weight</strong></td><td>Real</td><td>Usually 1.0, weight for redistribution</td></tr><tr><td><strong>eb2.redistribution_type</strong></td><td>String</td><td><strong>StateRedist/FluxRedist/NewRedist/NoRedist</strong><br>Type of redistribution used to by-pass teh small cut-cell problem. See <a href="theory/ibmeb.md">theory</a> and <a href="code/ebm.md">implementation</a></td></tr></tbody></table>
 
 ### prob.h
 
