@@ -181,21 +181,4 @@ class keep_euler_t {
   }
 };
 
-// Immersed boundaries ///////////////////////////////////////////////////
-// TODO: the following if results in a compilation error with USE_IBM as all
-// branches of constexpr if are evaluated at compile time and IBMultiFab is not
-// defined without USE_IBM. This is a problem as we want to use the same code
-// for both IBM and non-IBM cases. if constexpr (PROB::do_ibm==1) {
-//   IBM::IBMultiFab& mfab = *IBM::ibMFa[level]; // this is ugly
-//   // field array
-//   auto& ibfab = mfab.get(mfi);
-//   auto const& conFabArr  = consmf.array(mfi); // this is a const
-//   because.array() returns a const but we can still modify conFab as consmf
-//   input argument is not const auto const& primFabArr = primsmf.array(mfi);
-//   auto const& ibFabArr = mfab.array(mfi);
-
-//   IBM::IBMultiFab& mfab = *ibMFa[level];
-//   IBM::ib.computeGPs(consfab, primsfab, ibfab, cls);
-// }
-
 #endif

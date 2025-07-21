@@ -4,7 +4,8 @@ case  $1 in
 	tput setaf 2
 	echo " ... removing plt*, *.tmp  files"
 	tput sgr0
-    	rm -rf ./plot/plt*
+    rm -rf ./plot/plt*
+	rm -rf ./plot/*.vtk
 	rm -f *.tmp
 	rm -f *.visit
 	rm -f *.log

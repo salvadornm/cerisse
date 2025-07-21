@@ -25,12 +25,10 @@ Real CNS::advance(Real time, Real dt, int /*iteration*/, int /*ncycle*/) {
   // }
 
 
-  
 
   state[0].allocOldData();
   state[0].swapTimeLevels(dt);
   
-
   MultiFab& S1 = get_old_data(State_Type);
   MultiFab& S2 = get_new_data(State_Type);
 
@@ -233,7 +231,8 @@ Real CNS::advance(Real time, Real dt, int /*iteration*/, int /*ncycle*/) {
       if (ibMarkers(i, j, k, 1)) {
 
         IntVect iv(AMREX_D_DECL(i, j, k)); 
-        Real cons[cls_h.NCONS];        
+        //Real cons[cls_h.NCONS];        
+        Real cons[PROB::ProbClosures::NCONS];
         cls_h.prims2cons(iv,prims,cons);        
         for (int n = 0; n < cls_h.NCONS; n++) {
           state(i, j, k, n) = cons[n];
@@ -242,6 +241,7 @@ Real CNS::advance(Real time, Real dt, int /*iteration*/, int /*ncycle*/) {
       }
     });
   }
+
 #endif
 
   // else if (order_rk == 4) {

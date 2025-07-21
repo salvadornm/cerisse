@@ -152,43 +152,40 @@ void prob_initdata (int i, int j, int k, amrex::Array4<amrex::Real> const& state
 
 }
 
+
+
 AMREX_GPU_DEVICE AMREX_FORCE_INLINE 
 void user_tagging(int i, int j, int k, int nt, auto& tagfab, const auto &sdatafab, 
                   const Array4<bool>&ibfab, const auto& geomdata, 
                   const ProbParm& pparm , int level) {
 
+  const Real* prob_lo = geomdata.ProbLo();                  
   const Real* dx  = geomdata.CellSize();
-  const Real x = (i+0.5_rt)*dx[0];
-  const Real y = (j+0.5_rt)*dx[1];
-  const Real z = (k+0.5_rt)*dx[2];
-  Real xrel[3];
+  const Real x =  prob_lo[0] + (i+0.5_rt)*dx[0];
+  const Real y =  prob_lo[1] + (j+0.5_rt)*dx[1];
+  const Real z =  prob_lo[2] + (k+0.5_rt)*dx[2];
   // coordinate relative to object
+  Real xrel[3];  
   xrel[0]= x-pparm.x0; xrel[1]= y-pparm.y0; xrel[2]= z-pparm.z0;
-  Real radius =xrel[0]*xrel[0] + xrel[1]*xrel[1] + xrel[2]*xrel[2];
-  const Real Rmax = 0.5_rt*0.5_rt;const Real Rmin = 0.15_rt*0.15_rt;
+  Real radius = sqrt(xrel[0]*xrel[0] + xrel[1]*xrel[1] + xrel[2]*xrel[2]);
+  const Real Rmax = 0.5_rt;const Real Rmin = 0.2_rt;
   // initialize thresholds at all levels
   Real rhofluc_threshold[6] = {0.3_rt,0.6_rt,0.9_rt,1000_rt,1000_rt,1000_rt};
 
-  // refinement first step
-  if ( nt==0) {
-    
-    if (level==0 ) {    
-      tagfab(i,j,k) = (radius < Rmax ) && (radius > Rmin);
-    }
 
-  }
-  else
-  {
-    int URHO = ProbClosures::URHO; 
-    // refine close to grads of density 
-    Real drhox = std::abs(sdatafab(i+1,j,k,URHO) - sdatafab(i-1,j,k,URHO));
-    Real drhoy = std::abs(sdatafab(i,j+1,k,URHO) - sdatafab(i,j-1,k,URHO));
-    Real rhop  = sdatafab(i,j,k,URHO);
-    Real rhofluc = std::sqrt(drhox*drhox + drhoy*drhoy)/rhop ;
+  tagfab(i,j,k) = (radius < Rmax ) && (radius > Rmin);
+  
+  // refine close to grads of density 
+  int URHO = ProbClosures::URHO; 
+  Real drhox = std::abs(sdatafab(i+1,j,k,URHO) - sdatafab(i-1,j,k,URHO));
+  Real drhoy = std::abs(sdatafab(i,j+1,k,URHO) - sdatafab(i,j-1,k,URHO));
+  Real drhoz = std::abs(sdatafab(i,j,k+1,URHO) - sdatafab(i,j,k-1,URHO));  
+  Real rhop  = sdatafab(i,j,k,URHO);
+  Real rhofluc = std::sqrt(drhox*drhox + drhoy*drhoy  + drhoz*drhoz)/rhop ;
 
-    tagfab(i,j,k) = (rhofluc > rhofluc_threshold[level]);
+  tagfab(i,j,k) = (rhofluc > rhofluc_threshold[level]);
 
-    // always refine close to body (at all levels)
+   // refine close to body (at all levels)
     if (ibfab(i,j,k,1)) {
       for (int ii = -1; ii <= 1; ii++) {
         for (int jj = -1; jj <= 1; jj++) {
@@ -198,7 +195,7 @@ void user_tagging(int i, int j, int k, int nt, auto& tagfab, const auto &sdatafa
         }
       }
     }
-  }
+
 
 }
 //////////////////////////// Boundary conditions ///////////////////////////////

@@ -1,6 +1,6 @@
-DEBUG   = FALSE
-DIM     = 3
-COMP     = gcc
+DEBUG     = FALSE
+DIM       = 3
+COMP      = gcc
 CXXSTD    = c++20
 PRECISION = DOUBLE
 
