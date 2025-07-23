@@ -28,14 +28,14 @@ using namespace amrex;
 
 namespace PROB {
 
-typedef closures_dt<indicies_t, visc_suth_t,cond_suth_t ,  multispecies_pele_gas_t<indicies_t>> ProbClosures;
+typedef closures_dt<indicies_t, transport_Pele_t , multispecies_pele_gas_t<indicies_t>> ProbClosures;
 
 // problem parameters 
 
 struct ProbParm {  
   // inflow state for initialisation
   //const Real p_inflow    = pres_atm2si; //[Pa] inflow pressure (1 atm)  
-  const Real T_inflow    = 291.7;  //[K]  
+  const Real T_inflow    = 285.5; //[K]  
   Real Y_inflow[NUM_SPECIES] = {1.0};
   ProbClosures pp_pc;
 
@@ -65,7 +65,6 @@ struct ProbParm {
   
   // inside combustor state/exit
   const Real p_0     = pres_atm2si; //[Pa] inflow pressure (1 atm) 
-  const Real p_bc    = p_0;
   const Real T_0     = 285.5;  //[K]  
   Real rho_0, eint_0;
 
@@ -117,11 +116,15 @@ template <typename cls_t > class user_source_t;
 
 // define nuemrical scheme comment/uncomment to set up 
 //typedef rhs_dt<weno_t<ReconScheme::Teno5, ProbClosures>, viscous_t<viscous_param_t, ProbClosures>, user_source_t<ProbClosures> > ProbRHS;
-//typedef rhs_dt<weno_t<ReconScheme::Teno5, ProbClosures>, viscous_t<viscous_param_t, ProbClosures>, no_source_t> ProbRHS;
+//typedef rhs_dt<weno_t<ReconScheme::Teno5, ProbClosures>, viscous_t<viscous_param_t, ProbClosures>, reactor_source_t<user_source_t<ProbClosures>,ProbClosures >> ProbRHS;
+ typedef rhs_dt<weno_t<ReconScheme::WenoZ5, ProbClosures>, viscous_t<viscous_param_t, ProbClosures>, reactor_source_t<user_source_t<ProbClosures>,ProbClosures >> ProbRHS;
 
 //typedef rhs_dt<riemann_t<false, ProbClosures>, viscous_t<viscous_param_t, ProbClosures>, user_source_t<ProbClosures> > ProbRHS;
+<<<<<<< HEAD
 typedef rhs_dt<weno_t<ReconScheme::WenoZ5, ProbClosures>, viscous_t<viscous_param_t, ProbClosures>, reactor_source_t<user_source_t<ProbClosures>,ProbClosures >> ProbRHS;
 //typedef rhs_dt<weno_t<ReconScheme::Teno5, ProbClosures>, viscous_t<viscous_param_t, ProbClosures>, reactor_source_t<user_source_t<ProbClosures>,ProbClosures >> ProbRHS;
+=======
+>>>>>>> personalgithub/reacting_ntnu
 //typedef rhs_dt<riemann_t<false, ProbClosures>, viscous_t<viscous_param_t, ProbClosures>, reactor_source_t<user_source_t<ProbClosures>,ProbClosures > > ProbRHS;
 
 
@@ -163,6 +166,8 @@ prob_initdata(int i, int j, int k, Array4<Real> const &state,
   eint =  prob_parm.eint_0;
 
   /**
+  
+  // const Real r = sqrt(x*x + y*y + (z-0.1)*(z-0.1));
   const Real r = sqrt(x*x + y*y);
   const Real z_low = 0.048;
   const Real z_hi = 0.060;
@@ -180,6 +185,8 @@ prob_initdata(int i, int j, int k, Array4<Real> const &state,
   cls.RYP2E(rhot, y_sp, prob_parm.p_0, eint); 
   
   
+  
+
   Real kin = Real(0.5) * rhot * (u[0] * u[0] + u[1] * u[1] + u[2]*u[2]);
   //state(i, j, k, cls.URHO) = rhot;
   state(i, j, k, cls.UMX)  = rhot * u[0];
@@ -208,20 +215,20 @@ bcnormal(const Real x[AMREX_SPACEDIM], Real dratio, const Real s_int[ProbClosure
       break;
       }
     case  2:  // SOUTH
-      GlobalBC::bc_fixP(0.0,1.0,0.0,&closures,prob_parm.p_bc, s_int, s_ext); 
+      GlobalBC::bc_fixP(0.0,1.0,0.0,&closures,prob_parm.p_0, s_int, s_ext); 
       break;
     case  1:  // WEST
-      GlobalBC::bc_fixP(1.0,0.0,0.0,&closures,prob_parm.p_bc, s_int, s_ext); 
+      GlobalBC::bc_fixP(1.0,0.0,0.0,&closures,prob_parm.p_0, s_int, s_ext); 
       break;
     case -1:  // EAST
-      GlobalBC::bc_fixP(-1.0,0.0,0.0,&closures,prob_parm.p_bc, s_int, s_ext);  
+      GlobalBC::bc_fixP(-1.0,0.0,0.0,&closures,prob_parm.p_0, s_int, s_ext);  
       break;
     case -2:  // NORTH
-      GlobalBC::bc_fixP(-1.0,0.0,0.0,&closures,prob_parm.p_bc, s_int, s_ext); 
+      GlobalBC::bc_fixP(-1.0,0.0,0.0,&closures,prob_parm.p_0, s_int, s_ext); 
       break;
     case -3:   //RIGHT 
       {
-      GlobalBC::bc_fixP(0.0,0.0,-1.0,&closures,prob_parm.p_bc, s_int, s_ext);  
+      GlobalBC::bc_fixP(0.0,0.0,-1.0,&closures,prob_parm.p_0, s_int, s_ext);  
 
       //GlobalBC::bc_subsonic_outflow_fixP(0.0,0.0,-1.0,&closures,prob_parm.p_0, s_int, s_ext);  
       break;  
@@ -305,16 +312,17 @@ class user_source_t {
   void inline rsrc(const Geometry& geomdata, const amrex::MFIter &mfi,
                   const amrex::Array4<const amrex::Real> &prims,
                   const amrex::Array4<amrex::Real> &rhs, const cls_t *cls_d,
-                  amrex::Real dt){
+                  amrex::Real dt, amrex::Real real_time){
 
     const Box& bxg = mfi.tilebox();
     // const Box& bxg = mfi.growntilebox(cls_t::NGHOST);
     const Real *prob_lo = geomdata.ProbLo();
     const Real *dx = geomdata.CellSize();
 
+    Real timestep = real_time / dt;
+
     ProbParm const prob_parm;
     const auto& cls = *cls_d;
-
 
     amrex::ParallelFor(bxg,
       [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept
@@ -326,10 +334,14 @@ class user_source_t {
       const Real r = sqrt(x*x + y*y + (z-prob_parm.zexit)*(z-prob_parm.zexit));
       
       // pressure relax  if P > P0  P drops and to keep T constant rho drops
+<<<<<<< HEAD
       const Real tau_relax = 50.0*dt; 
+=======
+>>>>>>> personalgithub/reacting_ntnu
       const Real coef =dt/tau_relax;
+      Real pres = prims(i,j,k,cls.QPRES);
 
-      const Real dP = (prob_parm.p_bc- prims(i,j,k,cls.QPRES))*coef;
+      const Real dP = (prob_parm.p_0- pres)*coef;
     
       const Real T = prims(i,j,k,cls.QT); // dT =0
       const Real rho  = prims(i, j, k, cls.QRHO);
@@ -348,7 +360,7 @@ class user_source_t {
                     + prims(i,j,k,cls.QW)*prims(i,j,k,cls.QW));
       Real Et  = prims(i,j,k,cls.QEINT) + kin;
     
-      bool buffer = (z > prob_parm.zexit) && (r > 0.035);
+      bool buffer = (z > prob_parm.zexit) && (r > 0.05);
 
       if (buffer){        
         rhs(i,j,k,cls.UMX) += prims(i,j,k,cls.QU)*drhodt;
@@ -360,7 +372,65 @@ class user_source_t {
         }                        
       }
 
+      /// temporary buffer layer so no pressure spikes in injector at initialisation
 
+      if (timestep < 2000) {
+        const Real z_low = 0.01;
+        const Real z_hi = 0.040;
+        const Real coef_2 = 10;
+
+        if (z >= z_low && z <= z_hi){
+          /**
+          Real pres_dif = (prob_parm.p_0 - pres) / coef_2;
+          Real rho_dif;
+          cls.PYT2R(pres_dif,Y,T,rho_dif);
+          Real rho_dif_dt = rho_dif / dt;
+          
+          rhs(i,j,k,cls.UMX) += prims(i,j,k,cls.QU)*rho_dif_dt;
+          rhs(i,j,k,cls.UMY) += prims(i,j,k,cls.QV)*rho_dif_dt; 
+          rhs(i,j,k,cls.UMZ) += prims(i,j,k,cls.QW)*rho_dif_dt;
+          rhs(i,j,k,cls.UET) += Et*rho_dif_dt;
+            for (int sp = 0; sp < NUM_SPECIES; sp++) {
+          rhs(i,j,k, cls.UFS + sp) += prims(i,j,k, cls.QFS + sp) * rho_dif_dt;  
+          }
+        */
+
+        Real w_deficit = (Real)0 - prims(i,j,k, cls.QW);
+        if (w_deficit < 0) {
+          Real w_source = prob_parm.Q / prims(i,j,k,cls.QRHO);
+          w_source /= (dt * coef_2);
+          rhs(i,j,k,cls.UMZ) += prims(i,j,k,cls.QRHO) * w_source;
+        }
+
+        }
+      }
+
+
+
+
+
+      /// igniting flow through source term in energy equation
+      /**
+      if (timestep < 1000) {
+
+          const Real r_cylinder = sqrt(x*x + y*y);
+          const Real z_low = 0.048;
+          const Real z_hi = 0.060;
+          if (r_cylinder <= 0.0095 && z >= z_low && z <= z_hi) {
+
+            const Real T_ignite = 1000;
+            Real rho_ignite, eint_ignite, rel_eint, releint_dt;
+            cls.PYT2R(pres, Y, T_ignite, rho_ignite);
+            cls.RYP2E(rho_ignite, Y, pres, eint_ignite);
+            rel_eint = eint_ignite - prims(i,j,k,cls.QEINT);
+            releint_dt = rel_eint / dt;
+            Real ratio = (1001 - 5*timestep);
+            releint_dt /= std::max(ratio,(Real)1);
+            rhs(i,j,k,cls.UET) += rho * releint_dt;
+          }
+      }
+      */
+    
       });
 
   };

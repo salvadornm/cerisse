@@ -44,7 +44,7 @@ class reactor_source_t {
   void inline src(const Geometry& geomdata, const amrex::MFIter& mfi,
                   const amrex::Array4<const amrex::Real>& prims,
                   const amrex::Array4<amrex::Real>& rhs, const cls_t* cls_d,
-                  amrex::Real dt) {
+                  amrex::Real dt, amrex::Real real_time) {
     if (!m_initialized) amrex::Abort("reactor_t not initialised");
 
     // amrex::Print() << "reactor_t::src()" << std::endl;
@@ -108,7 +108,7 @@ class reactor_source_t {
 
       // fill mask      
       mask(i, j, k) = (T(i, j, k) > CNSConstants::min_react_temp) ? 1 : -1; // temp snm 
-
+      //mask(i, j, k) = (T(i, j, k) > 500) ? 1 : -1; // temp snm 
     });
 
     // Not necessary to start a stream here, however pelePhysics function only takes a stream. Practically, launch and execution overhead determines  efficiency effect -- https://stackoverflow.com/questions/27038162/how-bad-is-it-to-launch-many-small-kernels-in-cuda#:~:text=Launch%20overhead%3A%20The%20overhead%20of,as%20the%20kernel%20in%20question. Seems unlikely this kernel launch cost will outweigh execution costs.
@@ -170,7 +170,7 @@ class reactor_source_t {
 
     // call user source term (passed as argument)
     //  - assume source_t is a user_source_t is lightweight (no persistent state, just logic),
-    source_t{}.rsrc(geomdata,mfi, prims, rhs, cls_d, dt);
+    source_t{}.rsrc(geomdata,mfi, prims, rhs, cls_d, dt, real_time);
 
   }
 };

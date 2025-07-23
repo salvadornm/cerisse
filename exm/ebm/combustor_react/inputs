@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # Simulation time
 max_step  =  10000
 stop_time =  0.5
@@ -66,3 +67,4 @@ cns.reactor_type = "ReactorCvode"
 cvode.solve_type =  "dense_direct"
 ode.clean_init_massfrac = 1
 
+=======
