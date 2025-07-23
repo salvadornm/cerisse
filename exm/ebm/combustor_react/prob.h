@@ -120,8 +120,9 @@ template <typename cls_t > class user_source_t;
 //typedef rhs_dt<weno_t<ReconScheme::Teno5, ProbClosures>, viscous_t<viscous_param_t, ProbClosures>, no_source_t> ProbRHS;
 
 //typedef rhs_dt<riemann_t<false, ProbClosures>, viscous_t<viscous_param_t, ProbClosures>, user_source_t<ProbClosures> > ProbRHS;
-
-typedef rhs_dt<riemann_t<false, ProbClosures>, viscous_t<viscous_param_t, ProbClosures>, reactor_source_t<user_source_t<ProbClosures>,ProbClosures > > ProbRHS;
+typedef rhs_dt<weno_t<ReconScheme::WenoZ5, ProbClosures>, viscous_t<viscous_param_t, ProbClosures>, reactor_source_t<user_source_t<ProbClosures>,ProbClosures >> ProbRHS;
+//typedef rhs_dt<weno_t<ReconScheme::Teno5, ProbClosures>, viscous_t<viscous_param_t, ProbClosures>, reactor_source_t<user_source_t<ProbClosures>,ProbClosures >> ProbRHS;
+//typedef rhs_dt<riemann_t<false, ProbClosures>, viscous_t<viscous_param_t, ProbClosures>, reactor_source_t<user_source_t<ProbClosures>,ProbClosures > > ProbRHS;
 
 
 
@@ -161,13 +162,23 @@ prob_initdata(int i, int j, int k, Array4<Real> const &state,
   for(int idim=0;idim < AMREX_SPACEDIM;idim++) {u[idim]=prob_parm.vel_0[idim];}
   eint =  prob_parm.eint_0;
 
-  const Real r = sqrt(x*x + y*y + (z-0.1)*(z-0.1));
-  if (r< 0.01)
+  /**
+  const Real r = sqrt(x*x + y*y);
+  const Real z_low = 0.048;
+  const Real z_hi = 0.060;
+  Real rho_spark;
+  if (r <= 0.0095 && z >= z_low && z <= z_hi)
   {   
     Real Tspark = 1000.0;
-    cls.PYT2R(prob_parm.p_0,y_sp, Tspark, rhot);
-    cls.RYP2E(rhot, y_sp, prob_parm.p_0, eint); 
+    cls.PYT2R(prob_parm.p_0,y_sp, Tspark, rho_spark);
+    cls.RYP2E(rho_spark, y_sp, prob_parm.p_0, eint); 
   }
+  */
+
+  Real Tspark = 1000;
+  cls.PYT2R(prob_parm.p_0,y_sp, Tspark, rhot);
+  cls.RYP2E(rhot, y_sp, prob_parm.p_0, eint); 
+  
   
   Real kin = Real(0.5) * rhot * (u[0] * u[0] + u[1] * u[1] + u[2]*u[2]);
   //state(i, j, k, cls.URHO) = rhot;
@@ -253,19 +264,25 @@ user_tagging(int i, int j, int k, int nt_level, auto &tagfab,
   // Real gradrho= Real(0.5)*sqrt(drhox*drhox+drhoy*drhoy)*o_over_rhot;        
 
 
-  switch (level)
+ switch (level)
   {
     case 0:
-      refine = (z < prob_parm.zexit) && (r < 0.025) ;    // refine combustor    
+      //refine= (z > 0.035) && (z < 0.07);
+      refine = (z < prob_parm.zexit); 
+      //refine = (z < prob_parm.zexit) && (r < 0.025) ;    // refine combustor    
       break;
     case 1:
-      //refine= (z > 0.035) && (z < 0.07);
-      break;      
+      refine= (z > 0.035) && (z < 0.07);    
+      // refine = (z < prob_parm.zexit); 
+      break;
+    case 2:
+      // refine= (z > 0.035) && (z < 0.07);    
+      break;  
+      
     default:
 
     break;
    }
-    
 
   tagfab(i,j,k) = refine;
 
@@ -309,7 +326,7 @@ class user_source_t {
       const Real r = sqrt(x*x + y*y + (z-prob_parm.zexit)*(z-prob_parm.zexit));
       
       // pressure relax  if P > P0  P drops and to keep T constant rho drops
-      const Real tau_relax = 100.0*dt; 
+      const Real tau_relax = 50.0*dt; 
       const Real coef =dt/tau_relax;
 
       const Real dP = (prob_parm.p_bc- prims(i,j,k,cls.QPRES))*coef;
