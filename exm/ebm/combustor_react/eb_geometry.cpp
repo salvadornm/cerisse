@@ -37,14 +37,10 @@ void Custom::build(const Geometry& geom, const int max_coarsening_level)
 
 
   // atmospheric box out of combustor
-<<<<<<< HEAD
+  
   //const Real z0atmo =0.1475; const Real z0atmo =0.155; 
   const Real z0atmo =  0.1775;
   //const Real Hatmo = 0.06; //0.026
-=======
-
-
->>>>>>> personalgithub/reacting_ntnu
   const Real Hatmo = 0.085;  //0.065;
   const Real Ratmo = 3.0*R_chamber; // 
   auto atmo = EB2::CylinderIF(Ratmo,Hatmo,dir_chamber,{AMREX_D_DECL(x0, y0, z0atmo)}, false);

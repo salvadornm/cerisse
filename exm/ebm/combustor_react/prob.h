@@ -19,6 +19,8 @@
 #endif
 
 #include <bc_types.h>
+#include <numbers>
+#include <cmath>
 
 // NTU Combustor-type for demonstration purposes
 // created by S Dupre and S Navarro-Martinez (2025)
@@ -117,14 +119,9 @@ template <typename cls_t > class user_source_t;
 // define nuemrical scheme comment/uncomment to set up 
 //typedef rhs_dt<weno_t<ReconScheme::Teno5, ProbClosures>, viscous_t<viscous_param_t, ProbClosures>, user_source_t<ProbClosures> > ProbRHS;
 //typedef rhs_dt<weno_t<ReconScheme::Teno5, ProbClosures>, viscous_t<viscous_param_t, ProbClosures>, reactor_source_t<user_source_t<ProbClosures>,ProbClosures >> ProbRHS;
- typedef rhs_dt<weno_t<ReconScheme::WenoZ5, ProbClosures>, viscous_t<viscous_param_t, ProbClosures>, reactor_source_t<user_source_t<ProbClosures>,ProbClosures >> ProbRHS;
-
-//typedef rhs_dt<riemann_t<false, ProbClosures>, viscous_t<viscous_param_t, ProbClosures>, user_source_t<ProbClosures> > ProbRHS;
-<<<<<<< HEAD
 typedef rhs_dt<weno_t<ReconScheme::WenoZ5, ProbClosures>, viscous_t<viscous_param_t, ProbClosures>, reactor_source_t<user_source_t<ProbClosures>,ProbClosures >> ProbRHS;
+//typedef rhs_dt<riemann_t<false, ProbClosures>, viscous_t<viscous_param_t, ProbClosures>, user_source_t<ProbClosures> > ProbRHS;
 //typedef rhs_dt<weno_t<ReconScheme::Teno5, ProbClosures>, viscous_t<viscous_param_t, ProbClosures>, reactor_source_t<user_source_t<ProbClosures>,ProbClosures >> ProbRHS;
-=======
->>>>>>> personalgithub/reacting_ntnu
 //typedef rhs_dt<riemann_t<false, ProbClosures>, viscous_t<viscous_param_t, ProbClosures>, reactor_source_t<user_source_t<ProbClosures>,ProbClosures > > ProbRHS;
 
 
@@ -166,8 +163,6 @@ prob_initdata(int i, int j, int k, Array4<Real> const &state,
   eint =  prob_parm.eint_0;
 
   /**
-  
-  // const Real r = sqrt(x*x + y*y + (z-0.1)*(z-0.1));
   const Real r = sqrt(x*x + y*y);
   const Real z_low = 0.048;
   const Real z_hi = 0.060;
@@ -179,13 +174,6 @@ prob_initdata(int i, int j, int k, Array4<Real> const &state,
     cls.RYP2E(rho_spark, y_sp, prob_parm.p_0, eint); 
   }
   */
-
-  Real Tspark = 1000;
-  cls.PYT2R(prob_parm.p_0,y_sp, Tspark, rhot);
-  cls.RYP2E(rhot, y_sp, prob_parm.p_0, eint); 
-  
-  
-  
 
   Real kin = Real(0.5) * rhot * (u[0] * u[0] + u[1] * u[1] + u[2]*u[2]);
   //state(i, j, k, cls.URHO) = rhot;
@@ -334,10 +322,7 @@ class user_source_t {
       const Real r = sqrt(x*x + y*y + (z-prob_parm.zexit)*(z-prob_parm.zexit));
       
       // pressure relax  if P > P0  P drops and to keep T constant rho drops
-<<<<<<< HEAD
       const Real tau_relax = 50.0*dt; 
-=======
->>>>>>> personalgithub/reacting_ntnu
       const Real coef =dt/tau_relax;
       Real pres = prims(i,j,k,cls.QPRES);
 
@@ -374,13 +359,14 @@ class user_source_t {
 
       /// temporary buffer layer so no pressure spikes in injector at initialisation
 
+      /**
       if (timestep < 2000) {
         const Real z_low = 0.01;
         const Real z_hi = 0.040;
         const Real coef_2 = 10;
 
         if (z >= z_low && z <= z_hi){
-          /**
+          
           Real pres_dif = (prob_parm.p_0 - pres) / coef_2;
           Real rho_dif;
           cls.PYT2R(pres_dif,Y,T,rho_dif);
@@ -393,7 +379,7 @@ class user_source_t {
             for (int sp = 0; sp < NUM_SPECIES; sp++) {
           rhs(i,j,k, cls.UFS + sp) += prims(i,j,k, cls.QFS + sp) * rho_dif_dt;  
           }
-        */
+
 
         Real w_deficit = (Real)0 - prims(i,j,k, cls.QW);
         if (w_deficit < 0) {
@@ -404,34 +390,73 @@ class user_source_t {
 
         }
       }
+      */
 
 
 
-
-
+      //const Real spark_time = 0.005;
       /// igniting flow through source term in energy equation
       /**
-      if (timestep < 1000) {
+       // [s] approx time needed for reaction to ignite
+      if (real_time <= spark_time) {
 
           const Real r_cylinder = sqrt(x*x + y*y);
           const Real z_low = 0.048;
-          const Real z_hi = 0.060;
-          if (r_cylinder <= 0.0095 && z >= z_low && z <= z_hi) {
+          const Real z_hi = 0.055;
+          if (r_cylinder <= 0.006 && z >= z_low && z <= z_hi) {
 
             const Real T_ignite = 1000;
-            Real rho_ignite, eint_ignite, rel_eint, releint_dt;
+            Real rho_ignite, eint_ignite, eint_dt;
             cls.PYT2R(pres, Y, T_ignite, rho_ignite);
             cls.RYP2E(rho_ignite, Y, pres, eint_ignite);
-            rel_eint = eint_ignite - prims(i,j,k,cls.QEINT);
-            releint_dt = rel_eint / dt;
-            Real ratio = (1001 - 5*timestep);
-            releint_dt /= std::max(ratio,(Real)1);
-            rhs(i,j,k,cls.UET) += rho * releint_dt;
+            //rel_eint = eint_ignite - prims(i,j,k,cls.QEINT);
+            eint_dt = eint_ignite / (3*dt);
+            //Real ratio = (1001 - 5*timestep);
+            //releint_dt /= std::max(ratio,(Real)1);
+            rhs(i,j,k,cls.UET) += rho * eint_dt;
           }
       }
       */
+     
+      const Real spark_time = 0.005;
+      const Real zlow = 0.046;
+      //const Real zhigh = 0.09; 
+      const bool Gaussian = true; 
+      if (Gaussian && z >= zlow) {
+        const Real tmean = spark_time/2;  
+        const Real xmean = 0; 
+        const Real ymean = 0; 
+        const Real zmean = 0.05; 
+
+        const Real t_sd = 2.0 * tmean;
+        const Real x_sd = 0.002;
+        const Real y_sd = 0.002; 
+        const Real z_sd = 0.004;
+        
+        const Real nsigma = 3.0;
+        const Real x_min = xmean -  nsigma * x_sd;
+        const Real x_max = xmean +  nsigma * x_sd;
+        const Real y_min = ymean -  nsigma * y_sd;
+        const Real y_max = ymean +  nsigma * y_sd;
+        const Real z_max = zmean +  nsigma * z_sd;
+
+        if (x >= x_min && x <= x_max && y >= y_min && y <= y_max && z <= z_max && real_time <= spark_time){
+
+        const Real T_ignite = 1000;
+        Real rho_ignite, eint_ignite, rel_eint, releint_dt;
+        cls.PYT2R(pres, Y, T_ignite, rho_ignite);
+        cls.RYP2E(rho_ignite, Y, pres, eint_ignite);
+        eint_ignite /= dt;
+
+        Real gaussian_source = eint_ignite/( 4.0 * std::numbers::pi * std::numbers::pi * t_sd * x_sd * y_sd * z_sd)
+                              * std::exp( -0.5 * ( (x - xmean)*(x - xmean)/(x_sd*x_sd) + (y - ymean)*(y - ymean)/(y_sd*y_sd) + 
+                                  (z - zmean)*(z - zmean)/(z_sd*z_sd) + (real_time - tmean)*(real_time - tmean)/(t_sd*t_sd) ));
+
+        rhs(i,j,k,cls.UET) += rho * gaussian_source;
+      }
+      }
     
-      });
+    });
 
   };
 };
