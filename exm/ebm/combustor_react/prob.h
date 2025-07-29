@@ -418,7 +418,7 @@ class user_source_t {
       }
       */
      
-      const Real spark_time = 0.005;
+      const Real spark_time = 0.0015;
       const Real zlow = 0.046;
       //const Real zhigh = 0.09; 
       const bool Gaussian = true; 
@@ -428,7 +428,7 @@ class user_source_t {
         const Real ymean = 0; 
         const Real zmean = 0.05; 
 
-        const Real t_sd = 2.0 * tmean;
+        const Real t_sd = tmean/3.0;
         const Real x_sd = 0.002;
         const Real y_sd = 0.002; 
         const Real z_sd = 0.004;
@@ -443,15 +443,20 @@ class user_source_t {
         if (x >= x_min && x <= x_max && y >= y_min && y <= y_max && z <= z_max && real_time <= spark_time){
 
         const Real T_ignite = 1000;
-        Real rho_ignite, eint_ignite, rel_eint, releint_dt;
+        Real rho_ignite, eint_ignite;
         cls.PYT2R(pres, Y, T_ignite, rho_ignite);
         cls.RYP2E(rho_ignite, Y, pres, eint_ignite);
         eint_ignite /= dt;
 
-        Real gaussian_source = eint_ignite/( 4.0 * std::numbers::pi * std::numbers::pi * t_sd * x_sd * y_sd * z_sd)
+        Real gaussian_denominator = 4.0 * std::numbers::pi * std::numbers::pi * t_sd * x_sd * y_sd * z_sd;
+
+        // unnormalised 
+        Real gaussian_source = eint_ignite
                               * std::exp( -0.5 * ( (x - xmean)*(x - xmean)/(x_sd*x_sd) + (y - ymean)*(y - ymean)/(y_sd*y_sd) + 
                                   (z - zmean)*(z - zmean)/(z_sd*z_sd) + (real_time - tmean)*(real_time - tmean)/(t_sd*t_sd) ));
 
+        std::cout << "i " << i << " j " << j << "k " << k << " eint_ignite :" << eint_ignite << "gaussian_source :" << gaussian_source << std::endl;
+ 
         rhs(i,j,k,cls.UET) += rho * gaussian_source;
       }
       }
