@@ -446,6 +446,7 @@ class user_source_t {
         Real rho_ignite, eint_ignite;
         cls.PYT2R(pres, Y, T_ignite, rho_ignite);
         cls.RYP2E(rho_ignite, Y, pres, eint_ignite);
+        eint_ignite = std::max((Real)0, eint_ignite - prims(i,j,k, cls.QEINT));
         eint_ignite /= dt;
 
         Real gaussian_denominator = 4.0 * std::numbers::pi * std::numbers::pi * t_sd * x_sd * y_sd * z_sd;
@@ -455,7 +456,7 @@ class user_source_t {
                               * std::exp( -0.5 * ( (x - xmean)*(x - xmean)/(x_sd*x_sd) + (y - ymean)*(y - ymean)/(y_sd*y_sd) + 
                                   (z - zmean)*(z - zmean)/(z_sd*z_sd) + (real_time - tmean)*(real_time - tmean)/(t_sd*t_sd) ));
 
-        std::cout << "i " << i << " j " << j << "k " << k << " eint_ignite :" << eint_ignite << "gaussian_source :" << gaussian_source << std::endl;
+        //std::cout << "i " << i << " j " << j << "k " << k << " eint_ignite :" << eint_ignite << "gaussian_source :" << gaussian_source << std::endl;
  
         rhs(i,j,k,cls.UET) += rho * gaussian_source;
       }
