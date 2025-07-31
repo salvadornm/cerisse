@@ -1,6 +1,7 @@
 import numpy as np
 import math
 import os
+import sys
 
 # Path to directory containing nozzle_functions.py
 sys.path.append("/Users/snm/codes/cerisse/tools/nozzle")
