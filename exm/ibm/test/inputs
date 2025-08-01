@@ -2,7 +2,7 @@
 #                                 INPUT FILE
 #------------------------------------------------------------------------------#
 # start time is assumed to be 0, unless re-starting
-max_step  = 1
+max_step  = 10
 stop_time = 100
 #time_step = 1.5e-6
 cfl = 0.3
@@ -24,7 +24,7 @@ cns.verbose = 1       # 0=quiet, 1=verbose
 ib.filename = ConfigA1_A0.stl
 ib.move = 0
 ib.plot_surf = 1
-ib.surf_file = plot/surf
+ib.surf_file = ./plot/surf
 ib.surf_int  = 2
 #-------------------------------- COMPUTATIONAL DOMAIN ------------------------#
 geometry.is_periodic = 0 0 0
@@ -49,7 +49,7 @@ amr.grid_eff        = 0.90   # what constitutes an efficient grid
 #-------------------------------- PLOTFILES -----------------------------------#
 amr.plot_files_output = 1
 amr.plot_file         = ./plot/plt # root name of plotfile
-amr.plot_int          = 20         # number of timesteps between plotfiles
+amr.plot_int          = 2          # number of timesteps between plotfiles
 amr.derive_plot_vars  = pressure velocity temperature
 amr.v = 1 # 0=quiet, 1=verbose
 
