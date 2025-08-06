@@ -357,69 +357,9 @@ class user_source_t {
         }                        
       }
 
-      /// temporary buffer layer so no pressure spikes in injector at initialisation
-
-      /**
-      if (timestep < 2000) {
-        const Real z_low = 0.01;
-        const Real z_hi = 0.040;
-        const Real coef_2 = 10;
-
-        if (z >= z_low && z <= z_hi){
-          
-          Real pres_dif = (prob_parm.p_0 - pres) / coef_2;
-          Real rho_dif;
-          cls.PYT2R(pres_dif,Y,T,rho_dif);
-          Real rho_dif_dt = rho_dif / dt;
-          
-          rhs(i,j,k,cls.UMX) += prims(i,j,k,cls.QU)*rho_dif_dt;
-          rhs(i,j,k,cls.UMY) += prims(i,j,k,cls.QV)*rho_dif_dt; 
-          rhs(i,j,k,cls.UMZ) += prims(i,j,k,cls.QW)*rho_dif_dt;
-          rhs(i,j,k,cls.UET) += Et*rho_dif_dt;
-            for (int sp = 0; sp < NUM_SPECIES; sp++) {
-          rhs(i,j,k, cls.UFS + sp) += prims(i,j,k, cls.QFS + sp) * rho_dif_dt;  
-          }
-
-
-        Real w_deficit = (Real)0 - prims(i,j,k, cls.QW);
-        if (w_deficit < 0) {
-          Real w_source = prob_parm.Q / prims(i,j,k,cls.QRHO);
-          w_source /= (dt * coef_2);
-          rhs(i,j,k,cls.UMZ) += prims(i,j,k,cls.QRHO) * w_source;
-        }
-
-        }
-      }
-      */
-
-
-
-      //const Real spark_time = 0.005;
-      /// igniting flow through source term in energy equation
-      /**
-       // [s] approx time needed for reaction to ignite
-      if (real_time <= spark_time) {
-
-          const Real r_cylinder = sqrt(x*x + y*y);
-          const Real z_low = 0.048;
-          const Real z_hi = 0.055;
-          if (r_cylinder <= 0.006 && z >= z_low && z <= z_hi) {
-
-            const Real T_ignite = 1000;
-            Real rho_ignite, eint_ignite, eint_dt;
-            cls.PYT2R(pres, Y, T_ignite, rho_ignite);
-            cls.RYP2E(rho_ignite, Y, pres, eint_ignite);
-            //rel_eint = eint_ignite - prims(i,j,k,cls.QEINT);
-            eint_dt = eint_ignite / (3*dt);
-            //Real ratio = (1001 - 5*timestep);
-            //releint_dt /= std::max(ratio,(Real)1);
-            rhs(i,j,k,cls.UET) += rho * eint_dt;
-          }
-      }
-      */
-     
-      const Real spark_time = 0.0015;
+      const Real spark_time = 0.0010;
       const Real zlow = 0.046;
+      const Real max_timestep = 3000;
       //const Real zhigh = 0.09; 
       const bool Gaussian = true; 
       if (Gaussian && z >= zlow) {
@@ -429,9 +369,9 @@ class user_source_t {
         const Real zmean = 0.05; 
 
         const Real t_sd = tmean/3.0;
-        const Real x_sd = 0.002;
-        const Real y_sd = 0.002; 
-        const Real z_sd = 0.004;
+        const Real x_sd = 0.0025;
+        const Real y_sd = 0.0025; 
+        const Real z_sd = 0.0025;
         
         const Real nsigma = 3.0;
         const Real x_min = xmean -  nsigma * x_sd;
@@ -440,7 +380,13 @@ class user_source_t {
         const Real y_max = ymean +  nsigma * y_sd;
         const Real z_max = zmean +  nsigma * z_sd;
 
-        if (x >= x_min && x <= x_max && y >= y_min && y <= y_max && z <= z_max && real_time <= spark_time){
+        // inverse tanh parameters
+
+        const Real p = 0.99;
+        const Real dt_goal = 6000; // number of timesteps before max source 
+        const Real k_tanh = Real(std::atanh(float(p))) / dt_goal;
+
+        if (x >= x_min && x <= x_max && y >= y_min && y <= y_max && z <= z_max && timestep <= max_timestep){
 
         const Real T_ignite = 1000;
         Real rho_ignite, eint_ignite;
@@ -449,16 +395,22 @@ class user_source_t {
         eint_ignite = std::max((Real)0, eint_ignite - prims(i,j,k, cls.QEINT));
         eint_ignite /= dt;
 
-        Real gaussian_denominator = 4.0 * std::numbers::pi * std::numbers::pi * t_sd * x_sd * y_sd * z_sd;
+        // spatial distribution of nrj source
 
-        // unnormalised 
-        Real gaussian_source = eint_ignite
-                              * std::exp( -0.5 * ( (x - xmean)*(x - xmean)/(x_sd*x_sd) + (y - ymean)*(y - ymean)/(y_sd*y_sd) + 
-                                  (z - zmean)*(z - zmean)/(z_sd*z_sd) + (real_time - tmean)*(real_time - tmean)/(t_sd*t_sd) ));
+        Real gaussian_space = std::exp( -0.5 * ( (x - xmean)*(x - xmean)/(x_sd*x_sd) + (y - ymean)*(y - ymean)/(y_sd*y_sd) + 
+                                  (z - zmean)*(z - zmean)/(z_sd*z_sd)));
 
-        //std::cout << "i " << i << " j " << j << "k " << k << " eint_ignite :" << eint_ignite << "gaussian_source :" << gaussian_source << std::endl;
- 
-        rhs(i,j,k,cls.UET) += rho * gaussian_source;
+        // temporal distribution of nrj source
+
+        Real gaussian_time = std::exp( -0.5 * ((real_time - tmean)*(real_time - tmean)/(t_sd*t_sd) ));
+        Real tanh_time = Real(std::tanh(float(k_tanh * timestep)));
+
+        // total nrj source 
+        
+        Real tanh_total = rho * gaussian_space * tanh_time * eint_ignite;
+        Real gauss_total = rho * gaussian_space * gaussian_time * eint_ignite;
+
+        rhs(i,j,k,cls.UET) += tanh_total;
       }
       }
     
