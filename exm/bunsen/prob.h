@@ -25,108 +25,130 @@
 
 namespace PROB {
 
-// executing python equil_from_equivalenceratio.py  
+// executing python equil_from_equivalenceratio.py (ubnder Kee/) 
 
 //  Initial Conditions  Mixture
-//     P=  101325.0 [Pa] amd T =  298.0 [K]
+//     P=  101325.0 [Pa] amd T =  300.0 [K]
 //     Equivalence Ratio=  0.8
+///    Fuel: 87.5% H2  12.5% CH4 (per volume)
+
+
 //  Unburn Mixture ...
 // ************ Phase gas ************
 // Moles:  1.0
 
 //   gas:
 
-//        temperature   298 K
-//           pressure   1.0132e+05 Pa
-//            density   0.90377 kg/m^3
-//   mean mol. weight   22.1 kg/kmol
+//        temperature   300 K
+//           pressure   1.0133e+05 Pa
+//            density   0.97189 kg/m^3
+//   mean mol. weight   23.925 kg/kmol
 //    phase of matter   gas
 
 //                           1 kg             1 kmol     
 //                      ---------------   ---------------
-//           enthalpy           -137.15             -3031  J
-//    internal energy       -1.1225e+05       -2.4807e+06  J
-//            entropy            8424.8        1.8619e+05  J/K
-//     Gibbs function       -2.5107e+06       -5.5487e+07  J
-//  heat capacity c_p            1314.9             29059  J/K
-//  heat capacity c_v            938.65             20744  J/K
+//           enthalpy            -74239       -1.7762e+06  J
+//    internal energy       -1.7849e+05       -4.2705e+06  J
+//            entropy            8007.6        1.9158e+05  J/K
+//     Gibbs function       -2.4765e+06       -5.9251e+07  J
+//  heat capacity c_p            1222.7             29254  J/K
+//  heat capacity c_v            875.19             20939  J/K
 
 //                       mass frac. Y      mole frac. X     chem. pot. / RT
 //                      ---------------   ---------------   ---------------
-//                 H2          0.022949           0.25157           -17.086
-//                 O2           0.22765           0.15723           -26.512
-//                 N2            0.7494           0.59119           -23.559
-//      [   +6 minor]                 0                 0  
+//                CH4           0.01646          0.024547            -56.03
+//                 H2          0.014479           0.17183           -17.479
+//                 O2            0.2257           0.16876           -26.453
+//                 N2           0.74336           0.63486           -23.487
 
 //  Burn Mixture ...
 // ************ Phase gas ************
-// Moles:  0.8763651682839297
+// Moles:  0.915684304383077
 
 //   gas:
 
-//        temperature   2175.1 K
+//        temperature   2117.2 K
 //           pressure   1.0133e+05 Pa
-//            density   0.14129 kg/m^3
-//   mean mol. weight   25.218 kg/kmol
+//            density   0.15039 kg/m^3
+//   mean mol. weight   26.128 kg/kmol
 //    phase of matter   gas
 
 //                           1 kg             1 kmol     
 //                      ---------------   ---------------
-//           enthalpy           -137.15           -3458.6  J
-//    internal energy       -7.1729e+05       -1.8089e+07  J
-//            entropy             10544         2.659e+05  J/K
-//     Gibbs function       -2.2935e+07       -5.7836e+08  J
-//  heat capacity c_p            1619.1             40830  J/K
-//  heat capacity c_v            1289.4             32515  J/K
+//           enthalpy            -74239       -1.9397e+06  J
+//    internal energy       -7.4797e+05       -1.9543e+07  J
+//            entropy             10197        2.6643e+05  J/K
+//     Gibbs function       -2.1663e+07       -5.6602e+08  J
+//  heat capacity c_p            1561.4             40796  J/K
+//  heat capacity c_v            1243.2             32482  J/K
 
 //                       mass frac. Y      mole frac. X     chem. pot. / RT
 //                      ---------------   ---------------   ---------------
-//                 H2         0.0001171         0.0014648           -26.263
-//                 O2          0.044507          0.035076           -32.406
-//                H2O             0.202           0.28276           -42.466
-//                  H         7.435e-06        0.00018601           -13.131
-//                  O        0.00027133        0.00042768           -16.203
-//                 OH         0.0036952         0.0054792           -29.335
-//                HO2        3.1809e-06        2.4303e-06           -45.538
-//               H2O2        2.3096e-07        1.7123e-07           -58.669
-//                 N2            0.7494            0.6746           -27.612
+//               CH2O         1.796e-13        1.5628e-13           -68.619
+//                HCO        1.4265e-11        1.2844e-11           -55.242
+//                CO2           0.04438          0.026348           -58.005
+//                 CO        0.00049205          0.000459           -41.865
+//                 H2        6.4213e-05        0.00083223           -26.753
+//                  H        3.8577e-06        9.9994e-05           -13.377
+//                 O2          0.044704          0.036503            -32.28
+//                  O        0.00018305        0.00029895            -16.14
+//                 OH         0.0022825         0.0035066           -29.517
+//                HO2        2.3351e-06        1.8485e-06           -45.657
+//               H2O2        1.6022e-07        1.2307e-07           -59.033
+//                H2O           0.16453           0.23863           -42.893
+//                 N2           0.74336           0.69332           -27.491
+//      [   +4 minor]        5.9832e-20        1.0342e-19  
+//--------------------------------------------------------------------------
 // problem parameters
 struct ProbParm {
 
   // unburn gases
-  Real rho_u = 0.90377;               // density  [kg/m^3]
-  Real T_u   = 298;                   // temperature [K] 
-  Real p_u   = 1.0132e+05;            // pressure [Pa]  (5 atm)
-  Real e_u   = -1.1225e+05;           // internal energy [J/kg]  
+  static constexpr Real rho_u = 0.97189;               // density  [kg/m^3]
+  static constexpr Real T_u  = 300.0;                   // temperature [K] 
+  static constexpr Real p_u   = 1.01325e+05;            // pressure [Pa]  (5 atm)
 
   // burn gases
-  Real rho_b = 0.14129;                 // density  [kg/m^3]
-  Real T_b   = 2175.1;                  // temperature [K]  
-  Real p_b   = p_u;                     // pressure [Pa]  (1 atm)   
-  Real e_b   = -7.1729e+05 ;            // internal energy [J/kg]
-  GpuArray<Real, NUM_SPECIES> Y_b = {0.0001171,0.044507,0.202 ,7.435e-06,0.00027133,0.0036952,3.1809e-06,2.3096e-07,0.7559};
+  static constexpr Real rho_b = 0.15039 ;                 // density  [kg/m^3]
+  static constexpr Real T_b   = 2117.2;                  // temperature [K]  
+  static constexpr Real p_b  = p_u;                     // pressure [Pa]  (1 atm)   
 
-  Real Y_0[NUM_SPECIES] = {0.0};
+  // mass fractions
+  
+  Real Y_0b[NUM_SPECIES]   = {0.0};
+  Real Y_0u[NUM_SPECIES] = {0.0};
+
   ProbParm(){
-    Y_0[H2_ID] = 0.022949 ;
-    Y_0[O2_ID] = 0.22765;
-    Y_0[N2_ID] = 1.0 - Y_0[O2_ID] - Y_0[H2_ID];
+    // unburn
+    Y_0u[CH4_ID] = 0.01646;
+    Y_0u[H2_ID]  = 0.014479;
+    Y_0u[O2_ID]  = 0.2257;
+    Y_0u[N2_ID]  = 0.74336; 
+    // burn
+    Y_0b[CH2O_ID] = 1.796e-13;
+    Y_0b[HCO_ID]  = 1.4265e-11;
+    Y_0b[CO2_ID]  = 0.04438;
+    Y_0b[CO_ID]   = 0.00049205;
+    Y_0b[H2_ID]   = 6.4213e-05;
+    Y_0b[H_ID]    = 3.8577e-06;
+    Y_0b[O2_ID]   = 0.044704;
+    Y_0b[O_ID]    = 0.00018305;
+    Y_0b[OH_ID]   = 0.0022825;
+    Y_0b[HO2_ID]  = 2.3351e-06;
+    Y_0b[H2O2_ID] = 1.6022e-07;
+    Y_0b[H2O_ID]  = 0.16453;
+    Y_0b[N2_ID]   = 0.74336;
   }
   
-  GpuArray<Real, NUM_SPECIES> Y_u = { Y_0[H2_ID] ,Y_0[O2_ID] , 0.,0., 0., 0., 0.,0., Y_0[N2_ID]};  // mass fractions [-] 
+  // Initial Flame position                                
+  Real Yflame= 0.8/1000.0; // [m] <-------------
 
+  // unburn gases velocity [m/s] (imposed from Fruzza et al 2023)
+  // Real u_u    = 3.2; // Flame with 100% H2
+  Real u_u     = 2.0; // Flame with 87.5% H2  12.5% CH4
 
-  // geometrical parameters                                     
-  Real Lx     =   0.04;  // half-width domain
-  Real Ly     =   0.04;
-  Real Yflame =   0.5*Ly;
+  Real u_b    = 6.7852789; // from 1D solution
 
-  // unburn gases velocity
-  Real u_u     = 3.2; // inflow velocity (unburn) IMPOSED [m/s]
-
-  
-  Real Q =  rho_u*u_u;  // flow rate (per area)
-
+  Real Q =  rho_u*u_u;  // incoming flow rate (per area)
   
 };
 
@@ -155,9 +177,9 @@ struct wall_param {
 
 using ProbClosures = closures_dt< indicies_t, transport_Pele_t, multispecies_pele_gas_t<indicies_t> >;
 
-using ProbRHS = rhs_dt< riemann_t<false, ProbClosures>, viscous_t<methodparm_t, ProbClosures>, reactor_t<ProbClosures> >;
-//using ProbRHS = rhs_dt< riemann_t<false, ProbClosures>, viscous_t<methodparm_t, ProbClosures>, no_source_t >;
-//using ProbRHS = rhs_dt< no_euler_t, viscous_t<methodparm_t, ProbClosures>, no_source_t >;
+//using ProbRHS = rhs_dt< riemann_t<false, ProbClosures>, viscous_t<methodparm_t, ProbClosures>, reactor_t<ProbClosures> >;
+//using ProbRHS = rhs_dt< riemann_t<false, ProbClosures>, no_diffusive_t, no_source_t >;
+using ProbRHS = rhs_dt< riemann_t<false, ProbClosures>, viscous_t<methodparm_t, ProbClosures>, no_source_t >;
 
 
 // define type of wall and EBM class
@@ -176,9 +198,8 @@ typedef manual_bc_t<ProbClosures> GlobalBC;
 void inline inputs() {
   // ParmParse pp;  
   amrex::Print() << " ****** Starting  *******" <<  std::endl;
-  amrex::Print() << " Planar Bunsen H2-Air Flame (June 2025)  " <<  std::endl;
+  amrex::Print() << " Planar Bunsen CH4/H2-Air Flame (June 2025)  " <<  std::endl;
   amrex::Print() << " Nspecies = " << NUM_SPECIES << std::endl;
-  amrex::Print() << " H2 O2 H2O H O OH HO2 H2O2 N2 " << std::endl;
   amrex::Print() << " ******           *******" << std::endl;
 }
 
@@ -202,37 +223,33 @@ AMREX_GPU_DEVICE AMREX_FORCE_INLINE void prob_initdata(
   Pt = prob_parm.p_u ;
   
   // initial position flame (domain coordinates)
-  Real yinterf= -0.1/1000.0; // [m]
+  Real yinterf= prob_parm.Yflame; // [m] <-------------
 
-  
-  Yu  = prob_parm.Y_u.data();
-  Yb  = prob_parm.Y_b.data();
-
-  vxt = prob_parm.u_u;
-  Real sumrhoY = 0.0;
+  Real sumY = 0.0;
 
   if (y > yinterf)
   { // burn
-    Tt = prob_parm.T_b;
+    vxt = prob_parm.u_b;
+    Tt  = prob_parm.T_b;   
     for (int n = 0; n < NUM_SPECIES; ++n) {
-      Yt[n]    = Yb[n];    
-      sumrhoY += Yt[n];
+      Yt[n]    = prob_parm.Y_0b[n];          
+      sumY += Yt[n];
     }
   }
   else
   { // unburn
+    vxt = prob_parm.u_u;
     Tt  = prob_parm.T_u;
     for (int n = 0; n < NUM_SPECIES; ++n) {
-      Yt[n]   = prob_parm.Y_0[n];    
-      sumrhoY += Yt[n];
+      Yt[n]   = prob_parm.Y_0u[n];    
+      sumY += Yt[n];
     }
 
   }
 
-  
 
   // ensure sumY =1
-  for (int n = 0; n < NUM_SPECIES; ++n) { Yt[n]   /=  sumrhoY;}
+  for (int n = 0; n < NUM_SPECIES; ++n) { Yt[n]   /=  sumY;}
   //--------------------------------------------------------------------------------------
   
   // compute density  
@@ -265,7 +282,7 @@ bcnormal(const Real x[AMREX_SPACEDIM], Real dratio, const Real s_int[ProbClosure
     case  2:  // SOUTH
       // inflow  unburn-----------------        
       GlobalBC::bc_inlet_fixmassflow(0.0,1.0,0.0,&closures,
-        prob_parm.Q,prob_parm.T_u,prob_parm.Y_0, s_int, s_ext);            
+        prob_parm.Q,prob_parm.T_u,prob_parm.Y_0u, s_int, s_ext);            
       break;
     case  1:  // WEST      
       break;
@@ -319,7 +336,7 @@ AMREX_GPU_DEVICE AMREX_FORCE_INLINE void user_tagging(
     }  
     Real c =  (Q[ProbClosures::QT]-prob_parm.T_u)/(prob_parm.T_b - prob_parm.T_u);
 
-    constexpr Real Cmax  = 0.95;constexpr Real Cmin  = 0.05;
+    constexpr Real Cmax  = 0.9;constexpr Real Cmin  = 0.1;
     bool refine_flame =   (c < Cmax) && (c > Cmin);
 
     switch (level)

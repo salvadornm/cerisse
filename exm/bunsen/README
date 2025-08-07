@@ -1,0 +1,20 @@
+Bunsem burner based on Friuzza et al (2003) set up
+
+H2 + CH4 mixtures at diffrent equialnec rations
+
+Using Kee mechanism
+
+To generate a 1D flame use the script in Kee folder
+
+cd Kee/
+python 1d-flame-run.py
+
+The flame can be seen by exectting in 
+python ~/codes/cerisse/tools/combustion/1d-flame-plot.py
+
+Burn/equilibrium conditiuons can be seen by
+
+cd Kee/
+python equil_from_equivalenceratio.py
+
+NOTE: This are mdoified copies of scrioptds in tools/combustion
