@@ -359,32 +359,44 @@ class user_source_t {
 
       const Real spark_time = 0.0010;
       const Real zlow = 0.046;
-      const Real max_timestep = 3000;
+      const Real max_timestep = 2000;
       //const Real zhigh = 0.09; 
       const bool Gaussian = true; 
       if (Gaussian && z >= zlow) {
         const Real tmean = spark_time/2;  
-        const Real xmean = 0; 
-        const Real ymean = 0; 
-        const Real zmean = 0.05; 
+        const Real xmean_spatial = 0; 
+        const Real ymean_spatial = 0; 
+        const Real zmean_spatial = 0.05; 
 
         const Real t_sd = tmean/3.0;
-        const Real x_sd = 0.0025;
-        const Real y_sd = 0.0025; 
-        const Real z_sd = 0.0025;
+        const Real x_sd = 0.00175;
+        const Real y_sd = 0.00175; 
+        const Real z_sd = 0.00175;
         
         const Real nsigma = 3.0;
-        const Real x_min = xmean -  nsigma * x_sd;
-        const Real x_max = xmean +  nsigma * x_sd;
-        const Real y_min = ymean -  nsigma * y_sd;
-        const Real y_max = ymean +  nsigma * y_sd;
-        const Real z_max = zmean +  nsigma * z_sd;
+        const Real x_min = xmean_spatial -  nsigma * x_sd;
+        const Real x_max = xmean_spatial +  nsigma * x_sd;
+        const Real y_min = ymean_spatial -  nsigma * y_sd;
+        const Real y_max = ymean_spatial +  nsigma * y_sd;
+        const Real z_max = zmean_spatial +  nsigma * z_sd;
+
+        // parameters for spaial gaussian in temrs of grid points
+
+        const Real i_mean = Real(std::round(float((xmean_spatial - prob_lo[0]) / dx[0] - Real(0.5)))); 
+        const Real j_mean = Real(std::round(float((ymean_spatial - prob_lo[1]) / dx[1] - Real(0.5)))); 
+        const Real k_mean = Real(std::round(float((zmean_spatial - prob_lo[2]) / dx[2] - Real(0.5)))); 
+
+        const Real i_sd = Real(std::round(std::abs(float(x_sd / dx[0]))));
+        const Real j_sd = Real(std::round(std::abs(float(y_sd / dx[1]))));
+        const Real k_sd = Real(std::round(std::abs(float(z_sd / dx[2]))));
 
         // inverse tanh parameters
 
         const Real p = 0.99;
         const Real dt_goal = 6000; // number of timesteps before max source 
         const Real k_tanh = Real(std::atanh(float(p))) / dt_goal;
+
+        // internal nrj source compute
 
         if (x >= x_min && x <= x_max && y >= y_min && y <= y_max && z <= z_max && timestep <= max_timestep){
 
@@ -397,8 +409,8 @@ class user_source_t {
 
         // spatial distribution of nrj source
 
-        Real gaussian_space = std::exp( -0.5 * ( (x - xmean)*(x - xmean)/(x_sd*x_sd) + (y - ymean)*(y - ymean)/(y_sd*y_sd) + 
-                                  (z - zmean)*(z - zmean)/(z_sd*z_sd)));
+        Real gaussian_space = std::exp( -0.5 * ( (i - i_mean)*(i - i_mean)/(i_sd*i_sd) + (j - j_mean)*(j - j_mean)/(j_sd*j_sd) + 
+                                  (k - k_mean)*(k - k_mean)/(k_sd*k_sd)));
 
         // temporal distribution of nrj source
 

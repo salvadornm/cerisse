@@ -1,7 +1,7 @@
 # Simulation time
 max_step  =  100000
 stop_time =  0.5
-cfl = 0.2
+cfl = 0.1
 #time_step = 1.0e-6
 
 cns.order_rk  = -2 
@@ -38,11 +38,11 @@ amr.grid_eff          = 0.7    # what constitutes an efficient grid
 
 # Plot and checkpoint
 amr.checkpoint_files_output = 1
-amr.check_file              = tanh5/chk     # root name of checkpoint file
+amr.check_file              = tanh9/chk     # root name of checkpoint file
 amr.check_int               = 1000   # number of timesteps betw.  checkpoints
 amr.restart = chk20000
 amr.plot_files_output = 1
-amr.plot_file         = tanh5/plt    # root name of plotfile
+amr.plot_file         = tanh9/plt    # root name of plotfile
 amr.plot_int          = 250          # number of timesteps between plotfiles
 amr.derive_plot_vars  = pressure velocity temperature
 

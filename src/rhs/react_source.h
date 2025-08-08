@@ -73,6 +73,13 @@ class reactor_source_t {
     auto const& fc     = tempf.array(2 * NUM_SPECIES + 3);  // number of RHS eval (not used)
     IArrayBox maskf(bx, 1, The_Async_Arena());
     maskf.setVal<RunOn::Gpu>(1);
+
+    IArrayBox maskf_noreact(bx, 1, The_Async_Arena());
+    amrex::Gpu::DeviceScalar<int> skip_react(0);
+    int* skip_react_ptr = skip_react.dataPtr();
+    auto const& mask_noreact = maskf_noreact.array();
+
+
     auto const& mask = maskf.array();  // 1: do reaction, -1: skip reaction
 
     amrex::ParallelFor(bx, [=] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {
@@ -108,9 +115,15 @@ class reactor_source_t {
 
       // fill mask      
       mask(i, j, k) = (T(i, j, k) > CNSConstants::min_react_temp) ? 1 : -1; // temp snm 
+
+      if (T(i,j,k) > Real(3000)) {
+        amrex::Gpu::Atomic::Max(skip_react_ptr, 1);
+      }
       //mask(i, j, k) = (T(i, j, k) > 500) ? 1 : -1; // temp snm 
     });
 
+    amrex::Gpu::streamSynchronize();
+    bool skip_reactb = skip_react.dataValue();
     // Not necessary to start a stream here, however pelePhysics function only takes a stream. Practically, launch and execution overhead determines  efficiency effect -- https://stackoverflow.com/questions/27038162/how-bad-is-it-to-launch-many-small-kernels-in-cuda#:~:text=Launch%20overhead%3A%20The%20overhead%20of,as%20the%20kernel%20in%20question. Seems unlikely this kernel launch cost will outweigh execution costs.
     /////////////////////////// React ///////////////////////////
     Real current_time = 0.0;
@@ -120,7 +133,11 @@ class reactor_source_t {
     m_reactor->react(bx, rY, rYsrc, T, rEi, rEisrc, fc, mask, dt, current_time,
                      amrex::Gpu::gpuStream());
 #else
-    m_reactor->react(bx, rY, rYsrc, T, rEi, rEisrc, fc, mask, dt, current_time);
+    if (skip_reactb) {
+      maskf_noreact.setVal<RunOn::Gpu>(-1);
+      m_reactor->react(bx, rY, rYsrc, T, rEi, rEisrc, fc, mask_noreact, dt, current_time);
+    }
+    else m_reactor->react(bx, rY, rYsrc, T, rEi, rEisrc, fc, mask, dt, current_time);
 #endif
     amrex::Gpu::Device::streamSynchronize();  // Important
 
