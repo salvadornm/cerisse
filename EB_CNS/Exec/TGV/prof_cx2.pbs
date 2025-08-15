@@ -1,0 +1,17 @@
+#PBS -l select=1:ncpus=128:mem=256gb:cpu_type=rome
+#PBS -l walltime=3:00:00
+#PBS -j oe
+#PBS -N tgv-m125-256x256x256-1x128
+
+module load tools/prod iimpi/2020a
+
+export FI_MLX_IFACE=eth0
+export I_MPI_HYDRA_BOOTSTRAP="rsh"
+export I_MPI_HYDRA_BOOTSTRAP_EXEC="/opt/pbs/bin/pbs_tmrsh"
+export I_MPI_HYDRA_BRANCH_COUNT=0
+
+cd $PBS_O_WORKDIR
+
+#LASTCHK=$(ls -d chk*00 | sort | tail -n 1)
+
+mpirun ./CX2.gnu.TPROF.MPI.ex prof.ini cns.fixed_dt=1.5e-8 amr.n_cell=256 256 256 #amr.restart=$LASTCHK

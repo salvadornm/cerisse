@@ -1,16 +1,18 @@
 # ====================================================== #
 #                  CERISSE INPUT SCRIPT                  #
 # ====================================================== #
-max_step = 5000
+max_step = 10000
 stop_time = 0.1
-amrex.fpe_trap_invalid = 1
+#amrex.fpe_trap_invalid = 1
 
 # ================ COMPUTATIONAL DOMAIN ================ #
 geometry.is_periodic = 1 0 1
 geometry.coord_sys   = 0  # 0: cart, 1: RZ, 2:spherical
 geometry.prob_lo     = 0.0   -0.6845 -1.369 #0, -H, -2H
 geometry.prob_hi     = 8.214  0.6845  1.369 #12H, H, 2H
-amr.n_cell           = 96     32      32    #stretching ratio = 2 in x and z directions
+#amr.n_cell           = 768    128     256
+#amr.n_cell           = 384    64      128
+amr.n_cell           = 192    32      64
 eb2.geom_type = all_regular
 
 # ================ BOUNDARY CONDITIONS ================= #
@@ -27,12 +29,12 @@ cns.do_ext_src = 1
 # ==================== WHAT NUMERICS =================== #
 cns.cfl = 0.3
 cns.dt_cutoff = 5.e-20
-cns.recon_scheme = 5  # 1: Godunov, 2: MUSCL, 3: WENO-Z3,
+cns.recon_scheme = 6  # 1: Godunov, 2: MUSCL, 3: WENO-Z3,
                       # 4: WENO-JS5, 5: WENO-Z5, 6: TENO5
 cns.do_vpdf      = 0  # enable Lagevin model and p_sgs correction
 cns.do_spdf      = 0  # enable IEM model
 cns.clip_temp    = 0  # clip minimum temperature [K]
-cns.do_les = 1
+cns.do_les = 0
 cns.les_model = "Smagorinsky"
 
 # ================== REACTION SETTINGS ================= #
@@ -49,13 +51,13 @@ amr.loadbalance_with_workestimates = 1 # for multi-level run, loadbalance_int = 
 #amr.loadbalance_max_fac    = 1.5      # default 1.5, what is this??
 
 # =============== REFINEMENT / REGRIDDING ============== #
-amr.max_level       = 2       # maximum level number allowed
+amr.max_level       = 0       # maximum level number allowed
 amr.ref_ratio       = 2 2 2 2 # refinement ratio
-amr.regrid_int      = 100     # how often to regrid
+amr.regrid_int      = 200     # how often to regrid
 amr.blocking_factor = 8
-amr.max_grid_size   = 64
+amr.max_grid_size   = 32
 amr.n_error_buf     = 2       # number of buffer cells in error est
-amr.grid_eff        = 0.8
+amr.grid_eff        = 0.9
 
 # ================== TAGGING CRITERIA ================== #
 # cns.refine_dengrad = 1e-4 2e-4 4e-4
@@ -64,22 +66,37 @@ amr.grid_eff        = 0.8
 cns.refine_magvort = 2e5 4e5
 cns.refine_magvort_max_lev = 4
 
+#cns.refinement_indicators = refinebox
+#cns.refinebox.in_box_lo = -1 -1 -2
+#cns.refinebox.in_box_hi = 10  1  2
+#cns.refinebox.max_level = 1
+
 # ==================== OUTPUT FILES ==================== #
 amr.checkpoint_files_output = 1
 amr.check_file      = chk    # root name of checkpoint file
-amr.check_int       = 200   # number of timesteps between checkpoints
+amr.check_int       = 5000   # number of timesteps between checkpoints
 #amr.check_per # interval physical time between checkpoints
 
 amr.plot_files_output = 1
 amr.plot_file         = plt  # root name of plotfile
-amr.plot_int          = 100  # number of timesteps between plotfiles
-#amr.plot_per # interval physical time between plotfiles
-amr.derive_plot_vars  = temp pressure x_velocity y_velocity z_velocity MachNumber divrho divu magvort cv cp transport_coef mu_t
+amr.plot_int          = 1000 # number of timesteps between plotfiles
+amr.plot_vars = density Temp
+amr.derive_plot_vars  = pressure velocity cv cp transport_coef #mu_t divrho divu
 cns.plot_rhoy = 0
 cns.plot_molefrac = 0
 cns.plot_massfrac = 0
 
 # ================= PROBLEM PARAMETERS ================= #
-prob.Re_b = 3000.0
+# Modesti & Pirozzoli (2016) CH15B
+#prob.Re_b = 7667.0
+#prob.Re_tau = 500.0
+#prob.u_tau = 3227.1887
+# CH15C
+prob.Re_b = 17000.0
+prob.Re_tau = 1015.0
+prob.u_tau = 2913.43
 prob.M_b = 1.5
 prob.Tw = 500.0
+prob.Pr = 0.72
+
+amr.data_log=ch15b.log

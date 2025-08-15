@@ -1,0 +1,183 @@
+# AMReX
+DIM = 3
+COMP = gnu
+PRECISION = DOUBLE
+
+# Profiling
+PROFILE = FALSE
+TINY_PROFILE = FALSE
+COMM_PROFILE = FALSE
+TRACE_PROFILE = FALSE
+MEM_PROFILE = FALSE
+USE_GPROF = FALSE
+
+# Performance
+USE_MPI = TRUE
+#USE_OMP = FALSE
+#USE_CUDA = FALSE
+#USE_HIP = FALSE
+#USE_SYCL = FALSE
+
+# Debugging
+DEBUG = FALSE
+FSANITIZER = FALSE
+THREAD_SANITIZER = FALSE
+
+# PelePhysics
+Eos_Model := GammaLaw
+Transport_Model := Sutherland
+Custom_Chemistry_Model := ../../Source/chem/NullSutherland
+
+# CNS
+#USE_EB = FALSE
+#NUM_AUX = 12
+#NUM_FIELD = 8
+
+# Link to problem exec folder
+CEXE_headers += prob.H prob_parm.H
+CEXE_sources += prob.cpp main.cpp
+Blocs += ../../Exec/Channel
+
+# GNU Make
+CERISSE_HOME ?= $(abspath ../../..)
+AMREX_HOME        ?= $(CERISSE_HOME)/Submodules/amrex
+PELE_PHYSICS_HOME ?= $(CERISSE_HOME)/Submodules/PelePhysics
+SUNDIALS_HOME     ?= $(CERISSE_HOME)/Submodules/sundials
+TOP ?= $(CERISSE_HOME)/EB_CNS
+
+# ifeq ($(USE_EB), TRUE)
+#    DEFINES += -DCNS_USE_EB=1
+# else
+USE_EB := FALSE
+# endif
+
+ifeq ($(USE_FULL_PROB_POST_TIMESTEP), TRUE)
+   DEFINES += -DUSE_FULL_PROB_POST_TIMESTEP
+endif
+
+ifeq ($(USE_PROB_POST_COARSETIMESTEP), TRUE)
+   DEFINES += -DUSE_PROB_POST_COARSETIMESTEP
+endif
+
+ifeq ($(USE_PROB_PARM_HOST), TRUE)
+   DEFINES += -DUSE_PROB_PARM_HOST
+endif
+
+ifeq ($(USE_PMFDATA), TRUE)
+   DEFINES += -DUSE_PMFDATA
+endif
+
+USE_SUNDIALS = TRUE
+USE_SUNDIALS_PP = TRUE
+LAZY = TRUE
+BL_NO_FORT = TRUE
+
+ifdef NUM_FIELD
+   DEFINES += -DNUM_FIELD=$(NUM_FIELD)
+   ifneq ($(NUM_FIELD), 0)
+      USERSuffix = .SF$(NUM_FIELD)
+   endif
+endif
+
+ifdef NUM_AUX
+   DEFINES += -DNUM_AUX=$(NUM_AUX)
+endif
+
+ifeq ($(USE_CUDA), TRUE)
+   CXXFLAGS+=-Xptxas --disable-optimizer-constants -Xcompiler=-std=c++17
+endif
+ifeq ($(USE_OMP), TRUE)
+   DEFINES += -DCRSEGRNDOMP # Coarse-grained OMP approach
+endif
+
+include $(AMREX_HOME)/Tools/GNUMake/Make.defs
+
+# ================= EB_CNS =================
+Bdirs := Source/hydro Source/diffusion Source/pdf Source/turb  # List of names of directory
+Bpack += $(foreach dir, $(Bdirs), $(TOP)/$(dir)/Make.package)  # List of Make.package
+Blocs += $(foreach dir, $(Bdirs), $(TOP)/$(dir))               # List of paths of directory
+Blocs += $(TOP)/Source
+
+CEXE_headers += CNS.H derive.H tagging.H CNS_K.H index_macros.H constants.H default_parm.H bc_util.H file_io.H nscbc.H
+CEXE_sources += advance.cpp advance_box.cpp bcfill.cpp derive.cpp CNS.cpp CNSBld.cpp io.cpp setup.cpp react.cpp file_io.cpp nscbc.cpp
+# ifeq ($(USE_EB), TRUE)
+#   CEXE_headers += custom_geometry.H
+#   CEXE_sources += init_eb2.cpp advance_box_eb.cpp custom_geometry.cpp
+# endif
+
+include $(Bpack)
+INCLUDE_LOCATIONS += $(Blocs)
+VPATH_LOCATIONS   += $(Blocs)
+
+# ================== AMREX ==================
+Adirs := Base Boundary AmrCore Amr
+Apack	+= $(foreach dir, $(Adirs), $(AMREX_HOME)/Src/$(dir)/Make.package)
+
+include $(Apack)
+
+# ifeq ($(USE_EB), TRUE)
+#    include $(AMREX_HOME)/Src/EB/Make.package
+# endif
+
+# =============== PELE_PHYSICS ===============
+Pdirs := Source Eos Transport Reactions Utility/TurbInflow Utility/PMF
+Ppack += $(foreach dir, $(Pdirs), $(PELE_PHYSICS_HOME)/$(dir)/Make.package)
+Plocs += $(foreach dir, $(Pdirs), $(PELE_PHYSICS_HOME)/$(dir))
+
+include $(Ppack)
+INCLUDE_LOCATIONS += $(Plocs)
+VPATH_LOCATIONS   += $(Plocs)
+
+# ThirdParty
+include $(PELE_PHYSICS_HOME)/ThirdParty/Make.ThirdParty # Because it is not Make."package"
+INCLUDE_LOCATIONS += $(PELE_PHYSICS_HOME)/ThirdParty
+VPATH_LOCATIONS   += $(PELE_PHYSICS_HOME)/ThirdParty
+
+# EOS
+ifeq ($(Eos_Model),$(filter $(Eos_Model),GammaLaw))
+   DEFINES += -DUSE_GAMMALAW_EOS
+endif
+ifeq ($(Eos_Model),$(filter $(Eos_Model),Fuego))
+   DEFINES += -DUSE_FUEGO_EOS
+endif
+ifeq ($(Eos_Model),$(filter $(Eos_Model),Soave-Redlich-Kwong))
+   DEFINES += -DUSE_SRK_EOS
+endif
+
+# Transport
+ifeq ($(Transport_Model),$(filter $(Transport_Model),Constant))
+   DEFINES += -DUSE_CONSTANT_TRANSPORT
+endif
+ifeq ($(Transport_Model),$(filter $(Transport_Model),Simple))
+   DEFINES += -DUSE_SIMPLE_TRANSPORT
+endif
+ifeq ($(Transport_Model),$(filter $(Transport_Model),Sutherland))
+   DEFINES += -DUSE_SUTHERLAND_TRANSPORT
+endif
+
+# Reactions
+ifdef Chemistry_Model
+   CHEM_HOME = $(PELE_PHYSICS_HOME)/Support/Mechanism/Models/$(Chemistry_Model)
+   include $(CHEM_HOME)/Make.package
+   INCLUDE_LOCATIONS += $(CHEM_HOME)
+   VPATH_LOCATIONS   += $(CHEM_HOME)
+endif
+ifdef Custom_Chemistry_Model
+   CHEM_HOME = $(Custom_Chemistry_Model)
+   include $(CHEM_HOME)/Make.package
+   INCLUDE_LOCATIONS += $(CHEM_HOME)
+   VPATH_LOCATIONS   += $(CHEM_HOME)
+endif
+
+all: $(executable)
+	@echo SUCCESS: $(executable)
+
+include $(AMREX_HOME)/Tools/GNUMake/Make.rules
+
+SUNDIALS:
+	@echo "==> Building SUNDIALS library"
+	cd $(PELE_PHYSICS_HOME)/ThirdParty; $(MAKE) sundials AMREX_HOME=$(AMREX_HOME) SUNDIALS_HOME=$(SUNDIALS_HOME) USE_CUDA=$(USE_CUDA) USE_HIP=$(USE_HIP) PELE_USE_KLU=$(PELE_USE_KLU) PELE_USE_MAGMA=$(PELE_USE_MAGMA) DEBUG=$(DEBUG) COMP=$(COMP) NVCC=$(COMP) PRECISION=$(PRECISION)
+
+SUNDIALSclean:
+	@echo "==> Removing SUNDIALS library"
+	cd $(PELE_PHYSICS_HOME)/ThirdParty; make AMREX_HOME=$(AMREX_HOME) USE_CUDA=$(USE_CUDA) USE_HIP=$(USE_HIP) PELE_USE_KLU=$(PELE_USE_KLU) PELE_USE_MAGMA=$(PELE_USE_MAGMA) DEBUG=$(DEBUG) COMP=$(HOSTCC) NVCC=$(COMP) PRECISION=$(PRECISION) clean
