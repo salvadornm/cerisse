@@ -84,7 +84,7 @@ AMREX_GPU_DEVICE AMREX_FORCE_INLINE void EquilibriumODE::parallel_wall_stress(
   Real /*lam*/, Real T_wall, Real& tau, Real& q)
 {
   constexpr int n_grid = 30;
-  const Real stretch = 1.1;
+  constexpr Real stretch = 1.1;
   const Real uw = 0.0; // wall velocity
   auto eos = pele::physics::PhysicsType::eos();
   auto trans = pele::physics::PhysicsType::transport();
@@ -107,9 +107,12 @@ AMREX_GPU_DEVICE AMREX_FORCE_INLINE void EquilibriumODE::parallel_wall_stress(
   const Real Prt = 0.9;    // turbulent Prandtl number
 
   Real y[n_grid], u[n_grid], T[n_grid]; // solution arrays
+  const Real y_denom =
+    0.5 * (std::pow(stretch, n_grid) + std::pow(stretch, n_grid - 1)) -
+    1; // this ensures y[n_grid-1] = h
   for (int i = 0; i < n_grid; ++i) {
-    Real ylo = h * (std::pow(stretch, i) - 1) / (std::pow(stretch, n_grid) - 1);
-    Real yhi = h * (std::pow(stretch, i + 1) - 1) / (std::pow(stretch, n_grid) - 1);
+    Real ylo = h * (std::pow(stretch, i) - 1) / y_denom;
+    Real yhi = h * (std::pow(stretch, i + 1) - 1) / y_denom;
     y[i] = 0.5 * (ylo + yhi);
     u[i] = y[i] / h * (uwm - uw) + uw; // linear initial guess
     T[i] = T_wall > 0.0 ? y[i] / h * (Twm - T_wall) + T_wall : Twm;
@@ -132,14 +135,24 @@ AMREX_GPU_DEVICE AMREX_FORCE_INLINE void EquilibriumODE::parallel_wall_stress(
                       nullptr, get_mu, dummy, get_lam, ltransparm);
       mu[i] = get_mu;
       lam[i] = get_lam;
+      // if (!std::isgreater(mu[i], std::numeric_limits<Real>::min()) 
+      //  || !std::isgreater(lam[i], std::numeric_limits<Real>::min())) {
+      //   std::cout << "i=" << i << ": rho=" << rho_i << ", T=" << T[i] << ", mu=" << mu[i]
+      //           << ", lam=" << lam[i] << std::endl;
+      // }
       eos.RTY2Cp(rho_i, T[i], Y, cp[i]);
       if (i == 0) { 
-        tauw = mu[0] * (u[0] - uw) / y[0]; 
+        tauw = mu[0] * std::max(u[0] - uw, std::numeric_limits<Real>::min()) / y[0]; 
         rho_0 = rho_i;
       }
       Real yplus_i = y[i] * std::sqrt(tauw / rho_0) / (mu[0] / rho_0);
+      // Real yplus_i = y[i] * std::sqrt(tauw * rho_i) / mu[i];  // Van-Driest transform
       mut[i] = kappa * y[i] * std::sqrt(rho_i * tauw) *
                std::pow(1.0 - std::exp(-yplus_i / Aplus), 2);
+      // if (!std::isgreater(mut[i], std::numeric_limits<Real>::min())) {
+      //   std::cout << "i=" << i << ": rho=" << rho_i << ", T=" << T[i] << ", tauw=" << tauw << ", u[0]=" << u[0] 
+      //             << ", mu=" << mu[i] << ", mut=" << mut[i] << std::endl;
+      // }
     }
     // printArray(mu, n_grid, "mu");
     // printArray(yplus, n_grid, "y+");
@@ -162,6 +175,10 @@ AMREX_GPU_DEVICE AMREX_FORCE_INLINE void EquilibriumODE::parallel_wall_stress(
     // freestream BC
     A(n_grid - 1, n_grid - 1) = 1.0;
     b(n_grid - 1) = uwm;
+    // if (!(std::abs(A(0, 0)) > std::numeric_limits<Real>::min())) {
+    //   std::cout << "mu_lo=" << mu_lo << ", mu_hi=" << mu_hi << ", y[0-1]=" << y[0]
+    //             << " " << y[1] << ", A(0,0)=" << A(0, 0) << std::endl;
+    // }
     // interior points
     for (int i = 1; i < n_grid - 1; ++i) {
       mu_lo = 0.5 * (mu[i - 1] + mut[i - 1] + mu[i] + mut[i]);
@@ -185,61 +202,62 @@ AMREX_GPU_DEVICE AMREX_FORCE_INLINE void EquilibriumODE::parallel_wall_stress(
     }
     // printArray(u, n_grid, "u");
 
-    // // solve for T
-    // for (int i = 0; i < n_grid; ++i) {
-    //   for (int j = 0; j < n_grid; ++j) {
-    //     A(i, j) = 0.0;
-    //   }
-    //   b(i) = 0.0;
-    // }
-    // // wall BC
-    // mu_lo = mu[0] + mut[0];
-    // mu_hi = 0.5 * (mu[0] + mut[0] + mu[1] + mut[1]);
-    // Real lam_lo = (lam[0] + cp[0] * mut[0] / Prt);
-    // Real lam_hi =
-    //   0.5 * (lam[0] + cp[0] * mut[0] / Prt + lam[1] + cp[1] * mut[1] / Prt);
-    // if (T_wall > 0.0) {
-    //   // Isothermal wall
-    //   A(0, 0) = lam_lo * (-1. / y[0]) - lam_hi * (1. / (y[1] - y[0]));
-    //   A(0, 1) = lam_hi * (1. / (y[1] - y[0]));
-    //   b(0) = -lam_lo * T_wall / y[0] + mu_lo * (uw * u[0] / y[0]) -
-    //          mu_hi * ((u[0] + u[1]) / 2 * (u[1] - u[0]) / (y[1] - y[0]));
-    // } else {
-    //   // adiabatic wall
-    //   A(0, 0) = -lam_hi * (1.0 / (y[1] - y[0]));
-    //   A(0, 1) = lam_hi * (1. / (y[1] - y[0]));
-    //   b(0) = mu_lo * (uw * u[0] / y[0]) -
-    //          mu_hi * ((u[0] + u[1]) / 2 * (u[1] - u[0]) / (y[1] - y[0]));
-    // }
-    // // freestream BC
-    // A(n_grid - 1, n_grid - 1) = 1.0;
-    // b(n_grid - 1) = Twm;
-    // // interior points
-    // for (int i = 1; i < n_grid - 1; ++i) {
-    //   mu_lo = 0.5 * (mu[i - 1] + mut[i - 1] + mu[i] + mut[i]);
-    //   mu_hi = 0.5 * (mu[i] + mut[i] + mu[i + 1] + mut[i + 1]);
-    //   lam_lo = 0.5 * (lam[i - 1] + cp[i - 1] * mut[i - 1] / Prt + lam[i] +
-    //                   cp[i] * mut[i] / Prt);
-    //   lam_hi = 0.5 * (lam[i] + cp[i] * mut[i] / Prt + lam[i + 1] +
-    //                   cp[i + 1] * mut[i + 1] / Prt);
-    //   A(i, i - 1) = lam_lo / (y[i] - y[i - 1]);
-    //   A(i, i) = -lam_lo / (y[i] - y[i - 1]) - lam_hi / (y[i + 1] - y[i]);
-    //   A(i, i + 1) = lam_hi / (y[i + 1] - y[i]);
-    //   b(i) =
-    //     mu_lo * ((u[i - 1] + u[i]) / 2 * (u[i] - u[i - 1]) / (y[i] - y[i - 1])) -
-    //     mu_hi * ((u[i] + u[i + 1]) / 2 * (u[i + 1] - u[i]) / (y[i + 1] - y[i]));
-    // }
-    // // printMatrix<n_grid>(A, "C");
-    // // printArray<n_grid>(b, "d");
+    // solve for T
+    for (int i = 0; i < n_grid; ++i) {
+      for (int j = 0; j < n_grid; ++j) {
+        A(i, j) = 0.0;
+      }
+      b(i) = 0.0;
+    }
+    // wall BC
+    mu_lo = mu[0] + mut[0];
+    mu_hi = 0.5 * (mu[0] + mut[0] + mu[1] + mut[1]);
+    Real lam_lo = (lam[0] + cp[0] * mut[0] / Prt);
+    Real lam_hi =
+      0.5 * (lam[0] + cp[0] * mut[0] / Prt + lam[1] + cp[1] * mut[1] / Prt);
+    if (T_wall > 0.0) {
+      // Isothermal wall
+      A(0, 0) = lam_lo * (-1. / y[0]) - lam_hi * (1. / (y[1] - y[0]));
+      A(0, 1) = lam_hi * (1. / (y[1] - y[0]));
+      b(0) = -lam_lo * T_wall / y[0] + mu_lo * (uw * u[0] / y[0]) -
+             mu_hi * ((u[0] + u[1]) / 2 * (u[1] - u[0]) / (y[1] - y[0]));
+    } else {
+      // adiabatic wall
+      A(0, 0) = -lam_hi * (1.0 / (y[1] - y[0]));
+      A(0, 1) = lam_hi * (1. / (y[1] - y[0]));
+      b(0) = mu_lo * (uw * u[0] / y[0]) -
+             mu_hi * ((u[0] + u[1]) / 2 * (u[1] - u[0]) / (y[1] - y[0]));
+    }
+    // AMREX_ALWAYS_ASSERT(std::abs(A(0, 0)) > std::numeric_limits<Real>::min());
+    // freestream BC
+    A(n_grid - 1, n_grid - 1) = 1.0;
+    b(n_grid - 1) = Twm;
+    // interior points
+    for (int i = 1; i < n_grid - 1; ++i) {
+      mu_lo = 0.5 * (mu[i - 1] + mut[i - 1] + mu[i] + mut[i]);
+      mu_hi = 0.5 * (mu[i] + mut[i] + mu[i + 1] + mut[i + 1]);
+      lam_lo = 0.5 * (lam[i - 1] + cp[i - 1] * mut[i - 1] / Prt + lam[i] +
+                      cp[i] * mut[i] / Prt);
+      lam_hi = 0.5 * (lam[i] + cp[i] * mut[i] / Prt + lam[i + 1] +
+                      cp[i + 1] * mut[i + 1] / Prt);
+      A(i, i - 1) = lam_lo / (y[i] - y[i - 1]);
+      A(i, i) = -lam_lo / (y[i] - y[i - 1]) - lam_hi / (y[i + 1] - y[i]);
+      A(i, i + 1) = lam_hi / (y[i + 1] - y[i]);
+      b(i) =
+        mu_lo * ((u[i - 1] + u[i]) / 2 * (u[i] - u[i - 1]) / (y[i] - y[i - 1])) -
+        mu_hi * ((u[i] + u[i + 1]) / 2 * (u[i + 1] - u[i]) / (y[i + 1] - y[i]));
+    }
+    // printMatrix<n_grid>(A, "C");
+    // printArray<n_grid>(b, "d");
 
-    // // solve
-    // lusolver.define(A);
-    // lusolver(tmp, b.arr);
-    // res_T = 0.0;
-    // for (int i = 0; i < n_grid; ++i) {
-    //   res_T += std::abs(T[i] - tmp[i]) / Real(n_grid);
-    //   T[i] = std::max(tmp[i], 90.0);
-    // }
+    // solve
+    lusolver.define(A);
+    lusolver(tmp, b.arr);
+    res_T = 0.0;
+    for (int i = 0; i < n_grid; ++i) {
+      res_T += std::abs(T[i] - tmp[i]) / Real(n_grid);
+      T[i] = std::clamp(tmp[i], 90.0, 4000.0);
+    }
     // // printArray(T, n_grid, "T");
 
     // std::cout << iter << " res_u = " << res_u << ", res_T = " << res_T << std::endl;

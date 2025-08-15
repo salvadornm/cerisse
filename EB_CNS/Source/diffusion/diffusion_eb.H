@@ -856,7 +856,9 @@ AMREX_GPU_DEVICE AMREX_FORCE_INLINE void compute_diff_wallflux(
 // #endif
 
   // Modify if using a wall model
-  if (do_wall_model) {
+  Real x = -3.175 + i / dxinv[0];
+  Real y = -1.27 + j / dxinv[1];
+  if (do_wall_model && (x > 1 || y > -0.01)) {
     // Check y+
     const Real dx = 1.0 / dxinv[0]; // dx == dy == dz
     const Real cfarea = apnorm * dx; // cut-face area / dx

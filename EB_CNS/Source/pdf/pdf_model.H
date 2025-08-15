@@ -252,6 +252,31 @@ AMREX_FORCE_INLINE AMREX_GPU_DEVICE void vpdf_langevin_model(
     amrex::Real delta = std::pow(AMREX_D_TERM(dx[0], *dx[1], *dx[2]),
                                  1.0 / amrex::Real(AMREX_SPACEDIM));
     amrex::Real eps = C_e * std::pow(tke, 1.5) / delta;
+    // TODO: FOR WMLES-SF TESTING ONLY. REMOVE BEFORE PRODUCTION RUN !!!
+    // amrex::Real c0 = C0;
+    // if (j == 0 || j == 31) {
+    //   eps = C_e * std::pow(tke, 1.5) / (0.41 * 0.5 * dx[1]); // kappa*y
+    //   c0 = 0.41 * 0.5 * C0;
+    // } else if (j == 1 || j == 30) {
+    //   eps = C_e * std::pow(tke, 1.5) / (0.41 * 1.5 * dx[1]);
+    //   c0 = 0.41 * 1.5 * C0;
+    // }
+    //c0 = 0.0;
+    // // FOR CHANNEL
+    // // amrex::Real x = 0. + (i + 0.5) * dx[0];
+    // amrex::Real y = -0.6845 + (j + 0.5) * dx[1];
+    // amrex::Real z = -1.369 + (k + 0.5) * dx[2];
+    // amrex::Real d_wall = 0.6845 - std::abs(y);    
+    // FOR MSJ
+    // amrex::Real x = -35.56 + (i + 0.5) * dx[0];
+    amrex::Real y = -1.27 + (j + 0.5) * dx[1];
+    amrex::Real z = -1.905 + (k + 0.5) * dx[2];
+    amrex::Real d_wall = std::min(std::min(y, 2.54 - y), 1.905 - std::abs(z));
+    // amrex::Real delta = std::min(std::pow(AMREX_D_TERM(dx[0], *dx[1], *dx[2]), 1.0 / amrex::Real(amrex::SpaceDim)), 
+    //                              0.41 * d_wall);
+    // amrex::Real eps = C_e * std::pow(tke, 1.5) / delta;
+    amrex::Real c0 = d_wall/dx[1] < 2 ? 0.0 : C0; //std::min(C0, std::max(d_wall/dx[1] - 2, 0.0) * 0.25);
+    // !!!!!!!!!!!!!!!!!!!!!! DO NOT IGNORE THIS !!!!!!!!!!!!!!!!!!!!!!!
     // Mach number correction for dissipation
     amrex::Real mean_rho = s(i, j, k, URHO);
     amrex::Real rhoinv = 1.0 / mean_rho;
@@ -265,6 +290,10 @@ AMREX_FORCE_INLINE AMREX_GPU_DEVICE void vpdf_langevin_model(
     eps *= (1.0 + std::min(M_turb2, 1.0));
     eps = std::max(eps, std::numeric_limits<amrex::Real>::epsilon()); // prevent divide by 0
 
+    // if (i == 0 && k == 0) {
+    //   std::cout << j << ": (d_wall/dx[1] - 0.5) * 0.5 = " << (d_wall/dx[1] - 0.5) * 0.5 << std::endl;
+    // }
+
     amrex::Real u_sgs;
     for (int nf = 1; nf <= NUM_FIELD; ++nf) {
       for (int dir = 0; dir < AMREX_SPACEDIM; ++dir) {
@@ -277,8 +306,14 @@ AMREX_FORCE_INLINE AMREX_GPU_DEVICE void vpdf_langevin_model(
         // if (shock_sensor[dir]) {
         //   u_sgs = (0.5 + 0.75 * C0) / (tke / eps + dt) * (mean_u - u) * dt;
         // } else {
-          u_sgs = (0.5 + 0.75 * C0) / (tke / eps + dt) * (mean_u - u) * dt +
-                  std::sqrt(C0 * eps) * dW[dir][nf - 1];
+          // Real c0y = (dir==1 && d_wall/dx[1]<=8) ? 0.0 : c0;
+          // Real c0y = (dir==1 /*|| dir==2*/) ? 0.0 : c0;
+          // Real c0y = dir==1 ? std::min(c0, std::max(d_wall/dx[1] - 3.5, 0.0) * 0.5) : c0;          
+          u_sgs = std::sqrt(c0 * eps) * dW[dir][nf - 1]; // do wiener term
+          u_sgs += dt / (tke / eps / (0.5 + 0.75 * c0) + dt) * (mean_u - u - u_sgs); // then do drift
+
+          // u_sgs = (0.5 + 0.75 * C0) / (tke / eps + dt) * (mean_u / s(i, j, k, nf * NVAR + URHO) * s(i, j, k, URHO) - u) * dt +
+          //         std::sqrt(C0 * eps) * dW[dir][nf - 1];
         // }
 
         s(i, j, k, nf * NVAR + UMX + dir) += s(i, j, k, nf * NVAR + URHO) * u_sgs;
@@ -316,7 +351,18 @@ AMREX_FORCE_INLINE AMREX_GPU_DEVICE void spdf_iem_model(
     tke = 0.5 * tke / amrex::Real(NUM_FIELD - 1); // k = 0.5*(u'^2 + v'^2 + w'^2)
     amrex::Real delta = std::pow(AMREX_D_TERM(dx[0], *dx[1], *dx[2]),
                                  1.0 / amrex::Real(AMREX_SPACEDIM));
-    amrex::Real eps = C_e * std::pow(tke, 1.5) / delta;
+    amrex::Real eps = C_e * std::pow(tke, 1.5) / delta;    
+    // TODO: FOR WMLES-SF TESTING ONLY. REMOVE BEFORE PRODUCTION RUN !!!
+    // if (j == 0 || j == 63 /*|| j == 1 || j == 30*/) {
+    //   tke = 0.0;
+    //   eps = std::numeric_limits<amrex::Real>::max();
+    // }
+    // if (j == 0 || j == 31) {
+    //   eps = C_e * std::pow(tke, 1.5) / (0.41 * 0.5 * dx[1]); // kappa*y
+    // } else if (j == 1 || j == 30) {
+    //   eps = C_e * std::pow(tke, 1.5) / (0.41 * 1.5 * dx[1]);
+    // }
+    // !!!!!!!!!!!!!!!!!!!!!! DO NOT IGNORE THIS !!!!!!!!!!!!!!!!!!!!!!!
     // Mach number correction for dissipation
     amrex::Real mean_rho = s(i, j, k, URHO);
     amrex::Real rhoinv = 1.0 / mean_rho;
@@ -333,6 +379,7 @@ AMREX_FORCE_INLINE AMREX_GPU_DEVICE void spdf_iem_model(
     // rhoQ_i = rhoQ_i + rho_i*0.5*C_Q*eps/k*(mean_y - y)*dt
     amrex::Real mean_Q, Q, Q_sgs;
     for (int nf = 1; nf <= NUM_FIELD; ++nf) {
+#if NUM_SPECIES > 1
       for (int ns = 0; ns < NUM_SPECIES; ++ns) {
         // Species (Q = Y)
         mean_Q = s(i, j, k, UFS + ns) / s(i, j, k, URHO);
@@ -341,6 +388,7 @@ AMREX_FORCE_INLINE AMREX_GPU_DEVICE void spdf_iem_model(
         Q_sgs = 0.5 * C_Y / (tke / eps + dt) * (mean_Q - Q) * dt;
         s(i, j, k, nf * NVAR + UFS + ns) += s(i, j, k, nf * NVAR + URHO) * Q_sgs;
       }
+#endif
 
       // // Energy (Q = E)
       // mean_Q = s(i, j, k, UEDEN) / s(i, j, k, URHO);
@@ -363,15 +411,42 @@ AMREX_FORCE_INLINE AMREX_GPU_DEVICE void spdf_iem_model(
       // Q_sgs = 0.5 * C_E * eps / tke * (mean_Q - Q) * dt;
       Q_sgs = 0.5 * C_E / (tke / eps + dt) * (mean_Q - Q) * dt;
       s(i, j, k, nf * NVAR + UEDEN) += s(i, j, k, nf * NVAR + URHO) * Q_sgs;
-      
+
       // Energy 3 (Q = Hi)
       // auto eos = pele::physics::PhysicsType::eos();
       // amrex::Real T = 0.0;
       // amrex::Real Y[NUM_SPECIES];
-      // for (int n = 0; n < NUM_SPECIES; ++n) 
+      // for (int n = 0; n < NUM_SPECIES; ++n)
       //   Y[n] = s(i, j, k, UFS + n) / s(i, j, k, URHO);
       // eos.REY2T()
       // eos.TY2H()
+
+      // // Energy 4 (Q = rEi)
+      // mean_Q = s(i, j, k, UEDEN) / s(i, j, k, URHO) 
+      //   - 0.5 * (AMREX_D_TERM(s(i, j, k, UMX) * s(i, j, k, UMX), 
+      //                       + s(i, j, k, UMY) * s(i, j, k, UMY),
+      //                       + s(i, j, k, UMZ) * s(i, j, k, UMZ))) 
+      //                       / s(i, j, k, URHO) / s(i, j, k, URHO);
+      // Q = s(i, j, k, nf * NVAR + UEDEN) / s(i, j, k, nf * NVAR + URHO)
+      //   - 0.5 * (AMREX_D_TERM(s(i, j, k, nf * NVAR + UMX) * s(i, j, k, nf * NVAR + UMX), 
+      //                       + s(i, j, k, nf * NVAR + UMY) * s(i, j, k, nf * NVAR + UMY),
+      //                       + s(i, j, k, nf * NVAR + UMZ) * s(i, j, k, nf * NVAR + UMZ))) 
+      //                       / s(i, j, k, nf * NVAR + URHO) / s(i, j, k, nf * NVAR + URHO);
+      // Q_sgs = 0.5 * C_E / (tke / eps + dt) * (mean_Q / s(i, j, k, nf * NVAR + URHO) * s(i, j, k, URHO) - Q) * dt;
+      // s(i, j, k, nf * NVAR + UEDEN) += s(i, j, k, nf * NVAR + URHO) * Q_sgs;
+
+      // // Density for pressure
+      // amrex::Real mean_rho = s(i, j, k, URHO);
+      // amrex::Real rho = s(i, j, k, nf * NVAR + URHO);
+      // amrex::Real mean_p = (1.4 - 1.0) * mean_rho * mean_Q;
+      // amrex::Real p = (1.4 - 1.0) * rho * Q;
+      // amrex::Real mean_ei = mean_Q;
+      // amrex::Real dei = Q_sgs;
+      // amrex::Real tau_p = std::sqrt(M_turb2) * tke / eps;
+      // // s(i, j, k, nf * NVAR + URHO) +=
+      // //   mean_rho / mean_p / (tau_p + dt) * (mean_p - p) * dt -
+      // //   rho / mean_ei * dei;
+      // s(i, j, k, nf * NVAR + URHO) += 1.0 / (tau_p + dt) * (mean_rho - rho) * dt;
     }
   });
 }

@@ -210,6 +210,7 @@ void CNS::compute_dSdt_box_eb(
           Real flx_tmp[NVAR] = {0.0};
           cns_diff_eb(iv, dir, q, coefs, flag, dxinv, flx_tmp);
 
+#if NUM_FIELD == 0
           // Wall model for regular solid boundaries (modifies flx_tmp)
           const bool lo_is_wall = phys_bc.lo(dir) == 5;
           const bool hi_is_wall = phys_bc.hi(dir) == 5;
@@ -217,7 +218,8 @@ void CNS::compute_dSdt_box_eb(
           const int domhi = geom.Domain().bigEnd(dir);
           const auto problo = geom.ProbLo();
           // const Real x = (i + 0.5) * dx[0] + problo[0];
-          if (eb_wall_model /*&& x < -1.0*/) { // in line with advance_box_eb   
+          // const Real y = (j + 0.5) * dx[1] + problo[1];
+          if (eb_wall_model /*&& x < -1.0 && y > 0.0*/) { // in line with advance_box_eb   
             if ((iv[dir] == domhi + 1 && hi_is_wall) ||
                 (iv[dir] == domlo && lo_is_wall)) {
               const auto iv1 = iv[dir] == domlo ? iv : iv - IntVect::TheDimensionVector(dir);
@@ -263,27 +265,29 @@ void CNS::compute_dSdt_box_eb(
               const Real t1[3] = {u2[0] / u_parallel, u2[1] / u_parallel, u2[2] / u_parallel};
               const Real ts = (u2[0] > 0.0) ? 1.0 : -1.0;
               const Real T2 = q(iv2, QTEMP);
+              const Real rho2 = q(iv2, QRHO);
                             
               // call wall_model.parallel_wall_stress
               if (yplus > 11.0 && u_parallel > 100.0 && !(T2 < 90.0) &&
-                  !(T2 > 4000.0) && rho > 0.0) {
+                  !(T2 > 4000.0) && rho2 > 0.0) {
                 // LawOfTheWall wm;
                 EquilibriumODE wm;                
                 Real T_wall = eb_isothermal ? eb_wall_temp : -1.0;
                 Real h = 1.5 * local_dx;
                 Real tauw, qw;
-                wm.parallel_wall_stress(u_parallel, T2, rho, Y, h, mu, lam, T_wall,
+                wm.parallel_wall_stress(u_parallel, T2, rho2, Y, h, mu, lam, T_wall,
                                         tauw, qw);
                 if (!isnan(tauw) && !isnan(qw)) {
                   const Real lohi = iv[dir] == domlo ? -1 : 1;
                   flx_tmp[UMX] = ts * t1[0] * tauw * lohi;
                   flx_tmp[UMY] = ts * t1[1] * tauw * lohi;
                   flx_tmp[UMZ] = ts * t1[2] * tauw * lohi;
-                  // flx_tmp[UEDEN] = qw * lohi; // TODO: no wall model heat flux for now
+                  flx_tmp[UEDEN] = qw * lohi;
                 }
               }
             }
           }
+#endif
 
           // Add flx_tmp to vflx
           for (int n = 0; n < NVAR; ++n) { vflx(iv, n) += flx_tmp[n]; }
@@ -299,6 +303,121 @@ void CNS::compute_dSdt_box_eb(
       const Box& flxbx = amrex::surroundingNodes(bxg3, dir);
       auto const& flx = flux_tmp[dir].array();
       auto const& vflx = vfluxfab[dir].array();
+      if (eb_wall_model) { // in line with advance_box_eb
+        const auto problo = geom.ProbLo();
+        const bool lo_is_wall = phys_bc.lo(dir) == 5;
+        const bool hi_is_wall = phys_bc.hi(dir) == 5;
+        const int domlo = geom.Domain().smallEnd(dir);
+        const int domhi = geom.Domain().bigEnd(dir);
+
+        // Mean primitive variables
+        FArrayBox q0fab(flxbx, 5 + NUM_SPECIES, The_Async_Arena());
+        auto const& q0 = q0fab.array();
+        amrex::ParallelFor(flxbx, [=] AMREX_GPU_DEVICE(int i, int j, int k) {
+          const IntVect iv(AMREX_D_DECL(i, j, k));
+          if (iv[dir] == domhi || iv[dir] == domhi - 1 || iv[dir] == domlo + 1 ||
+              iv[dir] == domlo) {
+            const Real invNF = Real(1.0) / Real(NUM_FIELD);
+            // rho
+            q0(iv, 0) = 0;
+            for (int nf = 1; nf <= NUM_FIELD; ++nf) {
+              q0(iv, 0) += sarr(iv, nf * NVAR + URHO);
+            }
+            q0(iv, 0) *= invNF;
+            // u, v, w
+            for (int n = 0; n < 3; ++n) {
+              q0(iv, 1 + n) = 0;
+              for (int nf = 1; nf <= NUM_FIELD; ++nf) {
+                q0(iv, 1 + n) += sarr(iv, nf * NVAR + UMX + n);
+              }
+              q0(iv, 1 + n) *= invNF / q0(iv, 0); // farve
+            }
+            // Temp
+            q0(iv, 4) = 0;
+            for (int nf = 1; nf <= NUM_FIELD; ++nf) {
+              q0(iv, 4) += sarr(iv, nf * NVAR + UTEMP);
+            }
+            q0(iv, 4) *= invNF;
+            // Y
+            for (int n = 0; n < NUM_SPECIES; ++n) {
+              q0(iv, 5 + n) = 0;
+              for (int nf = 1; nf <= NUM_FIELD; ++nf) {
+                q0(iv, 5 + n) += sarr(iv, nf * NVAR + UFS + n);
+              }
+              q0(iv, 5 + n) *= invNF / q0(iv, 0); // farve
+            }
+          }
+        });
+
+        // Wall model for regular solid boundaries (using mean field)
+        amrex::ParallelFor(flxbx, [=] AMREX_GPU_DEVICE(int i, int j, int k) {
+          const IntVect iv(AMREX_D_DECL(i, j, k));
+
+          // const Real y = (j + 0.5) * dx[1] + problo[1];
+          if ((iv[dir] == domhi + 1 && hi_is_wall) ||
+              (iv[dir] == domlo && lo_is_wall) /*&& y > 0.0*/) {
+            const auto iv1 =
+              iv[dir] == domlo ? iv : iv - IntVect::TheDimensionVector(dir);
+
+            // get density and transport coefficients
+            Real rho = q0(iv1, 0);
+            Real Y[NUM_SPECIES];
+            for (int n = 0; n < NUM_SPECIES; ++n) { Y[n] = q0(iv1, 5 + n); }
+            auto trans = pele::physics::PhysicsType::transport();
+            auto const* ltransparm = CNS::trans_parms.device_trans_parm();
+            Real mu, lam, xi_unused;
+            trans.transport(true, true, true, false, false, eb_wall_temp, rho, Y,
+                            nullptr, nullptr, mu, xi_unused, lam, ltransparm);
+
+            // Check y+
+            const Real local_dx = dx[1]; // dx == dy == dz
+            // const Real tau =
+            //   mu / local_dx *
+            //   std::sqrt(q0(iv1, 1) * q0(iv1, 1) + q0(iv1, 2) * q0(iv1, 2) +
+            //             q0(iv1, 3) * q0(iv1, 3));
+            const Real tau = std::sqrt(vflx(iv, UMX) * vflx(iv, UMX) +
+                                       vflx(iv, UMY) * vflx(iv, UMY) +
+                                       vflx(iv, UMZ) * vflx(iv, UMZ)) /
+                             Real(NUM_FIELD);
+            const Real yplus = std::sqrt(tau * rho) / mu * local_dx;
+
+            // Tangent vectors (t1.n = 0, t2.t1 = 0, u.t2 = 0)
+            const auto iv2 = iv[dir] == domlo
+                               ? iv + IntVect::TheDimensionVector(dir)
+                               : iv - 2 * IntVect::TheDimensionVector(dir);
+            Real u2[3] = {q0(iv2, 1), q0(iv2, 2), q0(iv2, 3)};
+            u2[dir] = 0.0;
+            const Real u_parallel =
+              std::sqrt(u2[0] * u2[0] + u2[1] * u2[1] + u2[2] * u2[2]);
+            const Real t1[3] = {u2[0] / u_parallel, u2[1] / u_parallel,
+                                u2[2] / u_parallel};
+            const Real ts = (u2[0] > 0.0) ? 1.0 : -1.0;
+            const Real T2 = q0(iv2, 4);
+            const Real rho2 = q0(iv2, 0);
+
+            // call wall_model.parallel_wall_stress
+            if (yplus > 11.0 && u_parallel > 100.0 && !(T2 < 90.0) &&
+                !(T2 > 4000.0) && !(rho2 < 0.0)) {
+              // LawOfTheWall wm;
+              EquilibriumODE wm;
+              Real T_wall = eb_isothermal ? eb_wall_temp : -1.0;
+              Real h = 1.5 * local_dx;
+              Real tauw, qw;
+              wm.parallel_wall_stress(u_parallel, T2, rho2, Y, h, mu, lam, T_wall,
+                                      tauw, qw);
+              if (!isnan(tauw) && !isnan(qw)) {
+                const Real lohi = iv[dir] == domlo ? -1 : 1;
+                for (int nf = 1; nf <= NUM_FIELD; ++nf) {
+                  vflx(iv, UMX) = ts * t1[0] * tauw * lohi * Real(NUM_FIELD);
+                  vflx(iv, UMY) = ts * t1[1] * tauw * lohi * Real(NUM_FIELD);
+                  vflx(iv, UMZ) = ts * t1[2] * tauw * lohi * Real(NUM_FIELD);
+                  vflx(iv, UEDEN) = qw * lohi * Real(NUM_FIELD);
+                }
+              }
+            }
+          }
+        });
+      } // eb_wall_model
 
       amrex::ParallelFor(
         flxbx, NUM_FIELD, [=] AMREX_GPU_DEVICE(int i, int j, int k, int nfm1) {
