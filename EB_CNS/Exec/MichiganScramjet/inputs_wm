@@ -21,6 +21,8 @@ cns.eb_wall_temp = 295
 cns.eb_wall_model = 1
 cns.redistribution_type = StateRedist #FluxRedist
 #cns.eb_weight = 1.0
+cns.no_wm_in_box_lo = -1.0 -2.0  -2.0
+cns.no_wm_in_box_hi =  1.0 -0.01  2.0
 
 # ================ BOUNDARY CONDITIONS ================= #
 # 0 = Interior             3 = Symmetry

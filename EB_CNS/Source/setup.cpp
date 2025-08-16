@@ -89,6 +89,7 @@ void CNS::read_params()
 {
   ParmParse pp("cns");
   ParmParse pa("amr");
+  Vector<Real> boxlo, boxhi;
 
   pp.query("v", verbose);
   pp.query("cfl", cfl);
@@ -113,7 +114,14 @@ void CNS::read_params()
 #endif
   pp.query("eb_isothermal", eb_isothermal);
   if (eb_isothermal) { pp.get("eb_wall_temp", eb_wall_temp); }
+  
   pp.query("eb_wall_model", eb_wall_model);
+  if (eb_wall_model && pp.queryarr("no_wm_in_box_lo", boxlo)) {
+    pp.getarr("no_wm_in_box_lo", boxhi);
+    no_wm_box.setLo(boxlo.data());
+    no_wm_box.setHi(boxhi.data());
+    if (!no_wm_box.ok()) { amrex::Abort("CNS: no_wm_box has negative volume"); }
+  }
   
   pp.query("recon_char_var", recon_char_var);
   pp.query("char_sys", char_sys);
@@ -248,12 +256,11 @@ void CNS::read_params()
 #endif
 
   int irefbox = 0;
-  Vector<Real> refboxlo, refboxhi;
   int refbox_maxlev;
   while (
-    pp.queryarr(("refine_box_lo_" + std::to_string(irefbox)).c_str(), refboxlo)) {
-    pp.getarr(("refine_box_hi_" + std::to_string(irefbox)).c_str(), refboxhi);
-    refine_boxes.emplace_back(refboxlo.data(), refboxhi.data());
+    pp.queryarr(("refine_box_lo_" + std::to_string(irefbox)).c_str(), boxlo)) {
+    pp.getarr(("refine_box_hi_" + std::to_string(irefbox)).c_str(), boxhi);
+    refine_boxes.emplace_back(boxlo.data(), boxhi.data());
 
     refbox_maxlev = 10;
     pp.query(("refine_box_max_level_" + std::to_string(irefbox)).c_str(),
@@ -272,10 +279,10 @@ void CNS::read_params()
 #endif
   }
 
-  if (pp.queryarr("buffer_box_lo", refboxlo)) {
-    pp.getarr("buffer_box_hi", refboxhi);
-    buffer_box.setLo(refboxlo.data());
-    buffer_box.setHi(refboxhi.data());
+  if (pp.queryarr("buffer_box_lo", boxlo)) {
+    pp.getarr("buffer_box_hi", boxhi);
+    buffer_box.setLo(boxlo.data());
+    buffer_box.setHi(boxhi.data());
     if (!buffer_box.ok()) { amrex::Abort("CNS: buffer_box has negative volume"); }
   }
 

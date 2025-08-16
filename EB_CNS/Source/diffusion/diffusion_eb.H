@@ -784,22 +784,6 @@ AMREX_GPU_DEVICE AMREX_FORCE_INLINE void compute_diff_wallflux(
     lam = coefs(i, j, k, CLAM);
   }
 
-// #ifdef MONITOR_PROBLEM_CELL
-  // if (!std::isgreater(rho, 0.0) || !std::isgreater(mu, 0.0) ||
-  //     !std::isgreater(lam, 0.0)) {
-  //   std::cout << "p: " << p << ", Tw: " << eb_wall_temp << ", Y:";
-  //   for (int n = 0; n < NUM_SPECIES; ++n) { std::cout << Y[n] << " "; }
-  //   std::cout << " rho: " << rho << ", mu: " << mu << ", lam: " << lam << std::endl;
-  // }
-  // if (std::isnan(v1) || std::isnan(v2) || std::isnan(u1) || std::isnan(u2) ||
-  //     std::isnan(w1) || std::isnan(w2) || 
-  //     !std::isgreater(T1, 0.0) || !std::isgreater(T2, 0.0)) {
-  //   std::cout << "d1: " << d1 << ", d2: " << d2 << " v1: " << v1 << ", v2: " << v2
-  //             << ", u1: " << u1 << ", u2: " << u2 << ", w1: " << w1 << ", w2: " << w2
-  //             << ", T1: " << T1 << ", T2: " << T2 << std::endl;
-  // }
-// #endif
-
   if (eb_no_slip) {
     Real dudn =
       -ddinv * (d2 * d2 * u1 -
@@ -846,19 +830,8 @@ AMREX_GPU_DEVICE AMREX_FORCE_INLINE void compute_diff_wallflux(
     viscw[UEDEN] = apnorm * lam * dTdn;
   }
 
-// #ifdef MONITOR_PROBLEM_CELL
-  // if (std::isnan(viscw[UMX]) || std::isnan(viscw[UMY]) || std::isnan(viscw[UMZ]) ||
-  //     std::isnan(viscw[UEDEN])) {
-  //   std::cout << "viscous wall flux: " << viscw[UMX] << ", " << viscw[UMY] << ", "
-  //             << viscw[UMZ] << ", " << viscw[UEDEN] << std::endl;
-  //   // amrex::Abort("Problem with wall flux");
-  // }
-// #endif
-
   // Modify if using a wall model
-  Real x = -3.175 + i / dxinv[0];
-  Real y = -1.27 + j / dxinv[1];
-  if (do_wall_model && (x > 1 || y > -0.01)) {
+  if (do_wall_model) {
     // Check y+
     const Real dx = 1.0 / dxinv[0]; // dx == dy == dz
     const Real cfarea = apnorm * dx; // cut-face area / dx

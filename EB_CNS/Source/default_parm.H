@@ -36,8 +36,10 @@ bool CNS::eb_no_slip    = true;  // No-slip EB walls?
 std::string CNS::redistribution_type = "StateRedist"; // StateRedist / FluxRedist / NoRedist
 #endif
 bool CNS::eb_isothermal = false; // Isothermal EB walls?
-bool CNS::eb_wall_model = false; // Use wall model for EB walls? (TODO: now only support ODE wall model)
 Real CNS::eb_wall_temp;          // EB wall temperature (if eb_isothermal = true)
+
+bool CNS::eb_wall_model = false; // Use wall model for EB walls? (TODO: now only support ODE wall model)
+RealBox CNS::no_wm_box;          // Do not apply wall model in this box
 
 // Numerics controls
 

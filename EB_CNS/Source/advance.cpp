@@ -198,7 +198,7 @@ void CNS::compute_dSdt(const MultiFab& S, MultiFab& dSdt, Real dt,
         }
 
         // shock sensor always needed in cns_riemann
-        if (use_hybrid_scheme)
+        // if (use_hybrid_scheme)
         {
           Real time = state[State_Type].curTime();
           int* bcrec_dummy;

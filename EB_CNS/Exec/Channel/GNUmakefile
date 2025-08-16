@@ -30,7 +30,7 @@ Custom_Chemistry_Model := ../../Source/chem/NullSutherland
 
 # CNS
 NUM_FIELD = 0
-USE_FULL_PROB_POST_TIMESTEP = TRUE
+#USE_FULL_PROB_POST_TIMESTEP = TRUE
 #NUM_AUX = 10
 
 # GNU Make

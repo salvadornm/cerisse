@@ -75,6 +75,9 @@ void CNS::fill_ext_src(int i, int j, int k, amrex::Real time,
   }
 }
 
+// Enable P(no I)D controller for bulk velocity (mass flow rate) by setting
+// `USE_FULL_PROB_POST_TIMESTEP = TRUE` in GNUMakefile. 
+// Adjust the P and D values below if necessary.
 #if USE_FULL_PROB_POST_TIMESTEP
 void CNS::full_prob_post_timestep(int /*iteration*/)
 {
