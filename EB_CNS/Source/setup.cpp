@@ -89,6 +89,7 @@ void CNS::read_params()
 {
   ParmParse pp("cns");
   ParmParse pa("amr");
+  Vector<Real> boxlo, boxhi;
 
   pp.query("v", verbose);
   pp.query("cfl", cfl);
@@ -109,13 +110,19 @@ void CNS::read_params()
   }
 
   pp.query("eb_no_slip", eb_no_slip);
+  pp.query("eb_recon_mode", eb_recon_mode); // 0: fill stencil, 1: return to PLM
+#endif
   pp.query("eb_isothermal", eb_isothermal);
   if (eb_isothermal) { pp.get("eb_wall_temp", eb_wall_temp); }
-  pp.query("eb_recon_mode", eb_recon_mode); // 0: fill stencil, 1: return to PLM
-
+  
   pp.query("eb_wall_model", eb_wall_model);
-#endif
-
+  if (eb_wall_model && pp.queryarr("no_wm_in_box_lo", boxlo)) {
+    pp.getarr("no_wm_in_box_lo", boxhi);
+    no_wm_box.setLo(boxlo.data());
+    no_wm_box.setHi(boxhi.data());
+    if (!no_wm_box.ok()) { amrex::Abort("CNS: no_wm_box has negative volume"); }
+  }
+  
   pp.query("recon_char_var", recon_char_var);
   pp.query("char_sys", char_sys);
   if (char_sys != 0 && char_sys != 1) {
@@ -249,12 +256,11 @@ void CNS::read_params()
 #endif
 
   int irefbox = 0;
-  Vector<Real> refboxlo, refboxhi;
   int refbox_maxlev;
   while (
-    pp.queryarr(("refine_box_lo_" + std::to_string(irefbox)).c_str(), refboxlo)) {
-    pp.getarr(("refine_box_hi_" + std::to_string(irefbox)).c_str(), refboxhi);
-    refine_boxes.emplace_back(refboxlo.data(), refboxhi.data());
+    pp.queryarr(("refine_box_lo_" + std::to_string(irefbox)).c_str(), boxlo)) {
+    pp.getarr(("refine_box_hi_" + std::to_string(irefbox)).c_str(), boxhi);
+    refine_boxes.emplace_back(boxlo.data(), boxhi.data());
 
     refbox_maxlev = 10;
     pp.query(("refine_box_max_level_" + std::to_string(irefbox)).c_str(),
@@ -273,10 +279,10 @@ void CNS::read_params()
 #endif
   }
 
-  if (pp.queryarr("buffer_box_lo", refboxlo)) {
-    pp.getarr("buffer_box_hi", refboxhi);
-    buffer_box.setLo(refboxlo.data());
-    buffer_box.setHi(refboxhi.data());
+  if (pp.queryarr("buffer_box_lo", boxlo)) {
+    pp.getarr("buffer_box_hi", boxhi);
+    buffer_box.setLo(boxlo.data());
+    buffer_box.setHi(boxhi.data());
     if (!buffer_box.ok()) { amrex::Abort("CNS: buffer_box has negative volume"); }
   }
 
@@ -717,6 +723,10 @@ void CNS::variableSetUp()
   derive_lst.add("reynolds_stress", IndexType::TheCellType(), AMREX_D_PICK(1, 3, 6),
                  rs_names, cns_dervaru, DeriveRec::TheSameBox);
   derive_lst.addComponent("reynolds_stress", desc_lst, State_Type, 0, LEN_STATE);
+
+  derive_lst.add("k_sgs", IndexType::TheCellType(), 1, cns_dertke,
+                 DeriveRec::TheSameBox);
+  derive_lst.addComponent("k_sgs", desc_lst, State_Type, 0, LEN_STATE);
 
   amrex::Vector<std::string> vary_names(NUM_SPECIES);
   for (int i = 0; i < NUM_SPECIES; i++) { vary_names[i] = "var_Y_" + spec_names[i]; }

@@ -1,0 +1,56 @@
+# ====================================================== #
+# Input to mf_manip/main.ex
+# This takes in a chkfile (amr.restart) and change its 
+# domain (geometry.prob_lo, geometry.prob_hi, amr.n_cell).
+# The output chkfile has only 1 level and does not support
+# EB, but one can pass it to the usual ex file for a 
+# restart to restore the desired levels and EB.
+#
+# Note: this returns an error at the end, but it is fine.
+# ====================================================== #
+
+# ==================== INPUT / OUTPUT ================== #
+amr.restart = ../../Exec/Channel/highRe/chk285000
+#amr.restart = ../../Exec/Channel/les/chk11000
+#amr.restart = ../../../../storage/NEW_MSJH/dev-wm/chk10000
+
+geometry.is_periodic = 1 0 1
+geometry.coord_sys   = 0  # 0: cart, 1: RZ, 2:spherical
+geometry.prob_lo     = 0.0   -0.6845 -1.369 #0, -H, -2H
+geometry.prob_hi     = 8.214  0.6845  1.369 #12H, H, 2H
+#amr.n_cell = 768 128 256
+amr.n_cell = 192     32      64
+
+cns.lo_bc = 0 1 0
+cns.hi_bc = 0 1 0
+
+manip.in_level = 0 # You need to make sure this covers the desired domain
+manip.fill_level = 1
+# manip.offset_cell = 0 0 0  (TODO)
+
+# ==================== OUTPUT FILES ==================== #
+amr.checkpoint_files_output = 1
+amr.check_file = chk
+amr.check_int = -1
+
+amr.plot_files_output = 1
+amr.plot_file = plt
+amr.plot_int = -1
+amr.plot_vars = density Temp
+amr.derive_plot_vars = pressure velocity cp cv
+cns.plot_rhoy = 0
+cns.plot_molefrac = 0
+cns.plot_massfrac = 1
+cns.plot_fields = 0
+
+# ================= GRIDDING (OPTIONAL) ================ #
+amr.max_level       = 1     # maximum level number allowed
+amr.ref_ratio       = 2 2 2 # refinement ratio
+#amr.regrid_int      = 20    # how often to regrid
+#amr.blocking_factor = 8
+#amr.max_grid_size   = 32
+#amr.n_error_buf     = 2 0 0 # number of buffer cells in error est
+#amr.grid_eff        = 0.8
+cns.refine_box_lo_0 = -1  -1 -2
+cns.refine_box_hi_0 =  10  1  2
+cns.refine_box_max_level_0 = 1

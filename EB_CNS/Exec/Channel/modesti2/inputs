@@ -1,7 +1,7 @@
 # ====================================================== #
 #                  CERISSE INPUT SCRIPT                  #
 # ====================================================== #
-max_step = 10000
+max_step = 400000
 stop_time = 0.1
 #amrex.fpe_trap_invalid = 1
 
@@ -10,9 +10,8 @@ geometry.is_periodic = 1 0 1
 geometry.coord_sys   = 0  # 0: cart, 1: RZ, 2:spherical
 geometry.prob_lo     = 0.0   -0.6845 -1.369 #0, -H, -2H
 geometry.prob_hi     = 8.214  0.6845  1.369 #12H, H, 2H
-#amr.n_cell           = 768    128     256
+amr.n_cell           = 768    128     256
 #amr.n_cell           = 384    64      128
-amr.n_cell           = 192    32      64
 eb2.geom_type = all_regular
 
 # ================ BOUNDARY CONDITIONS ================= #
@@ -63,8 +62,8 @@ amr.grid_eff        = 0.9
 # cns.refine_dengrad = 1e-4 2e-4 4e-4
 # cns.refine_dengrad_max_lev = 4
 
-cns.refine_magvort = 2e5 4e5
-cns.refine_magvort_max_lev = 4
+#cns.refine_magvort = 2e5 4e5
+#cns.refine_magvort_max_lev = 4
 
 #cns.refinement_indicators = refinebox
 #cns.refinebox.in_box_lo = -1 -1 -2
@@ -79,7 +78,7 @@ amr.check_int       = 5000   # number of timesteps between checkpoints
 
 amr.plot_files_output = 1
 amr.plot_file         = plt  # root name of plotfile
-amr.plot_int          = 1000 # number of timesteps between plotfiles
+amr.plot_int          = 5000 # number of timesteps between plotfiles
 amr.plot_vars = density Temp
 amr.derive_plot_vars  = pressure velocity cv cp transport_coef #mu_t divrho divu
 cns.plot_rhoy = 0
@@ -88,15 +87,13 @@ cns.plot_massfrac = 0
 
 # ================= PROBLEM PARAMETERS ================= #
 # Modesti & Pirozzoli (2016) CH15B
-#prob.Re_b = 7667.0
-#prob.Re_tau = 500.0
-#prob.u_tau = 3227.1887
+prob.Re_b = 7667.0
+prob.Re_tau = 500.0
+prob.u_tau = 3227.1887
 # CH15C
-prob.Re_b = 17000.0
-prob.Re_tau = 1015.0
-prob.u_tau = 2913.43
+#prob.Re_b = 17000.0
+#prob.Re_tau = 1015.0
+#prob.u_tau = 2913.43
 prob.M_b = 1.5
 prob.Tw = 500.0
 prob.Pr = 0.72
-
-amr.data_log=ch15b.log

@@ -384,8 +384,12 @@ protected:
   static std::string redistribution_type;
 #endif
   static bool eb_isothermal;
-  static bool eb_wall_model;
   static amrex::Real eb_wall_temp;
+
+  // Wall model
+
+  static bool eb_wall_model;  
+  static amrex::RealBox no_wm_box;
 
   // Buffer layer
 
