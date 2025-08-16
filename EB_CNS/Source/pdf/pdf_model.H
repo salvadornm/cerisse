@@ -269,13 +269,13 @@ AMREX_FORCE_INLINE AMREX_GPU_DEVICE void vpdf_langevin_model(
     // amrex::Real d_wall = 0.6845 - std::abs(y);    
     // FOR MSJ
     // amrex::Real x = -35.56 + (i + 0.5) * dx[0];
-    amrex::Real y = -1.27 + (j + 0.5) * dx[1];
-    amrex::Real z = -1.905 + (k + 0.5) * dx[2];
-    amrex::Real d_wall = std::min(std::min(y, 2.54 - y), 1.905 - std::abs(z));
+    // amrex::Real y = -1.27 + (j + 0.5) * dx[1];
+    // amrex::Real z = -1.905 + (k + 0.5) * dx[2];
+    // amrex::Real d_wall = std::min(std::min(y, 2.54 - y), 1.905 - std::abs(z));
     // amrex::Real delta = std::min(std::pow(AMREX_D_TERM(dx[0], *dx[1], *dx[2]), 1.0 / amrex::Real(amrex::SpaceDim)), 
     //                              0.41 * d_wall);
     // amrex::Real eps = C_e * std::pow(tke, 1.5) / delta;
-    amrex::Real c0 = d_wall/dx[1] < 2 ? 0.0 : C0; //std::min(C0, std::max(d_wall/dx[1] - 2, 0.0) * 0.25);
+    // amrex::Real c0 = d_wall/dx[1] < 2 ? 0.0 : C0; //std::min(C0, std::max(d_wall/dx[1] - 2, 0.0) * 0.25);
     // !!!!!!!!!!!!!!!!!!!!!! DO NOT IGNORE THIS !!!!!!!!!!!!!!!!!!!!!!!
     // Mach number correction for dissipation
     amrex::Real mean_rho = s(i, j, k, URHO);
