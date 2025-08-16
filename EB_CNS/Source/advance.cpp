@@ -197,9 +197,8 @@ void CNS::compute_dSdt(const MultiFab& S, MultiFab& dSdt, Real dt,
           flux[idim].setVal<RunOn::Device>(0.);
         }
 
-        // shock sensor always needed in cns_riemann
-        // if (use_hybrid_scheme)
-        {
+        // shock sensor needed in cns_riemann
+        if (use_hybrid_scheme || use_high_order_corr) {
           Real time = state[State_Type].curTime();
           int* bcrec_dummy;
           cns_dershocksensor(amrex::grow(bx, 3), shock_sensor_mf[mfi], 0, 1, S[mfi],

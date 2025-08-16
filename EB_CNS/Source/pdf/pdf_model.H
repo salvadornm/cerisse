@@ -252,16 +252,8 @@ AMREX_FORCE_INLINE AMREX_GPU_DEVICE void vpdf_langevin_model(
     amrex::Real delta = std::pow(AMREX_D_TERM(dx[0], *dx[1], *dx[2]),
                                  1.0 / amrex::Real(AMREX_SPACEDIM));
     amrex::Real eps = C_e * std::pow(tke, 1.5) / delta;
+    amrex::Real c0 = C0;
     // TODO: FOR WMLES-SF TESTING ONLY. REMOVE BEFORE PRODUCTION RUN !!!
-    // amrex::Real c0 = C0;
-    // if (j == 0 || j == 31) {
-    //   eps = C_e * std::pow(tke, 1.5) / (0.41 * 0.5 * dx[1]); // kappa*y
-    //   c0 = 0.41 * 0.5 * C0;
-    // } else if (j == 1 || j == 30) {
-    //   eps = C_e * std::pow(tke, 1.5) / (0.41 * 1.5 * dx[1]);
-    //   c0 = 0.41 * 1.5 * C0;
-    // }
-    //c0 = 0.0;
     // // FOR CHANNEL
     // // amrex::Real x = 0. + (i + 0.5) * dx[0];
     // amrex::Real y = -0.6845 + (j + 0.5) * dx[1];
@@ -274,8 +266,7 @@ AMREX_FORCE_INLINE AMREX_GPU_DEVICE void vpdf_langevin_model(
     // amrex::Real d_wall = std::min(std::min(y, 2.54 - y), 1.905 - std::abs(z));
     // amrex::Real delta = std::min(std::pow(AMREX_D_TERM(dx[0], *dx[1], *dx[2]), 1.0 / amrex::Real(amrex::SpaceDim)), 
     //                              0.41 * d_wall);
-    // amrex::Real eps = C_e * std::pow(tke, 1.5) / delta;
-    // amrex::Real c0 = d_wall/dx[1] < 2 ? 0.0 : C0; //std::min(C0, std::max(d_wall/dx[1] - 2, 0.0) * 0.25);
+    // c0 = d_wall/dx[1] < 2 ? 0.0 : C0; //std::min(C0, std::max(d_wall/dx[1] - 2, 0.0) * 0.25);
     // !!!!!!!!!!!!!!!!!!!!!! DO NOT IGNORE THIS !!!!!!!!!!!!!!!!!!!!!!!
     // Mach number correction for dissipation
     amrex::Real mean_rho = s(i, j, k, URHO);

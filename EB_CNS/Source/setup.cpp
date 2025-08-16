@@ -141,6 +141,7 @@ void CNS::read_params()
     pp.query("limiter_theta", plm_theta); // MUSCL limiter parameter
   }
   pp.query("use_hybrid_scheme", use_hybrid_scheme);
+  pp.query("use_high_order_corr", use_high_order_corr);
   pp.query("teno_cutoff", teno_cutoff);
 
   Vector<int> lo_bc(AMREX_SPACEDIM), hi_bc(AMREX_SPACEDIM);

@@ -43,12 +43,13 @@ RealBox CNS::no_wm_box;          // Do not apply wall model in this box
 
 // Numerics controls
 
-int  CNS::recon_scheme      = 5;     // 1: Godunov, 2: MUSCL, 3: WENO-Z3, 4: WENO-JS5, 5: WENO-Z5, 6: TENO5
-int  CNS::char_sys          = 0;     // What to use in characteristic transformation (0: c, 1: gamma)
-bool CNS::recon_char_var    = true;  // Reconstruct the thermodynamic variable to cell interfaces? A must for high-order
-Real CNS::plm_theta         = 2.0;   // [1,2] 1: minmod; 2: van Leer's MC (higher sharper)
-bool CNS::use_hybrid_scheme = false; // Use central scheme in smooth region?
-Real CNS::teno_cutoff       = 1e-4;  // TENO's cutoff value. < 0 triggers adaptively calculating cutoff
+int  CNS::recon_scheme      = 6;      // 1: Godunov, 2: MUSCL, 3: WENO-Z3, 4: WENO-JS5, 5: WENO-Z5, 6: TENO5
+int  CNS::char_sys          = 0;      // What to use in characteristic transformation (0: c, 1: gamma)
+bool CNS::recon_char_var    = true;   // Reconstruct the thermodynamic variable to cell interfaces? A must for high-order
+Real CNS::plm_theta         = 2.0;    // [1,2] 1: minmod; 2: van Leer's MC (higher sharper)
+bool CNS::use_hybrid_scheme = false;  // Use central scheme in smooth region?
+bool CNS::use_high_order_corr = true; // Use alternative FD WENO correction (Balsara et al 2024)
+Real CNS::teno_cutoff       = 1e-4;   // TENO's cutoff value. < 0 triggers adaptively calculating cutoff
 bool CNS::use_typical_vals_chem = false; // tell chem_integrator typical value of Temp
 int  CNS::reset_typical_vals_int = 10;   // interval to reset the typical value
 

@@ -365,6 +365,7 @@ protected:
   static amrex::Real plm_theta;
   static int recon_scheme;
   static bool use_hybrid_scheme;
+  static bool use_high_order_corr;
 
   // LES-PDF stochastic fields
 
