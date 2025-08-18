@@ -21,4 +21,5 @@ Coleman et al:
 
 ## References
 1. Coleman et al (1995) https://doi.org/10.1017/S0022112095004587
-2. Hamzehloo et al (2021) https://doi.org/10.1002/fld.4879
+2. Foysi et al (2004) https://doi.org/10.1017/S0022112004009371
+3. Hamzehloo et al (2021) https://doi.org/10.1002/fld.4879

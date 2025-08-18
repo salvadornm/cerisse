@@ -39,6 +39,7 @@ void amrex_probinit(const int* /*init*/, const int* /*name*/, const int* /*namel
   inflow_state[UMY] = 0.0;
   inflow_state[UMZ] = rho * v;
   inflow_state[UEDEN] = rho * eint + 0.5 * rho * v * v;
+  inflow_state[UTEMP] = CNS::h_prob_parm->inflow_T;
   inflow_state[UFS + N2_ID] = 0.0;
   inflow_state[UFS + O2_ID] = rho;
 

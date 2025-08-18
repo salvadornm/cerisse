@@ -65,8 +65,8 @@ int main(int argc, char* argv[])
 
 #if CNS_USE_EB
     AmrLevel::SetEBSupportLevel(EBSupport::full); // need all
-    AmrLevel::SetEBMaxGrowCells(6, 6, 6); // for ebcellflags, vfrac, area fraction,
-                                          // boundary centroids and face centroids
+    AmrLevel::SetEBMaxGrowCells(NUM_GROW, 4, 4); // for ebcellflags, vfrac, area fraction,
+                                                 // boundary centroids and face centroids
     initialize_EB2(amr.Geom(amr.maxLevel()), amr.maxLevel(), amr.maxLevel());
 #endif
 

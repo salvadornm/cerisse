@@ -12,7 +12,7 @@ ProbParm* CNS::d_prob_parm = nullptr;
 ProbParmHost* CNS::prob_parm_host = nullptr;
 #endif
 
-using BndryFunc = StateDescriptor::BndryFunc;
+// using BndryFunc = StateDescriptor::BndryFunc;
 
 // Components are:
 // Interior, Inflow = UserBC, Outflow, Symmetry = SlipWall, SlipWall, NoSlipWall,

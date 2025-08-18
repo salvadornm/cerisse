@@ -34,6 +34,7 @@ prob_initdata(int i, int j, int k, amrex::Array4<amrex::Real> const& state,
   state(i, j, k, UMY) = amrex::Real(0.0);
   state(i, j, k, UMZ) = amrex::Real(0.0);
   state(i, j, k, UEDEN) = rho * eint;
+  state(i, j, k, UTEMP) = prob_parm.interior_T;
   for (int n = 0; n < NUM_SPECIES; ++n) {
     state(i, j, k, UFS + n) = state(i, j, k, URHO) * prob_parm.massfrac[n];
   }

@@ -55,16 +55,20 @@ void CNS::compute_dSdt_box_eb(
   FArrayBox wlfab(bxg5, NCHAR, The_Async_Arena());
   FArrayBox wrfab(bxg5, NCHAR, The_Async_Arena());
   FArrayBox coefsfab; // Diffusion coefficients
-  if (do_diffusion) { coefsfab.resize(bxg4, LEN_COEF, The_Async_Arena()); }
+  if (do_diffusion) { coefsfab.resize(bxg6, LEN_COEF, The_Async_Arena()); }
   auto const& w = wfab.array();
   auto const& wl = wlfab.array();
   auto const& wr = wrfab.array();
 
+  divcfab.setVal<RunOn::Device>(0.0);
+
   // Temporary flux before redistribution
   std::array<FArrayBox, amrex::SpaceDim> flux_tmp;
   for (int dir = 0; dir < amrex::SpaceDim; ++dir) {
-    flux_tmp[dir].resize(amrex::surroundingNodes(bxg3, dir), ncomp,
-                         The_Async_Arena());
+    flux_tmp[dir].resize(amrex::surroundingNodes(bxg3, dir)
+                           .grow((dir + 1) % amrex::SpaceDim, 1)
+                           .grow((dir + 2) % amrex::SpaceDim, 1),
+                         ncomp, The_Async_Arena());
     flux_tmp[dir].setVal<RunOn::Device>(0.);
   }
   // Store viscous fluxes separately in V/VSPDF
@@ -73,8 +77,9 @@ void CNS::compute_dSdt_box_eb(
   const bool store_in_vflux = do_diffusion && do_vpdf && update_fields;  
   if (store_in_vflux) {
     for (int dir = 0; dir < amrex::SpaceDim; ++dir) {
-      vfluxfab[dir].resize(amrex::surroundingNodes(bxg3, dir), NVAR,
-                           The_Async_Arena());
+      vfluxfab[dir].resize(amrex::surroundingNodes(bxg3, dir)
+      .grow((dir + 1) % amrex::SpaceDim, 1)
+      .grow((dir + 2) % amrex::SpaceDim, 1), NVAR, The_Async_Arena());
       vfluxfab[dir].setVal<RunOn::Device>(0.0);
     }
   }
@@ -110,7 +115,7 @@ void CNS::compute_dSdt_box_eb(
       if (do_visc) {
         BL_PROFILE("PelePhysics::get_transport_coeffs()");
         auto const* ltransparm = trans_parms.device_trans_parm();
-        amrex::ParallelFor(bxg4, [=](int i, int j, int k) {
+        amrex::ParallelFor(bxg6, [=](int i, int j, int k) {
           if (!flag(i, j, k).isCovered()) {
             Real muloc, xiloc, lamloc, Ddiag[NUM_SPECIES];
             Real* dummy_chi_mix = nullptr;
@@ -157,21 +162,21 @@ void CNS::compute_dSdt_box_eb(
 
     // Compute fluxes for each space direction
     for (int dir = 0; dir < amrex::SpaceDim; ++dir) {
-      const Box& flxbx = amrex::surroundingNodes(bxg3, dir);
       auto const& flx = flux_tmp[dir].array(nf * NVAR);
+      const Box& flxbx = flux_tmp[dir].box();
 
       // Hydro/hyperbolic fluxes
       if (do_hydro) {
         // Shock-capturing scheme
         // 1. Convert primitive to characteristic at cell centre
-        const Box& charbox = amrex::grow(bxg3, dir, 3);
+        const Box& charbox = amrex::growHi(amrex::growLo(flxbx, dir, 3), dir, 2);
         amrex::ParallelFor(charbox, [=] AMREX_GPU_DEVICE(int i, int j, int k) {
           if (!flag(i, j, k).isCovered()) {
             cns_ctochar(i, j, k, dir, q, w, char_sys);
           }
         });
         // 2. FD interpolation to cell face
-        const Box& reconbox = amrex::grow(bxg3, dir, 1);
+        const Box& reconbox = amrex::growLo(flxbx, dir, 1);
         amrex::ParallelFor(
           TypeList<CompileTimeOptions<1, 2, 3, 4, 5, 6>, CompileTimeOptions<0, 1>>{},
           {recon_scheme, eb_recon_mode}, reconbox, NCHAR,
