@@ -669,7 +669,7 @@ void cns_dershocksensor(const Box& bx, FArrayBox& derfab, int dcomp, int /*ncomp
   amrex::ParallelFor(bx, [=] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {
     // "Shock" sensor
     Real divu2 = divu(i, j, k) * divu(i, j, k);
-    Real magvort2 = magvort(i, j, k) * magvort(i, j, k);    
+    Real magvort2 = magvort(i, j, k) * magvort(i, j, k);
     // shock_sensor(i, j, k) = divu2 / (divu2 + magvort2 + 1.0e-3); // Ducros
     Real magvel2 = (AMREX_D_TERM(sarr(i, j, k, UMX) * sarr(i, j, k, UMX),
                                  +sarr(i, j, k, UMY) * sarr(i, j, k, UMY),
@@ -678,7 +678,7 @@ void cns_dershocksensor(const Box& bx, FArrayBox& derfab, int dcomp, int /*ncomp
     Real cellsize2 =
       std::pow(AMREX_D_TERM(dx[0], *dx[1], *dx[2]), 2.0 / Real(amrex::SpaceDim));
     // shock_sensor(i, j, k) = divu2 / (divu2 + magvel2 / cellsize2 + 1.0e-6); // Hendrickson, Kartha, Candler
-    shock_sensor(i, j, k) = divu2 / (divu2 + magvort2 + std::sqrt(magvel2 / cellsize2)); // mixed
+    shock_sensor(i, j, k) = divu2 / (divu2 + magvort2 + std::sqrt(magvel2 / cellsize2) + 1.0e-6); // mixed
     // shock_sensor(i, j, k) *= divu(i, j, k) < 0.0 ? 1.0 : 0.0; // only tag compression
 
     // Partial density discontinuity sensor

@@ -66,6 +66,7 @@ void CNS::fill_ext_src(int i, int j, int k, amrex::Real /*time*/,
 void CNS::full_prob_post_timestep(int /*iteration*/)
 {
   // Sum kinetic energy and incompressible enstrophy
+  if (parent->NumDataLogs() == 0) { return; }
 
   int finest_level = parent->finestLevel();
   amrex::Real time = state[State_Type].curTime();

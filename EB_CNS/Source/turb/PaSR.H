@@ -29,6 +29,7 @@ AMREX_GPU_DEVICE AMREX_FORCE_INLINE void unpack_pasr(
                                          std::numeric_limits<Real>::denorm_min()),
                tau_chem);
   }
+  tau_chem = std::max(tau_chem, std::numeric_limits<Real>::epsilon());
 
   // Calculate mixing timescale tau_mix
   Real mu_T;

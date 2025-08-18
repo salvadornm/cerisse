@@ -3,6 +3,7 @@
 #include "diffusion.H"
 #include "hydro.H"
 #include "recon.H"
+#include "wall_model.H"
 
 using namespace amrex;
 
@@ -27,6 +28,7 @@ void CNS::compute_dSdt_box(Box const& bx, Array4<const Real>& sarr,
   const auto dx = geom.CellSizeArray();
   const auto dxinv = geom.InvCellSizeArray();
   const bool do_diffusion = do_visc || do_les || buffer_box.ok();
+  const auto problo = geom.ProbLo();
 
   // Prepare FABs to store data
   FArrayBox qfab(bxg3, NPRIM, The_Async_Arena()); // Primitive variables
@@ -144,6 +146,8 @@ void CNS::compute_dSdt_box(Box const& bx, Array4<const Real>& sarr,
         num_scheme_switch = 1; // all smooth, use central scheme
                                // else, use shock-capturing scheme
       }
+    } else if (recon_scheme == 7) {
+      num_scheme_switch = 1;
     }
 
     // Compute fluxes for each space direction
@@ -190,8 +194,33 @@ void CNS::compute_dSdt_box(Box const& bx, Array4<const Real>& sarr,
       // Viscous fluxes
       if (do_diffusion) {
         auto const& vflx = store_in_vflux ? vfluxfab[dir].array() : flx;
+        const bool lo_is_wall = phys_bc.lo(dir) == 5;
+        const bool hi_is_wall = phys_bc.hi(dir) == 5;
+        const int domlo = geom.Domain().smallEnd(dir);
+        const int domhi = geom.Domain().bigEnd(dir);
+        
         amrex::ParallelFor(flxbx, [=] AMREX_GPU_DEVICE(int i, int j, int k) {
-          cns_diff(i, j, k, dir, q, coefs, dxinv, vflx);
+          const IntVect iv(AMREX_D_DECL(i, j, k));
+
+          Real flx_tmp[NVAR] = {0.0};
+          cns_diff(iv, dir, q, coefs, dxinv, flx_tmp);
+
+#if NUM_FIELD == 0
+          if (eb_wall_model) {
+            // Wall model for regular solid boundaries (modifies flx_tmp)
+            RealVect pos{AMREX_D_DECL((i + 0.5) * dx[0] + problo[0],
+                                      (j + 0.5) * dx[1] + problo[1],
+                                      (k + 0.5) * dx[2] + problo[2])};
+            if (!no_wm_box.contains(pos)) {
+              apply_regular_wall_model<EquilibriumODE>(
+                iv, dir, lo_is_wall, hi_is_wall, domlo, domhi, dx, q, coefs,
+                eb_isothermal, eb_wall_temp, flx_tmp);
+            }
+          }
+#endif
+
+          // Add flx_tmp to vflx
+          for (int n = 0; n < NVAR; ++n) { vflx(iv, n) += flx_tmp[n]; }
         });
       }
     } // for dir
@@ -202,9 +231,69 @@ void CNS::compute_dSdt_box(Box const& bx, Array4<const Real>& sarr,
   if (store_in_vflux) {
     for (int dir = 0; dir < amrex::SpaceDim; ++dir) {
       const Box& flxbx = amrex::surroundingNodes(bx, dir);
-      auto const& flx = flxfab[dir]->array();
       auto const& vflx = vfluxfab[dir].array();
+      if (eb_wall_model) {
+        const bool lo_is_wall = phys_bc.lo(dir) == 5; // || phys_bc.lo(dir) == 1;
+        const bool hi_is_wall = phys_bc.hi(dir) == 5; // || phys_bc.hi(dir) == 1;
+        const int domlo = geom.Domain().smallEnd(dir);
+        const int domhi = geom.Domain().bigEnd(dir);
 
+        // Mean primitive variables
+        FArrayBox q0fab(flxbx, 5 + NUM_SPECIES, The_Async_Arena());
+        auto const& q0 = q0fab.array();
+        amrex::ParallelFor(flxbx, [=] AMREX_GPU_DEVICE(int i, int j, int k) {
+          const IntVect iv(AMREX_D_DECL(i, j, k));
+          if (iv[dir] == domhi || iv[dir] == domhi - 1 || iv[dir] == domlo + 1 ||
+              iv[dir] == domlo) {
+            const Real invNF = Real(1.0) / Real(NUM_FIELD);
+            // rho
+            q0(iv, 0) = 0;
+            for (int nf = 1; nf <= NUM_FIELD; ++nf) {
+              q0(iv, 0) += sarr(iv, nf * NVAR + URHO);
+            }
+            q0(iv, 0) *= invNF;
+            // u, v, w
+            for (int n = 0; n < 3; ++n) {
+              q0(iv, 1 + n) = 0;
+              for (int nf = 1; nf <= NUM_FIELD; ++nf) {
+                q0(iv, 1 + n) += sarr(iv, nf * NVAR + UMX + n);
+              }
+              q0(iv, 1 + n) *= invNF / q0(iv, 0); // farve
+            }
+            // Temp
+            q0(iv, 4) = 0;
+            for (int nf = 1; nf <= NUM_FIELD; ++nf) {
+              q0(iv, 4) += sarr(iv, nf * NVAR + UTEMP);
+            }
+            q0(iv, 4) *= invNF;
+            // Y
+            for (int n = 0; n < NUM_SPECIES; ++n) {
+              q0(iv, 5 + n) = 0;
+              for (int nf = 1; nf <= NUM_FIELD; ++nf) {
+                q0(iv, 5 + n) += sarr(iv, nf * NVAR + UFS + n);
+              }
+              q0(iv, 5 + n) *= invNF / q0(iv, 0); // farve
+            }
+          }
+        });
+
+        // Wall model for regular solid boundaries (using mean field)
+        amrex::ParallelFor(flxbx, [=] AMREX_GPU_DEVICE(int i, int j, int k) {
+          const IntVect iv(AMREX_D_DECL(i, j, k));
+          RealVect pos{AMREX_D_DECL((i + 0.5) * dx[0] + problo[0],
+                                    (j + 0.5) * dx[1] + problo[1],
+                                    (k + 0.5) * dx[2] + problo[2])};
+
+          if (!no_wm_box.contains(pos)) {
+            auto const* ltransparm = CNS::trans_parms.device_trans_parm();
+            apply_regular_wall_model_sf<EquilibriumODE>(
+              iv, dir, lo_is_wall, hi_is_wall, domlo, domhi, dx, q0, eb_isothermal,
+              eb_wall_temp, ltransparm, vflx);
+          }
+        });
+      } // eb_wall_model
+      
+      auto const& flx = flxfab[dir]->array();
       amrex::ParallelFor(
         flxbx, NUM_FIELD, [=] AMREX_GPU_DEVICE(int i, int j, int k, int nfm1) {
           const Real invNF = Real(1.0) / Real(NUM_FIELD);

@@ -33,20 +33,23 @@ BCRec CNS::phys_bc; // Holds BC info
 int  CNS::eb_recon_mode = 0;     // 0: fill covered stencil with first cell values; 1: switch to 2nd order scheme close to EB
 Real CNS::eb_weight     = 0.5;   // Weight for FluxRedist
 bool CNS::eb_no_slip    = true;  // No-slip EB walls?
-bool CNS::eb_isothermal = false; // Isothermal EB walls?
-bool CNS::eb_wall_model = false; // Use wall model for EB walls? (TODO: now only support ODE wall model)
-Real CNS::eb_wall_temp;          // EB wall temperature (if eb_isothermal = true)
 std::string CNS::redistribution_type = "StateRedist"; // StateRedist / FluxRedist / NoRedist
 #endif
+bool CNS::eb_isothermal = false; // Isothermal EB walls?
+Real CNS::eb_wall_temp;          // EB wall temperature (if eb_isothermal = true)
+
+bool CNS::eb_wall_model = false; // Use wall model for EB walls? (TODO: now only support ODE wall model)
+RealBox CNS::no_wm_box;          // Do not apply wall model in this box
 
 // Numerics controls
 
-int  CNS::recon_scheme      = 5;     // 1: Godunov, 2: MUSCL, 3: WENO-Z3, 4: WENO-JS5, 5: WENO-Z5, 6: TENO5
-int  CNS::char_sys          = 0;     // What to use in characteristic transformation (0: c, 1: gamma)
-bool CNS::recon_char_var    = true;  // Reconstruct the thermodynamic variable to cell interfaces? A must for high-order
-Real CNS::plm_theta         = 2.0;   // [1,2] 1: minmod; 2: van Leer's MC (higher sharper)
-bool CNS::use_hybrid_scheme = false; // Use central scheme in smooth region?
-Real CNS::teno_cutoff       = 1e-4;  // TENO's cutoff value. < 0 triggers adaptively calculating cutoff
+int  CNS::recon_scheme      = 6;      // 1: Godunov, 2: MUSCL, 3: WENO-Z3, 4: WENO-JS5, 5: WENO-Z5, 6: TENO5
+int  CNS::char_sys          = 0;      // What to use in characteristic transformation (0: c, 1: gamma)
+bool CNS::recon_char_var    = true;   // Reconstruct the thermodynamic variable to cell interfaces? A must for high-order
+Real CNS::plm_theta         = 2.0;    // [1,2] 1: minmod; 2: van Leer's MC (higher sharper)
+bool CNS::use_hybrid_scheme = false;  // Use central scheme in smooth region?
+bool CNS::use_high_order_corr = true; // Use alternative FD WENO correction (Balsara et al 2024)
+Real CNS::teno_cutoff       = 1e-4;   // TENO's cutoff value. < 0 triggers adaptively calculating cutoff
 bool CNS::use_typical_vals_chem = false; // tell chem_integrator typical value of Temp
 int  CNS::reset_typical_vals_int = 10;   // interval to reset the typical value
 

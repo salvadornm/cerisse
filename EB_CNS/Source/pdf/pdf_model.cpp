@@ -54,6 +54,15 @@ void CNS::compute_pdf_model(amrex::MultiFab& S, amrex::Real dt, int iteration)
   amrex::Real dW[AMREX_SPACEDIM][NUM_FIELD];
   WienerProcess.generate_new(sqrt(dt), 2, 0);
   WienerProcess.get_rand(nStep(), dW);
+  // if (amrex::ParallelDescriptor::IOProcessor()) {
+  //   for (int d = 0; d < 3; ++d) {
+  //     amrex::Print() << "dW[" << d << "] = ";
+  //     for (int n = 0; n < NUM_FIELD; ++n) {
+  //       amrex::Print() << dW[d][n] << " ";
+  //     }
+  //     amrex::Print() << std::endl;
+  //   }
+  // }
 
 #if CNS_USE_EB
   auto const& fact = dynamic_cast<amrex::EBFArrayBoxFactory const&>(S.Factory());

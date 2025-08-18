@@ -42,9 +42,9 @@ CNS::CNS(Amr& papa, int lev, const Geometry& level_geom, const BoxArray& bl,
 
   Sborder.define(grids, dmap, LEN_STATE, NUM_GROW, MFInfo(), Factory());
   shock_sensor_mf.define(grids, dmap, 1, NUM_GROW, MFInfo(), Factory());
-  // if (!use_hybrid_scheme) {
-  //   shock_sensor_mf.setVal(1.0); // default to shock-capturing scheme
-  // }
+  if (!use_hybrid_scheme && !use_high_order_corr) {
+    shock_sensor_mf.setVal(1.0); // default to shock-capturing scheme
+  }
   // ifine_mask.define(grids, dmap, 1, 0, MFInfo());
   // fillFineMask();
 
@@ -377,6 +377,14 @@ void CNS::post_restart()
   // ifine_mask.define(grids, dmap, 1, 0, MFInfo());
   // fillFineMask();
 
+  // Initialise LES model (must happen before react because pasr may be needed)
+  if (do_les || do_pasr) {
+    ParmParse pp("cns");
+    std::string les_model_name;
+    pp.get("les_model", les_model_name);
+    les_model = LESModel::create(les_model_name);
+  }
+
   // Initialize reactor
   if (do_react) {
     if (chem_integrator == "ReactorNull") {
@@ -389,7 +397,7 @@ void CNS::post_restart()
 
     if (use_typical_vals_chem) { set_typical_values_chem(); }
 
-    react_state(parent->cumTime(), parent->dtLevel(level), true);
+    react_state(parent->cumTime(), parent->dtLevel(level), false);
   }
 
   MultiFab& S_new = get_new_data(State_Type);
@@ -403,7 +411,7 @@ void CNS::post_restart()
   WienerProcess.init(AMREX_SPACEDIM, level, ref_ratio);
 
   // Populate fields (when restarting from a different number of fields)
-  if ((NUM_FIELD > 0) && do_restart_fields) {
+  if (do_restart_fields) {
     Print() << " >> Resetting stochastic fields state data ..." << std::endl;
 
     // Move aux variables
@@ -736,10 +744,9 @@ void CNS::avgDown()
   MultiFab& S_crse = get_new_data(State_Type);
   const MultiFab& S_fine = fine_lev.get_new_data(State_Type);
 
+#if CNS_USE_EB
   MultiFab volume(S_fine.boxArray(), S_fine.DistributionMap(), 1, 0);
   geom.GetVolume(volume);
-
-#if CNS_USE_EB
   amrex::EB_average_down(S_fine, S_crse, volume, fine_lev.volFrac(), 0,
                          S_fine.nComp(), fine_ratio);
 #else

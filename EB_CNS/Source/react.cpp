@@ -153,7 +153,7 @@ void CNS::react_state(Real time, Real dt, bool init_react)
           //////////////////////// Unpack data ////////////////////////
           // Prepare (rho, velocities, mu) for PaSR
           FArrayBox qfab, mufab;
-          if (do_pasr) {
+          if (do_pasr && !init_react) { // do not do pasr for the first step
             const Box bxg1 = amrex::grow(bx, 1);
             qfab.resize(bxg1, 4, The_Async_Arena()); // [rho, u, v, w]
             auto const& qarr = qfab.array();
@@ -208,10 +208,10 @@ void CNS::react_state(Real time, Real dt, bool init_react)
               // Monitor problem cell
               bool any_rY_unbounded = false;
               for (int n = 0; n < NUM_SPECIES; ++n) {
-                any_rY_unbounded |=
-                  (rY(i, j, k, n) < -1e-5 || rY(i, j, k, n) > 1.0 + 1e-5 ||
-                   std::isnan(rY(i, j, k, n)));
+                any_rY_unbounded |= std::isnan(rY(i, j, k, n));
+                  // || (rY(i, j, k, n) < -1e-5 || rY(i, j, k, n) > 1.0 + 1e-5;
               }
+              bool T_unbounded = T(i, j, k) < clip_temp || T(i, j, k) > 4000.0;
 #ifndef AMREX_USE_GPU
               if (any_rY_unbounded) {
                 std::cout << "Reaction causing rY=[ ";
@@ -219,7 +219,7 @@ void CNS::react_state(Real time, Real dt, bool init_react)
                   std::cout << rY(i, j, k, n) << " ";
                 std::cout << "] @ " << i << "," << j << "," << k << '\n';
               }
-              if (T(i, j, k) < clip_temp) {
+              if (T_unbounded) {
                 std::cout << "Reaction causing T=" << snew_arr(i, j, k, UTEMP)
                           << "->" << T(i, j, k) << " @ " << i << "," << j << "," << k
                           << '\n';
@@ -227,7 +227,7 @@ void CNS::react_state(Real time, Real dt, bool init_react)
 #endif
               // update drY/dt in I_R
               Real new_rho = 0.0;
-              if (do_pasr) {
+              if (do_pasr && !init_react) {
                 // Modify rY if PaSR is on
                 unpack_pasr(i, j, k, new_rho, sold_arr, rY, rYsrc, qarr, muarr,
                             dxinv, dt);
