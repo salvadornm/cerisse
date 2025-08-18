@@ -153,7 +153,7 @@ void CNS::react_state(Real time, Real dt, bool init_react)
           //////////////////////// Unpack data ////////////////////////
           // Prepare (rho, velocities, mu) for PaSR
           FArrayBox qfab, mufab;
-          if (do_pasr) {
+          if (do_pasr && !init_react) { // do not do pasr for the first step
             const Box bxg1 = amrex::grow(bx, 1);
             qfab.resize(bxg1, 4, The_Async_Arena()); // [rho, u, v, w]
             auto const& qarr = qfab.array();
@@ -225,11 +225,14 @@ void CNS::react_state(Real time, Real dt, bool init_react)
                           << "->" << T(i, j, k) << " @ " << i << "," << j << "," << k
                           << '\n';
               }
-#endif        
-              Real new_rho;
-              if (any_rY_unbounded || T_unbounded) {
-                // set drY/dt = 0
-                new_rho = snew_arr(i, j, k, URHO);
+#endif
+              // update drY/dt in I_R
+              Real new_rho = 0.0;
+              if (do_pasr && !init_react) {
+                // Modify rY if PaSR is on
+                unpack_pasr(i, j, k, new_rho, sold_arr, rY, rYsrc, qarr, muarr,
+                            dxinv, dt);
+              } else {
                 for (int n = 0; n < NUM_SPECIES; ++n) {
                   rY(i, j, k, n) = snew_arr(i, j, k, UFS + n);
                   I_R_arr(i, j, k, n) = 0.0;
