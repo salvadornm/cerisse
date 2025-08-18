@@ -10,17 +10,19 @@ Created by:
 
 
 ## Getting the code
+1. Clone the repository
+    ```bash
+    git clone git@github.com:salvadornm/cerisse.git
+    cd cerisse
+    ```
+2. Checkout to the `cerisse1` branch
+    ```bash    
+    git checkout cerisse1
+    ```
+3. Get all submodules
+    ```bash    
+    git submodule init
+    git submodule update
+    ```
 
-1. Clone the repository with all submodules
-    ```bash
-    git clone --recursive git@github.com:salvadornm/cerisse.git
-    ```
-2. Or clone the bare repository (and install Submodules later)
-    ```bash
-    git clone  git@github.com:salvadornm/cerisse.git
-    ```
-3. Or download latest release from comand line
-    ```bash
-    wget https://github.com/cerisse/archive/refs/tags/v01.zip
-    ```
-4. Or download a release from [here](https://github.com/salvadornm/cerisse/releases) 
+Or download a release from [here](https://github.com/salvadornm/cerisse/releases) 
