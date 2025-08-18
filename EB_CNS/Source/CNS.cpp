@@ -41,7 +41,7 @@ CNS::CNS(Amr& papa, int lev, const Geometry& level_geom, const BoxArray& bl,
   buildMetrics();
 
   Sborder.define(grids, dmap, LEN_STATE, NUM_GROW, MFInfo(), Factory());
-  shock_sensor_mf.define(grids, dmap, 1, 3, MFInfo(), Factory());
+  shock_sensor_mf.define(grids, dmap, 1, NUM_GROW, MFInfo(), Factory());
   // if (!use_hybrid_scheme) {
   //   shock_sensor_mf.setVal(1.0); // default to shock-capturing scheme
   // }
@@ -600,8 +600,8 @@ void CNS::printTotalandCheckNan() const
 
   const MultiFab& S_new = get_new_data(State_Type);
   MultiFab mf(grids, dmap, 1, 0);
-  std::array<Real, 6> tot;
-  for (int comp = 0; comp < 6; ++comp) {
+  std::array<Real, 5> tot;
+  for (int comp = 0; comp < 5; ++comp) {
     MultiFab::Copy(mf, S_new, comp, 0, 1, 0);
 #if CNS_USE_EB
     MultiFab::Multiply(mf, *volfrac, 0, 0, 1, 0);

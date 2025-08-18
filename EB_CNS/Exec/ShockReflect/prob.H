@@ -156,7 +156,7 @@ void bcnormal(const amrex::Real x[AMREX_SPACEDIM],
 AMREX_GPU_DEVICE
 AMREX_FORCE_INLINE
 void prob_post_restart(int i, int j, int k, amrex::Array4<amrex::Real> const& state,
-                       amrex::GeometryData const& geomdata, Parm const& parm,
+                       amrex::GeometryData const& geomdata,
                        ProbParm const& prob_parm)
 {
 }
