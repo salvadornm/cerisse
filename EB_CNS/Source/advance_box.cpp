@@ -28,6 +28,7 @@ void CNS::compute_dSdt_box(Box const& bx, Array4<const Real>& sarr,
   const auto dx = geom.CellSizeArray();
   const auto dxinv = geom.InvCellSizeArray();
   const bool do_diffusion = do_visc || do_les || buffer_box.ok();
+  const auto problo = geom.ProbLo();
 
   // Prepare FABs to store data
   FArrayBox qfab(bxg3, NPRIM, The_Async_Arena()); // Primitive variables
@@ -145,6 +146,8 @@ void CNS::compute_dSdt_box(Box const& bx, Array4<const Real>& sarr,
         num_scheme_switch = 1; // all smooth, use central scheme
                                // else, use shock-capturing scheme
       }
+    } else if (recon_scheme == 7) {
+      num_scheme_switch = 1;
     }
 
     // Compute fluxes for each space direction
@@ -174,11 +177,11 @@ void CNS::compute_dSdt_box(Box const& bx, Array4<const Real>& sarr,
           amrex::ParallelFor(flxbx, [=] AMREX_GPU_DEVICE(int i, int j, int k) {
             cns_riemann(i, j, k, dir, flx, q, wl, wr, char_sys, recon_char_var);
 
-            // bool do_high_order_diff =
-            //   (shock_sensor(i, j, k) < 0.95) &&
-            //   (shock_sensor(IntVect(AMREX_D_DECL(i, j, k)) -
-            //                 IntVect::TheDimensionVector(dir)) < 0.95);
-            // if (do_high_order_diff) { cns_afd_correction(i, j, k, dir, q, flx); }
+            bool do_high_order_diff =
+              (shock_sensor(i, j, k) < 0.95) &&
+              (shock_sensor(IntVect(AMREX_D_DECL(i, j, k)) -
+                            IntVect::TheDimensionVector(dir)) < 0.95);
+            if (do_high_order_diff) { cns_afd_correction(i, j, k, dir, q, flx); }
           });
         } else {
           // Central scheme
@@ -191,87 +194,30 @@ void CNS::compute_dSdt_box(Box const& bx, Array4<const Real>& sarr,
       // Viscous fluxes
       if (do_diffusion) {
         auto const& vflx = store_in_vflux ? vfluxfab[dir].array() : flx;
+        const bool lo_is_wall = phys_bc.lo(dir) == 5;
+        const bool hi_is_wall = phys_bc.hi(dir) == 5;
+        const int domlo = geom.Domain().smallEnd(dir);
+        const int domhi = geom.Domain().bigEnd(dir);
         
         amrex::ParallelFor(flxbx, [=] AMREX_GPU_DEVICE(int i, int j, int k) {
           const IntVect iv(AMREX_D_DECL(i, j, k));
 
           Real flx_tmp[NVAR] = {0.0};
           cns_diff(iv, dir, q, coefs, dxinv, flx_tmp);
-          
-          // Wall model for regular solid boundaries (modifies flx_tmp)
-          const bool lo_is_wall = phys_bc.lo(dir) == 5;
-          const bool hi_is_wall = phys_bc.hi(dir) == 5;
-          const int domlo = geom.Domain().smallEnd(dir);
-          const int domhi = geom.Domain().bigEnd(dir);
-          const auto problo = geom.ProbLo();
-          // const Real x = (i + 0.5) * dx[0] + problo[0];
-          if (eb_wall_model /*&& x < -1.0*/) { // in line with advance_box_eb            
-            if ((iv[dir] == domhi + 1 && hi_is_wall) ||
-                (iv[dir] == domlo && lo_is_wall)) {
-              const auto iv1 = iv[dir] == domlo ? iv : iv - IntVect::TheDimensionVector(dir);
-              
-              // setup some image point values
-              // get density and transport coefficients
-              Real rho, mu, lam, p = q(iv1, QPRES),
-                                 Y[NUM_SPECIES]; // assume dp/dn, dY/dn ~ 0
-              for (int n = 0; n < NUM_SPECIES; ++n) { Y[n] = q(iv1, QFS + n); }
-              // if (eb_isothermal) {
-              //   auto trans = pele::physics::PhysicsType::transport();
-              //   auto const* ltransparm = CNS::trans_parms.device_trans_parm();
-              //   Real xi_unused;
 
-              //   auto eos = pele::physics::PhysicsType::eos();
-              //   eos.PYT2R(p, Y, eb_wall_temp, rho); // assume dp/dn ~ 0
-
-              //   trans.transport(true, true, true, false, false, eb_wall_temp, rho, Y,
-              //                   nullptr, nullptr, mu, xi_unused, lam, ltransparm);
-              // } else 
-              {
-                // Adiabatic wall dT/dn ~ 0
-                rho = q(iv1, QRHO);
-                mu = coefs(iv1, CMU);
-                lam = coefs(iv1, CLAM);
-              }
-
-              // Check y+
-              const Real local_dx = dx[0];  // dx == dy == dz
-              const Real tau =
-                std::sqrt(flx_tmp[UMX] * flx_tmp[UMX] + flx_tmp[UMY] * flx_tmp[UMY] +
-                          flx_tmp[UMZ] * flx_tmp[UMZ]);
-              const Real utau = std::sqrt(tau / rho);
-              const Real yplus = rho * utau / mu * local_dx;              
-
-              // Tangent vectors (t1.n = 0, t2.t1 = 0, u.t2 = 0)
-              const auto iv2 = iv[dir] == domlo ? iv + IntVect::TheDimensionVector(dir)
-                                                : iv - 2 * IntVect::TheDimensionVector(dir);
-              // const auto iv2 = iv + lohi * IntVect::TheDimensionVector(dir);
-              Real u2[3] = {q(iv2, QU), q(iv2, QV), q(iv2, QW)};
-              u2[dir] = 0.0;
-              const Real u_parallel = std::sqrt(u2[0] * u2[0] + u2[1] * u2[1] + u2[2] * u2[2]);
-              const Real t1[3] = {u2[0] / u_parallel, u2[1] / u_parallel, u2[2] / u_parallel};
-              const Real ts = (u2[0] > 0.0) ? 1.0 : -1.0;
-              const Real T2 = q(iv2, QTEMP);
-                            
-              // call wall_model.parallel_wall_stress
-              if (yplus > 11.0 && u_parallel > 100.0 && !(T2 < 90.0) &&
-                  !(T2 > 4000.0) && rho > 0.0) {
-                // LawOfTheWall wm;
-                EquilibriumODE wm;                
-                Real T_wall = eb_isothermal ? eb_wall_temp : -1.0;
-                Real h = 1.5 * local_dx;
-                Real tauw, qw;
-                wm.parallel_wall_stress(u_parallel, T2, rho, Y, h, mu, lam, T_wall,
-                                        tauw, qw);
-                if (!isnan(tauw) && !isnan(qw)) {
-                  const Real lohi = iv[dir] == domlo ? -1 : 1;
-                  flx_tmp[UMX] = ts * t1[0] * tauw * lohi;
-                  flx_tmp[UMY] = ts * t1[1] * tauw * lohi;
-                  flx_tmp[UMZ] = ts * t1[2] * tauw * lohi;
-                  flx_tmp[UEDEN] = qw * lohi; // TODO: no wall model heat flux for now
-                }
-              }
+#if NUM_FIELD == 0
+          if (eb_wall_model) {
+            // Wall model for regular solid boundaries (modifies flx_tmp)
+            RealVect pos{AMREX_D_DECL((i + 0.5) * dx[0] + problo[0],
+                                      (j + 0.5) * dx[1] + problo[1],
+                                      (k + 0.5) * dx[2] + problo[2])};
+            if (!no_wm_box.contains(pos)) {
+              apply_regular_wall_model<EquilibriumODE>(
+                iv, dir, lo_is_wall, hi_is_wall, domlo, domhi, dx, q, coefs,
+                eb_isothermal, eb_wall_temp, flx_tmp);
             }
           }
+#endif
 
           // Add flx_tmp to vflx
           for (int n = 0; n < NVAR; ++n) { vflx(iv, n) += flx_tmp[n]; }
@@ -285,9 +231,69 @@ void CNS::compute_dSdt_box(Box const& bx, Array4<const Real>& sarr,
   if (store_in_vflux) {
     for (int dir = 0; dir < amrex::SpaceDim; ++dir) {
       const Box& flxbx = amrex::surroundingNodes(bx, dir);
-      auto const& flx = flxfab[dir]->array();
       auto const& vflx = vfluxfab[dir].array();
+      if (eb_wall_model) {
+        const bool lo_is_wall = phys_bc.lo(dir) == 5; // || phys_bc.lo(dir) == 1;
+        const bool hi_is_wall = phys_bc.hi(dir) == 5; // || phys_bc.hi(dir) == 1;
+        const int domlo = geom.Domain().smallEnd(dir);
+        const int domhi = geom.Domain().bigEnd(dir);
 
+        // Mean primitive variables
+        FArrayBox q0fab(flxbx, 5 + NUM_SPECIES, The_Async_Arena());
+        auto const& q0 = q0fab.array();
+        amrex::ParallelFor(flxbx, [=] AMREX_GPU_DEVICE(int i, int j, int k) {
+          const IntVect iv(AMREX_D_DECL(i, j, k));
+          if (iv[dir] == domhi || iv[dir] == domhi - 1 || iv[dir] == domlo + 1 ||
+              iv[dir] == domlo) {
+            const Real invNF = Real(1.0) / Real(NUM_FIELD);
+            // rho
+            q0(iv, 0) = 0;
+            for (int nf = 1; nf <= NUM_FIELD; ++nf) {
+              q0(iv, 0) += sarr(iv, nf * NVAR + URHO);
+            }
+            q0(iv, 0) *= invNF;
+            // u, v, w
+            for (int n = 0; n < 3; ++n) {
+              q0(iv, 1 + n) = 0;
+              for (int nf = 1; nf <= NUM_FIELD; ++nf) {
+                q0(iv, 1 + n) += sarr(iv, nf * NVAR + UMX + n);
+              }
+              q0(iv, 1 + n) *= invNF / q0(iv, 0); // farve
+            }
+            // Temp
+            q0(iv, 4) = 0;
+            for (int nf = 1; nf <= NUM_FIELD; ++nf) {
+              q0(iv, 4) += sarr(iv, nf * NVAR + UTEMP);
+            }
+            q0(iv, 4) *= invNF;
+            // Y
+            for (int n = 0; n < NUM_SPECIES; ++n) {
+              q0(iv, 5 + n) = 0;
+              for (int nf = 1; nf <= NUM_FIELD; ++nf) {
+                q0(iv, 5 + n) += sarr(iv, nf * NVAR + UFS + n);
+              }
+              q0(iv, 5 + n) *= invNF / q0(iv, 0); // farve
+            }
+          }
+        });
+
+        // Wall model for regular solid boundaries (using mean field)
+        amrex::ParallelFor(flxbx, [=] AMREX_GPU_DEVICE(int i, int j, int k) {
+          const IntVect iv(AMREX_D_DECL(i, j, k));
+          RealVect pos{AMREX_D_DECL((i + 0.5) * dx[0] + problo[0],
+                                    (j + 0.5) * dx[1] + problo[1],
+                                    (k + 0.5) * dx[2] + problo[2])};
+
+          if (!no_wm_box.contains(pos)) {
+            auto const* ltransparm = CNS::trans_parms.device_trans_parm();
+            apply_regular_wall_model_sf<EquilibriumODE>(
+              iv, dir, lo_is_wall, hi_is_wall, domlo, domhi, dx, q0, eb_isothermal,
+              eb_wall_temp, ltransparm, vflx);
+          }
+        });
+      } // eb_wall_model
+      
+      auto const& flx = flxfab[dir]->array();
       amrex::ParallelFor(
         flxbx, NUM_FIELD, [=] AMREX_GPU_DEVICE(int i, int j, int k, int nfm1) {
           const Real invNF = Real(1.0) / Real(NUM_FIELD);
