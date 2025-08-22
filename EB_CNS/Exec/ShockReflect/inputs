@@ -30,10 +30,11 @@ cns.cfl = 0.3
 cns.dt_cutoff = 5.e-20
 cns.recon_scheme = 6  # 1: Godunov, 2: MUSCL, 3: WENO-Z3,
                       # 4: WENO-JS5, 5: WENO-Z5, 6: TENO5
-cns.char_sys       = 0 
+cns.char_sys       = 0
 cns.recon_char_var = 1 # will be sharper when turned on
 cns.teno_cutoff = -1
-cns.use_hybrid_scheme = 1
+cns.use_hybrid_scheme = 0
+cns.use_high_order_corr = 1
 
 # ================ VERBOSITY & DIAGNOSIS =============== #
 cns.v = 1

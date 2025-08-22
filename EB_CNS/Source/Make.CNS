@@ -5,6 +5,7 @@ SUNDIALS_HOME     ?= $(CERISSE_HOME)/Submodules/sundials
 TOP ?= $(CERISSE_HOME)/EB_CNS
 
 EBASE = Cerisse
+DEFINES += -DGIT_HASH="\"$(shell git rev-parse --short HEAD)"\"
 
 ifeq ($(USE_EB), TRUE)
    DEFINES += -DCNS_USE_EB=1
@@ -122,15 +123,19 @@ ifdef Custom_Chemistry_Model
    VPATH_LOCATIONS   += $(CHEM_HOME)
 endif
 
-all: SUNDIALS $(executable)
+all: TPL $(executable)
 	@echo SUCCESS: $(executable)
 
 include $(AMREX_HOME)/Tools/GNUMake/Make.rules
 
-SUNDIALS:
+TPL:
 	@echo "==> Building SUNDIALS library"
 	cd $(PELE_PHYSICS_HOME)/ThirdParty; $(MAKE) sundials AMREX_HOME=$(AMREX_HOME) SUNDIALS_HOME=$(SUNDIALS_HOME) USE_CUDA=$(USE_CUDA) USE_HIP=$(USE_HIP) PELE_USE_KLU=$(PELE_USE_KLU) PELE_USE_MAGMA=$(PELE_USE_MAGMA) DEBUG=$(DEBUG) COMP=$(COMP) NVCC=$(COMP) PRECISION=$(PRECISION)
 
-SUNDIALSclean:
+TPLclean:
 	@echo "==> Removing SUNDIALS library"
 	cd $(PELE_PHYSICS_HOME)/ThirdParty; make AMREX_HOME=$(AMREX_HOME) USE_CUDA=$(USE_CUDA) USE_HIP=$(USE_HIP) PELE_USE_KLU=$(PELE_USE_KLU) PELE_USE_MAGMA=$(PELE_USE_MAGMA) DEBUG=$(DEBUG) COMP=$(HOSTCC) NVCC=$(COMP) PRECISION=$(PRECISION) clean
+
+#
+# For debug, use `make print-xxx`. See amrex/Tools/GNUMake/README.md
+#

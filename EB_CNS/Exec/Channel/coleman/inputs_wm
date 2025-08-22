@@ -10,15 +10,18 @@ geometry.is_periodic = 1 0 1
 geometry.coord_sys   = 0  # 0: cart, 1: RZ, 2:spherical
 geometry.prob_lo     = 0.0   -0.6845 -1.369 #0, -H, -2H
 geometry.prob_hi     = 8.214  0.6845  1.369 #12H, H, 2H
-amr.n_cell           = 768    128     256
+amr.n_cell           = 192    32      64
 eb2.geom_type = all_regular
 
 # ================ BOUNDARY CONDITIONS ================= #
 # 0 = Interior             3 = Symmetry
 # 1 = Inflow / UserBC      4 = SlipWall = 3
 # 2 = Outflow (FOExtrap)   5 = NoSlipWall (adiabatic)
-cns.lo_bc = 0 1 0
-cns.hi_bc = 0 1 0
+cns.lo_bc = 0 5 0 # WM needs 5
+cns.hi_bc = 0 5 0
+cns.eb_isothermal = 1
+cns.eb_wall_temp = 500
+cns.eb_wall_model = 1
 
 # ==================== WHAT PHYSICS ==================== #
 cns.do_visc  = 1

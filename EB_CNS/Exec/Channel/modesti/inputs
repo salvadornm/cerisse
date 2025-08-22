@@ -11,7 +11,6 @@ geometry.coord_sys   = 0  # 0: cart, 1: RZ, 2:spherical
 geometry.prob_lo     = 0.0   -0.6845 -1.369 #0, -H, -2H
 geometry.prob_hi     = 8.214  0.6845  1.369 #12H, H, 2H
 amr.n_cell           = 768    128     256
-#amr.n_cell           = 384    64      128
 eb2.geom_type = all_regular
 
 # ================ BOUNDARY CONDITIONS ================= #
@@ -24,6 +23,7 @@ cns.hi_bc = 0 1 0
 # ==================== WHAT PHYSICS ==================== #
 cns.do_visc  = 1
 cns.do_ext_src = 1
+cns.do_react = 0
 
 # ==================== WHAT NUMERICS =================== #
 cns.cfl = 0.3
@@ -33,11 +33,8 @@ cns.recon_scheme = 6  # 1: Godunov, 2: MUSCL, 3: WENO-Z3,
 cns.do_vpdf      = 0  # enable Lagevin model and p_sgs correction
 cns.do_spdf      = 0  # enable IEM model
 cns.clip_temp    = 0  # clip minimum temperature [K]
-cns.do_les = 0
-cns.les_model = "Smagorinsky"
-
-# ================== REACTION SETTINGS ================= #
-cns.do_react = 0
+#cns.do_les = 0
+#cns.les_model = "Smagorinsky"
 
 # ================ VERBOSITY & DIAGNOSIS =============== #
 cns.v = 2 # 0/1/2
@@ -73,7 +70,7 @@ amr.grid_eff        = 0.9
 # ==================== OUTPUT FILES ==================== #
 amr.checkpoint_files_output = 1
 amr.check_file      = chk    # root name of checkpoint file
-amr.check_int       = 5000   # number of timesteps between checkpoints
+amr.check_int       = 10000  # number of timesteps between checkpoints
 #amr.check_per # interval physical time between checkpoints
 
 amr.plot_files_output = 1
@@ -87,13 +84,13 @@ cns.plot_massfrac = 0
 
 # ================= PROBLEM PARAMETERS ================= #
 # Modesti & Pirozzoli (2016) CH15B
-prob.Re_b = 7667.0
-prob.Re_tau = 500.0
-prob.u_tau = 3227.1887
+#prob.Re_b = 7667.0
+#prob.Re_tau = 500.0
+#prob.u_tau = 3227.1887
 # CH15C
-#prob.Re_b = 17000.0
-#prob.Re_tau = 1015.0
-#prob.u_tau = 2913.43
+prob.Re_b = 17000.0
+prob.Re_tau = 1015.0
+prob.u_tau = 2913.43
 prob.M_b = 1.5
 prob.Tw = 500.0
 prob.Pr = 0.72
