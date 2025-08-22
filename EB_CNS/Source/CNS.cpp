@@ -41,7 +41,7 @@ CNS::CNS(Amr& papa, int lev, const Geometry& level_geom, const BoxArray& bl,
   buildMetrics();
 
   Sborder.define(grids, dmap, LEN_STATE, NUM_GROW, MFInfo(), Factory());
-  shock_sensor_mf.define(grids, dmap, 1, NUM_GROW, MFInfo(), Factory());
+  shock_sensor_mf.define(grids, dmap, 1, NUM_GROW - 1, MFInfo(), Factory());
   if (!use_hybrid_scheme && !use_high_order_corr) {
     shock_sensor_mf.setVal(1.0); // default to shock-capturing scheme
   }

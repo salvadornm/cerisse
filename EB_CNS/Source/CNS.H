@@ -364,6 +364,7 @@ protected:
   static int char_sys;
   static amrex::Real plm_theta;
   static int recon_scheme;
+  static amrex::Real shock_sensor_threshold;
   static bool use_hybrid_scheme;
   static bool use_high_order_corr;
 

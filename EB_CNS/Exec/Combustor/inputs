@@ -15,7 +15,7 @@ amr.n_cell           = 80    80     80
 cns.lo_bc       =  3 5 1 
 cns.hi_bc       =  3 5 2 
 
-cns.do_visc  = 1
+cns.do_visc  = 0
 
 cns.do_react = 0
 cns.chem_integrator = Reactor_Null

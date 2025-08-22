@@ -41,6 +41,7 @@ cns.char_sys       = 0
 cns.recon_char_var = 1
 #cns.clip_temp      = 0
 #cns.use_hybrid_scheme = 0
+#cns.shock_sensor_threshold = 0.1
 cns.use_high_order_corr = 1
 
 # ================ VERBOSITY & DIAGNOSIS =============== #

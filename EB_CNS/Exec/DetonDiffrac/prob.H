@@ -17,7 +17,7 @@
  * @param k         z position.
  * @param state     state data.
  * @param geomdata  domain geometry data.
- * @param parm      Parm data defined in parm.H.
+
  * @param prob_parm ProbParm data as defined in prob_parm.H and initialised in
  * amrex_probinit.
  */
@@ -91,7 +91,7 @@ AMREX_GPU_DEVICE AMREX_FORCE_INLINE void bcnormal(
  * @param k         z position.
  * @param state     state data.
  * @param geomdata  domain geometry data.
- * @param parm      Parm data defined in parm.H.
+
  * @param prob_parm ProbParm data as defined in prob_parm.H and initialised in
  * amrex_probinit.
  */

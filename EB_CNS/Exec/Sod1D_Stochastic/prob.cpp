@@ -49,7 +49,6 @@ void amrex_probinit(const int* /*init*/, const int* /*name*/, const int* /*namel
  * @param geomdata  domain geometry data.
  * @param state     state data.
  * @param ext_src   external source term.
- * @param parm      Parm data defined in parm.H.
  * @param prob_parm ProbParm data as defined in prob_parm.H and initialised in
  * amrex_probinit.
  */

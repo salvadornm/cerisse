@@ -26,7 +26,7 @@ public:
  * @param k         z position.
  * @param state     state data.
  * @param geomdata  domain geometry data.
- * @param parm      Parm data defined in parm.H.
+
  * @param prob_parm ProbParm data as defined in prob_parm.H and initialised in
  * amrex_probinit.
  */
@@ -46,6 +46,7 @@ prob_initdata(int i, int j, int k, amrex::Array4<amrex::Real> const& state,
   state(i, j, k, UMX) = prob_parm.rho * prob_parm.u;
   state(i, j, k, UMY) = 0.0;
   state(i, j, k, UMZ) = 0.0;
+  state(i, j, k, UTEMP) = prob_parm.T;
   state(i, j, k, UEDEN) =
     prob_parm.rhoe + 0.5 * prob_parm.rho * prob_parm.u * prob_parm.u;
   for (int n = 0; n < NUM_SPECIES; ++n)
@@ -95,6 +96,7 @@ bcnormal(const amrex::Real x[AMREX_SPACEDIM], const amrex::Real s_int[LEN_STATE]
     s_ext[UMX] = prob_parm.rho * prob_parm.u;
     s_ext[UMY] = 0.0;
     s_ext[UMZ] = 0.0;
+    s_ext[UTEMP] = prob_parm.T;
     s_ext[UEDEN] = prob_parm.rhoe + 0.5 * prob_parm.rho * prob_parm.u * prob_parm.u;
     for (int n = 0; n < NUM_SPECIES; ++n)
       s_ext[UFS + n] = prob_parm.rho * prob_parm.massfrac[n];
@@ -117,7 +119,7 @@ bcnormal(const amrex::Real x[AMREX_SPACEDIM], const amrex::Real s_int[LEN_STATE]
  * @param k         z position.
  * @param state     state data.
  * @param geomdata  domain geometry data.
- * @param parm      Parm data defined in parm.H.
+
  * @param prob_parm ProbParm data as defined in prob_parm.H and initialised in
  * amrex_probinit.
  */

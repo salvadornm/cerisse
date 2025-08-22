@@ -177,10 +177,13 @@ void CNS::compute_dSdt_box(Box const& bx, Array4<const Real>& sarr,
           amrex::ParallelFor(flxbx, [=] AMREX_GPU_DEVICE(int i, int j, int k) {
             cns_riemann(i, j, k, dir, flx, q, wl, wr, char_sys, recon_char_var);
 
-            bool do_high_order_diff =
-              (shock_sensor(i, j, k) < 0.95) &&
-              (shock_sensor(IntVect(AMREX_D_DECL(i, j, k)) -
-                            IntVect::TheDimensionVector(dir)) < 0.95);
+            const IntVect iv(AMREX_D_DECL(i, j, k));
+            const IntVect ivd = IntVect::TheDimensionVector(dir);
+            const bool do_high_order_diff =
+              (shock_sensor(iv - 2 * ivd) < shock_sensor_threshold) &&
+              (shock_sensor(iv - ivd) < shock_sensor_threshold) &&
+              (shock_sensor(iv) < shock_sensor_threshold) &&
+              (shock_sensor(iv + ivd) < shock_sensor_threshold);
             if (do_high_order_diff) { cns_afd_correction(i, j, k, dir, q, flx); }
           });
         } else {

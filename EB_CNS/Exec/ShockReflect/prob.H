@@ -16,7 +16,6 @@
  * @param k         z index.
  * @param state     state data.
  * @param geomdata  domain geometry data.
- * @param parm      Parm data defined in parm.H.
  * @param prob_parm ProbParm data as defined in prob_parm.H and initialised in
  * amrex_probinit.
  */
@@ -149,7 +148,6 @@ void bcnormal(const amrex::Real x[AMREX_SPACEDIM],
  * @param k         z position.
  * @param state     state data.
  * @param geomdata  domain geometry data.
- * @param parm      Parm data defined in parm.H.
  * @param prob_parm ProbParm data as defined in prob_parm.H and initialised in
  * amrex_probinit.
  */

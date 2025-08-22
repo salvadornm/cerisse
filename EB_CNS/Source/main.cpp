@@ -27,8 +27,8 @@ int main(int argc, char* argv[])
                     ____ _______   __ ____________                    
                    / __// __/ _ \ / // __/ __/ __/                    
                   / /_ / __/ _/_// /_\ \_\ \/ _/                      
-                  \___/___/_/|_|/_//___/___/___/                      
-    )" << '\n';
+                  \___/___/_/|_|/_//___/___/___/ )" << GIT_HASH 
+    << "            \n\n";
 
   BL_PROFILE_VAR("main()", pmain);
 
@@ -65,8 +65,8 @@ int main(int argc, char* argv[])
 
 #if CNS_USE_EB
     AmrLevel::SetEBSupportLevel(EBSupport::full); // need all
-    AmrLevel::SetEBMaxGrowCells(NUM_GROW, 4, 4); // for ebcellflags, vfrac, area fraction,
-                                                 // boundary centroids and face centroids
+    AmrLevel::SetEBMaxGrowCells(NUM_GROW, 5, 4);  // for ebcellflags, vfrac, area fraction,
+                                                  // boundary centroids and face centroids
     initialize_EB2(amr.Geom(amr.maxLevel()), amr.maxLevel(), amr.maxLevel());
 #endif
 

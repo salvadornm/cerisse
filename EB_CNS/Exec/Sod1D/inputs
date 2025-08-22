@@ -18,7 +18,7 @@ cns.hi_bc       =  2 3 3
 cns.do_visc  = 0
 cns.do_react = 0
 
-cns.recon_scheme = 5
+cns.recon_scheme = 6
 cns.recon_char_var = 1
 
 cns.cfl = 0.3

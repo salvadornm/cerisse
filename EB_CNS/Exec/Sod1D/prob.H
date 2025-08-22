@@ -16,14 +16,12 @@
  * @param k         z position.
  * @param state     state data.
  * @param geomdata  domain geometry data.
- * @param parm      Parm data defined in parm.H.
  * @param prob_parm ProbParm data as defined in prob_parm.H and initialised in
  * amrex_probinit.
  */
-AMREX_GPU_DEVICE
-AMREX_FORCE_INLINE
-void prob_initdata(int i, int j, int k, amrex::Array4<amrex::Real> const& state,
-                   amrex::GeometryData const& geomdata, ProbParm const& prob_parm)
+AMREX_GPU_DEVICE AMREX_FORCE_INLINE void
+prob_initdata(int i, int j, int k, amrex::Array4<amrex::Real> const& state,
+              amrex::GeometryData const& geomdata, ProbParm const& prob_parm)
 {
   // Geometry
   const amrex::Real* prob_lo = geomdata.ProbLo();
@@ -65,13 +63,11 @@ void prob_initdata(int i, int j, int k, amrex::Array4<amrex::Real> const& state,
  * @sa CnsFillExtDir
  * @sa CnsFillExtDir::operator()
  */
-AMREX_GPU_DEVICE
-AMREX_FORCE_INLINE
-void bcnormal(const amrex::Real x[AMREX_SPACEDIM],
-              const amrex::Real* /*s_int[LEN_STATE]*/,
-              const amrex::Real* /*s_refl[LEN_STATE]*/, amrex::Real s_ext[LEN_STATE],
-              const int idir, const int sgn, const amrex::Real /*time*/,
-              amrex::GeometryData const& /*geomdata*/, ProbParm const& prob_parm)
+AMREX_GPU_DEVICE AMREX_FORCE_INLINE void bcnormal(
+  const amrex::Real x[AMREX_SPACEDIM], const amrex::Real* /*s_int[LEN_STATE]*/,
+  const amrex::Real* /*s_refl[LEN_STATE]*/, amrex::Real s_ext[LEN_STATE],
+  const int idir, const int sgn, const amrex::Real /*time*/,
+  amrex::GeometryData const& /*geomdata*/, ProbParm const& prob_parm)
 {
 }
 
@@ -83,15 +79,12 @@ void bcnormal(const amrex::Real x[AMREX_SPACEDIM],
  * @param k         z position.
  * @param state     state data.
  * @param geomdata  domain geometry data.
- * @param parm      Parm data defined in parm.H.
  * @param prob_parm ProbParm data as defined in prob_parm.H and initialised in
  * amrex_probinit.
  */
-AMREX_GPU_DEVICE
-AMREX_FORCE_INLINE
-void prob_post_restart(int i, int j, int k, amrex::Array4<amrex::Real> const& state,
-                       amrex::GeometryData const& geomdata, Parm const& parm,
-                       ProbParm const& prob_parm)
+AMREX_GPU_DEVICE AMREX_FORCE_INLINE void
+prob_post_restart(int i, int j, int k, amrex::Array4<amrex::Real> const& state,
+                  amrex::GeometryData const& geomdata, ProbParm const& prob_parm)
 {
 }
 

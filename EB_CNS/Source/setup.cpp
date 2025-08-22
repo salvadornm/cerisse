@@ -140,6 +140,7 @@ void CNS::read_params()
   ) {
     pp.query("limiter_theta", plm_theta); // MUSCL limiter parameter
   }
+  pp.query("shock_sensor_threshold", shock_sensor_threshold);
   pp.query("use_hybrid_scheme", use_hybrid_scheme);
   pp.query("use_high_order_corr", use_high_order_corr);
   pp.query("teno_cutoff", teno_cutoff);

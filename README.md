@@ -1,4 +1,4 @@
-![](cerisse_ramjet.png)
+![Example LES of a ramjet combustor. From top to bottom: temperature, pressure, density gradient, and streamwise velocity.](cerisse_ramjet.png)
 
 # Cerisse
 **A high-order adaptive mesh refinement solver for Large Eddy Simulation of compressible turbulent reactive flows**
@@ -48,6 +48,7 @@ We use GNU Make system for generating executables.
     mpirun -np 8 ./Cerisse2d.gnu.MPI.ex inputs
     ```
 
-- See `prob_param.H`, `prob.H`, and `prob.cpp` for the problem definition
+- See `prob_parm.H`, `prob.H`, and `prob.cpp` for the problem definition
 - See `inputs` for runtime options
 - See `GNUmakefile` for compile-time options
+- More information about the solver can be found in [`docs`](docs). [Cerrisse2 docs](hslesdnsrf.gitbook.io/cerisse-docs) may also be useful, but bear in mind that the two solvers are different.

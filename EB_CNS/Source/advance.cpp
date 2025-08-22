@@ -201,7 +201,7 @@ void CNS::compute_dSdt(const MultiFab& S, MultiFab& dSdt, Real dt,
         if (use_hybrid_scheme || use_high_order_corr) {
           Real time = state[State_Type].curTime();
           int* bcrec_dummy;
-          cns_dershocksensor(amrex::grow(bx, 3), shock_sensor_mf[mfi], 0, 1, S[mfi],
+          cns_dershocksensor(amrex::grow(bx, NUM_GROW - 1), shock_sensor_mf[mfi], 0, 1, S[mfi],
                              geom, time, bcrec_dummy, level);
         }
 
@@ -384,22 +384,33 @@ void CNS::enforce_consistent_state(MultiFab& S)
                 Real target_temp = clip_temp;
                 int n_neighbour = 1;
                 for (int ix = -1; ix <= 1; ++ix) {
-                  for (int iy = -1; iy <= 1; ++iy) {
-                    for (int iz = -1; iz <= 1; ++iz) {
-                      Real T_neighbour = s_arr(i + ix, j + iy, k + iz, UTEMP);
-                      if (std::isgreater(T_neighbour, clip_temp) &&
-                          std::isless(T_neighbour, 4000.0) &&
-                          bx.contains(i + ix, j + iy, k + iz)
-#if CNS_USE_EB
-                          && flag_arr(i + ix, j + iy, k + iz).isRegular()
+#if AMREX_SPACEDIM > 1
+                for (int iy = -1; iy <= 1; ++iy)
+#else
+                const int iy = 0;
 #endif
-                      ) {
-                        target_temp += T_neighbour;
-                        n_neighbour += 1;
-                      }
-                    } // iz
-                  }   // iy
-                }     // ix
+                {
+#if AMREX_SPACEDIM > 2
+                for (int iz = -1; iz <= 1; ++iz)
+#else
+                const int iz = 0;
+#endif
+                {
+                  if (bx.contains(i + ix, j + iy, k + iz)) {
+                    Real T_neighbour = s_arr(i + ix, j + iy, k + iz, UTEMP);
+                    if (std::isgreater(T_neighbour, clip_temp) &&
+                        std::isless(T_neighbour, 4000.0)
+#if CNS_USE_EB
+                        && flag_arr(i + ix, j + iy, k + iz).isRegular()
+#endif
+                    ) {
+                      target_temp += T_neighbour;
+                      n_neighbour += 1;
+                    }
+                  }
+                } // iz
+                } // iy
+                } // ix
                 target_temp /= Real(n_neighbour);
                 target_temp = amrex::min(target_temp, 200.0);
 
@@ -416,21 +427,20 @@ void CNS::enforce_consistent_state(MultiFab& S)
                                               +s_arr(iv, UMZ) * s_arr(iv, UMZ)));
                 Real ei = rhoinv * s_arr(iv, UEDEN) - ke;
                 auto eos = pele::physics::PhysicsType::eos();
+              // // Option 1: Keep KE, add ei to increase T
+              // if (verbose > 2) {
+              //   std::cout << "Energy added to cell " << iv
+              //             << ": T=" << s_arr(iv, UTEMP) << "->" << target_temp
+              //             << " ei=" << ei << "->";
+              // }
+              // s_arr(iv, UTEMP) = target_temp;
+              // s_arr(iv, UEDEN) -= ei * rhoNew;
+              // eos.RTY2E(rhoNew, target_temp, Y, ei);
+              // s_arr(iv, UEDEN) += ei * rhoNew;
+              // if (verbose > 2) { std::cout << ei << "\n"; }
 
-                // // Option 1: Keep KE, add ei to increase T
-                // if (verbose > 2) {
-                //   std::cout << "Energy added to cell " << iv
-                //             << ": T=" << s_arr(iv, UTEMP) << "->" << target_temp
-                //             << " ei=" << ei << "->";
-                // }
-                // s_arr(iv, UTEMP) = target_temp;
-                // s_arr(iv, UEDEN) -= ei * rhoNew;
-                // eos.RTY2E(rhoNew, target_temp, Y, ei);
-                // s_arr(iv, UEDEN) += ei * rhoNew;
-                // if (verbose > 2) { std::cout << ei << "\n"; }
-
-                // Option 2: Keep total E, reduce vel
-                // (because it usually fails at high ke/ei region)
+              // Option 2: Keep total E, reduce vel
+              // (because it usually fails at high ke/ei region)
 #ifndef AMREX_USE_GPU
                 if (verbose > 2) {
                   std::cout << "Momentum removed from cell " << iv

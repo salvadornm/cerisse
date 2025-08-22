@@ -47,6 +47,7 @@ int  CNS::recon_scheme      = 6;      // 1: Godunov, 2: MUSCL, 3: WENO-Z3, 4: WE
 int  CNS::char_sys          = 0;      // What to use in characteristic transformation (0: c, 1: gamma)
 bool CNS::recon_char_var    = true;   // Reconstruct the thermodynamic variable to cell interfaces? A must for high-order
 Real CNS::plm_theta         = 2.0;    // [1,2] 1: minmod; 2: van Leer's MC (higher sharper)
+Real CNS::shock_sensor_threshold = 0.7; // Shock sensor threshold, in [0,1]
 bool CNS::use_hybrid_scheme = false;  // Use central scheme in smooth region?
 bool CNS::use_high_order_corr = true; // Use alternative FD WENO correction (Balsara et al 2024)
 Real CNS::teno_cutoff       = 1e-4;   // TENO's cutoff value. < 0 triggers adaptively calculating cutoff

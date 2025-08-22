@@ -660,41 +660,57 @@ void cns_dershocksensor(const Box& bx, FArrayBox& derfab, int dcomp, int /*ncomp
   FArrayBox magvort_fab(bx, 1, amrex::The_Async_Arena());
   cns_derdivu(bx, divu_fab, 0, 1, datafab, geomdata, time, bcrec, level);
   cns_dermagvort(bx, magvort_fab, 0, 1, datafab, geomdata, time, bcrec, level);
-  
+
+#if CNS_USE_EB
+  const auto& flag_fab = getEBCellFlagFab(datafab);
+  const auto& typ = flag_fab.getType(bx);
+  if (typ == FabType::covered) {
+    derfab.setVal<RunOn::Device>(1.0, bx, dcomp, 1);
+    return;
+  }
+  const auto& flags = flag_fab.const_array();
+#endif
   auto const divu = divu_fab.const_array();
   auto const magvort = magvort_fab.const_array();
   auto shock_sensor = derfab.array(dcomp);
   const Real* dx = geomdata.CellSize();
   auto const sarr = datafab.const_array();
   amrex::ParallelFor(bx, [=] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {
-    // "Shock" sensor
-    Real divu2 = divu(i, j, k) * divu(i, j, k);
-    Real magvort2 = magvort(i, j, k) * magvort(i, j, k);
-    // shock_sensor(i, j, k) = divu2 / (divu2 + magvort2 + 1.0e-3); // Ducros
-    Real magvel2 = (AMREX_D_TERM(sarr(i, j, k, UMX) * sarr(i, j, k, UMX),
-                                 +sarr(i, j, k, UMY) * sarr(i, j, k, UMY),
-                                 +sarr(i, j, k, UMZ) * sarr(i, j, k, UMZ))) /
-                   sarr(i, j, k, URHO) / sarr(i, j, k, URHO);
-    Real cellsize2 =
-      std::pow(AMREX_D_TERM(dx[0], *dx[1], *dx[2]), 2.0 / Real(amrex::SpaceDim));
-    // shock_sensor(i, j, k) = divu2 / (divu2 + magvel2 / cellsize2 + 1.0e-6); // Hendrickson, Kartha, Candler
-    shock_sensor(i, j, k) = divu2 / (divu2 + magvort2 + std::sqrt(magvel2 / cellsize2) + 1.0e-6); // mixed
-    // shock_sensor(i, j, k) *= divu(i, j, k) < 0.0 ? 1.0 : 0.0; // only tag compression
+#if CNS_USE_EB
+    if (flags(i, j, k).isCovered()) {
+      shock_sensor(i, j, k) = 1.0;
+    } else
+#endif
+    {
+      // "Shock" sensor
+      Real divu2 = divu(i, j, k) * divu(i, j, k);
+      Real magvort2 = magvort(i, j, k) * magvort(i, j, k);
+      // shock_sensor(i, j, k) = divu2 / (divu2 + magvort2 + 1.0e-3); // Ducros
+      Real magvel2 = (AMREX_D_TERM(sarr(i, j, k, UMX) * sarr(i, j, k, UMX),
+                                   +sarr(i, j, k, UMY) * sarr(i, j, k, UMY),
+                                   +sarr(i, j, k, UMZ) * sarr(i, j, k, UMZ))) /
+                     sarr(i, j, k, URHO) / sarr(i, j, k, URHO);
+      Real cellsize2 =
+        std::pow(AMREX_D_TERM(dx[0], *dx[1], *dx[2]), 2.0 / Real(amrex::SpaceDim));
+      // shock_sensor(i, j, k) = divu2 / (divu2 + magvel2 / cellsize2 + 1.0e-6); // Hendrickson, Kartha, Candler
+      shock_sensor(i, j, k) = divu2 / (divu2 + magvort2 + std::sqrt(magvel2 / cellsize2) + 1.0e-6); // mixed
+      // shock_sensor(i, j, k) *= divu(i, j, k) < 0.0 ? 1.0 : 0.0; // only tag compression
 
-    // Partial density discontinuity sensor
-    for (int ns = 0; ns < NUM_SPECIES; ++ns) {
-      AMREX_D_TERM(
-        Real drYdx =
-          (sarr(i + 1, j, k, UFS + ns) - sarr(i - 1, j, k, UFS + ns)) / dx[0];
-        , Real drYdy =
-            (sarr(i, j + 1, k, UFS + ns) - sarr(i, j - 1, k, UFS + ns)) / dx[1];
-        , Real drYdz =
-            (sarr(i, j, k + 1, UFS + ns) - sarr(i, j, k - 1, UFS + ns)) / dx[2];)
-      Real drY2 =
-        std::sqrt(AMREX_D_TERM(drYdx * drYdx, +drYdy * drYdy, +drYdz * drYdz));
-      Real rY2 = sarr(i, j, k, UFS + ns) * sarr(i, j, k, UFS + ns);
-      shock_sensor(i, j, k) =
-        amrex::max(shock_sensor(i, j, k), drY2 / (drY2 + rY2 / cellsize2 + 1.0e-6));
+      // Partial density discontinuity sensor
+      for (int ns = 0; ns < NUM_SPECIES; ++ns) {
+        AMREX_D_TERM(
+          Real drYdx =
+            (sarr(i + 1, j, k, UFS + ns) - sarr(i - 1, j, k, UFS + ns)) / dx[0];
+          , Real drYdy =
+              (sarr(i, j + 1, k, UFS + ns) - sarr(i, j - 1, k, UFS + ns)) / dx[1];
+          , Real drYdz =
+              (sarr(i, j, k + 1, UFS + ns) - sarr(i, j, k - 1, UFS + ns)) / dx[2];)
+        Real drY2 =
+          std::sqrt(AMREX_D_TERM(drYdx * drYdx, +drYdy * drYdy, +drYdz * drYdz));
+        Real rY2 = sarr(i, j, k, UFS + ns) * sarr(i, j, k, UFS + ns);
+        shock_sensor(i, j, k) = amrex::max(shock_sensor(i, j, k),
+                                           drY2 / (drY2 + rY2 / cellsize2 + 1.0e-6));
+      }
     }
   });
 }
