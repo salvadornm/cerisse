@@ -42,16 +42,14 @@ prob_initdata(int i, int j, int k, amrex::Array4<amrex::Real> const& state,
   for (int nf = 0; nf <= NUM_FIELD; ++nf) {
     amrex::Real u[3], T, p;
     // if (rsq < R*R) {
-    u[0] =
-      prob_parm.v0 * (1 - prob_parm.beta * (y - yc) / R * exp(-0.5 * rsq / R / R));
-    u[1] = prob_parm.v0 * prob_parm.beta * (x - xc) / R * exp(-0.5 * rsq / R / R);
+    u[0] = prob_parm.v0 * (1 - prob_parm.beta * (y - yc) / R * std::exp(-0.5 * rsq / R / R));
+    u[1] = prob_parm.v0 * prob_parm.beta * (x - xc) / R * std::exp(-0.5 * rsq / R / R);
     u[2] = 0.0;
     // T = prob_parm.T0 -
     //     0.5 * (prob_parm.v0 * prob_parm.beta * prob_parm.v0 * prob_parm.beta) / cv
-    //     *
-    //       exp(-rsq / R / R);
+    //     * std::exp(-rsq / R / R);
     p = prob_parm.p0 - 0.5 * prob_parm.rho0 * prob_parm.v0 * prob_parm.beta *
-                         prob_parm.v0 * prob_parm.beta * exp(-rsq / R / R);
+                         prob_parm.v0 * prob_parm.beta * std::exp(-rsq / R / R);
     // } else {
     //   u[0] = prob_parm.v0;
     //   u[1] = 0.0;

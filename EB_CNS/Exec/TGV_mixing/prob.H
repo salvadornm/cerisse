@@ -32,25 +32,25 @@ prob_initdata(int i, int j, int k, amrex::Array4<amrex::Real> const& state,
 
   // TG functions
   amrex::Real u[3] = {0.0};
-  u[0] = prob_parm.v0 * sin(prob_parm.omega_x * x / prob_parm.L) *
-         cos(prob_parm.omega_y * y / prob_parm.L) *
-         cos(prob_parm.omega_z * z / prob_parm.L);
-  u[1] = -prob_parm.v0 * cos(prob_parm.omega_x * x / prob_parm.L) *
-         sin(prob_parm.omega_y * y / prob_parm.L) *
-         cos(prob_parm.omega_z * z / prob_parm.L);
+  u[0] = prob_parm.v0 * std::sin(prob_parm.omega_x * x / prob_parm.L) *
+                        std::cos(prob_parm.omega_y * y / prob_parm.L) *
+                        std::cos(prob_parm.omega_z * z / prob_parm.L);
+  u[1] = -prob_parm.v0 * std::cos(prob_parm.omega_x * x / prob_parm.L) *
+                         std::sin(prob_parm.omega_y * y / prob_parm.L) *
+                         std::cos(prob_parm.omega_z * z / prob_parm.L);
   if (prob_parm.convecting) {
     u[0] += prob_parm.v0;
     u[1] += prob_parm.v0;
   }
   const amrex::Real p =
     prob_parm.p0 + prob_parm.rho0 * prob_parm.v0 * prob_parm.v0 / 16.0 *
-                     (cos(2.0 * prob_parm.omega_x * x / prob_parm.L) +
-                      cos(2.0 * prob_parm.omega_y * y / prob_parm.L)) *
-                     (cos(2.0 * prob_parm.omega_z * z / prob_parm.L) + 2.0);
+                     (std::cos(2.0 * prob_parm.omega_x * x / prob_parm.L) +
+                      std::cos(2.0 * prob_parm.omega_y * y / prob_parm.L)) *
+                     (std::cos(2.0 * prob_parm.omega_z * z / prob_parm.L) + 2.0);
   amrex::Real rho, eint;
   amrex::Real d = 0.05;
-  amrex::Real Y1 = 0.5 * (tanh((x + 0.5) / d) - tanh((x - 0.5) / d));
-  // amrex::Real Y1 = 0.5 * cos(prob_parm.omega_x * x / prob_parm.L) + 0.5;
+  amrex::Real Y1 = 0.5 * (std::tanh((x + 0.5) / d) - std::tanh((x - 0.5) / d));
+  // amrex::Real Y1 = 0.5 * std::cos(prob_parm.omega_x * x / prob_parm.L) + 0.5;
   amrex::Real massfrac[2] = {Y1, 1.0 - Y1};
   auto eos = pele::physics::PhysicsType::eos();
   eos.PYT2RE(p, massfrac, prob_parm.T0, rho, eint);

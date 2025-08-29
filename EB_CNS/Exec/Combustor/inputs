@@ -56,7 +56,7 @@ amr.check_int       = 50        # number of timesteps between checkpoints
 amr.plot_files_output = 1
 amr.plot_file         = plt      # root name of plotfile
 amr.plot_int          = 10       # number of timesteps between plotfiles
-amr.derive_plot_vars  = temp pressure x_velocity y_velocity z_velocity MachNumber divrho divu magvort
+amr.derive_plot_vars  = pressure velocity MachNumber divrho divu magvort
 cns.plot_massfrac = 1
 cns.plot_rhoY = 0
 

@@ -29,9 +29,9 @@ prob_initdata(int i, int j, int k, amrex::Array4<amrex::Real> const& state,
 {
   state(i, j, k, URHO) = prob_parm.rho;
   state(i, j, k, UMX) = prob_parm.rho * prob_parm.u *
-                        cos(prob_parm.ang / 180.0 * M_PI); // inclined by 30 deg
+                        std::cos(prob_parm.ang / 180.0 * M_PI); // inclined by 30 deg
   state(i, j, k, UMY) =
-    prob_parm.rho * prob_parm.u * sin(prob_parm.ang / 180.0 * M_PI);
+    prob_parm.rho * prob_parm.u * std::sin(prob_parm.ang / 180.0 * M_PI);
   state(i, j, k, UMZ) = 0.0;
   state(i, j, k, UEDEN) =
     prob_parm.rhoe + 0.5 * prob_parm.rho * prob_parm.u * prob_parm.u;
@@ -61,8 +61,8 @@ bcnormal(const amrex::Real x[AMREX_SPACEDIM], const amrex::Real s_int[LEN_STATE]
 {
   s_ext[URHO] = prob_parm.rho;
   s_ext[UMX] = prob_parm.rho * prob_parm.u *
-               cos(prob_parm.ang / 180.0 * M_PI); // inclined by 30 deg
-  s_ext[UMY] = prob_parm.rho * prob_parm.u * sin(prob_parm.ang / 180.0 * M_PI);
+               std::cos(prob_parm.ang / 180.0 * M_PI); // inclined by 30 deg
+  s_ext[UMY] = prob_parm.rho * prob_parm.u * std::sin(prob_parm.ang / 180.0 * M_PI);
   s_ext[UMZ] = 0.0;
   s_ext[UEDEN] = prob_parm.rhoe + 0.5 * prob_parm.rho * prob_parm.u * prob_parm.u;
   s_ext[UFS] = prob_parm.rho;
@@ -107,8 +107,7 @@ prob_tag_error(int i, int j, int k, amrex::Array4<char> const& tagarr,
   const amrex::Real d = 1.732 * y - x + 1; // normal distance from wall
 
   // This is eqv. as tagging high temperature
-  if (sarr(i, j, k, URHO) <
-      9e-6 /*|| d < 0.5*(x - 1.0) + 0.5*/) { // refine behind shock
+  if (sarr(i, j, k, URHO) < 9e-6 /*|| d < 0.5*(x - 1.0) + 0.5*/) { // refine behind shock
     tagarr(i, j, k) = tagval;
   }
 }

@@ -67,6 +67,7 @@ bcnormal(const amrex::Real x[AMREX_SPACEDIM], const amrex::Real s_int[LEN_STATE]
       prob_parm.rhoe +
       0.5 * prob_parm.rho * (prob_parm.u * prob_parm.u + prob_parm.v * prob_parm.v);
     s_ext[UFS] = prob_parm.rho;
+    s_ext[UTEMP] = prob_parm.T;
   } else {
     // Pressure outlet
     // bc_pressure_outlet(s_ext, s_int, prob_parm.p, idir);

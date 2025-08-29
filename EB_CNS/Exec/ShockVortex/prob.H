@@ -42,9 +42,9 @@ prob_initdata(int i, int j, int k, amrex::Array4<amrex::Real> const& state,
   const amrex::Real b = 0.175;
   // Vortex strength
   const amrex::Real M_v = 0.9;
-  const amrex::Real v_m = M_v * sqrt(g);
+  const amrex::Real v_m = M_v * std::sqrt(g);
   // Distance from vortex
-  const amrex::Real r = sqrt((x - x_c) * (x - x_c) + (y - y_c) * (y - y_c));
+  const amrex::Real r = std::sqrt((x - x_c) * (x - x_c) + (y - y_c) * (y - y_c));
 
   // Find states at the position
   amrex::Real rho = x <= 0.5 ? prob_parm.rho_l : prob_parm.rho_r;
@@ -63,22 +63,22 @@ prob_initdata(int i, int j, int k, amrex::Array4<amrex::Real> const& state,
       u -= v_m * r / a * sin_theta;
       v += v_m * r / a * cos_theta;
 
-      radial_term = -2.0 * b * b * log(b) - (0.5 * a * a) + (2.0 * b * b * log(a)) +
+      radial_term = -2.0 * b * b * std::log(b) - (0.5 * a * a) + (2.0 * b * b * std::log(a)) +
                     (0.5 * b * b * b * b / (a * a));
       amrex::Real t_a =
-        t_u - (g - 1.0) * pow(v_m * a / (a * a - b * b), 2) * radial_term / (R * g);
+        t_u - (g - 1.0) * std::pow(v_m * a / (a * a - b * b), 2) * radial_term / (R * g);
       radial_term = 0.5 * (1.0 - r * r / (a * a));
       temperature = t_a - (g - 1.0) * v_m * v_m * radial_term / (R * g);
     } else {
       u -= v_m * a * (r - b * b / r) / (a * a - b * b) * sin_theta;
       v += v_m * a * (r - b * b / r) / (a * a - b * b) * cos_theta;
 
-      radial_term = -2.0 * b * b * log(b) - (0.5 * r * r) + (2.0 * b * b * log(r)) +
+      radial_term = -2.0 * b * b * std::log(b) - (0.5 * r * r) + (2.0 * b * b * std::log(r)) +
                     (0.5 * b * b * b * b / (r * r));
       temperature =
-        t_u - (g - 1.0) * pow(v_m * a / (a * a - b * b), 2) * radial_term / (R * g);
+        t_u - (g - 1.0) * std::pow(v_m * a / (a * a - b * b), 2) * radial_term / (R * g);
     }
-    rho_e = prob_parm.p_l * pow(temperature / t_u, g / (g - 1.0)) / (g - 1.0);
+    rho_e = prob_parm.p_l * std::pow(temperature / t_u, g / (g - 1.0)) / (g - 1.0);
   }
 
   // Finally, set the states

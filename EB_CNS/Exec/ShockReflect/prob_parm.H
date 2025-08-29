@@ -10,8 +10,8 @@ using namespace amrex::literals;
 struct ProbParm
 {
   amrex::Real p_l = 116.5; // post-shock
-  amrex::Real u_l = 8.25 * cos(30.0 / 180.0 * M_PI);
-  amrex::Real v_l = -8.25 * sin(30.0 / 180.0 * M_PI);
+  amrex::Real u_l = 8.25 * std::cos(30.0 / 180.0 * M_PI);
+  amrex::Real v_l = -8.25 * std::sin(30.0 / 180.0 * M_PI);
   amrex::Real rho_l = 8.0;
   amrex::Real rhoe_l;
   // amrex::Real T_l;

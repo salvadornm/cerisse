@@ -10,8 +10,8 @@ geometry.coord_sys   = 0
 geometry.prob_lo     = 0.0   0.0
 geometry.prob_hi     = 10.0  10.0
 #amr.n_cell           = 32    32
-amr.n_cell           = 64    64
-#amr.n_cell           = 128   128
+#amr.n_cell           = 64    64
+amr.n_cell           = 128   128
 #amr.n_cell           = 256   256
 eb2.geom_type = all_regular
 
@@ -47,7 +47,7 @@ amr.loadbalance_with_workestimates = 0 # for multi-level run, loadbalance_int = 
 #amr.loadbalance_max_fac    = 1.5      # default 1.5, what is this??
 
 # =============== REFINEMENT / REGRIDDING ============== #
-amr.max_level       = 1       # maximum level number allowed
+amr.max_level       = 0       # maximum level number allowed
 amr.ref_ratio       = 2       # refinement ratio
 amr.regrid_int      = 50      # how often to regrid
 amr.blocking_factor = 8
@@ -68,7 +68,7 @@ amr.plot_files_output = 1
 amr.plot_file         = slow3/plt  # root name of plotfile
 amr.plot_int          = 2000   # number of timesteps between plotfiles
 #amr.plot_per          = 0.0005762 # interval physical time between plotfiles
-amr.derive_plot_vars  = pressure temp x_velocity y_velocity MachNumber magvort #divrho divu z_velocity cp cv transport_coef
+amr.derive_plot_vars  = pressure temp velocity MachNumber magvort #divrho divu cp cv transport_coef
 cns.plot_fields = 0
 cns.plot_rhoy = 0
 cns.plot_molefrac = 0

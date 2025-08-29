@@ -384,22 +384,7 @@ void CNS::post_restart()
     pp.get("les_model", les_model_name);
     les_model = LESModel::create(les_model_name);
   }
-
-  // Initialize reactor
-  if (do_react) {
-    if (chem_integrator == "ReactorNull") {
-      amrex::Print() << "WARNING: turning on reactions while using ReactorNull. "
-                        "Make sure this is intended.\n";
-    }
-
-    reactor = pele::physics::reactions::ReactorBase::create(chem_integrator);
-    reactor->init(1, 1);
-
-    if (use_typical_vals_chem) { set_typical_values_chem(); }
-
-    react_state(parent->cumTime(), parent->dtLevel(level), false);
-  }
-
+  
   MultiFab& S_new = get_new_data(State_Type);
 
 #if (NUM_FIELD > 0)
@@ -414,11 +399,15 @@ void CNS::post_restart()
   if (do_restart_fields) {
     Print() << " >> Resetting stochastic fields state data ..." << std::endl;
 
+    MultiFab& S_old = get_old_data(State_Type);
+
     // Move aux variables
+    MultiFab::Copy(S_old, S_old, NVAR, UFA, NUM_AUX, 0);
     MultiFab::Copy(S_new, S_new, NVAR, UFA, NUM_AUX, 0);
 
     // Copy mean to fields
     for (int nf = 1; nf < NUM_FIELD + 1; ++nf) {
+      MultiFab::Copy(S_old, S_old, 0, nf * NVAR, NVAR, 0);
       MultiFab::Copy(S_new, S_new, 0, nf * NVAR, NVAR, 0);
     }
 
@@ -434,6 +423,21 @@ void CNS::post_restart()
     }
   }
 #endif
+
+  // Initialise reactor
+  if (do_react) {
+    if (chem_integrator == "ReactorNull") {
+      amrex::Print() << "WARNING: turning on reactions while using ReactorNull. "
+                        "Make sure this is intended.\n";
+    }
+
+    reactor = pele::physics::reactions::ReactorBase::create(chem_integrator);
+    reactor->init(1, 1);
+
+    if (use_typical_vals_chem) { set_typical_values_chem(); }
+
+    react_state(parent->cumTime(), parent->dtLevel(level), false);
+  }
 
   ProbParm const* lprobparm = d_prob_parm;
   const auto geomdata = geom.data();

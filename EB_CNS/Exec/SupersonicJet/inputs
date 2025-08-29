@@ -30,10 +30,10 @@ cns.do_react = 1
 cns.chem_integrator = "ReactorCvode"
 cvode.solve_type = "denseAJ_direct"
 ode.clean_init_massfrac = 1 # ensure 0 <= Y <= 1 before integration
-ode.rtol = 1e-5             # relative tolerance
-ode.atol = 1e-8             # absolute tolerance
+#ode.rtol = 1e-5             # relative tolerance
+#ode.atol = 1e-8             # absolute tolerance
 cns.use_typical_vals_chem = 0
-cns.min_react_temp = 0      # no reaction in cells below this temp (can reduce runtime in ReactorCvode)
+cns.min_react_temp = 90     # no reaction in cells below this temp (can reduce runtime in ReactorCvode)
 cns.update_heat_release = 1
 cns.rk_reaction_iter = 0
 
@@ -43,11 +43,12 @@ cns.dt_cutoff = 5.e-20
 cns.recon_scheme = 6  # 1: Godunov,  2: MUSCL,   3: WENO-Z3, 
                       # 4: WENO-JS5, 5: WENO-Z5, 6: TENO-5
 cns.recon_char_var = 1
-cns.teno_cutoff = 2e-4
-cns.do_psgs      = 1  # enable p_sgs correction
+#cns.teno_cutoff = 2e-4
+cns.do_psgs      = 0  # enable p_sgs correction
 cns.do_vpdf      = 1  # enable Lagevin model
 cns.do_spdf      = 1  # enable IEM model
-cns.clip_temp    = 50 # clip minimum temperature [K]
+cns.clip_temp    = 90 # clip minimum temperature [K]
+#cns.high_order_corr = 0
 
 # ================ VERBOSITY & DIAGNOSIS =============== #
 cns.v = 1
@@ -100,7 +101,7 @@ amr.plot_files_output = 1
 amr.plot_file         = plt  # root name of plotfile
 amr.plot_int          = 100  # number of timesteps between plotfiles
 #amr.plot_per # interval physical time between plotfiles
-amr.derive_plot_vars  = temp pressure x_velocity y_velocity z_velocity MachNumber divrho divu magvort cv cp transport_coef reynolds_stress
+amr.derive_plot_vars  = pressure velocity MachNumber divrho divu magvort cv cp transport_coef reynolds_stress
 cns.plot_rhoy = 0
 cns.plot_molefrac = 0
 cns.plot_massfrac = 1

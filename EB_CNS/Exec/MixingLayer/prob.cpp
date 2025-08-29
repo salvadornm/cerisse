@@ -76,8 +76,8 @@ void CNS::fill_ext_src(int i, int j, int k, amrex::Real time,
   if (rsq >= theta_sq) {
     for (int nf = 0; nf <= NUM_FIELD; ++nf) {
       ext_src(i, j, k, nf * NVAR + UMY) +=
-        0.01 * pp.uc * exp(-rsq / theta_sq) * cos(6.0 * M_PI * z / Lz) *
-        sin(1e-6 * time); // Yuri says amplitude is 0.1*Uc ??
+        0.01 * pp.uc * std::exp(-rsq / theta_sq) * std::cos(6.0 * M_PI * z / Lz) *
+        std::sin(1e-6 * time); // Yuri says amplitude is 0.1*Uc ??
     }
   }
 }

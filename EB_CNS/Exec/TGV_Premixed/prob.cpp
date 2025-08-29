@@ -291,9 +291,9 @@ void CNS::full_prob_post_timestep(int /*iteration*/)
             minT = amrex::min(minT, T);
 
             ksgs += vol * 0.5 * rho *
-                    (pow(mxf * rhofinv - mx * rhoinv, 2) +
-                     pow(myf * rhofinv - my * rhoinv, 2) +
-                     pow(mzf * rhofinv - mz * rhoinv, 2));
+                    (std::pow(mxf * rhofinv - mx * rhoinv, 2) +
+                     std::pow(myf * rhofinv - my * rhoinv, 2) +
+                     std::pow(mzf * rhofinv - mz * rhoinv, 2));
           }
           ksgs /= amrex::Real(NUM_FIELD);
           ke += ksgs;

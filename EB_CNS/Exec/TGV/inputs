@@ -72,10 +72,10 @@ amr.check_int       = 1000   # number of timesteps between checkpoints
 #amr.check_per # interval physical time between checkpoints
 
 amr.plot_files_output = 1
-amr.plot_file         = /media/enson/data1/enson/TGV/teno5/sf128^3/plt  # root name of plotfile
+amr.plot_file         = teno5/sf128^3/plt  # root name of plotfile
 amr.plot_int          = 200  # number of timesteps between plotfiles
 #amr.plot_per # interval physical time between plotfiles
-amr.derive_plot_vars  = pressure x_velocity y_velocity z_velocity magvort transport_coef reynolds_stress #temp MachNumber divrho divu cv cp 
+amr.derive_plot_vars  = pressure velocity magvort transport_coef reynolds_stress #temp MachNumber divrho divu cv cp 
 cns.plot_rhoy = 0
 cns.plot_molefrac = 0
 cns.plot_massfrac = 0

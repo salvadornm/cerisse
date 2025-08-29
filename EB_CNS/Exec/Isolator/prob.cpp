@@ -79,7 +79,7 @@ void amrex_probinit(const int* /*init*/, const int* /*name*/, const int* /*namel
     }
     // Iterate to find gamma
     for (int iter = 0; iter < 10; ++iter) {
-      T = pow((p / p1) * (M / M1), 2) * (gamma / gamma1) * T1;
+      T = std::pow((p / p1) * (M / M1), 2) * (gamma / gamma1) * T1;
       eos.PYT2R(p, CNS::h_prob_parm->Y.begin(), T, rho);
       eos.RTY2G(rho, T, CNS::h_prob_parm->Y.begin(), gamma);
       // amrex::Print() << "Iter " << iter << " (gamma, T, rho) = " << gamma << ", "
@@ -166,7 +166,7 @@ void CNS::fill_ext_src(int i, int j, int k, Real time, GeometryData const& geomd
 //   auto floor_wall = EB2::PlaneIF({AMREX_D_DECL(0.0, -10.0, 0.0)}, {AMREX_D_DECL(0.0, 1.0, 0.0)});
 //   auto inclined_wall = EB2::PlaneIF(
 //     {AMREX_D_DECL(9.525, 0.0, 0.0)},
-//     {AMREX_D_DECL(-sin(4.0 / 180.0 * M_PI), -cos(4.0 / 180.0 * M_PI), 0.0)});
+//     {AMREX_D_DECL(-std::sin(4.0 / 180.0 * M_PI), -std::cos(4.0 / 180.0 * M_PI), 0.0)});
 //   auto triangle = EB2::IntersectionIF<EB2::PlaneIF, EB2::PlaneIF, EB2::PlaneIF>(
 //     rear_wall, floor_wall, inclined_wall);
 

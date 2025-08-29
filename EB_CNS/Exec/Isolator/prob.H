@@ -182,7 +182,7 @@ AMREX_GPU_DEVICE AMREX_FORCE_INLINE void bcnormal(
   //     }
   //   } else {
   //     // Fuel
-  //     // amrex::Real damping = time > 2e-4 ? 1.0 : 1.0 - exp(-5.0 * time / 2e-4);
+  //     // amrex::Real damping = time > 2e-4 ? 1.0 : 1.0 - std::exp(-5.0 * time / 2e-4);
   //     amrex::Real damping = 1.0;
   //     amrex::Real jet_profile = 1.0;
   //     // if (pp.do_bl) {

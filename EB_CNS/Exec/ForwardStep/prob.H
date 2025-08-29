@@ -72,6 +72,7 @@ bcnormal(const amrex::Real x[AMREX_SPACEDIM], const amrex::Real s_int[LEN_STATE]
       s_ext[nf * NVAR + UEDEN] =
         prob_parm.rhoe_l + 0.5 * prob_parm.rho_l * prob_parm.u_l * prob_parm.u_l;
       s_ext[nf * NVAR + UFS] = prob_parm.rho_l;
+      s_ext[nf * NVAR + UTEMP] = prob_parm.T_l;
     }
   }
 }

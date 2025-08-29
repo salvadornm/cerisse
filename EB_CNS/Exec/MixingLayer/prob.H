@@ -61,7 +61,7 @@ bcnormal(const amrex::Real x[AMREX_SPACEDIM], const amrex::Real* /*s_int[NVAR]*/
   amrex::Real dy = geomdata.CellSize(1);
   // amrex::Real meanu = 0.5*(ua+ub);
   amrex::Real meanu =
-    0.5 * (pp.u1 + pp.u2) + 0.5 * (pp.u1 - pp.u2) * tanh(2 * y / pp.theta_w);
+    0.5 * (pp.u1 + pp.u2) + 0.5 * (pp.u1 - pp.u2) * std::tanh(2 * y / pp.theta_w);
   // amrex::Real ua = 0.5*(pp.u1 + pp.u2) + 0.5*(pp.u1 - pp.u2)*tanh(2*(y -
   // dy/2)/pp.theta_w); amrex::Real ub = 0.5*(pp.u1 + pp.u2) + 0.5*(pp.u1 -
   // pp.u2)*tanh(2*(y + dy/2)/pp.theta_w); amrex::Real stdu =

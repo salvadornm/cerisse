@@ -59,7 +59,7 @@ amr.checkpoint_files_output = 0
 
 amr.plot_files_output = 1
 amr.plot_int          = 20   # number of timesteps between plotfiles
-amr.derive_plot_vars  = temp pressure x_velocity y_velocity MachNumber divrho divu magvort cp cv
+amr.derive_plot_vars  = pressure velocity MachNumber divrho divu magvort cp cv
 cns.plot_rhoy = 0
 cns.plot_molefrac = 0
 cns.plot_massfrac = 0

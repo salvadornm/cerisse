@@ -62,7 +62,7 @@ prob_initdata(int i, int j, int k, amrex::Array4<amrex::Real> const& state,
       }
     } else { // Between two jets
       const amrex::Real profile =
-        0.5 + 0.5 * tanh((rsqr - 0.15425 * 0.15425) / (0.03625 * 0.03625 * 2));
+        0.5 + 0.5 * std::tanh((rsqr - 0.15425 * 0.15425) / (0.03625 * 0.03625 * 2));
       state(i, j, k, nf * NVAR + URHO) = 0.5 * (pp.rho1 + pp.rho2);
       state(i, j, k, nf * NVAR + UMX) =
         state(i, j, k, nf * NVAR + URHO) * (profile * pp.u1 + (1 - profile) * pp.u2);
@@ -126,7 +126,7 @@ AMREX_GPU_DEVICE AMREX_FORCE_INLINE void bcnormal(
           }
 
           profile =
-            1 + (profile - 1) * (1 - pow((sqrt(rsqr) - 0.53975) / 0.34925, 7));
+            1 + (profile - 1) * (1 - std::pow((std::sqrt(rsqr) - 0.53975) / 0.34925, 7));
         }
         const amrex::Real prof_y = 0.0;
         const amrex::Real prof_z = 0.0;
@@ -141,6 +141,7 @@ AMREX_GPU_DEVICE AMREX_FORCE_INLINE void bcnormal(
         for (int n = 0; n < NUM_SPECIES; ++n) {
           s_ext[nf * NVAR + UFS + n] = pp.rho1 * pp.Y1[n];
         }
+        s_ext[nf * NVAR + UTEMP] = pp.T1;
       } else if (rsqr < 0.118 * 0.118) { // Fuel jet
         amrex::Real profile = 1;         //- pow(rsqr/0.118/0.118, 6);
         // profile += (pp.inflow_turbulence ? amrex::RandomNormal(0.0, 0.18) : 0.0);
@@ -179,6 +180,7 @@ AMREX_GPU_DEVICE AMREX_FORCE_INLINE void bcnormal(
         for (int n = 0; n < NUM_SPECIES; ++n) {
           s_ext[nf * NVAR + UFS + n] = pp.rho2 * pp.Y2[n];
         }
+        s_ext[nf * NVAR + UTEMP] = pp.T2;
       } else if (rsqr > 0.889 * 0.889) { // Still air
         s_ext[nf * NVAR + URHO] = pp.rho_a;
         s_ext[nf * NVAR + UMX] = 0.0;
@@ -188,13 +190,10 @@ AMREX_GPU_DEVICE AMREX_FORCE_INLINE void bcnormal(
         for (int n = 0; n < NUM_SPECIES; ++n) {
           s_ext[nf * NVAR + UFS + n] = pp.rho_a * pp.Y_a[n];
         }
+        s_ext[nf * NVAR + UTEMP] = pp.T_a;
       } else { // Between two jets (adiabatic no-slip wall)
         s_ext[nf * NVAR + URHO] = s_int[nf * NVAR + URHO];
-        s_ext[nf * NVAR + UMX] =
-          -s_int
-            [nf * NVAR +
-             UMX]; //* amrex::min(amrex::max((time-0.00017)/(0.000165-0.00017), 1.0),
-                   //-1.0);
+        s_ext[nf * NVAR + UMX] = -s_int[nf * NVAR + UMX]; //* amrex::min(amrex::max((time-0.00017)/(0.000165-0.00017), 1.0), -1.0);
         s_ext[nf * NVAR + UMY] = -s_int[nf * NVAR + UMY];
         s_ext[nf * NVAR + UMZ] = -s_int[nf * NVAR + UMZ];
         s_ext[nf * NVAR + UEDEN] = s_int[nf * NVAR + UEDEN];
@@ -202,9 +201,9 @@ AMREX_GPU_DEVICE AMREX_FORCE_INLINE void bcnormal(
           s_ext[nf * NVAR + UFS + n] = s_int[nf * NVAR + UFS + n];
         }
       }
+      s_ext[nf * NVAR + UTEMP] = s_int[nf * NVAR + UTEMP];
     } else /*if (idir == 0 && sgn == -1)*/ {
-      // bc_pressure_outlet(x, &s_ext[nf * NVAR], &s_int[nf * NVAR], pp.p_a,
-      // geomdata);
+      // bc_pressure_outlet(x, &s_ext[nf * NVAR], &s_int[nf * NVAR], pp.p_a, geomdata);
       bc_foextrap_outlet(idir, sgn, &s_ext[nf * NVAR], &s_int[nf * NVAR]);
     }
   }

@@ -35,15 +35,15 @@ prob_initdata(int i, int j, int k, amrex::Array4<amrex::Real> const& state,
   auto eos = pele::physics::PhysicsType::eos();
   if (prob_parm.mode == 0) {
     // TG functions
-    u[0] = prob_parm.v0 * sin(2.0 * M_PI * x / prob_parm.L) *
-           cos(2.0 * M_PI * y / prob_parm.L) * cos(2.0 * M_PI * z / prob_parm.L);
-    u[1] = -prob_parm.v0 * cos(2.0 * M_PI * x / prob_parm.L) *
-           sin(2.0 * M_PI * y / prob_parm.L) * cos(2.0 * M_PI * z / prob_parm.L);
+    u[0] = prob_parm.v0 * std::sin(2.0 * M_PI * x / prob_parm.L) *
+           std::cos(2.0 * M_PI * y / prob_parm.L) * std::cos(2.0 * M_PI * z / prob_parm.L);
+    u[1] = -prob_parm.v0 * std::cos(2.0 * M_PI * x / prob_parm.L) *
+           std::sin(2.0 * M_PI * y / prob_parm.L) * std::cos(2.0 * M_PI * z / prob_parm.L);
     const amrex::Real p =
       prob_parm.p0 + prob_parm.rho0 * prob_parm.v0 * prob_parm.v0 / 16.0 *
-                       (cos(2.0 * 2.0 * M_PI * x / prob_parm.L) +
-                        cos(2.0 * 2.0 * M_PI * y / prob_parm.L)) *
-                       (cos(2.0 * 2.0 * M_PI * z / prob_parm.L) + 2.0);
+                       (std::cos(2.0 * 2.0 * M_PI * x / prob_parm.L) +
+                        std::cos(2.0 * 2.0 * M_PI * y / prob_parm.L)) *
+                       (std::cos(2.0 * 2.0 * M_PI * z / prob_parm.L) + 2.0);
     eos.PYT2RE(p, prob_parm.Y.begin(), prob_parm.T0, rho, eint);
   } else {
     // HIT functions

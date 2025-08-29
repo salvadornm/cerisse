@@ -86,7 +86,7 @@ cns.refine_magvort_max_lev = 4
 
 # amr.loTemp.max_level = 3
 # amr.loTemp.value_less = 500
-# amr.loTemp.field_name = temp
+# amr.loTemp.field_name = Temp
 
 # amr.flame_tracer.max_level = 3
 # amr.flame_tracer.value_greater = 1.e-6
@@ -102,7 +102,7 @@ amr.plot_files_output = 1
 amr.plot_file         = plt  # root name of plotfile
 amr.plot_int          = 50   # number of timesteps between plotfiles
 #amr.plot_per # interval physical time between plotfiles
-amr.derive_plot_vars  = temp pressure x_velocity y_velocity z_velocity MachNumber divrho divu magvort cv cp transport_coef
+amr.derive_plot_vars  = pressure velocity MachNumber divrho divu magvort cv cp transport_coef
 cns.plot_rhoy = 0
 cns.plot_molefrac = 0
 cns.plot_massfrac = 1

@@ -59,18 +59,18 @@ void DoubleRamp::build(const Geometry& geom, const int max_coarsening_level)
   point[0] = 0.0;
   point[1] = 0.0;
 
-  norm[0] = sin(ang1);
-  norm[1] = -cos(ang1);
+  norm[0] = std::sin(ang1);
+  norm[1] = -std::cos(ang1);
 
   EB2::PlaneIF ramp1(point, norm);
 
   // Ramp plane 2
   // so that ramp 1 and 2 have the same length
-  point[0] = 23.0; // h * cos(ang1) / (sin(ang1) + sin(ang2));
-  point[1] = point[0] * tan(ang1);
+  point[0] = 23.0; // h * std::cos(ang1) / (std::sin(ang1) + std::sin(ang2));
+  point[1] = point[0] * std::tan(ang1);
 
-  norm[0] = sin(ang2);
-  norm[1] = -cos(ang2);
+  norm[0] = std::sin(ang2);
+  norm[1] = -std::cos(ang2);
 
   EB2::PlaneIF ramp2(point, norm);
 

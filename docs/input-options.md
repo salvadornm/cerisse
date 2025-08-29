@@ -99,6 +99,7 @@ There are also 3 options to control the BC for embedded boundaries, `cns.eb_no_s
 
 | Option                      | Type          | Default | Description                                                  |
 | --------------------------- | ------------- | ------- | ------------------------------------------------------------ |
+| cns.do_hydro                | Bool          | 1       | Compute hydrodynamic/hyperbolic fluxes or not
 | cns.do_visc                 | Bool          | 1       | Compute viscous fluxes or not (note that no-slip walls and isothermal walls require `do_visc`)
 | cns.do_ext_src              | Bool          | 1       | Add the external source term specified in `prob.cpp`
 | cns.do_react                | Bool          | 0       | Compute chemical reaction source term
@@ -111,7 +112,7 @@ See also the "Reaction options" section below.
 cns.cfl = 0.3
 cns.dt_cutoff = 5.e-20
 cns.recon_scheme = 6  # 1: Godunov,  2: MUSCL,   3: WENO-Z3, 
-                      # 4: WENO-JS5, 5: WENO-Z5, 6: TENO-5
+                      # 4: WENO-JS5, 5: WENO-Z5, 6: TENO-5,  7: KEEP
 ...
 ```
 Godunov is first-order (piecewise constant) reconstruction, MUSCL is second-order, while the number represents the formal order of the reconstruction scheme.
@@ -123,12 +124,19 @@ Option             | Type             | Default   | Meaning
 cns.cfl            | Real             | 0.3       | Acoustic Courant number
 cns.dt_cutoff      | Real             | 5.e-20    | Minimum timestep size allowed
 cns.fixed_dt       | Real             | 0         | Run with constant dt
-cns.recon_scheme   | Int (1 to 6)     | 5         | Reconstruction scheme 
-cns.char_sys       | Int (0 or 1)     | 0 (sos)   | System for characteristic variable conversion
+cns.dt_max_change  | Real             | 1.2       | Limit how much dt can change in one step (dt^n+1 <= dt_max_change * dt^n)
+cns.amr_interp_order | Int (1 to 4)   | 2         | Interpolation order for AMR coarse-fine boundary. Only <= 2 is TVD
+cns.recon_scheme   | Int (1 to 7)     | 6         | Reconstruction scheme, 1: Godunov1, 2: MUSCL2, 3: WENO-Z3, 4: WENO-JS5, 5: WENO-Z5, 6: TENO5, 7: KEEP2 (may not be stable for multispecies)
+cns.char_sys       | Int (0 or 1)     | 0         | System for characteristic variable conversion, 0: speed of sound, 1: gamma
 cns.recon_char_var | Int (0 or 1)     | 1         | Reconstruct characteristic system variable or not (solver order will reduce if this is off)
 cns.limiter_theta  | Real             | 2.0       | Parameter in MUSCL limiter, between 1 and 2; 1: minmod, 2: van Leer's MC (higher sharper) 
+cns.shock_sensor_threshold | Real (0 to 1) | 0.7  | Shock sensor threshold for hybrid scheme and high-order AFD correction
+cns.use_hybrid_scheme | Bool          | 0         | Use KEEP2 in smooth regions shock_sensor < shock_sensor_threshold
+cns.use_high_order_corr | Bool        | 1         | Enable high-order alternative FD WENO correction term if shock_sensor < shock_sensor_threshold
+cns.teno_cutoff    | Real             | 1e-4      | TENO's cutoff parameter (CT), smaller for sharper solution. < 0 triggers adaptively calculating cutoff
 cns.rk_order       | Int (1 or 2)     | 1         | Switch between forward Euler and 2nd-order Runge-Kutta (note that WENO is not stable with forward Euler)
-cns.clip_temp      | Real             | [C++ epsilon](https://en.cppreference.com/w/cpp/types/numeric_limits/epsilon) | The `enforce_consistent_state()` routine adds energy to cells below this temperature to enforce non-negative temperature |
+cns.clip_temp      | Real             | [C++ epsilon](https://en.cppreference.com/w/cpp/types/numeric_limits/epsilon) | The `enforce_consistent_state()` routine adds energy to cells below this temperature to enforce non-negative temperature. Note that it also caps temperature < 4000 K |
+cns.buffer_box_lo, cns.buffer_box_hi | Reals   |  | Lower and higher ends cooridinates of buffer box. Viscosity and diffusivity are increased in the buffer box
 
 ### LES models
 
@@ -147,6 +155,8 @@ Two types of LES models are available, traditional eddy-viscosity type and stoch
 
 For using stochastic fields, the number of fields must be decided at compile time using the `NUM_FIELD` option in `GNUmakefile`. The following options are available to control the runtime behaviour:
 
+Note that LES is not yet implemented for EB.
+
 | Option                      | Type          | Default | Description                                                  |
 | --------------------------- | ------------- |:-------:| ------------------------------------------------------------ |
 | cns.do_psgs                 | Bool          | 0       | Apply the pressure correction term
@@ -159,15 +169,14 @@ For using stochastic fields, the number of fields must be decided at compile tim
 
 | Name                               | Meaning                                                      |
 | ---------------------------------- | ------------------------------------------------------------ |
-| temp                               | Temperature                                                  |
 | pressure                           | Pressure                                                     |
 | eint                               | Internal energy                                              |
-| x_velocity, y_velocity, z_velocity | Velocities                                                   |
+| velocity                           | Velocities                                                   |
 | MachNumber                         | Mach Number                                                  |
 | magvort                            | Vorticity magnitude                                          |
 | divu                               | Velocity divergence                                          |
 | divrho                             | Density divengence                                           |
-| shock_sensor                       | Pressure-based shock sensor                                  |
+| shock_sensor                       | Shock sensor                                                 |
 | cp                                 | Specific heat at constant pressure                           |
 | cv                                 | Specific heat at constant volume                             |
 | transport_coef                     | Transport coefficients. Note that species diffusivities are multipled by density (rho*D) |
@@ -234,6 +243,7 @@ There are a few more options to control the EB boundary conditions:
 | cns.eb_no_slip              | Bool          | 1       | No-slip wall or not
 | cns.eb_isothermal           | Bool          | 0       | Isothermal or adiabatic wall
 | cns.eb_wall_temp            | Real          |         | Temperature of the wall (if isothermal wall)
+| cns.wall_model              | Bool          | 0       | Do ODE wall model on EB walls and no-slip walls (option 5 in BC)
 
 ## Reaction options
 
@@ -253,10 +263,10 @@ Four chemical integrators are supplied by PelePhysics:
 | Option                      | Type          | Default | Description                                                  |
 | --------------------------- | ------------- |:-------:| ------------------------------------------------------------ |
 | cns.chem_integrator         | String        | "Reactor_Null" | Select the chemical integrator
-| cns.use_typical_vals_chem   | Bool          | 0              | Tell the chemical integrator to get the typical value of temperature and massfractions (NOT IMPLEMENTED)
-| cns.reset_typical_vals_int  | Int           | 10             | How often to reset the typical values (NOT IMPLEMENTED)
+| cns.use_typical_vals_chem   | Bool          | 0              | Tell the chemical integrator to get the typical value of temperature and massfractions
+| cns.reset_typical_vals_int  | Int           | 10             | How often to reset the typical values
 | cns.rk_reaction_iter        | Int           | 0              | After a normal RK2 timestep, we can iterate to tightly couple the chemistry, this is how many times to iterate the chemistry
-| cns.min_react_temp          | Real          | 300.0          | Turn off reactor below this temperature
+| cns.min_react_temp          | Real          | 300.0          | Turn off reactor below this temperature (may be more stable and save some computation if "Reactor_Cvode" is used)
 
 Some useful `ode` options
 
@@ -264,3 +274,9 @@ Some useful `ode` options
 | --------------------------- | ------------- |:-------:| ------------------------------------------------------------ |
 | ode.verbose                 | Bool          | 0       | Print out runtime info
 | ode.clean_init_massfrac     | Bool          | 0        | Normalise mass fractions to sumY=1 at the beginning of reactor solver
+
+## Initial/boundary condition utilities
+
+A few helper functions for setting up problem conditions, such as adiabatic wall, isothermal wall, shock relationsip, and outlet, are available in `bc_util.H`.
+
+WARNING: Note that in isothermal walls, `UEDEN` of the conservative variable vector is set to the fluid cell energy, so that pressure can be recovered in `cons2prim`. It is only used in inviscid fluxes. However, `UTEMP` is set to the ghost point temperature such that the wall temperature can be used in diffusive fluxes.

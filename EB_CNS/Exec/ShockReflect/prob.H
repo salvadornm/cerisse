@@ -32,7 +32,7 @@ void prob_initdata(int i, int j, int k, amrex::Array4<amrex::Real> const& state,
 
   for (int nf = 0; nf <= NUM_FIELD; ++nf) {
     // Set the states
-    if (x < 1. / 6. + 1. / sqrt(3.) * y) {
+    if (x < 1. / 6. + 1. / std::sqrt(3.) * y) {
       state(i, j, k, nf * NVAR + URHO) = prob_parm.rho_l;
       state(i, j, k, nf * NVAR + UMX) = prob_parm.rho_l * prob_parm.u_l;
       state(i, j, k, nf * NVAR + UMY) = prob_parm.rho_l * prob_parm.v_l;
@@ -116,8 +116,8 @@ void bcnormal(const amrex::Real x[AMREX_SPACEDIM],
         }
       } else { // yhi
         // moving shock conditions
-        amrex::Real us = 10. * prob_parm.c_r / sqrt(3.) * 2.; // shock speed
-        if (x[0] - us * time < 1. / 6. + 1. / sqrt(3.) * x[1]) {
+        amrex::Real us = 10. * prob_parm.c_r / std::sqrt(3.) * 2.; // shock speed
+        if (x[0] - us * time < 1. / 6. + 1. / std::sqrt(3.) * x[1]) {
           s_ext[nf * NVAR + URHO] = prob_parm.rho_l;
           s_ext[nf * NVAR + UMX] = prob_parm.rho_l * prob_parm.u_l;
           s_ext[nf * NVAR + UMY] = prob_parm.rho_l * prob_parm.v_l;

@@ -38,7 +38,7 @@ prob_initdata(int i, int j, int k, amrex::Array4<amrex::Real> const& state,
   const bool mask = (x <= 1);
 
   // Set the states
-  state(i, j, k, URHO) = mask ? 3.857143 : 1.0 + 0.2 * sin(5 * x);
+  state(i, j, k, URHO) = mask ? 3.857143 : 1.0 + 0.2 * std::sin(5 * x);
   state(i, j, k, UMX) = state(i, j, k, URHO) * (mask ? 2.629369 : 0.0);
   state(i, j, k, UMY) = 0.0;
   state(i, j, k, UMZ) = 0.0;

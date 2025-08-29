@@ -1,8 +1,8 @@
 # ====================================================== #
 #                  CERISSE INPUT SCRIPT                  #
 # ====================================================== #
-max_step = 200
-stop_time = 0.1
+max_step = 300
+stop_time = 1.4e-5
 amrex.fpe_trap_invalid = 0
 
 # ================ COMPUTATIONAL DOMAIN ================ #
@@ -53,6 +53,7 @@ cns.recon_scheme = 5  # 1: Godunov, 2: MUSCL, 3: WENO-Z3,
 cns.char_sys       = 0
 cns.recon_char_var = 1
 cns.clip_temp      = 90  # clip minimum temperature [K]
+# cns.use_hybrid_scheme = 1
 # cns.do_psgs      = 1   # enable p_sgs correction
 # cns.do_vpdf      = 1   # enable Lagevin model
 # cns.do_spdf      = 1   # enable IEM model
@@ -61,7 +62,7 @@ cns.clip_temp      = 90  # clip minimum temperature [K]
 cns.chem_integrator = "ReactorCvode"
 cvode.solve_type = "denseAJ_direct"
 ode.clean_init_massfrac = 1 # ensure Y in [0,1] before integration
-cns.min_react_temp = 600    # no reaction below this temp
+cns.min_react_temp = 300    # no reaction below this temp
 cns.update_heat_release = 1
 # cns.rk_reaction_iter = 2
 
@@ -94,9 +95,9 @@ amr.check_file = 90deg/chk
 amr.check_int  = 50
 
 amr.plot_files_output = 1
-amr.plot_int  = 10         # number of timesteps between plotfiles
+amr.plot_int  = 50         # number of timesteps between plotfiles
 amr.plot_file = 90deg/plt  # root name of plotfile
-amr.derive_plot_vars  = temp pressure x_velocity y_velocity MachNumber divrho divu magvort cp cv
+amr.derive_plot_vars  = pressure velocity MachNumber divrho divu magvort cp cv shock_sensor
 cns.plot_rhoy = 0
 cns.plot_molefrac = 0
 cns.plot_massfrac = 1

@@ -134,6 +134,7 @@ normal_shock_relations(amrex::Real s_ext[NVAR], const amrex::Real s_int[NVAR],
                    (AMREX_D_TERM(s_ext[UMX] * s_ext[UMX], +s_ext[UMY] * s_ext[UMY],
                                  +s_ext[UMZ] * s_ext[UMZ]));
   for (int n = 0; n < NUM_SPECIES; ++n) s_ext[UFS + n] = s_ext[URHO] * y[n];
+  eos.RYP2T(s_ext[URHO], y, p_r, s_ext[UTEMP]);
 }
 
 AMREX_GPU_DEVICE AMREX_FORCE_INLINE void
@@ -146,6 +147,7 @@ bc_foextrap_outlet(const int dir, const int lo_hi, amrex::Real s_ext[NVAR],
                , s_ext[UMZ] = s_int[UMZ];)
   s_ext[UEDEN] = s_int[UEDEN];
   for (int n = 0; n < NUM_SPECIES; n++) s_ext[UFS + n] = s_int[UFS + n];
+  s_ext[UTEMP] = s_int[UTEMP];
 
   // Outflow: prohibit backflow
   if (s_ext[UMX + dir] * lo_hi > 0.0) {

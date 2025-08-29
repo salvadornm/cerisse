@@ -181,12 +181,12 @@ AMREX_GPU_DEVICE AMREX_FORCE_INLINE void bcnormal(
       }
     } else {
       // Fuel
-      // amrex::Real damping = time > 2e-4 ? 1.0 : 1.0 - exp(-5.0 * time / 2e-4);
+      // amrex::Real damping = time > 2e-4 ? 1.0 : 1.0 - std::exp(-5.0 * time / 2e-4);
       amrex::Real damping = 1.0;
       amrex::Real jet_profile = 1.0;
       // if (pp.do_bl) {
       //   amrex::Real r_over_D = sqrt(rsqr) / (0.1245 * 2.0);
-      //   jet_profile = r_over_D < 0.35 ? 1.0 : 1.0 - pow(6.67*(r_over_D-0.35), 2.5);
+      //   jet_profile = r_over_D < 0.35 ? 1.0 : 1.0 - std::pow(6.67*(r_over_D-0.35), 2.5);
       // }
       for (int nf = 0; nf <= NUM_FIELD; ++nf) {
         s_ext[nf * NVAR + URHO] = pp.rho_j;
