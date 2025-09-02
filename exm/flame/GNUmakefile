@@ -2,7 +2,7 @@
 DIM = 2
 COMP = gnu
 CXXSTD    = c++20
-PRECISION = TRUE
+PRECISION = DOUBLE
 
 # Profiling
 TINY_PROFILE = FALSE
@@ -16,27 +16,19 @@ USE_OMP = FALSE
 # Debugging
 DEBUG = FALSE
 
-# Boundaries
-USE_GPIBM=FALSE
-USE_EB = TRUE
-
-
 # PelePhysics
-USE_PELEPHYSICS = TRUE
 EOS_MODEL := FUEGO
 TRANSPORT_MODEL := SIMPLE
-CHEMISTRY_MODEL := Kee
-USE_LOCALCHEM = TRUE
-LOCALCHEM_PATH = $(abspath ./)
-
-# Cerisse Option ensure sumY=1
-ENSURE_MASSFRACSUM = FALSE
+CHEMISTRY_MODEL := LiDryer
 
 # Utilities
 USE_UTILITIES = TRUE
 
 # CNS
 AMREX_NO_PROBINIT = TRUE
+USE_GPIBM = FALSE
+USE_EB = FALSE
+USE_PELEPHYSICS = TRUE
 #USE_SUNDIALS_PP = TRUE #for CVODE on GPU -- NOT needed https://github.com/AMReX-Combustion/PelePhysics/pull/194
 #PELE_USE_KLU = FALSE #for direct solve
 

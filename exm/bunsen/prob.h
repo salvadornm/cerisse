@@ -142,6 +142,8 @@ struct ProbParm {
   // Initial Flame position                                
   Real Yflame= 0.8/1000.0; // [m] <-------------
 
+
+
   // unburn gases velocity [m/s] (imposed from Fruzza et al 2023)
   // Real u_u    = 3.2; // Flame with 100% H2
   Real u_u     = 2.0; // Flame with 87.5% H2  12.5% CH4
@@ -149,6 +151,8 @@ struct ProbParm {
   Real u_b    = 6.7852789; // from 1D solution
 
   Real Q =  rho_u*u_u;  // incoming flow rate (per area)
+
+  Real lf = 0.2e-3; // flame thickness (estimate)
   
 };
 
@@ -177,9 +181,9 @@ struct wall_param {
 
 using ProbClosures = closures_dt< indicies_t, transport_Pele_t, multispecies_pele_gas_t<indicies_t> >;
 
-//using ProbRHS = rhs_dt< riemann_t<false, ProbClosures>, viscous_t<methodparm_t, ProbClosures>, reactor_t<ProbClosures> >;
+using ProbRHS = rhs_dt< riemann_t<false, ProbClosures>, viscous_t<methodparm_t, ProbClosures>, reactor_t<ProbClosures> >;
 //using ProbRHS = rhs_dt< riemann_t<false, ProbClosures>, no_diffusive_t, no_source_t >;
-using ProbRHS = rhs_dt< riemann_t<false, ProbClosures>, viscous_t<methodparm_t, ProbClosures>, no_source_t >;
+//using ProbRHS = rhs_dt< riemann_t<false, ProbClosures>, viscous_t<methodparm_t, ProbClosures>, no_source_t >;
 
 
 // define type of wall and EBM class
@@ -227,25 +231,41 @@ AMREX_GPU_DEVICE AMREX_FORCE_INLINE void prob_initdata(
 
   Real sumY = 0.0;
 
-  if (y > yinterf)
-  { // burn
-    vxt = prob_parm.u_b;
-    Tt  = prob_parm.T_b;   
-    for (int n = 0; n < NUM_SPECIES; ++n) {
-      Yt[n]    = prob_parm.Y_0b[n];          
-      sumY += Yt[n];
-    }
-  }
-  else
-  { // unburn
-    vxt = prob_parm.u_u;
-    Tt  = prob_parm.T_u;
-    for (int n = 0; n < NUM_SPECIES; ++n) {
-      Yt[n]   = prob_parm.Y_0u[n];    
-      sumY += Yt[n];
-    }
 
+  // smooth profile over lf 
+  const Real beta=2; // the higher the beta the sharper the profile and vice-versa
+  Real H = (y-yinterf)/prob_parm.lf;
+  Real fburn = 0.5*tanh(beta*H) + 0.5; // fburn   0:unburn  1:burn
+
+  // smooth properties
+  vxt  = prob_parm.u_u*(1.0-fburn)   + fburn*prob_parm.u_b;  
+  for (int n = 0; n < NUM_SPECIES; ++n) {
+    Yt[n]   = prob_parm.Y_0u[n]*(1.0-fburn) + fburn*prob_parm.Y_0b[n];
+    sumY += Yt[n];
   }
+  Tt = prob_parm.T_u*(1.0-fburn)   + fburn*prob_parm.T_b;
+  //Pt = prob_parm.p_u*(1.0-fburn)   + fburn*prob_parm.p_b ;
+
+
+  //
+  // if (y > yinterf)
+  // { // burn
+  //   vxt = prob_parm.u_b;
+  //   Tt  = prob_parm.T_b;   
+  //   for (int n = 0; n < NUM_SPECIES; ++n) {
+  //     Yt[n]    = prob_parm.Y_0b[n];          
+  //     sumY += Yt[n];
+  //   }
+  // }
+  // else
+  // { // unburn
+  //   vxt = prob_parm.u_u;
+  //   Tt  = prob_parm.T_u;
+  //   for (int n = 0; n < NUM_SPECIES; ++n) {
+  //     Yt[n]   = prob_parm.Y_0u[n];    
+  //     sumY += Yt[n];
+  //   }
+  // }
 
 
   // ensure sumY =1

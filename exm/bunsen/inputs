@@ -1,9 +1,9 @@
 # Simulation time
 # start time is assumed to be 0, unless re-starting
-max_step  = 100000
+max_step  = 10000
 stop_time = 0.1
-cfl = 0.5
-#time_step =2e-8
+#cfl = 0.5
+time_step =1e-8
 
 # Geometry 
 geometry.is_periodic = 0 0 

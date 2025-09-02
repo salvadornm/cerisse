@@ -431,7 +431,7 @@ class viscous_t {
       lamf = interp<param::order>(iv, d1, cls_t::CLAM, coeffs);
 #if NUM_SPECIES > 1          
       for (int n = 0; n < NUM_SPECIES; ++n) {  
-        rhoD_f[n] = interp<param::order>(iv, d1, cls_t::CRHOD + n, coeffs); 
+        rhoD_f[n] = interp<param::order>(iv, d1, cls_t::CRHOD + n, coeffs);             
       }
 #endif      
 
@@ -510,7 +510,6 @@ class viscous_t {
     const Real dpdx  = normal_diff<param::order>(iv, d1, cls_t::QPRES, q, dxinv);     
     const Real pface = interp<param::order>(iv, d1, cls_t::QPRES, q);
     const Real dlnp = dpdx/pface; 
-    //const Real dlnp = 0.0; 
      
     Real Vc = 0.0;    
     Real Yf[NUM_SPECIES],hf[NUM_SPECIES];
@@ -532,6 +531,7 @@ class viscous_t {
       }
       
       Yf[n] = Yface; hf[n] = hface;
+    
       const Real Vd = -rhoD_f[n] * (dXdx + (Xface - Yface) * dlnp);
       Vc += Vd;
       flx(iv, cls_t::UFS + n) += Vd; 
