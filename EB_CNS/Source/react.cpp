@@ -226,7 +226,16 @@ void CNS::react_state(Real time, Real dt, bool init_react)
               }
 #endif
               // update drY/dt in I_R
-              Real new_rho = 0.0;
+              Real new_rho;
+              if (any_rY_unbounded || T_unbounded) {
+                // set drY/dt = 0
+                new_rho = snew_arr(i, j, k, URHO);
+                for (int n = 0; n < NUM_SPECIES; ++n) {
+                  rY(i, j, k, n) = snew_arr(i, j, k, UFS + n);
+                  I_R_arr(i, j, k, n) = 0.0;
+                }
+              } else {
+                new_rho = 0.0;
               if (do_pasr && !init_react) {
                 // Modify rY if PaSR is on
                 unpack_pasr(i, j, k, new_rho, sold_arr, rY, rYsrc, qarr, muarr,
@@ -242,6 +251,7 @@ void CNS::react_state(Real time, Real dt, bool init_react)
                 I_R_arr(i, j, k, n) =
                   (rY(i, j, k, n) - sold_arr(i, j, k, UFS + n)) / dt -
                   rYsrc(i, j, k, n);
+                }
               }
 
               // update heat release rate (this is not used, just to plot)
