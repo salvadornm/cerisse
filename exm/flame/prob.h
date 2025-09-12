@@ -15,6 +15,8 @@
 #include "RHS.h"
 
 #include <numbers>
+#include <bc_types.h>
+
 
 namespace PROB {
 
@@ -76,17 +78,25 @@ static combustion_functions::Moles_Mixture mix = combustion_functions::compute_M
 struct ProbParm {
 
   // unburn gases
-  Real rho_u = 0.98933;               // density  [kg/m^3]
+  Real rho_u = 0.9893277276003428;   // density  [kg/m^3]
   Real T_u   = 298;                   // temperature [K] 
   Real p_u   = 1.0132e+05;            // pressure [Pa]  (5 atm)
-  Real e_u   = -1.0255e+05;           // internal energy [J/kg]  
   GpuArray<Real, NUM_SPECIES> Y_u = { 0.014468, 0.22963 , 0.,0., 0., 0., 0.,0., 0.7559};  // mass fractions [-] 
+
+  Real Y_0u[NUM_SPECIES] = {0.0};
+  ProbParm(){
+    // unburn  
+    Y_0u[H2_ID]  = 0.014467517837899192;
+    Y_0u[O2_ID]  = 0.22962878760502656;
+    Y_0u[N2_ID]  = 0.7559036945570743;
+  }
+
+
 
   // burn gases
   Real rho_b = 0.19626;                 // density  [kg/m^3]
   Real T_b   = 1644.8;                  // temperature [K]  
   Real p_b   = p_u;                     // pressure [Pa]  (1 atm)   
-  Real e_b   = -5.1641e+05 ;            // internal energy [J/kg]
   GpuArray<Real, NUM_SPECIES> Y_b = {5.1557e-07,0.11471,0.12917,8.5022e-09,4.5034e-06,0.00021046,4.7965e-07,3.3189e-08,0.7559};
 
   // geometrical parameters                                     
@@ -99,9 +109,10 @@ struct ProbParm {
   Real SL     =  0.49; // estimated burning velocity
   Real lf     =  417e-6; // estimated flame thickness  (417 microns) Using Cantera and 1d-flame-plot.py
   // unburn gases velocity
-  Real u_u     = 0.534292484155303; // inflow velocity (unburn)
-  
-  Real mflow =  rho_u*u_u;  // flow rate (per area)
+  Real u_u     = 0.534292484155303; // inflow velocity (unburn) FROM CANTERA 1D profiles
+    
+  Real Q =  rho_u*u_u;  // incoming flow rate (per area)
+
 
 };
 
@@ -122,7 +133,15 @@ using ProbClosures = closures_dt< indicies_t, transport_Pele_t, multispecies_pel
 //using ProbRHS = rhs_dt< riemann_t<false, ProbClosures>, viscous_t<methodparm_t, ProbClosures>, reactor_t<ProbClosures> >;
 //using ProbRHS = rhs_dt< riemann_t<false, ProbClosures>, viscous_t<methodparm_t, ProbClosures>, no_source_t>;
 //using ProbRHS = rhs_dt< riemann_t<false, ProbClosures>, no_diffusive_t, reactor_t<ProbClosures> >;
-using ProbRHS = rhs_dt< no_euler_t, viscous_t<methodparm_t, ProbClosures>, reactor_t<ProbClosures> >;
+//using ProbRHS = rhs_dt< no_euler_t, viscous_t<methodparm_t, ProbClosures>, reactor_t<ProbClosures> >;
+using ProbRHS = rhs_dt< riemann_t<false, ProbClosures>, viscous_t<methodparm_t, ProbClosures>, reactor_t<ProbClosures> >;
+
+//using ProbRHS = rhs_dt< centraldif_t <false, false, 2,ProbClosures>, viscous_t<methodparm_t, ProbClosures>, reactor_t<ProbClosures> >;
+
+
+
+typedef manual_bc_t<ProbClosures> GlobalBC;
+
 
 void inline inputs() {
   // ParmParse pp;  
@@ -169,6 +188,8 @@ AMREX_GPU_DEVICE AMREX_FORCE_INLINE void prob_initdata(
   y1 += yflame_front;
   y2 += yflame_front;
 
+  Real sumrhoY = 0.0;
+  
   // read from PMF profile ----> pmf_vals
   //--------------------------------------------------------------------------------------
   // pmf_vals[0] =T  pmf_vals[1]= Velocity  pmf_vals[2] = rho pmf_vals[3+k] = Y[k];
@@ -178,13 +199,31 @@ AMREX_GPU_DEVICE AMREX_FORCE_INLINE void prob_initdata(
   pele::physics::PMF::pmf(pmf_data,y1,y2,pmf_vals);
 
   // PMF--> T,u and Y (P is assumed constant)
-  Tt  = pmf_vals[0];
-  vxt = pmf_vals[1];
-  Real sumrhoY = 0.0;
+  // Tt  = pmf_vals[0];
+  // vxt = pmf_vals[1];
+  // for (int n = 0; n < NUM_SPECIES; ++n) {
+  //   Yt[n]   = max(pmf_vals[3+n],0.0);        
+  //   sumrhoY += Yt[n];
+  // }
+  
+  
+  // fresh start
+  Tt  = prob_parm.T_u;
+  vxt = prob_parm.u_u;
   for (int n = 0; n < NUM_SPECIES; ++n) {
-    Yt[n]   = pmf_vals[3+n];    
+    Yt[n] = prob_parm.Y_0u[n];
     sumrhoY += Yt[n];
   }
+  // spark
+  // Gaussian profile centered at interface, width 0.005
+  const amrex::Real center = yinterf;
+  const amrex::Real sigma  = 0.005;
+  // Gaussian value between 0 and 1
+  amrex::Real gauss = std::exp( - std::pow((y - center)/sigma, 2) );
+  Tt += 1000.0*gauss;
+
+
+
   // ensure sumY =1
   for (int n = 0; n < NUM_SPECIES; ++n) { Yt[n]   /=  sumrhoY;}
   //--------------------------------------------------------------------------------------
@@ -195,6 +234,40 @@ AMREX_GPU_DEVICE AMREX_FORCE_INLINE void prob_initdata(
   // compute energy  
   cls.RYP2E(rhot, Yt, Pt, et);
 
+  // debug
+  Real haux[NUM_SPECIES]={0.0};
+  cls.RTY2Hi(rhot, Tt, Yt, haux);
+  Real ht = 0.0; 
+  Real kin = Real(0.5) * vxt * vxt;
+
+  // std::cout << " ------------------------------- " << std::endl;
+  // std::cout << " (spec internal energy) e "  << et << " [J/kg] " << std::endl;
+  // std::cout << " T "    << Tt << " [kg/m3] " << std::endl;
+  // std::cout << " rho "  << rhot << " [kg/m3] " << std::endl;
+  // std::cout << " 1/2 v^2     "  << kin << " [J/kg] " << std::endl;
+  // std::cout << " 1/2 rho v^2 "  << rhot*kin << " [J/m3] " << std::endl;
+  // std::cout << " spec total Energy=  et " << et + kin << " [J/m3] " << std::endl;
+  // std::cout << " total Energy= rho et " << rhot * (et + kin )<< " [J/m3] " << std::endl;
+  // for (int n = 0; n < NUM_SPECIES; ++n) {
+  //  std::cout << " n "  <<  n << " hk = " << haux[n] << " [J/kg] " << std::endl;
+  //  ht += haux[n]*Yt[n];
+  // }
+  // std::cout << " (spec enthalpy M1) h  = Yk hk      => "  << ht << " [J/kg] " << std::endl;
+  // std::cout << " (spec enthalpy M2) h  = e + P/rho  => "  << et + Pt/rhot<< " [J/kg] " << std::endl;
+  // std::cout << " (spec total enthalpy) htot  = et + P/rho  => "  << et + Pt/rhot + kin << " [J/kg] " << std::endl;
+
+  // // fix total enthalpy
+  // Real htotalfix = -130.2384975 + Real(0.5) * prob_parm.u_u* prob_parm.u_u;
+  // Real hfix= htotalfix - kin;
+  // Real Tfix = 0.0;
+  // // calc new T  and rho
+  // auto eos = pele::physics::PhysicsType::eos();
+  // eos.RHY2T(rhot*rho_si2cgs,hfix*specenergy_si2cgs, Yt, Tfix); cls.PYT2R(Pt,Yt,Tfix,rhot);
+  // // re-calculate internal energy
+  // Real efix = hfix - Pt/rhot;
+  // et = efix;  
+  /// SNM
+
   //
   state(i, j, k, cls.UMX) = Real(0.0);
   state(i, j, k, cls.UMY) = rhot* vxt;
@@ -203,6 +276,10 @@ AMREX_GPU_DEVICE AMREX_FORCE_INLINE void prob_initdata(
   for (int n = 0; n < NUM_SPECIES; ++n) {
     state(i, j, k, cls.UFS + n) = rhot * Yt[n];
   }
+
+
+  //
+
 }
 
 /////////////////////////////// BC /////////////////////////////////////////////
@@ -212,41 +289,25 @@ bcnormal(const Real x[AMREX_SPACEDIM], Real dratio, const Real s_int[ProbClosure
          const int sgn, const Real time, GeometryData const & /*geomdata*/,
          ProbClosures const &closures, ProbParm const &prob_parm) {
 
-  const int URHO = ProbClosures::URHO;
-  const int UMX  = ProbClosures::UMX;
-  const int UMY  = ProbClosures::UMY;
-  const int UMZ  = ProbClosures::UMZ;
-  const int UET  = ProbClosures::UET;
-  const int UFS  = ProbClosures::UFS;
-
-  Real rhot, vxt,et,Tt,Pt;
-  const Real *Yt;
-   
   const int face = (idir+1)*sgn;
 
   switch(face)
   {
     case  2:  // SOUTH
       // inflow  unburn-----------------  
-      rhot = prob_parm.rho_u;
-      vxt  = prob_parm.u_u;
-      Yt   = prob_parm.Y_u.data();
-      et   = prob_parm.e_u;
-      
-      s_ext[URHO] = rhot;
-      s_ext[UMX]  = 0.0;
-      s_ext[UMY]  = rhot* vxt;
-      s_ext[UMZ]  = 0.0;    
-      s_ext[UET]  = rhot * et + Real(0.5) * rhot * vxt * vxt;  
-      for (int n = 0; n < NUM_SPECIES; ++n) {
-        s_ext[UFS+n] = rhot * Yt[n];
-      }        
+      GlobalBC::bc_inlet_fixmassflow(0.0,1.0,0.0,&closures,
+            prob_parm.Q,prob_parm.T_u,prob_parm.Y_0u, s_int, s_ext);
+
+      //GlobalBC::bc_fixP(0.0,1.0,0.0,&closures,prob_parm.p_u, s_int, s_ext);
+
       break;
     case  1:  // WEST      
       break;
     case -1:  // EAST
-      break;
+      break;      
     case -2:   // NORTH
+    //  GlobalBC::bc_fixP(0.0,-1.0,0.0,&closures,prob_parm.p_u, s_int, s_ext);
+      GlobalBC::bc_subsonic_outflow_fixP(0.0,-1.0,0.0,&closures,prob_parm.p_u, s_int, s_ext);
       break;
     default:
 

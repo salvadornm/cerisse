@@ -504,7 +504,7 @@ class multispecies_pele_gas_t {
       const Real P, const Real Y[NUM_SPECIES], const Real T, Real& R) const {
  
       auto eos = pele::physics::PhysicsType::eos();                   
-      eos.PYT2R(P*pres_si2cgs, Y, T, R); R = R*rho_cgs2si;
+      eos.PYT2R(P*pres_si2cgs, Y, T, R); R *= rho_cgs2si;
   }            
 
   //-------------------------------------------------------------------------------------
@@ -515,10 +515,10 @@ class multispecies_pele_gas_t {
   }
   // @brief Compute enthalpy species array from mass fraction species array, T and rho
   AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE void RTY2Hi(const Real rho, const Real T,const Real Y[NUM_SPECIES],
-    Real (&hk)[NUM_SPECIES]) {
+    Real (&hk)[NUM_SPECIES]) const {
     auto eos = pele::physics::PhysicsType::eos();
-    eos.RTY2Hi(rho*rho_si2cgs, T, Y, hk); 
-    for (int n = 0; n < NUM_SPECIES; n++) { hk[n] = hk[n]*specenergy_cgs2si;}
+    eos.RTY2Hi(rho*rho_si2cgs, T, Y, hk); //eos.T2Hi(T, hk);
+    for (int n = 0; n < NUM_SPECIES; n++) { hk[n] *= specenergy_cgs2si;}
   }
   //------------------------------------------------------------------------------------- 
   AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE void ensurePTYfillq(

@@ -1,9 +1,9 @@
 # Simulation time
 # start time is assumed to be 0, unless re-starting
-max_step  = 20000
+max_step  = 500000
 stop_time = 0.1
-cfl = 0.5
-#time_step =1e-7
+#cfl = 0.3
+time_step =1e-8
 
 # Geometry 
 geometry.is_periodic = 1 0 
@@ -17,14 +17,14 @@ geometry.prob_hi     =  0.00025  0.04
 # 2 = Outflow            5 = NoSlipWall
 # 6 = user defined
 cns.lo_bc = -1  1 
-cns.hi_bc = -1  2 
+cns.hi_bc = -1  1 
 
 # Verbose/screen output 
-cns.verbose          = 1    # Cerisse output    0=quiet, 1=verbose
-amr.v                = 1    # AMReX   output    0=quiet, 1=verbose
+cns.verbose          = 0    # Cerisse output    0=quiet, 1=verbose
+amr.v                = 0    # AMReX   output    0=quiet, 1=verbose
 
 # Refinement and regridding 
-amr.n_cell          = 4 640 
+amr.n_cell          = 4 1280 
 amr.max_level       = 0     # maximum level number allowed
 amr.ref_ratio       = 2 2   # refinement ratio per level
 amr.regrid_int      = 500   # how often to regrid per level
@@ -42,7 +42,7 @@ amr.check_int               = 10000    # number of timesteps between checkpoints
 amr.plot_files_output = 1
 amr.plot_file         = plot/plt # root name of plotfile
 amr.derive_plot_vars  = pressure velocity temperature
-amr.plot_int          = 500          # number of timesteps between plotfiles
+amr.plot_int          = 1000          # number of timesteps between plotfiles
 
 cns.order_rk  = -2 # original -2 2
 cns.stages_rk = 2
@@ -59,3 +59,11 @@ pmf.v = 1
 cns.reactor_type = "ReactorCvode"
 cvode.solve_type =  "dense_direct"
 ode.clean_init_massfrac = 1
+
+##
+transport.const_viscosity = 1.81e-5
+transport.const_bulk_viscosity = 0.0
+transport.const_conductivity = 0.0 # 0.0262
+transport.const_diffusivity = 0.0 # 2.51e-5  # rho D = mu/Sc with Sc=0.72
+transport.const_thermal_diffusion_ratio =  0.0
+transport.units = MKS

@@ -72,13 +72,19 @@ class viscous_t {
     // fill it with prims data
     amrex::ParallelFor( bxg, [=, *this] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {        
       for (int n=0;n<cls_t::NPRIM; n++){ q(i,j,k,n) = prims(i,j,k,n);}   
+
+      q(i,j,k,cls_t::QRHO) *=rho_si2cgs; // convert to cgs for PelePhysics   
+
     });  
-    auto const& q_y   = qfab.const_array(cls_t::QFS);  // array: species mass fraction
-    auto const& q_T   = qfab.const_array(cls_t::QT);   // array: temperature 
-    auto const& q_rho = qfab.const_array(cls_t::QRHO); // array: density
+
+    // pointers/arrays to communicate with pelephysics 
+    auto const& q_y   = qfab.const_array(cls_t::QFS);             // species mass fraction
+    auto const& q_T   = qfab.const_array(cls_t::QT);              // temperature 
+    auto const& q_rho = qfab.const_array(cls_t::QRHO);            // density (change units below)
+    
      
     BL_PROFILE("PelePhysics::get_transport_coeffs()");
-    Array4<Real> chi; // dummy Soret effect coef
+    Array4<Real> chi; // dummy Soret effect coef (not ready yet)
     
     // temp snm
     //pele::physics::transport::TransportParams< pele::physics::PhysicsType::transport_type> trans_parms;
@@ -96,14 +102,27 @@ class viscous_t {
     // change units
     amrex::ParallelFor(
         bxg, [=, *this] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {        
-        mu_arr(i,j,k)  = mu_arr(i,j,k) *visc_cgs2si;
-        lam_arr(i,j,k) = lam_arr(i,j,k)*cond_cgs2si;    
+        mu_arr(i,j,k) *= visc_cgs2si;
+        lam_arr(i,j,k)*= cond_cgs2si;    
         for (int n=0;n<NUM_SPECIES; n++){        
-          rhoD_arr(i,j,k,n) = rhoD_arr(i,j,k,n)*rhodiff_cgs2si;
+          rhoD_arr(i,j,k,n) *= rhodiff_cgs2si;
         }   
-        xi_arr(i,j,k)  = xi_arr(i,j,k)*visc_cgs2si;
-        });
+        xi_arr(i,j,k) *= visc_cgs2si;
 
+        // SNM debug
+        // std::cout << " mu= "  << mu_arr(i,j,k) << std::endl;
+        // std::cout << " lam= " << lam_arr(i,j,k) << std::endl;
+        // std::cout << " xi= " << xi_arr(i,j,k) << std::endl;
+        // std::cout << " rho= " << q_rho(i,j,k) << std::endl;
+        // for (int n=0;n<NUM_SPECIES; n++){        
+        //   std::cout << " n= " << n <<  " Diff= "   << rhoD_arr(i,j,k)/q_rho(i,j,k);
+        //   std::cout << " rhoDiff= "   << rhoD_arr(i,j,k) << std::endl;
+        // }
+        //
+
+
+        });        
+    //    
 #else
     amrex::ParallelFor(
         bxg, [=, *this] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {        
@@ -221,10 +240,10 @@ class viscous_t {
     const Real divu   = AMREX_D_TERM(u11, +u22, +u33);
     
     const Real muf    = interp<param::order>(iv, d1, cls_t::CMU, coeffs);
-    const Real xif    = interp<param::order>(iv, d1, cls_t::CXI, coeffs);
+    const Real xif    = interp<param::order>(iv, d1, cls_t::CXI, coeffs);    
     const Real lamf   = interp<param::order>(iv, d1, cls_t::CLAM, coeffs);
-    
-    AMREX_D_TERM(Real tau11 = muf * (2.0 * u11 - (2.0 / 3.0) * divu) + xif * divu;
+     
+    AMREX_D_TERM(Real tau11 = muf * (2.0 * u11 - 2.0 / 3.0 * divu) + xif * divu;
                , Real tau12 = muf * (u12 + u21);, Real tau13 = muf * (u13 + u31);)
 
     // momentum
@@ -240,7 +259,7 @@ class viscous_t {
     const Real u3    = interp<param::order>(iv, d1, QU3, q);
 #endif
 
-    // energy
+    // energy heat flux
     flx(iv, cls_t::UET) -= AMREX_D_TERM(u1 * tau11, +u2 * tau12, +u3 * tau13) + lamf* dTdn;
     
 #if NUM_SPECIES > 1    
@@ -282,7 +301,6 @@ class viscous_t {
         ymass[l][n] = yaux[n]; 
         hi[l][n]    = haux[n];
       }
-      // clip
       //
       ivp +=  amrex::IntVect::TheDimensionVector(d1);  
       
@@ -301,8 +319,7 @@ class viscous_t {
     
     const Real dpdx  = normal_diff<param::order>(iv, d1, cls_t::QPRES, q, dxinv); 
     const Real pface = interp<param::order>(iv, d1, cls_t::QPRES, q);
-    const Real dlnp = dpdx/pface;
-    //Real dlnp = 0.0;  
+    const Real dlnp = dpdx/pface; //Real dlnp = 0.0;  
      
     Real Vc = 0.0;    
     Real Yf[NUM_SPECIES],hf[NUM_SPECIES];
@@ -324,16 +341,15 @@ class viscous_t {
       Yf[n] = Yface; hf[n] = hface;
 
       const Real rhoD_f = interp<param::order>(iv, d1, cls_t::CRHOD + n, coeffs); 
-
       const Real Vd = -rhoD_f * (dXdx + (Xface - Yface) * dlnp);
       Vc += Vd;
       flx(iv, cls_t::UFS + n) += Vd; 
-      flx(iv, cls_t::UET)     += Vd * hface;
+      flx(iv, cls_t::UET)     += Vd * hface; 
      }
     // Add correction velocity to fluxes so sum(Vd) = 0
     for (int n = 0; n < NUM_SPECIES; ++n) {       
       flx(iv, cls_t::UFS + n)-= Yf[n] * Vc;
-      flx(iv, cls_t::UET)    -= Yf[n] * hf[n] * Vc;
+      flx(iv, cls_t::UET)    -= Yf[n] * hf[n] * Vc; 
     }
 
     // --------------------------------------------------------------------------
