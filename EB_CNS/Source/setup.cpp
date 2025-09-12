@@ -116,13 +116,29 @@ void CNS::read_params()
   if (eb_isothermal) { pp.get("eb_wall_temp", eb_wall_temp); }
   
   pp.query("eb_wall_model", eb_wall_model);
-  if (eb_wall_model && pp.queryarr("no_wm_in_box_lo", boxlo)) {
-    pp.getarr("no_wm_in_box_lo", boxhi);
-    no_wm_box.setLo(boxlo.data());
-    no_wm_box.setHi(boxhi.data());
-    if (!no_wm_box.ok()) { amrex::Abort("CNS: no_wm_box has negative volume"); }
+  if (eb_wall_model) {
+    std::string wall_model_name = "EquilibriumODE";
+    pp.query("wall_model", wall_model_name);
+// #ifdef AMREX_USE_GPU
+//     les_wm = (LESWallModel*)The_Arena()->alloc(sizeof(LESWallModel));
+// #endif
+//     get_les_wall_model(wall_model_name, les_wm);
+    auto unique_ptr = LESWallModel::create(wall_model_name);
+#ifdef AMREX_USE_GPU
+    les_wm = (LESWallModel*)The_Arena()->alloc(sizeof(LESWallModel));
+    amrex::Gpu::htod_memcpy_async(les_wm, unique_ptr.release(), sizeof(LESWallModel));
+#else
+    les_wm = unique_ptr.release();
+#endif
+
+    if (pp.queryarr("no_wm_in_box_lo", boxlo)) {
+      pp.getarr("no_wm_in_box_lo", boxhi);
+      no_wm_box.setLo(boxlo.data());
+      no_wm_box.setHi(boxhi.data());
+      if (!no_wm_box.ok()) { amrex::Abort("CNS: no_wm_box has negative volume"); }
+    }
   }
-  
+
   pp.query("recon_char_var", recon_char_var);
   pp.query("char_sys", char_sys);
   if (char_sys != 0 && char_sys != 1) {
@@ -276,8 +292,13 @@ void CNS::read_params()
       (RealBox*)The_Arena()->alloc(sizeof(RealBox) * refine_boxes.size());
     Gpu::htod_memcpy_async(dp_refine_boxes, refine_boxes.data(),
                            sizeof(RealBox) * refine_boxes.size());
+    dp_refine_boxes_max_lev =
+      (int*)The_Arena()->alloc(sizeof(int) * refine_boxes.size());
+    Gpu::htod_memcpy_async(dp_refine_boxes_max_lev, refine_boxes_max_lev.data(),
+                           sizeof(int) * refine_boxes_max_lev.size());
 #else
     dp_refine_boxes = refine_boxes.data();
+    dp_refine_boxes_max_lev = refine_boxes_max_lev.data();
 #endif
   }
 
@@ -328,6 +349,22 @@ void CNS::read_params()
     pp.query("Pr_T", Pr_T);
     pp.query("Sc_T", Sc_T);
     pp.query("Cm", Cm);
+  }
+  if (do_les || do_pasr) {
+    std::string les_model_name;
+    pp.get("les_model", les_model_name);
+// #ifdef AMREX_USE_GPU
+//     les_model = (LESModel*)The_Arena()->alloc(sizeof(LESModel));
+// #endif
+//     get_les_model(les_model_name, les_model);
+    auto unique_ptr = LESModel::create(les_model_name);
+#ifdef AMREX_USE_GPU
+    les_model = (LESModel*)The_Arena()->alloc(sizeof(LESModel));
+    amrex::Gpu::htod_memcpy_async(les_model, unique_ptr.release(),
+                                  sizeof(LESModel)); // not trivially copyable
+#else
+    les_model = unique_ptr.release();
+#endif
   }
 
   pp.query("do_nscbc", do_nscbc);
@@ -764,5 +801,8 @@ void CNS::variableCleanUp()
 
 #ifdef AMREX_USE_GPU
   The_Arena()->free(dp_refine_boxes);
+  The_Arena()->free(dp_refine_boxes_max_lev);
+  The_Arena()->free(les_model);
+  The_Arena()->free(les_wm);
 #endif
 }

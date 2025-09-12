@@ -334,7 +334,7 @@ void CNS::enforce_consistent_state(MultiFab& S)
             // Clip species rhoYs and get new rho
             Real rhoNew = 0.0;
             for (int ns = 0; ns < NUM_SPECIES; ++ns) {
-              s_arr(iv, UFS + ns) = amrex::max<Real>(0.0, s_arr(iv, UFS + ns));
+              s_arr(iv, UFS + ns) = amrex::max<Real>(Real(0.0), s_arr(iv, UFS + ns));
               rhoNew += s_arr(iv, UFS + ns);
             }
             if (rhoNew <= 0.0) {
@@ -373,15 +373,17 @@ void CNS::enforce_consistent_state(MultiFab& S)
             eos.REY2T(rhoNew, ei, Y, T);
             s_arr(iv, UTEMP) = T;
           });
-
+          
+          const Real min_temp = clip_temp;
+          const Real max_temp = 4000.0;
           amrex::ParallelFor(
             bx, NUM_FIELD + 1,
             [=] AMREX_GPU_DEVICE(int i, int j, int k, int nf) noexcept {
               const IntVect iv{AMREX_D_DECL(i, j, k)};
 
-              if (s_arr(iv, UTEMP) < clip_temp) {
+              if (s_arr(iv, UTEMP) < min_temp) {
                 // Find target temp by averaging over the neighbours
-                Real target_temp = clip_temp;
+                Real target_temp = min_temp;
                 int n_neighbour = 1;
                 for (int ix = -1; ix <= 1; ++ix) {
 #if AMREX_SPACEDIM > 1
@@ -398,8 +400,8 @@ void CNS::enforce_consistent_state(MultiFab& S)
                 {
                   if (bx.contains(i + ix, j + iy, k + iz)) {
                     Real T_neighbour = s_arr(i + ix, j + iy, k + iz, UTEMP);
-                    if (std::isgreater(T_neighbour, clip_temp) &&
-                        std::isless(T_neighbour, 4000.0)
+                    if (std::isgreater(T_neighbour, min_temp) &&
+                        std::isless(T_neighbour, max_temp)
 #if CNS_USE_EB
                         && flag_arr(i + ix, j + iy, k + iz).isRegular()
 #endif
@@ -412,7 +414,7 @@ void CNS::enforce_consistent_state(MultiFab& S)
                 } // iy
                 } // ix
                 target_temp /= Real(n_neighbour);
-                target_temp = amrex::min(target_temp, 200.0);
+                target_temp = amrex::min(target_temp, Real(200.0));
 
                 // Calculate new temperature
                 const Real rhoNew = s_arr(iv, URHO);
@@ -460,11 +462,11 @@ void CNS::enforce_consistent_state(MultiFab& S)
                              , s_arr(iv, UMZ) *= fac;)
                 // If not enough, add energy
                 s_arr(iv, UEDEN) +=
-                  rhoNew * amrex::max(diff_ei - ctrl_parm * ke, 0.0);
+                  rhoNew * amrex::max(diff_ei - ctrl_parm * ke, Real(0.0));
 #ifndef AMREX_USE_GPU
                 if (verbose > 2) { std::cout << s_arr(iv, UEDEN) << '\n'; }
 #endif
-              } // if T < clip_temp
+              } // if T outside [min_temp, max_temp]
 
               if (s_arr(iv, UTEMP) > 4000.0) {
                 Real target_temp = 4000.0;

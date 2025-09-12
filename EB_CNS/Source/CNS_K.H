@@ -106,14 +106,21 @@ AMREX_GPU_DEVICE AMREX_FORCE_INLINE void cns_check_species_sum_to_one(
   for (int n = 0; n < NUM_SPECIES; n++) { sumRhoY += state(i, j, k, UFS + n); }
 
   if (std::isnan(sumRhoY)) {
-    amrex::Abort("Input Y contains nan, (i, j, k) = " + std::to_string(i) + ", " +
-                 std::to_string(j) + ", " + std::to_string(k));
+    amrex::Abort(
+#ifndef AMREX_USE_GPU
+      "Input Y contains nan, (i, j, k) = " + std::to_string(i) + ", " +
+      std::to_string(j) + ", " + std::to_string(k)
+#endif
+    );
 
   } else if (std::abs(sumRhoY - rho) > 0.1 * amrex::Real(rho)) {
-    amrex::Abort("Input Y must sum to one. rho = " + std::to_string(rho) +
-                 ", sum(rhoY) = " + std::to_string(sumRhoY) +
-                 ", (i, j, k) = " + std::to_string(i) + ", " + std::to_string(j) +
-                 ", " + std::to_string(k));
+    amrex::Abort(
+#ifndef AMREX_USE_GPU 
+      "Input Y must sum to one. rho = " + std::to_string(rho) +
+      ", sum(rhoY) = " + std::to_string(sumRhoY) + ", (i, j, k) = " +
+      std::to_string(i) + ", " + std::to_string(j) + ", " + std::to_string(k)
+#endif
+    );
 
   } else if (std::abs(sumRhoY - rho) > amrex::Real(1e-10)) {
     state(i, j, k, URHO) = sumRhoY; // always prioritise rhoY

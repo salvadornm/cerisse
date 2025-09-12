@@ -1,6 +1,7 @@
 #include "derive.H"
 
 #include "CNS.H"
+#include "hydro.H"
 
 using namespace amrex;
 
@@ -709,7 +710,7 @@ void cns_dershocksensor(const Box& bx, FArrayBox& derfab, int dcomp, int /*ncomp
           std::sqrt(AMREX_D_TERM(drYdx * drYdx, +drYdy * drYdy, +drYdz * drYdz));
         Real rY2 = sarr(i, j, k, UFS + ns) * sarr(i, j, k, UFS + ns);
         shock_sensor(i, j, k) = amrex::max(shock_sensor(i, j, k),
-                                           drY2 / (drY2 + rY2 / cellsize2 + 1.0e-6));
+                                           drY2 / (drY2 + rY2 / cellsize2 + Real(1e-6)));
       }
     }
   });
@@ -722,6 +723,8 @@ void cns_derturbvisc(const Box& bx, FArrayBox& derfab, int dcomp, int /*ncomp*/,
   auto const dat = datafab.const_array();
   auto mu_T = derfab.array(dcomp);
   auto xi_T = derfab.array(dcomp + 1);
+  // auto mu = derfab.array(dcomp);
+  // auto xi = derfab.array(dcomp + 1);
 
   const auto dxinv = geomdata.InvCellSizeArray();
 
@@ -729,6 +732,33 @@ void cns_derturbvisc(const Box& bx, FArrayBox& derfab, int dcomp, int /*ncomp*/,
   amrex::FArrayBox local(gbx, AMREX_SPACEDIM + 1,
                          amrex::The_Async_Arena()); // [rho, u, v, w]
   auto larr = local.array();
+
+  // // Prepare data
+  // const auto dxinv = geomdata.InvCellSizeArray();
+  // const Box& gbx = amrex::grow(bx, 1);
+  // FArrayBox qfab(gbx, NPRIM, amrex::The_Async_Arena());
+  // auto q = qfab.array();
+  // amrex::ParallelFor(gbx, [=] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {
+  //   cns_ctoprim(i, j, k, 0, dat, q);
+  // });
+
+  // // Set value to 0
+  // FArrayBox dfab(bx, NUM_SPECIES + 1, amrex::The_Async_Arena());
+  // auto dummy_lambda = dfab.array(0);
+  // auto dummy_rhoD = dfab.array(1);
+  // amrex::ParallelFor(bx, [=] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {
+  //   mu(i, j, k) = 0.0;
+  //   xi(i, j, k) = 0.0;
+  //   dummy_lambda(i, j, k) = 0.0;
+  //   for (int ns = 0; ns < NUM_SPECIES; ++ns) dummy_rhoD(i, j, k, ns) = 0.0;
+  // });
+
+  // // Compute mu_T, xi_T
+  // const auto dx = geomdata.CellSizeArray();
+  // const Real delta = std::pow(AMREX_D_TERM(dx[0], *dx[1], *dx[2]),
+  //                             Real(1.0) / Real(amrex::SpaceDim)); // LES filter width
+  // CNS::les_model->get_sgs_transport_coeffs(bx, q, dummy_rhoD, mu, xi, dummy_lambda, 
+  //                                          dxinv, delta, CNS::Cs, CNS::C_I, CNS::Pr_T, CNS::Sc_T);
 
   amrex::ParallelFor(gbx, [=] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {
     const amrex::Real rhoinv = 1.0 / dat(i, j, k, URHO);
@@ -738,6 +768,8 @@ void cns_derturbvisc(const Box& bx, FArrayBox& derfab, int dcomp, int /*ncomp*/,
                  , larr(i, j, k, QW) = dat(i, j, k, UMZ) * rhoinv;)
   });
 
+  auto* gpu_les_model = CNS::les_model;
+  const Real gpu_Cs = CNS::Cs;
   amrex::ParallelFor(bx, [=] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {
 #if AMREX_SPACEDIM == 2
     Real delta = 1.0 / std::sqrt(dxinv[0] * dxinv[1]);
@@ -745,7 +777,7 @@ void cns_derturbvisc(const Box& bx, FArrayBox& derfab, int dcomp, int /*ncomp*/,
     Real delta = std::pow(dxinv[0]*dxinv[1]*dxinv[2], -1./3.);
 #endif
 
-    CNS::les_model->mu_T_cc(i, j, k, larr, dxinv, delta, CNS::Cs, mu_T(i, j, k));
-    CNS::les_model->xi_T_cc(i, j, k, larr, dxinv, delta, CNS::Cs, xi_T(i, j, k));
+    gpu_les_model->mu_T_cc(i, j, k, larr, dxinv, delta, gpu_Cs, mu_T(i, j, k));
+    gpu_les_model->xi_T_cc(i, j, k, larr, dxinv, delta, gpu_Cs, xi_T(i, j, k));
   });
 }

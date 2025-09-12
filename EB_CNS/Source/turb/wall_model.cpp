@@ -13,7 +13,7 @@ using namespace amrex;
 
 AMREX_GPU_DEVICE AMREX_FORCE_INLINE void LawOfTheWall::parallel_wall_stress(
   Real u, Real T, Real rho, Real Y[NUM_SPECIES], Real h, Real mu, Real lam,
-  Real T_wall, Real& tau, Real& q)
+  Real T_wall, const d_trans_parm* /*ltransparm*/, Real& tau, Real& q)
 {
   // u^+ = 1/kappa * log(y^+) + B
   const Real kappa = 0.4;
@@ -80,7 +80,7 @@ void printMatrix(Array2D<Real, 0, N - 1, 0, N - 1, Order::C> mat, std::string na
 
 AMREX_GPU_DEVICE AMREX_FORCE_INLINE void EquilibriumODE::parallel_wall_stress(
   Real uwm, Real Twm, Real rhowm, Real Y[NUM_SPECIES], Real h, Real /*mu*/,
-  Real /*lam*/, Real T_wall, Real& tau, Real& q)
+  Real /*lam*/, Real T_wall, const d_trans_parm* ltransparm, Real& tau, Real& q)
 {
   constexpr int n_grid = 30;
   constexpr Real stretch = 1.1;
@@ -88,18 +88,18 @@ AMREX_GPU_DEVICE AMREX_FORCE_INLINE void EquilibriumODE::parallel_wall_stress(
   auto eos = pele::physics::PhysicsType::eos();
   auto trans = pele::physics::PhysicsType::transport();
 
-#ifdef WALLMODEL_DEBUG
-  pele::physics::transport::TransportParams<
-    pele::physics::PhysicsType::transport_type>
-    trans_parms;
-  trans_parms.allocate();
-  trans_parms.host_trans_parm().const_viscosity = 1.0e-6 * 1.225e-3;
-  trans_parms.host_trans_parm().const_conductivity = 0.025;
-  trans_parms.sync_to_device();
-  auto const* ltransparm = trans_parms.device_trans_parm();
-#else
-  auto const* ltransparm = CNS::trans_parms.device_trans_parm();
-#endif
+// #ifdef WALLMODEL_DEBUG
+//   pele::physics::transport::TransportParams<
+//     pele::physics::PhysicsType::transport_type>
+//     trans_parms;
+//   trans_parms.allocate();
+//   trans_parms.host_trans_parm().const_viscosity = 1.0e-6 * 1.225e-3;
+//   trans_parms.host_trans_parm().const_conductivity = 0.025;
+//   trans_parms.sync_to_device();
+//   auto const* ltransparm = trans_parms.device_trans_parm();
+// #else
+//   auto const* ltransparm = CNS::trans_parms.device_trans_parm();
+// #endif
 
   const Real kappa = 0.41; // von Karman constant
   const Real Aplus = 17.0; // constant in the log-law
@@ -230,7 +230,7 @@ AMREX_GPU_DEVICE AMREX_FORCE_INLINE void EquilibriumODE::parallel_wall_stress(
     res_T = 0.0;
     for (int i = 0; i < n_grid; ++i) {
       res_T += std::abs(T[i] - tmp[i]) / Real(n_grid);
-      T[i] = std::clamp(tmp[i], 90.0, 4000.0);
+      T[i] = std::clamp(tmp[i], Real(90.0), Real(4000.0));
     }
     iter++;
   }

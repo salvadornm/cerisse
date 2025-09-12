@@ -17,26 +17,90 @@ public:
 
   ~LESModel() override = default;
 
-  virtual void mu_T_cc(const int i, const int j, const int k,
-                       const amrex::Array4<const amrex::Real>& q,
-                       const amrex::GpuArray<amrex::Real, AMREX_SPACEDIM>& dxinv,
-                       const amrex::Real deltabar, const amrex::Real Cs,
-                       amrex::Real& mu_T) = 0;
+  virtual AMREX_GPU_DEVICE void mu_T_cc(
+    const int i, const int j, const int k, const amrex::Array4<const amrex::Real>& q,
+    const amrex::GpuArray<amrex::Real, AMREX_SPACEDIM>& dxinv,
+    const amrex::Real deltabar, const amrex::Real Cs, amrex::Real& mu_T) = 0;
 
-  virtual void mu_T_fc(const amrex::Real dudx, const amrex::Real dudy,
-                       const amrex::Real dudz, const amrex::Real dvdx,
-                       const amrex::Real dvdy, const amrex::Real dvdz,
-                       const amrex::Real dwdx, const amrex::Real dwdy,
-                       const amrex::Real dwdz, const amrex::Real rho,
-                       const amrex::Real deltabar, const amrex::Real Cs,
-                       amrex::Real& mu_T) = 0;
+  virtual AMREX_GPU_DEVICE void
+  mu_T_fc(const amrex::Real dudx, const amrex::Real dudy, const amrex::Real dudz,
+          const amrex::Real dvdx, const amrex::Real dvdy, const amrex::Real dvdz,
+          const amrex::Real dwdx, const amrex::Real dwdy, const amrex::Real dwdz,
+          const amrex::Real rho, const amrex::Real deltabar, const amrex::Real Cs,
+          amrex::Real& mu_T) = 0;
 
-  virtual void xi_T_cc(const int i, const int j, const int k,
-                       const amrex::Array4<const amrex::Real>& q,
-                       const amrex::GpuArray<amrex::Real, AMREX_SPACEDIM>& dxinv,
-                       const amrex::Real deltabar, const amrex::Real CI,
-                       amrex::Real& xi_T);
+  virtual AMREX_GPU_DEVICE void xi_T_cc(
+    const int i, const int j, const int k, const amrex::Array4<const amrex::Real>& q,
+    const amrex::GpuArray<amrex::Real, AMREX_SPACEDIM>& dxinv,
+    const amrex::Real deltabar, const amrex::Real CI, amrex::Real& xi_T);
 };
+
+// void get_les_model(std::string model_name, LESModel* les_model_ptr)
+// {
+//   auto unique_ptr = LESModel::create(model_name);
+// #ifdef AMREX_USE_GPU
+//   amrex::Gpu::htod_memcpy_async(les_model_ptr, unique_ptr.get(),
+//                                 sizeof(LESModel)); // not trivially copyable
+// #else
+//   les_model_ptr = unique_ptr.data();
+// #endif
+// }
+
+/**
+ * @brief Base class to register eddy viscosity type LES models.
+ */
+// class LESModel : public pele::physics::Factory<LESModel>
+// {
+// public:
+//   static const std::string base_identifier() { return "LESModel"; }
+
+//   ~LESModel() override = default;
+
+//   void get_sgs_transport_coeffs(
+//     amrex::Box const& bx, amrex::Array4<const amrex::Real> const& q_in,
+//     amrex::Array4<amrex::Real> const& rhoD, amrex::Array4<amrex::Real> const& mu,
+//     amrex::Array4<amrex::Real> const& xi, amrex::Array4<amrex::Real> const&
+//     lambda, const amrex::GpuArray<amrex::Real, AMREX_SPACEDIM>& dxinv, const
+//     amrex::Real delta, const amrex::Real Cs, const amrex::Real C_I, const
+//     amrex::Real Pr_T, const amrex::Real Sc_T)
+//   {
+//     amrex::ParallelFor(bx, [q_in, rhoD, mu, xi, lambda, dxinv, delta, Cs, C_I,
+//     Pr_T,
+//                             Sc_T, this] AMREX_GPU_DEVICE(int i, int j, int k) {
+//       amrex::Real mu_T, xi_T;
+//       mu_T_cc(i, j, k, q_in, dxinv, delta, Cs, mu_T);
+//       // xi_T_cc(i, j, k, qar_rhoin, dxinv, delta, C_I, xi_T);
+//       xi_T = 0.0; // TODO: this divu is calculated at cell centre, not face centre
+//       amrex::Real Y[NUM_SPECIES], cp;
+//       for (int n = 0; n < NUM_SPECIES; ++n) { Y[n] = q_in(i, j, k, QFS + n); }
+//       auto eos = pele::physics::PhysicsType::eos();
+//       eos.RTY2Cp(q_in(i, j, k, QRHO), q_in(i, j, k, QTEMP), Y, cp);
+
+//       mu(i, j, k) += mu_T;
+//       xi(i, j, k) += xi_T;
+//       lambda(i, j, k) += cp * mu_T / Pr_T;
+//       for (int ns = 0; ns < NUM_SPECIES; ++ns) { rhoD(i, j, k, ns) += mu_T / Sc_T;
+//       }
+//     });
+//   }
+
+//   virtual AMREX_GPU_DEVICE AMREX_FORCE_INLINE void mu_T_cc(
+//     const int i, const int j, const int k, const amrex::Array4<const amrex::Real>&
+//     q, const amrex::GpuArray<amrex::Real, AMREX_SPACEDIM>& dxinv, const
+//     amrex::Real deltabar, const amrex::Real Cs, amrex::Real& mu_T) = 0;
+
+//   virtual AMREX_GPU_DEVICE AMREX_FORCE_INLINE void
+//   mu_T_fc(const amrex::Real dudx, const amrex::Real dudy, const amrex::Real dudz,
+//           const amrex::Real dvdx, const amrex::Real dvdy, const amrex::Real dvdz,
+//           const amrex::Real dwdx, const amrex::Real dwdy, const amrex::Real dwdz,
+//           const amrex::Real rho, const amrex::Real deltabar, const amrex::Real Cs,
+//           amrex::Real& mu_T) = 0;
+
+//   virtual AMREX_GPU_DEVICE AMREX_FORCE_INLINE void xi_T_cc(
+//     const int i, const int j, const int k, const amrex::Array4<const amrex::Real>&
+//     q, const amrex::GpuArray<amrex::Real, AMREX_SPACEDIM>& dxinv, const
+//     amrex::Real deltabar, const amrex::Real CI, amrex::Real& xi_T);
+// };
 
 /**
  * @brief Calculate the turbulent bulk viscosity.
@@ -95,19 +159,17 @@ class Smagorinsky : public LESModel::Register<Smagorinsky>
 public:
   static const std::string identifier() { return "Smagorinsky"; }
 
-  void mu_T_cc(const int i, const int j, const int k,
-               const amrex::Array4<const amrex::Real>& q,
-               const amrex::GpuArray<amrex::Real, AMREX_SPACEDIM>& dxinv,
-               const amrex::Real deltabar, const amrex::Real Cs,
-               amrex::Real& mu_T) override;
+  AMREX_GPU_DEVICE void mu_T_cc(
+    const int i, const int j, const int k, const amrex::Array4<const amrex::Real>& q,
+    const amrex::GpuArray<amrex::Real, AMREX_SPACEDIM>& dxinv,
+    const amrex::Real deltabar, const amrex::Real Cs, amrex::Real& mu_T) override;
 
-  void mu_T_fc(const amrex::Real dudx, const amrex::Real dudy,
-               const amrex::Real dudz, const amrex::Real dvdx,
-               const amrex::Real dvdy, const amrex::Real dvdz,
-               const amrex::Real dwdx, const amrex::Real dwdy,
-               const amrex::Real dwdz, const amrex::Real rho,
-               const amrex::Real deltabar, const amrex::Real Cs,
-               amrex::Real& mu_T) override;
+  AMREX_GPU_DEVICE void
+  mu_T_fc(const amrex::Real dudx, const amrex::Real dudy, const amrex::Real dudz,
+          const amrex::Real dvdx, const amrex::Real dvdy, const amrex::Real dvdz,
+          const amrex::Real dwdx, const amrex::Real dwdy, const amrex::Real dwdz,
+          const amrex::Real rho, const amrex::Real deltabar, const amrex::Real Cs,
+          amrex::Real& mu_T) override;
 };
 
 // Nicoud & Ducros (1999) https://doi.org/10.1023/A:1009995426001
@@ -116,19 +178,17 @@ class WALE : public LESModel::Register<WALE>
 public:
   static const std::string identifier() { return "WALE"; }
 
-  void mu_T_cc(const int i, const int j, const int k,
-               const amrex::Array4<const amrex::Real>& q,
-               const amrex::GpuArray<amrex::Real, AMREX_SPACEDIM>& dxinv,
-               const amrex::Real deltabar, const amrex::Real Cs,
-               amrex::Real& mu_T) override;
+  AMREX_GPU_DEVICE void mu_T_cc(
+    const int i, const int j, const int k, const amrex::Array4<const amrex::Real>& q,
+    const amrex::GpuArray<amrex::Real, AMREX_SPACEDIM>& dxinv,
+    const amrex::Real deltabar, const amrex::Real Cs, amrex::Real& mu_T) override;
 
-  void mu_T_fc(const amrex::Real dudx, const amrex::Real dudy,
-               const amrex::Real dudz, const amrex::Real dvdx,
-               const amrex::Real dvdy, const amrex::Real dvdz,
-               const amrex::Real dwdx, const amrex::Real dwdy,
-               const amrex::Real dwdz, const amrex::Real rho,
-               const amrex::Real deltabar, const amrex::Real Cs,
-               amrex::Real& mu_T) override;
+  AMREX_GPU_DEVICE void
+  mu_T_fc(const amrex::Real dudx, const amrex::Real dudy, const amrex::Real dudz,
+          const amrex::Real dvdx, const amrex::Real dvdy, const amrex::Real dvdz,
+          const amrex::Real dwdx, const amrex::Real dwdy, const amrex::Real dwdz,
+          const amrex::Real rho, const amrex::Real deltabar, const amrex::Real Cs,
+          amrex::Real& mu_T) override;
 };
 
 #endif

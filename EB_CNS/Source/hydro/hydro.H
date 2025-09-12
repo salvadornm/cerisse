@@ -36,7 +36,7 @@ cns_ctoprim(int i, int j, int k, int ns, amrex::Array4<amrex::Real const> const&
   amrex::Real Y[NUM_SPECIES];
   for (int n = 0; n < NUM_SPECIES; ++n) {
     Y[n] = u(i, j, k, ns + UFS + n) * rhoinv;
-    q(i, j, k, QFS + n) = std::max(Y[n], 0.0);
+    q(i, j, k, QFS + n) = std::max(Y[n], Real(0.0));
   }
 
   auto eos = pele::physics::PhysicsType::eos();

@@ -22,4 +22,26 @@ sed -i '16{
   :done
 }' "$FILE"
 
+echo "... Modifying PelePhysics/Reactions/ReactorCvode.cpp"
+FILE="../../../Submodules/PelePhysics/Reactions/ReactorCvode.cpp"
+sed -i '1168{/cusolver_status/{ # Keep already-commented lines as is
+  s/.*/#ifdef AMREX_USE_FLOAT\
+    cusolver_status = cusolverSpScsrqrBufferInfoBatched\
+#else\
+    cusolver_status = cusolverSpDcsrqrBufferInfoBatched\
+#endif\
+    (/
+}}' "$FILE"
+
+echo "... Modifying PelePhysics/Reactions/ReactorCvodePreconditioner.cpp"
+FILE="../../../Submodules/PelePhysics/Reactions/ReactorCvodePreconditioner.cpp"
+sed -i '115{/cuS_st/{ # Keep already-commented lines as is
+  s/.*/#ifdef AMREX_USE_FLOAT\
+    cuS_st = cusolverSpScsrqrsvBatched\
+#else\
+    cuS_st = cusolverSpDcsrqrsvBatched\
+#endif\
+   (/
+}}' "$FILE"
+
 echo "DONE"

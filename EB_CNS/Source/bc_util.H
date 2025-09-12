@@ -77,7 +77,7 @@ bc_isothermal_wall(amrex::Real s_ext[NVAR], const amrex::Real s_int[NVAR],
   amrex::Real T = s_int[UTEMP];
   
   // // Ghost cell states
-  amrex::Real Tg = amrex::max(1e-5, 2 * Tw - T); // prevent negative temp
+  amrex::Real Tg = amrex::max(amrex::Real(1e-5), 2 * Tw - T); // prevent negative temp
   // amrex::Real eg;
   // eos.RTY2E(s_int[URHO], Tg, Y, eg);
   // eg += ke;

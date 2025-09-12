@@ -15,7 +15,7 @@
  * @param dx  grid size.
  * @warning This is moved to psgs_model.cpp
  */
-AMREX_FORCE_INLINE AMREX_GPU_DEVICE void vpdf_psgs_model(
+AMREX_FORCE_INLINE void vpdf_psgs_model(
   const amrex::Box& bx, amrex::Array4<amrex::Real>& s, const amrex::Real dt,
   const amrex::Real (*)[NUM_FIELD] /*dW[AMREX_SPACEDIM][NUM_FIELD]*/,
   const amrex::Real dx[AMREX_SPACEDIM])
@@ -105,7 +105,7 @@ AMREX_FORCE_INLINE AMREX_GPU_DEVICE void vpdf_psgs_model(
  * @param C_e  turbulent dissipation model parameter.
  * @param shock_threshold  threshold in shock sensor.
  */
-AMREX_FORCE_INLINE AMREX_GPU_DEVICE void
+AMREX_FORCE_INLINE void
 vpdf_pd_model(const amrex::Box& bx, amrex::Array4<amrex::Real>& s,
               const amrex::Real dt, const amrex::Real dW[AMREX_SPACEDIM][NUM_FIELD],
               const amrex::Real dx[AMREX_SPACEDIM], const amrex::Real C_e = 1.05,
@@ -232,7 +232,7 @@ vpdf_pd_model(const amrex::Box& bx, amrex::Array4<amrex::Real>& s,
  * @param dx  grid size.
  * @param C0,C_e  model parameters
  */
-AMREX_FORCE_INLINE AMREX_GPU_DEVICE void vpdf_langevin_model(
+AMREX_FORCE_INLINE void vpdf_langevin_model(
   const amrex::Box& bx, amrex::Array4<amrex::Real>& s, const amrex::Real dt,
   const amrex::Real dW[AMREX_SPACEDIM][NUM_FIELD],
   const amrex::Real dx[AMREX_SPACEDIM], const amrex::Real C0 = 2.1,
@@ -278,7 +278,7 @@ AMREX_FORCE_INLINE AMREX_GPU_DEVICE void vpdf_langevin_model(
     auto eos = pele::physics::PhysicsType::eos();
     eos.RTY2Cs(mean_rho, mean_T, mean_Y, mean_cs);
     amrex::Real M_turb2 = 2.0 * tke / mean_cs / mean_cs; // turbulent Mach number
-    eps *= (1.0 + std::min(M_turb2, 1.0));
+    eps *= (1.0_rt + std::min(M_turb2, 1.0_rt));
     eps = std::max(eps, std::numeric_limits<amrex::Real>::epsilon()); // prevent divide by 0
 
     // if (i == 0 && k == 0) {
@@ -323,7 +323,7 @@ AMREX_FORCE_INLINE AMREX_GPU_DEVICE void vpdf_langevin_model(
  * @param dx  grid size.
  * @param C_E,C_Y,C_e  model parameters.
  */
-AMREX_FORCE_INLINE AMREX_GPU_DEVICE void spdf_iem_model(
+AMREX_FORCE_INLINE void spdf_iem_model(
   const amrex::Box& bx, amrex::Array4<amrex::Real>& s, const amrex::Real dt,
   const amrex::Real (*)[NUM_FIELD] /*dW[AMREX_SPACEDIM][NUM_FIELD]*/,
   const amrex::Real dx[AMREX_SPACEDIM], const amrex::Real C_E = 2.0,
@@ -364,7 +364,7 @@ AMREX_FORCE_INLINE AMREX_GPU_DEVICE void spdf_iem_model(
     auto eos = pele::physics::PhysicsType::eos();
     eos.RTY2Cs(mean_rho, mean_T, mean_Y, mean_cs);
     amrex::Real M_turb2 = 2.0 * tke / mean_cs / mean_cs; // turbulent Mach number
-    eps *= (1.0 + std::min(M_turb2, 1.0));
+    eps *= (1.0_rt + std::min(M_turb2, 1.0_rt));
     eps = std::max(eps, std::numeric_limits<amrex::Real>::epsilon()); // prevent divide by 0
 
     // rhoQ_i = rhoQ_i + rho_i*0.5*C_Q*eps/k*(mean_y - y)*dt
@@ -455,7 +455,7 @@ AMREX_FORCE_INLINE AMREX_GPU_DEVICE void spdf_iem_model(
  * @param C_0 W.
  * @param C_Y Langevin model parameter.
  */
-AMREX_FORCE_INLINE AMREX_GPU_DEVICE void species_langevin(
+AMREX_FORCE_INLINE void species_langevin(
   const amrex::Box& bx, amrex::Array4<amrex::Real>& s, const amrex::Real dt,
   const amrex::Real dW[AMREX_SPACEDIM][NUM_FIELD],
   const amrex::Real dx[AMREX_SPACEDIM], const amrex::Real C_e = 500.0,

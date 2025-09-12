@@ -20,7 +20,10 @@
 #include "constants.H"
 #include "index_macros.H"
 #include "prob_parm.H"
+#include "wall_model.H"
+#if NUM_FIELD > 0
 #include "random.H"
+#endif
 
 using namespace amrex;
 
@@ -151,9 +154,11 @@ public:
                            amrex::Array4<const amrex::Real>& shock_sensor);
 #endif
 
+#if NUM_FIELD > 0
   void computeAvg(amrex::MultiFab& State);
 
   void compute_pdf_model(amrex::MultiFab& S, amrex::Real dt, int iteration);
+#endif
 
   // Estimate timestep size based on CFL number
   amrex::Real estTimeStep();
@@ -207,7 +212,8 @@ public:
   static amrex::Real C_I;
   static amrex::Real Pr_T;
   static amrex::Real Sc_T;
-  static std::unique_ptr<LESModel> les_model;
+  // static std::unique_ptr<LESModel> les_model;
+  static LESModel* les_model;
   static amrex::Real Cm;
 
   // NSCBC
@@ -218,10 +224,6 @@ public:
   static amrex::Real nscbc_relax_T;
   static amrex::Real ambient_p;
   static amrex::BCRec phys_bc; // this has to be public for cns_bcfill to access
-
-  // Reconstruction
-
-  static amrex::Real teno_cutoff;
 
 #ifndef AMREX_USE_CUDA
 protected:
@@ -246,11 +248,11 @@ protected:
 #endif
                     bool write_to_flux_register = true);
 
-  void fill_ext_src(int i, int j, int k, amrex::Real time,
-                    amrex::GeometryData const& geomdata,
-                    amrex::Array4<const amrex::Real> const& state,
-                    amrex::Array4<amrex::Real> const& ext_src,
-                    ProbParm const& prob_parm);
+  // void fill_ext_src(int i, int j, int k, amrex::Real time,
+  //                   amrex::GeometryData const& geomdata,
+  //                   amrex::Array4<const amrex::Real> const& state,
+  //                   amrex::Array4<amrex::Real> const& ext_src,
+  //                   ProbParm const& prob_parm);
 
 #ifdef USE_FULL_PROB_POST_TIMESTEP
   void full_prob_post_timestep(int iteration);
@@ -329,7 +331,9 @@ protected:
   //
   // PDF related
 
+#if NUM_FIELD > 0
   UniqueRand WienerProcess;
+#endif
 
   //
   // Control parameters
@@ -363,6 +367,7 @@ protected:
   static bool recon_char_var;
   static int char_sys;
   static amrex::Real plm_theta;
+  static amrex::Real teno_cutoff;
   static int recon_scheme;
   static amrex::Real shock_sensor_threshold;
   static bool use_hybrid_scheme;
@@ -392,6 +397,7 @@ protected:
 
   static bool eb_wall_model;  
   static amrex::RealBox no_wm_box;
+  static LESWallModel* les_wm;
 
   // Buffer layer
 
@@ -404,6 +410,7 @@ protected:
   static amrex::Vector<amrex::RealBox> refine_boxes;
   static amrex::Vector<int> refine_boxes_max_lev;
   static amrex::RealBox* dp_refine_boxes;
+  static int* dp_refine_boxes_max_lev;
   static amrex::Vector<amrex::Real> refine_dengrad;
   static int refine_dengrad_max_lev;
   static amrex::Vector<amrex::Real> refine_velgrad;
@@ -427,4 +434,10 @@ void cns_null_bcfill(amrex::Box const& bx, amrex::FArrayBox& data, const int dco
                      const amrex::Real time, const amrex::Vector<amrex::BCRec>& bcr,
                      const int bcomp, const int scomp);
 
+// AMREX_GPU_DEVICE AMREX_FORCE_INLINE
+// void fill_ext_src(int i, int j, int k, amrex::Real time,
+//                   amrex::GeometryData const& geomdata,
+//                   amrex::Array4<const amrex::Real> const& state,
+//                   amrex::Array4<amrex::Real> const& ext_src,
+//                   ProbParm const& prob_parm);
 #endif

@@ -1,3 +1,5 @@
+#if NUM_FIELD > 0
+
 #include "pdf_model.H"
 
 /**
@@ -11,8 +13,8 @@ void CNS::computeAvg(MultiFab& S)
 #pragma omp parallel if (Gpu::notInLaunchRegion())
 #endif
   {
-    for (amrex::MFIter mfi(S, amrex::TilingIfNotGPU()); mfi.isValid(); ++mfi) {
-      const amrex::Box& bx = mfi.tilebox();
+    for (MFIter mfi(S, amrex::TilingIfNotGPU()); mfi.isValid(); ++mfi) {
+      const Box& bx = mfi.tilebox();
       auto sarr = S.array(mfi);
 
       amrex::ParallelFor(bx, NVAR,
@@ -21,7 +23,7 @@ void CNS::computeAvg(MultiFab& S)
                            for (int nf = 1; nf <= NUM_FIELD; ++nf) {
                              sarr(i, j, k, n) += sarr(i, j, k, nf * NVAR + n);
                            }
-                           sarr(i, j, k, n) /= amrex::Real(NUM_FIELD);
+                           sarr(i, j, k, n) /= Real(NUM_FIELD);
                          });
 
       amrex::Gpu::synchronize();
@@ -32,7 +34,7 @@ void CNS::computeAvg(MultiFab& S)
 /**
  * \brief Compute modelled terms for Velocity-PDF (Langevin) / Species-PDF (IEM)
  */
-void CNS::compute_pdf_model(amrex::MultiFab& S, amrex::Real dt, int iteration)
+void CNS::compute_pdf_model(MultiFab& S, Real dt, int iteration)
 {
   BL_PROFILE("CNS::compute_pdf_model()");
 
@@ -51,7 +53,7 @@ void CNS::compute_pdf_model(amrex::MultiFab& S, amrex::Real dt, int iteration)
   const auto* dx = geom.CellSize();
 
   // Prepare Wiener process for vpdf. It is constant over space.
-  amrex::Real dW[AMREX_SPACEDIM][NUM_FIELD];
+  Real dW[AMREX_SPACEDIM][NUM_FIELD];
   WienerProcess.generate_new(sqrt(dt), 2, 0);
   WienerProcess.get_rand(nStep(), dW);
   // if (amrex::ParallelDescriptor::IOProcessor()) {
@@ -69,13 +71,13 @@ void CNS::compute_pdf_model(amrex::MultiFab& S, amrex::Real dt, int iteration)
   auto const& flags = fact.getMultiEBCellFlagFab();
 #endif
 
-  amrex::MultiFab& cost = get_new_data(Cost_Type);
+  MultiFab& cost = get_new_data(Cost_Type);
 
 #ifdef AMREX_USE_OMP
 #pragma omp parallel if (Gpu::notInLaunchRegion())
 #endif
   {
-    for (amrex::MFIter mfi(S, amrex::TilingIfNotGPU()); mfi.isValid(); ++mfi) {
+    for (MFIter mfi(S, amrex::TilingIfNotGPU()); mfi.isValid(); ++mfi) {
       auto wt = amrex::second();
 
       const amrex::Box& bx = mfi.tilebox();
@@ -85,7 +87,7 @@ void CNS::compute_pdf_model(amrex::MultiFab& S, amrex::Real dt, int iteration)
       if (flag.getType(bx) != amrex::FabType::covered)
 #endif
       {
-        amrex::Array4<Real> sarr = S.array(mfi);
+        Array4<Real> sarr = S.array(mfi);
 
         // The order of Langevin and IEM does not matter, as they act on different
         // variables The order of p_sgs and Langevin may matter, do not know
@@ -106,8 +108,10 @@ void CNS::compute_pdf_model(amrex::MultiFab& S, amrex::Real dt, int iteration)
       if (do_load_balance) {
         amrex::Gpu::streamSynchronize();
         wt = (amrex::second() - wt) / bx.d_numPts();
-        cost[mfi].plus<amrex::RunOn::Device>(wt, bx);
+        cost[mfi].plus<RunOn::Device>(wt, bx);
       }
     } // mfi loop
   }   // omp parallel
 }
+
+#endif

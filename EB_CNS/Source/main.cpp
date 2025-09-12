@@ -32,9 +32,9 @@ int main(int argc, char* argv[])
 
   BL_PROFILE_VAR("main()", pmain);
 
-  double timer_tot = amrex::ParallelDescriptor::second();
-  double timer_init = 0.;
-  double timer_advance = 0.;
+  Real timer_tot = amrex::ParallelDescriptor::second();
+  Real timer_init = 0.;
+  Real timer_advance = 0.;
 
   int max_step;
   Real strt_time;

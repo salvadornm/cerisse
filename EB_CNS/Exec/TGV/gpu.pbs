@@ -1,0 +1,11 @@
+#PBS -l select=1:ncpus=1:mem=32gb:ngpus=1 
+#:gpu_type=A100
+#PBS -l walltime=3:00:00
+#PBS -j oe
+#PBS -N tgv-m125-128-1
+
+module load tools/prod intel/2025a CMake/3.31.3-GCCcore-14.2.0 CUDA/12.8.0
+
+cd $PBS_O_WORKDIR
+
+./Cerisse3d.gnu.FLOAT.CUDA.ex prof.ini #amr.n_cell=256 256 256

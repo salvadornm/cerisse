@@ -16,7 +16,7 @@ cns_tag_grad(int i, int j, int k, amrex::Array4<char> const& tag,
   AMREX_D_TERM(ax = amrex::Math::abs(s(i + 1, j, k) - s(i - 1, j, k)) * dxinv[0];
                , ay = amrex::Math::abs(s(i, j + 1, k) - s(i, j - 1, k)) * dxinv[1];
                , az = amrex::Math::abs(s(i, j, k + 1) - s(i, j, k - 1)) * dxinv[2];)
-  if (0.5 * amrex::max<amrex::Real>(ax, ay, az) >= grad_threshold) {
+  if (0.5 * amrex::max(ax, ay, az) >= grad_threshold) {
     tag(i, j, k) = tagval;
   }
 }

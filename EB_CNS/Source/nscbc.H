@@ -94,7 +94,7 @@ extrap_prim(amrex::IntVect iv, amrex::IntVect iv_dir, int index, int isign,
 
   if (index == QRHO || index == QPRES) {
     for (int ii = 1; ii <= 6; ++ii) {
-      q(iv - ii * iv_dir, index) = amrex::max(q(iv - ii * iv_dir, index), 1e-10);
+      q(iv - ii * iv_dir, index) = amrex::max(q(iv - ii * iv_dir, index), amrex::Real(1e-10));
     }
   }
 }
@@ -133,7 +133,8 @@ nscbc_c2prim(int i, int j, int k, int ns, amrex::Array4<amrex::Real const> const
   q(i, j, k, QEINT) = pele::physics::Constants::RU / wbar; // use the place for ei to store R, sorry for the confusion 
   q(i, j, k, QTEMP) = T;
 
-  // // Monitor problem cell
+#ifndef AMREX_USE_GPU
+  // Monitor problem cell
   std::ostream& ss = std::cout;
 
   if ((T <= 0.0) || amrex::isnan(cs) || amrex::isnan(ux) || 
@@ -146,6 +147,7 @@ nscbc_c2prim(int i, int j, int k, int ns, amrex::Array4<amrex::Real const> const
       }
       ss << '\n';
   }
+#endif
 }
 
 AMREX_GPU_DEVICE AMREX_FORCE_INLINE void

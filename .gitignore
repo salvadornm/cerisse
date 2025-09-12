@@ -3,7 +3,7 @@
 plt*
 chk*
 *.visit
-Backtrace*
+Backtrace.*
 tmp_build_dir
 
 # vscode data

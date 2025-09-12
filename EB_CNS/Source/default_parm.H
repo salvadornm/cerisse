@@ -66,12 +66,13 @@ Real CNS::ambient_p = 1013250.0; // for outflow
 
 bool CNS::do_les  = false;       // Enable eddy viscosity type SGS model?
 bool CNS::do_pasr = false;       // Enable partially stirred reactor model?
-std::unique_ptr<LESModel> CNS::les_model; // Avaliable models are "Smagorinsky" or "WALE"
+LESModel* CNS::les_model = nullptr; // Avaliable models are "Smagorinsky" or "WALE". This lives on device
 Real CNS::Cs   = 0.1;    // Smagorinsky constant
 Real CNS::C_I  = 0.0066; // Yoshizawa constant (not used)
 Real CNS::Pr_T = 0.7;    // Turbulent Prandtl number = mu_T/(cp*kappa_T)
 Real CNS::Sc_T = 0.7;    // Turbulent Schmidt number = mu_T/(rho*D_T)
 Real CNS::Cm   = 0.1;    // PaSR mixing timescale coefficient
+LESWallModel* CNS::les_wm = nullptr; // Avaliable models are "EquilibriumODE" or "LawOfTheWall". This lives on device
 
 // Stochastic fields
 
@@ -91,6 +92,7 @@ int  CNS::refine_cutcells_max_lev = 10;
 Vector<RealBox> CNS::refine_boxes; // Refine in user-specified boxes
 Vector<int>     CNS::refine_boxes_max_lev;
 RealBox*        CNS::dp_refine_boxes;
+int*            CNS::dp_refine_boxes_max_lev;
 Vector<Real> CNS::refine_dengrad;  // Refine based on density gradient
 int          CNS::refine_dengrad_max_lev = -1;
 Vector<Real> CNS::refine_velgrad;  // Refine based on velocity gradient

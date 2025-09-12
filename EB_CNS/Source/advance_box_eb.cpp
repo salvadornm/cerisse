@@ -2,6 +2,7 @@
 #include "central_scheme.H"
 #include "diffusion_eb.H"
 #include "hydro.H"
+#include "prob.H"
 #include "hydro_eb.H"
 #include "recon_eb.H"
 
@@ -85,6 +86,28 @@ void CNS::compute_dSdt_box_eb(
       vfluxfab[dir].setVal<RunOn::Device>(0.0);
     }
   }
+ 
+  // To be captured in GPU kernels
+  auto const* gpu_trans_parm = trans_parms.device_trans_parm();
+  // auto* const gpu_les_model = les_model;
+  // const Real gpu_Cs = Cs;
+  // const Real gpu_C_I = C_I;
+  // const Real gpu_Pr_T = Pr_T;
+  // const Real gpu_Sc_T = Sc_T;
+  const int gpu_char_sys = char_sys;
+  const bool gpu_recon_char_var = recon_char_var;
+  const Real gpu_threshold = shock_sensor_threshold;
+  const Real gpu_plm_theta = plm_theta;
+  const Real gpu_teno_cutoff = teno_cutoff;
+  const bool gpu_eb_wall_model = eb_wall_model;
+  const RealBox gpu_no_wm_box = no_wm_box;
+  const bool gpu_eb_isothermal = eb_isothermal;
+  const Real gpu_eb_wall_temp = eb_wall_temp;
+  auto* const gpu_les_wm = les_wm;
+  const bool gpu_do_hydro = do_hydro;
+  const bool gpu_do_visc = do_visc;
+  const bool gpu_eb_no_slip = eb_no_slip;
+  const Real gpu_eb_weight = eb_weight;
 
   // Advance
 #if NUM_FIELD > 0
@@ -116,8 +139,7 @@ void CNS::compute_dSdt_box_eb(
       // Physical transport coefs
       if (do_visc) {
         BL_PROFILE("PelePhysics::get_transport_coeffs()");
-        auto const* ltransparm = trans_parms.device_trans_parm();
-        amrex::ParallelFor(bxg6, [=](int i, int j, int k) {
+        amrex::ParallelFor(bxg6, [=] AMREX_GPU_DEVICE(int i, int j, int k) {
           if (!flag(i, j, k).isCovered()) {
             Real muloc, xiloc, lamloc, Ddiag[NUM_SPECIES];
             Real* dummy_chi_mix = nullptr;
@@ -132,7 +154,7 @@ void CNS::compute_dSdt_box_eb(
             const bool wtr_get_chi = false;
             trans.transport(wtr_get_xi, wtr_get_mu, wtr_get_lam, wtr_get_Ddiag,
                             wtr_get_chi, qar_Tin(i, j, k), qar_rhoin(i, j, k), yin,
-                            Ddiag, dummy_chi_mix, muloc, xiloc, lamloc, ltransparm);
+                            Ddiag, dummy_chi_mix, muloc, xiloc, lamloc, gpu_trans_parm);
 
             // Copy to output
             mu(i, j, k) = muloc;
@@ -149,11 +171,12 @@ void CNS::compute_dSdt_box_eb(
       // Buffer region
       if (buffer_box.ok()) {
         const auto problo = geom.ProbLo();
+        const auto gpu_buffer_box = buffer_box;
         amrex::ParallelFor(bxg4, [=] AMREX_GPU_DEVICE(int i, int j, int k) {
           RealVect pos{AMREX_D_DECL((i + 0.5) * dx[0] + problo[0],
                                     (j + 0.5) * dx[1] + problo[1],
                                     (k + 0.5) * dx[2] + problo[2])};
-          if (buffer_box.contains(pos)) {
+          if (gpu_buffer_box.contains(pos)) {
             mu(i, j, k) += 0.1;
             xi(i, j, k) += 0.1;
             lambda(i, j, k) += 1e5;
@@ -174,7 +197,7 @@ void CNS::compute_dSdt_box_eb(
         const Box& charbox = amrex::growHi(amrex::growLo(flxbx, dir, 3), dir, 2);
         amrex::ParallelFor(charbox, [=] AMREX_GPU_DEVICE(int i, int j, int k) {
           if (!flag(i, j, k).isCovered()) {
-            cns_ctochar(i, j, k, dir, q, w, char_sys);
+            cns_ctochar(i, j, k, dir, q, w, gpu_char_sys);
           }
         });
         // 2. FD interpolation to cell face
@@ -186,7 +209,7 @@ void CNS::compute_dSdt_box_eb(
                                auto captured_recon_scheme,
                                auto captured_eb_recon_mode) {
             cns_recon_eb<captured_recon_scheme, captured_eb_recon_mode>(
-              i, j, k, n, dir, w, wl, wr, plm_theta, flag);
+              i, j, k, n, dir, w, wl, wr, gpu_plm_theta, gpu_teno_cutoff, flag);
           });
         // 3. Solve Riemann problem for fluxes at cell face
         amrex::ParallelFor(flxbx, [=] AMREX_GPU_DEVICE(int i, int j, int k) {
@@ -194,15 +217,13 @@ void CNS::compute_dSdt_box_eb(
               !flag(IntVect(AMREX_D_DECL(i, j, k)) -
                     IntVect::TheDimensionVector(dir))
                  .isCovered()) {
-            cns_riemann(i, j, k, dir, flx, q, wl, wr, char_sys, recon_char_var);
+            cns_riemann(i, j, k, dir, flx, q, wl, wr, gpu_char_sys, gpu_recon_char_var);
 
             const IntVect iv(AMREX_D_DECL(i, j, k));
             const IntVect ivd = IntVect::TheDimensionVector(dir);
             const bool do_high_order_diff =
-              (shock_sensor(iv - 2 * ivd) < shock_sensor_threshold) &&
-              (shock_sensor(iv - ivd) < shock_sensor_threshold) &&
-              (shock_sensor(iv) < shock_sensor_threshold) &&
-              (shock_sensor(iv + ivd) < shock_sensor_threshold);
+              (shock_sensor(iv - 2 * ivd) < gpu_threshold) && (shock_sensor(iv - ivd) < gpu_threshold) &&
+              (shock_sensor(iv) < gpu_threshold) && (shock_sensor(iv + ivd) < gpu_threshold);
             if (do_high_order_diff) {
               cns_afd_correction_eb(i, j, k, dir, q, flag, flx);
             }
@@ -226,15 +247,15 @@ void CNS::compute_dSdt_box_eb(
           cns_diff_eb(iv, dir, q, coefs, flag, dxinv, flx_tmp);
 
 #if NUM_FIELD == 0
-          if (eb_wall_model) {
+          if (gpu_eb_wall_model) {
             // Wall model for regular solid boundaries (modifies flx_tmp)
             RealVect pos{AMREX_D_DECL((i + 0.5) * dx[0] + problo[0],
                                       (j + 0.5) * dx[1] + problo[1],
                                       (k + 0.5) * dx[2] + problo[2])};
-            if (!no_wm_box.contains(pos)) {
-              apply_regular_wall_model<EquilibriumODE>(
-                iv, dir, lo_is_wall, hi_is_wall, domlo, domhi, dx, q, coefs,
-                eb_isothermal, eb_wall_temp, flx_tmp);
+            if (!gpu_no_wm_box.contains(pos)) {
+              apply_regular_wall_model(iv, dir, lo_is_wall, hi_is_wall, domlo, domhi,
+                                       dx, gpu_les_wm, q, coefs, gpu_eb_isothermal,
+                                       gpu_eb_wall_temp, gpu_trans_parm, flx_tmp);
             }
           }
 #endif
@@ -305,11 +326,10 @@ void CNS::compute_dSdt_box_eb(
                                     (j + 0.5) * dx[1] + problo[1],
                                     (k + 0.5) * dx[2] + problo[2])};
 
-          if (!no_wm_box.contains(pos)) {
-            auto const* ltransparm = CNS::trans_parms.device_trans_parm();
-            apply_regular_wall_model_sf<EquilibriumODE>(
-              iv, dir, lo_is_wall, hi_is_wall, domlo, domhi, dx, q0, eb_isothermal,
-              eb_wall_temp, ltransparm, vflx);
+          if (!gpu_no_wm_box.contains(pos)) {
+            apply_regular_wall_model_sf(iv, dir, lo_is_wall, hi_is_wall, domlo,
+                                        domhi, dx, gpu_les_wm, q0, gpu_eb_isothermal,
+                                        gpu_eb_wall_temp, gpu_trans_parm, vflx);
           }
         });
       } // eb_wall_model
@@ -363,13 +383,13 @@ void CNS::compute_dSdt_box_eb(
       RealVect pos{AMREX_D_DECL((i + 0.5) * dx[0] + problo[0],
                                 (j + 0.5) * dx[1] + problo[1],
                                 (k + 0.5) * dx[2] + problo[2])};
-      const bool do_wall_model = eb_wall_model && !no_wm_box.contains(pos);
+      const bool do_wall_model = gpu_eb_wall_model && !gpu_no_wm_box.contains(pos);
 
       eb_compute_div(i, j, k, blo, bhi, q, divc, AMREX_D_DECL(fx_in, fy_in, fz_in),
                      AMREX_D_DECL(fx_out, fy_out, fz_out), flag, vfrac, bcent, coefs,
                      AMREX_D_DECL(apx, apy, apz), AMREX_D_DECL(fcx, fcy, fcz), dxinv,
-                     do_hydro, do_visc, eb_no_slip, eb_isothermal, eb_wall_temp,
-                     do_wall_model);
+                     gpu_do_hydro, gpu_do_visc, gpu_eb_no_slip, gpu_eb_isothermal, gpu_eb_wall_temp,
+                     do_wall_model, gpu_trans_parm, gpu_les_wm);
     });
   } // for fields
 
@@ -382,8 +402,7 @@ void CNS::compute_dSdt_box_eb(
     auto const& srd_update_scale = srd_update_scale_fab.array();
     amrex::ParallelFor(bxg3, [=] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {
       redistwgt(i, j, k) = vfrac(i, j, k);
-      srd_update_scale(i, j, k) =
-        eb_weight; // = 1.0 more stable for detondiff, = 0.5 for airfoil. Why?
+      srd_update_scale(i, j, k) = gpu_eb_weight; // = 1.0 more stable for detondiff, = 0.5 for airfoil. Why?
     });
 
     bool use_wts_in_divnc = true;
@@ -516,7 +535,7 @@ void CNS::compute_dSdt_box_eb(
   if (do_ext_src) {
     ProbParm const* lprobparm = d_prob_parm;
     const auto geomdata = geom.data();
-    const amrex::Real time = state[State_Type].curTime();
+    const Real time = state[State_Type].curTime();
 
     amrex::ParallelFor(bx, [=] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {
       if (!flag(i, j, k).isCovered()) {

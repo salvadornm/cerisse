@@ -55,10 +55,19 @@ void CNS::react_state(Real time, Real dt, bool init_react)
   MultiFab SDotTemp(grids, dmap, NUM_SPECIES + 1, 0); // d[rY, rEi]/dt
   iMultiFab maskFab(grids, dmap, 1, 0); //= 1: do reaction, = -1: don't do reaction
   MultiFab fctCount(grids, dmap, 1, 0); // number of RHS evaluations in reactor
-
   STemp.setVal(0.0);
   SDotTemp.setVal(0.0);
   fctCount.setVal(0.0);
+
+  // To be captured in GPU kernels
+  auto const* ltransparm = trans_parms.device_trans_parm();
+  const Real gpu_min_react_temp = min_react_temp;
+  const Real gpu_clip_temp = clip_temp;
+  const bool gpu_do_pasr = do_pasr;
+  auto* gpu_les_model = les_model;
+  const Real gpu_Cs = Cs;
+  const Real gpu_Cm = Cm;
+  const bool gpu_update_heat_release = update_heat_release;
 
 #if CNS_USE_EB
   auto const& fact = dynamic_cast<EBFArrayBoxFactory const&>(Snew.Factory());
@@ -134,7 +143,7 @@ void CNS::react_state(Real time, Real dt, bool init_react)
             rEisrc(i, j, k) = (rEinew - rEi(i, j, k)) / dt;
 
             // fill mask
-            mask(i, j, k) = (T(i, j, k) > min_react_temp) ? 1 : -1;
+            mask(i, j, k) = (T(i, j, k) > gpu_min_react_temp) ? 1 : -1;
             // mask(i, j, k) = (ifm_arr(i, j, k) == 1) ? mask(i, j, k) : -1;
 #if CNS_USE_EB
             mask(i, j, k) = (vfrac_arr(i, j, k) > 0.0) ? mask(i, j, k) : -1;
@@ -188,7 +197,6 @@ void CNS::react_state(Real time, Real dt, bool init_react)
                 constexpr bool get_Ddiag = false;
                 constexpr bool get_chi = false;
                 auto trans = pele::physics::PhysicsType::transport();
-                auto const* ltransparm = trans_parms.device_trans_parm();
                 trans.transport(get_xi, get_mu, get_lam, get_Ddiag, get_chi, Tin,
                                 rhoin, yin, nullptr, nullptr, muloc, xiloc, lamloc,
                                 ltransparm);
@@ -201,7 +209,7 @@ void CNS::react_state(Real time, Real dt, bool init_react)
           // For unpack_pasr
           auto const& qarr = qfab.array();
           auto const& muarr = mufab.array();
-          const auto dxinv = geom.InvCellSizeArray();
+          const auto dxinv = geom.InvCellSizeArray();          
 
           amrex::ParallelFor(bx, [=] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {
             if (mask(i, j, k) != -1) {
@@ -211,7 +219,7 @@ void CNS::react_state(Real time, Real dt, bool init_react)
                 any_rY_unbounded |= std::isnan(rY(i, j, k, n));
                   // || (rY(i, j, k, n) < -1e-5 || rY(i, j, k, n) > 1.0 + 1e-5;
               }
-              bool T_unbounded = T(i, j, k) < clip_temp || T(i, j, k) > 4000.0;
+              bool T_unbounded = T(i, j, k) < gpu_clip_temp || T(i, j, k) > 4000.0;
 #ifndef AMREX_USE_GPU
               if (any_rY_unbounded) {
                 std::cout << "Reaction causing rY=[ ";
@@ -236,26 +244,26 @@ void CNS::react_state(Real time, Real dt, bool init_react)
                 }
               } else {
                 new_rho = 0.0;
-              if (do_pasr && !init_react) {
-                // Modify rY if PaSR is on
-                unpack_pasr(i, j, k, new_rho, sold_arr, rY, rYsrc, qarr, muarr,
-                            dxinv, dt);
-              } else {
-                for (int n = 0; n < NUM_SPECIES; ++n) {
-                  rY(i, j, k, n) = std::max(0.0, rY(i, j, k, n));
-                  new_rho += rY(i, j, k, n);
+                if (gpu_do_pasr && !init_react) {
+                  // Modify rY if PaSR is on
+                  unpack_pasr(i, j, k, new_rho, sold_arr, rY, rYsrc, qarr, muarr,
+                              dxinv, dt, gpu_les_model, gpu_Cs, gpu_Cm);
+                } else {
+                  for (int n = 0; n < NUM_SPECIES; ++n) {
+                    rY(i, j, k, n) = amrex::max(Real(0.0), rY(i, j, k, n));
+                    new_rho += rY(i, j, k, n);
+                  }
                 }
-              }
 
-              for (int n = 0; n < NUM_SPECIES; ++n) {
-                I_R_arr(i, j, k, n) =
-                  (rY(i, j, k, n) - sold_arr(i, j, k, UFS + n)) / dt -
-                  rYsrc(i, j, k, n);
+                for (int n = 0; n < NUM_SPECIES; ++n) {
+                  I_R_arr(i, j, k, n) =
+                    (rY(i, j, k, n) - sold_arr(i, j, k, UFS + n)) / dt -
+                    rYsrc(i, j, k, n);
                 }
               }
 
               // update heat release rate (this is not used, just to plot)
-              if (update_heat_release) {
+              if (gpu_update_heat_release) {
                 Real Y[NUM_SPECIES];
                 for (int n = 0; n < NUM_SPECIES; n++) {
                   Y[n] = rY(i, j, k, n) / new_rho;

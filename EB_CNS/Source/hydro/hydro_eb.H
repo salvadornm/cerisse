@@ -64,9 +64,8 @@ AMREX_GPU_DEVICE AMREX_FORCE_INLINE void compute_hyp_wallflux(
 }
 
 AMREX_GPU_DEVICE AMREX_FORCE_INLINE void eb_compute_div(
-  int i, int j, int k, amrex::IntVect const& blo,
-  amrex::IntVect const& bhi, amrex::Array4<const amrex::Real> const& q,
-  amrex::Array4<amrex::Real> const& divu,
+  int i, int j, int k, amrex::IntVect const& blo, amrex::IntVect const& bhi,
+  amrex::Array4<const amrex::Real> const& q, amrex::Array4<amrex::Real> const& divu,
   AMREX_D_DECL(Array4<amrex::Real const> const& u,
                amrex::Array4<amrex::Real const> const& v,
                amrex::Array4<amrex::Real const> const& w),
@@ -84,7 +83,8 @@ AMREX_GPU_DEVICE AMREX_FORCE_INLINE void eb_compute_div(
                amrex::Array4<amrex::Real const> const& fcz),
   amrex::GpuArray<amrex::Real, AMREX_SPACEDIM> const& dxinv, const bool do_hydro,
   const bool do_visc, const bool eb_no_slip, const bool eb_isothermal,
-  const amrex::Real eb_wall_temp, const bool eb_wall_model)
+  const amrex::Real eb_wall_temp, const bool eb_wall_model,
+  const d_trans_parm* ltransparm, LESWallModel* const les_wm)
 {
   using amrex::Real;
 
@@ -313,7 +313,7 @@ AMREX_GPU_DEVICE AMREX_FORCE_INLINE void eb_compute_div(
                             apz(i, j, k), apz(i, j, k + 1),
 #endif
                             dxinv, flux_diff_wall, eb_no_slip, eb_isothermal,
-                            eb_wall_temp, eb_wall_model);
+                            eb_wall_temp, eb_wall_model, ltransparm, les_wm);
     }
 
 #ifdef MONITOR_PROBLEM_CELL

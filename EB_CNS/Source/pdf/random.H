@@ -1,6 +1,8 @@
 #ifndef CNS_RANDOM_H_
 #define CNS_RANDOM_H_
 
+#if NUM_FIELD > 0
+
 #include <AMReX_IntVect.H>
 #include <AMReX_ParallelDescriptor.H>
 #include <AMReX_Random.H>
@@ -8,8 +10,6 @@
 #include <AMReX_Vector.H>
 
 #include "index_macros.H"
-
-#if NUM_FIELD > 0
 
 /**
  * @brief A class for generating, broadcasting, and storing random numbers across
@@ -205,29 +205,8 @@ private:
   int _num_step;            // number of finest steps per coarsest level step
   int _num_rand;            // number of random numbers requested (usually NUM_FIELD)
 
-  static amrex::Vector<amrex::Real>
-    _data; // data object, static so only one copy exists
-};
-
-#else
-
-/**
- * @brief A dummy UniqueRand class if NUM_FIELD == 0.
- */
-class UniqueRand
-{
-public:
-  UniqueRand() = default;
-
-  void init(int num_rand, int lev, amrex::Vector<amrex::IntVect> ref_ratio) {}
-
-  void generate_new(amrex::Real sqrtdt_coarse, int rand_mode, int sync_mode) {}
-
-  void get_rand(int step, amrex::Real out[][NUM_FIELD]) {}
-
-private:
-  static amrex::Vector<amrex::Real>
-    _data; // data object, static so only one copy exists
+  // data object, static so only one copy exists
+  static amrex::Vector<amrex::Real> _data; 
 };
 
 #endif // end if NUM_FIELD > 0

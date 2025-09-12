@@ -16,7 +16,7 @@
  */
 AMREX_GPU_DEVICE AMREX_FORCE_INLINE void muscl(amrex::Real s[3], amrex::Real& sm,
                                                amrex::Real& sp,
-                                               amrex::Real plm_theta) noexcept
+                                               const amrex::Real plm_theta) noexcept
 {
   using amrex::Real;
 
@@ -188,7 +188,7 @@ AMREX_GPU_DEVICE AMREX_FORCE_INLINE void wenoz5(amrex::Real s[5], amrex::Real& s
 
 /// \brief TENO 5th order. Ref https://doi.org/10.1016/j.cpc.2018.10.009.
 AMREX_GPU_DEVICE AMREX_FORCE_INLINE void teno5(amrex::Real s[5], amrex::Real& sm,
-                                               amrex::Real& sp) noexcept
+                                               amrex::Real& sp, const amrex::Real teno_cutoff) noexcept
 {
   using amrex::Real;
 
@@ -218,14 +218,14 @@ AMREX_GPU_DEVICE AMREX_FORCE_INLINE void teno5(amrex::Real s[5], amrex::Real& sm
   beta[0] = POWER6(1.0 + xi[0]);
   beta1 = 1.0 / (beta[2] + beta[1] + beta[0]);
 
-  if (CNS::teno_cutoff <= 0) {
+  if (teno_cutoff <= 0) {
     // Adaptive TENO, Ref: https://doi.org/10.1016/j.jcp.2020.109902
     Real H = 0.1; // the stencil is considered discontinuous if max(xi) > 1/H
     Real theta = 1.0 / (1.0 + H * amrex::max(xi[0], xi[1], xi[2]));
     Real m = 4.0 + std::floor(theta * 6.0);
     CT = std::pow(10.0, -m);
   } else {
-    CT = CNS::teno_cutoff;
+    CT = teno_cutoff;
   }
 
   alpha[2] = beta[2] * beta1 < CT ? 0.0 : 1.0;
@@ -257,7 +257,7 @@ AMREX_GPU_DEVICE AMREX_FORCE_INLINE void teno5(amrex::Real s[5], amrex::Real& sm
   beta[0] = POWER6(1.0 + xi[0]);
   beta1 = 1.0 / (beta[2] + beta[1] + beta[0]);
 
-  if (CNS::teno_cutoff <= 0) {
+  if (teno_cutoff <= 0) {
     // Adaptive TENO, Ref: https://doi.org/10.1016/j.jcp.2020.109902
     Real H = 0.1;
     Real theta = 1.0 / (1.0 + H * amrex::max(xi[0], xi[1], xi[2]));
@@ -303,7 +303,7 @@ template<int recon_scheme>
 AMREX_GPU_DEVICE AMREX_FORCE_INLINE void cns_recon(
   int i, int j, int k, int n, int dir, amrex::Array4<amrex::Real const> const& q,
   amrex::Array4<amrex::Real> const& ql, amrex::Array4<amrex::Real> const& qr,
-  amrex::Real plm_theta) noexcept
+  const amrex::Real plm_theta, const amrex::Real teno_cutoff) noexcept
 {
   using amrex::Real;
 
@@ -318,7 +318,7 @@ AMREX_GPU_DEVICE AMREX_FORCE_INLINE void cns_recon(
     s[2] = q(iv, n);
     s[3] = q(iv + iv_dir, n);
     s[4] = q(iv + 2 * iv_dir, n);
-    teno5(s, qr(iv, n), ql(iv + iv_dir, n));
+    teno5(s, qr(iv, n), ql(iv + iv_dir, n), teno_cutoff);
   } else if constexpr (recon_scheme == 5) {
     // WENO-Z5
     Real s[5];

@@ -193,7 +193,8 @@ AMREX_GPU_DEVICE AMREX_FORCE_INLINE void compute_diff_wallflux(
   const amrex::Real axp, const amrex::Real aym, const amrex::Real ayp,
   const amrex::GpuArray<amrex::Real, 2> dxinv,
   amrex::GpuArray<amrex::Real, NVAR>& viscw, bool eb_no_slip, bool eb_isothermal,
-  amrex::Real eb_wall_temp, const bool do_wall_model) noexcept
+  amrex::Real eb_wall_temp, const bool do_wall_model, const d_trans_parm* ltransparm,
+  LESWallModel* const wm) noexcept
 {
   //  This implementation assumes adiabatic or isothermal walls
 
@@ -350,7 +351,6 @@ AMREX_GPU_DEVICE AMREX_FORCE_INLINE void compute_diff_wallflux(
   for (int n = 0; n < NUM_SPECIES; ++n) { Y[n] = q(i, j, k, QFS + n); }
   if (eb_isothermal) {
     auto trans = pele::physics::PhysicsType::transport();
-    auto const* ltransparm = CNS::trans_parms.device_trans_parm();
     auto eos = pele::physics::PhysicsType::eos();
     eos.PYT2R(p, Y, eb_wall_temp, rho);
 
@@ -410,32 +410,22 @@ AMREX_GPU_DEVICE AMREX_FORCE_INLINE void compute_diff_wallflux(
 
     if (yplus > 11.0) {
       // Wall model
-      // LawOfTheWall wm;
-      EquilibriumODE wm;
       Real u_parallel = u2 * anrmy - v2 * anrmx; // u dot tangent
       Real ts = (u_parallel > 0.0) ? 1.0 : -1.0;
       u_parallel *= ts; // abs(u)
-      if (u_parallel > 1e-3 && T2 > 90.0 && T2 < 5000.0 && rho > 0.0) {
+      if (u_parallel > 0.1 && T2 > 90.0 && T2 < 3000.0 && rho > 0.0) {
         Real T_wall = eb_isothermal ? eb_wall_temp : -1.0;
         Real h = d2 * dx;
         Real tauw, qw;
-        wm.parallel_wall_stress(u_parallel, T2, rho, Y, h, mu, lam, T_wall, tauw, qw);
-        // Real dudy = -ddinv * (d2 * d2 * u1 - d1 * d1 * u2);
-        // std::cout << u_parallel << " " << h << " " << mu*dudy/dx << " " << tau << "  ";
-        // std::cout << "y+: " << yplus << " -> " << rho * std::sqrt(tauw / rho) / mu * dx;
-        // std::cout << "  viscous wall stress: " << tau * cfarea << " (" << viscw[UMX] << ", " << viscw[UMY]
-        //           << ") -> ";
-
-        viscw[UMX] = cfarea * ts * anrmy * tauw;
-        viscw[UMY] = -cfarea * ts * anrmx * tauw;
-        // std::cout << tauw * cfarea << " (" << viscw[UMX] << ", " << viscw[UMY] << ")";
-        // viscw[UEDEN] = cfarea * qw; // TODO: no wall model heat flux for now
-        // std::cout << "  " << apnorm << " (" << anrmx << ", " << anrmy << ")\n";
+        wm->parallel_wall_stress(u_parallel, T2, rho, Y, h, mu, lam, T_wall, ltransparm, tauw, qw);
+        
+        if (!isnan(tauw) && !isnan(qw)) {
+          viscw[UMX] = cfarea * ts * anrmy * tauw;
+          viscw[UMY] = -cfarea * ts * anrmx * tauw;
+          viscw[UEDEN] = cfarea * qw;
+        }
       }
-    } 
-    // else {
-    //   std::cout << "y+: " << yplus << std::endl;
-    // }
+    }
   }
 }
 
@@ -449,7 +439,8 @@ AMREX_GPU_DEVICE AMREX_FORCE_INLINE void compute_diff_wallflux(
   const amrex::Real azm, const amrex::Real azp,
   const amrex::GpuArray<amrex::Real, 3> dxinv,
   amrex::GpuArray<amrex::Real, NVAR>& viscw, bool eb_no_slip, bool eb_isothermal,
-  amrex::Real eb_wall_temp, const bool do_wall_model) noexcept
+  amrex::Real eb_wall_temp, const bool do_wall_model, const d_trans_parm* ltransparm,
+  LESWallModel* const wm) noexcept
 {
   //  This implementation assumes adiabatic or isothermal walls
 
@@ -843,52 +834,30 @@ AMREX_GPU_DEVICE AMREX_FORCE_INLINE void compute_diff_wallflux(
     if (yplus > 11.0) {
       BL_PROFILE("EB_WallModel");
       // Wall model
-      // LawOfTheWall wm;
-      EquilibriumODE wm;
       // Tangent vectors (t1.n = 0, t2.t1 = 0, u.t2 = 0)
       Real t1[3];
-      Real udotn = u1 * anrmx + v1 * anrmy + w1 * anrmz;
-      t1[0] = u1 - udotn * anrmx;
-      t1[1] = v1 - udotn * anrmy;
-      t1[2] = w1 - udotn * anrmz;
+      Real udotn = u2 * anrmx + v2 * anrmy + w2 * anrmz;
+      t1[0] = u2 - udotn * anrmx;
+      t1[1] = v2 - udotn * anrmy;
+      t1[2] = w2 - udotn * anrmz;
       Real tnorm = std::sqrt(t1[0] * t1[0] + t1[1] * t1[1] + t1[2] * t1[2]);
       t1[0] /= tnorm;
       t1[1] /= tnorm;
       t1[2] /= tnorm;
-      // if(std::abs(t1[0] * anrmx + t1[1] * anrmy + t1[2] * anrmz) > 1.e-10) {
-      //   std::cout << t1[0] << " " << t1[1] << " " << t1[2] << "; " 
-      //             << anrmx << " " << anrmy << " " << anrmz << "; "
-      //             << u2 << " " << v2 << " " << w2 << "; "
-      //             << std::abs(t1[0] * anrmx + t1[1] * anrmy + t1[2] * anrmz)
-      //             << std::endl;
-      //   amrex::Abort("Tangent vector is not orthogonal to the normal vector");
-      // }
-      Real u_parallel = u1 * t1[0] + v1 * t1[1] + w1 * t1[2]; // u dot tangent
+      Real u_parallel = u2 * t1[0] + v2 * t1[1] + w2 * t1[2]; // u dot tangent
       Real ts = (u_parallel > 0.0) ? 1.0 : -1.0;
       u_parallel *= ts; // abs(u)
-      if (u_parallel > 100.0 && T1 > 90.0 && T1 < 3000.0 && rho > 0.0) {
+      if (u_parallel > 0.1 && T2 > 90.0 && T1 < 3000.0 && rho > 0.0) {
         Real T_wall = eb_isothermal ? eb_wall_temp : -1.0;
-        Real h = d1 * dx;
+        Real h = d2 * dx;
         Real tauw, qw;
-        wm.parallel_wall_stress(u_parallel, T1, rho, Y, h, mu, lam, T_wall, tauw, qw);
-        // std::cout << "y+: " << yplus << " -> "
-        //           << rho * std::sqrt(tauw / rho) / mu * dx;
-        // std::cout << "  viscous wall stress: " << tau * cfarea << " (" << viscw[UMX]
-        //           << ", " << viscw[UMY] << ", " << viscw[UMY] << ") -> ";
+        wm->parallel_wall_stress(u_parallel, T2, rho, Y, h, mu, lam, T_wall, ltransparm, tauw, qw);
+
         if (!isnan(tauw) && !isnan(qw)) {
-        viscw[UMX] = cfarea * ts * t1[0] * tauw;
-        viscw[UMY] = cfarea * ts * t1[1] * tauw;
-        viscw[UMZ] = cfarea * ts * t1[2] * tauw;
-        // std::cout << tauw * cfarea << " (" << viscw[UMX] << ", " << viscw[UMY]
-        //           << ", " << viscw[UMZ] << ")";
-        viscw[UEDEN] = cfarea * qw;
-        // std::cout << "  " << apnorm << " (" << anrmx << ", " << anrmy << ", "
-        //           << anrmz << ")\n";
-        
-        // if ((i == 100 && j == 16 && k == 23))
-        //   std::cout << "(" << i <<","<<j<<","<<k<<")" << ": tauw=" << tauw << ", qw=" << qw 
-        //             << ", t=" << ts*t1[0] <<"," << ts*t1[1] <<","<< ts*t1[2] << ", cfarea=" << cfarea 
-        //             << ", guess y+=" << yplus << std::endl;
+          viscw[UMX] = cfarea * ts * t1[0] * tauw;
+          viscw[UMY] = cfarea * ts * t1[1] * tauw;
+          viscw[UMZ] = cfarea * ts * t1[2] * tauw;
+          viscw[UEDEN] = cfarea * qw;
         }
       }
     }

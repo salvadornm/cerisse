@@ -22,7 +22,9 @@ using namespace amrex;
 
 #include "default_parm.H"
 
+#if NUM_FIELD > 0
 amrex::Vector<amrex::Real> UniqueRand::_data;
+#endif
 
 ////////////////////////////////////////////////////////////////////////////
 //    Overriding AmrLevel virtual functions                               //
@@ -70,13 +72,14 @@ CNS::CNS(Amr& papa, int lev, const Geometry& level_geom, const BoxArray& bl,
   WienerProcess.init(AMREX_SPACEDIM, level, ref_ratio);
 #endif
 
-  // Initialise LES model
-  if (do_les || do_pasr) {
-    ParmParse pp("cns");
-    std::string les_model_name;
-    pp.get("les_model", les_model_name);
-    les_model = LESModel::create(les_model_name);
-  }
+  // // Initialise LES model
+  // if (do_les || do_pasr) {
+  //   ParmParse pp("cns");
+  //   std::string les_model_name;
+  //   pp.get("les_model", les_model_name);
+  //   auto les_model2 = LESModel::create(les_model_name);
+  //   // get_les_model(les_model_name, les_model);
+  // }
 }
 
 CNS::~CNS()
@@ -378,12 +381,13 @@ void CNS::post_restart()
   // fillFineMask();
 
   // Initialise LES model (must happen before react because pasr may be needed)
-  if (do_les || do_pasr) {
-    ParmParse pp("cns");
-    std::string les_model_name;
-    pp.get("les_model", les_model_name);
-    les_model = LESModel::create(les_model_name);
-  }
+  // if (do_les || do_pasr) {
+  //   ParmParse pp("cns");
+  //   std::string les_model_name;
+  //   pp.get("les_model", les_model_name);
+  //   // les_model = LESModel::create(les_model_name);
+  //   get_les_model(les_model_name, les_model);
+  // }
   
   MultiFab& S_new = get_new_data(State_Type);
 
@@ -476,7 +480,8 @@ void CNS::errorEst(TagBoxArray& tags, int clearval, int tagval, Real time,
     const auto problo = geom.ProbLoArray();
     const auto dx = geom.CellSizeArray();
     auto boxes = dp_refine_boxes;
-
+    auto max_lev = dp_refine_boxes_max_lev;
+    const int lev = level;
     auto const& tagma = tags.arrays();
     ParallelFor(
       tags, [=] AMREX_GPU_DEVICE(int box_no, int i, int j, int k) noexcept {
@@ -484,7 +489,7 @@ void CNS::errorEst(TagBoxArray& tags, int clearval, int tagval, Real time,
                                   (j + 0.5) * dx[1] + problo[1],
                                   (k + 0.5) * dx[2] + problo[2])};
         for (int irb = 0; irb < n_refine_boxes; ++irb) {
-          if (boxes[irb].contains(pos) && (level < refine_boxes_max_lev[irb])) {
+          if (boxes[irb].contains(pos) && (lev < max_lev[irb])) {
             tagma[box_no](i, j, k) = tagval;
           }
         }
@@ -590,10 +595,11 @@ void CNS::errorEst(TagBoxArray& tags, int clearval, int tagval, Real time,
   const auto geomdata = geom.data();
   auto tagarr = tags.arrays();
   auto const& sarrs = S_new.arrays();
+  const int lev = level;
   amrex::ParallelFor(tags,
                      [=] AMREX_GPU_DEVICE(int box_no, int i, int j, int k) noexcept {
-                       prob_tag_error(i, j, k, tagarr[box_no], sarrs[box_no], level,
-                                      tagval, time, geomdata, *lprobparm);
+                       prob_tag_error(i, j, k, tagarr[box_no], sarrs[box_no],
+                                      lev, tagval, time, geomdata, *lprobparm);
                      });
 
   Gpu::streamSynchronize();

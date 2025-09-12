@@ -104,8 +104,7 @@ void Triangles::build(const Geometry& geom, const int max_coarsening_level)
   problo = geom.ProbLo();
   probhi = geom.ProbHi();
 
-  maxlen = amrex::max<Real>(amrex::max<Real>(geom.ProbLength(0), geom.ProbLength(1)),
-                            geom.ProbLength(2));
+  maxlen = amrex::max(AMREX_D_DECL(geom.ProbLength(0), geom.ProbLength(1), geom.ProbLength(2)));
 
   // setting all triangles to be waaay outside the domain initially
   for (int itri = 0; itri < max_tri; itri++) {

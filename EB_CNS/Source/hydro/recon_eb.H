@@ -22,7 +22,7 @@ template<int recon_scheme, int eb_mode>
 AMREX_GPU_DEVICE AMREX_FORCE_INLINE void cns_recon_eb(
   int i, int j, int k, int n, int dir, amrex::Array4<const amrex::Real> const& q,
   amrex::Array4<amrex::Real> const& ql, amrex::Array4<amrex::Real> const& qr,
-  amrex::Real plm_theta,
+  amrex::Real plm_theta, amrex::Real teno_cutoff,
   amrex::Array4<amrex::EBCellFlag const> const& flag) noexcept
 {
   using amrex::Real;
@@ -69,7 +69,7 @@ AMREX_GPU_DEVICE AMREX_FORCE_INLINE void cns_recon_eb(
     s[2] = q(iv, n);
     s[3] = q(ivp1, n);
     s[4] = q(ivp2, n);
-    teno5(s, qr(iv, n), ql(iv + iv_dir, n));
+    teno5(s, qr(iv, n), ql(iv + iv_dir, n), teno_cutoff);
   } else if constexpr (recon_scheme == 5) {
     // WENO-Z5
     Real s[5];
@@ -128,7 +128,7 @@ AMREX_GPU_DEVICE AMREX_FORCE_INLINE void cns_afd_correction_eb(
   const int ng = (cn1 & cp1) ? ((cn2 & cp2) ? 3 : 2) : 1;
   if (ng == 1) { return; } // Cannot do AFD correction
 
-  Real f[2 * ng][NVAR];
+  Real f[6][NVAR]; // Use the max ng because GPU requires constant size
   for (int m = 0; m < 2 * ng; ++m) {
     cns_flux(iv + (m - ng) * iv_dir, dir, q, f[m]);
   }

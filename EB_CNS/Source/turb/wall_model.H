@@ -7,6 +7,9 @@
 
 #include "index_macros.H"
 
+using d_trans_parm = pele::physics::transport::TransParm<
+    pele::physics::EosType, pele::physics::PhysicsType::transport_type>;
+
 class LESWallModel : public pele::physics::Factory<LESWallModel>
 {
 public:
@@ -26,12 +29,21 @@ public:
    * @param tau[out] Parallel wall stress
    * @param q[out]   Wall heat flux
    */
-  virtual void parallel_wall_stress(amrex::Real u, amrex::Real T, amrex::Real rho,
-                                    amrex::Real Y[NUM_SPECIES], amrex::Real h,
-                                    amrex::Real mu, amrex::Real lam,
-                                    amrex::Real T_wall, amrex::Real& tau,
-                                    amrex::Real& q) = 0;
+  virtual AMREX_GPU_DEVICE void parallel_wall_stress(
+    amrex::Real u, amrex::Real T, amrex::Real rho, amrex::Real Y[NUM_SPECIES],
+    amrex::Real h, amrex::Real mu, amrex::Real lam, amrex::Real T_wall,
+    const d_trans_parm* ltransparm, amrex::Real& tau, amrex::Real& q) = 0;
 };
+
+// void get_les_wall_model(std::string model_name, LESWallModel* les_wm_ptr)
+// {
+//   auto unique_ptr = LESWallModel::create(model_name);
+// #ifdef AMREX_USE_GPU
+//   amrex::Gpu::htod_memcpy_async(les_wm_ptr, unique_ptr.get(), sizeof(LESWallModel));
+// #else
+//   les_wm_ptr = unique_ptr.data();
+// #endif
+// }
 
 // Algebric wall model
 
@@ -40,10 +52,10 @@ class LawOfTheWall : public LESWallModel::Register<LawOfTheWall>
 public:
   static const std::string identifier() { return "LawOfTheWall"; }
 
-  void parallel_wall_stress(amrex::Real u, amrex::Real T, amrex::Real rho,
-                            amrex::Real Y[NUM_SPECIES], amrex::Real h,
-                            amrex::Real mu, amrex::Real lam, amrex::Real T_wall,
-                            amrex::Real& tau, amrex::Real& q) override;
+  AMREX_GPU_DEVICE void parallel_wall_stress(
+    amrex::Real u, amrex::Real T, amrex::Real rho, amrex::Real Y[NUM_SPECIES],
+    amrex::Real h, amrex::Real mu, amrex::Real lam, amrex::Real T_wall,
+    const d_trans_parm* ltransparm, amrex::Real& tau, amrex::Real& q) override;
 };
 
 // ODE wall model
@@ -53,22 +65,21 @@ class EquilibriumODE : public LESWallModel::Register<EquilibriumODE>
 public:
   static const std::string identifier() { return "EquilibriumODE"; }
 
-  void parallel_wall_stress(amrex::Real u, amrex::Real T, amrex::Real rho,
-                            amrex::Real Y[NUM_SPECIES], amrex::Real h,
-                            amrex::Real mu, amrex::Real lam, amrex::Real T_wall,
-                            amrex::Real& tau, amrex::Real& q) override;
+  AMREX_GPU_DEVICE void parallel_wall_stress(
+    amrex::Real u, amrex::Real T, amrex::Real rho, amrex::Real Y[NUM_SPECIES],
+    amrex::Real h, amrex::Real mu, amrex::Real lam, amrex::Real T_wall,
+    const d_trans_parm* ltransparm, amrex::Real& tau, amrex::Real& q) override;
 };
 
 // Apply wall model on regular walls
 
-template <class WallModel>
 AMREX_GPU_DEVICE AMREX_FORCE_INLINE void apply_regular_wall_model(
   const amrex::IntVect& iv, const int dir, const bool lo_is_wall,
   const bool hi_is_wall, const int domlo, const int domhi,
-  const amrex::GpuArray<amrex::Real, AMREX_SPACEDIM> dx,
+  const amrex::GpuArray<amrex::Real, AMREX_SPACEDIM> dx, LESWallModel* const wm,
   const amrex::Array4<const amrex::Real>& q,
   const amrex::Array4<const amrex::Real>& coefs, const bool is_isothermal,
-  const amrex::Real wall_temp, amrex::Real flx[UFS])
+  const amrex::Real wall_temp, const d_trans_parm* ltransparm, amrex::Real flx[UFS])
 {
   if ((iv[dir] == domhi + 1 && hi_is_wall) || (iv[dir] == domlo && lo_is_wall)) {
     // first fluid cell (1)
@@ -110,9 +121,8 @@ AMREX_GPU_DEVICE AMREX_FORCE_INLINE void apply_regular_wall_model(
       const amrex::Real T_wall = is_isothermal ? wall_temp : -1.0;
       const amrex::Real h = 1.5 * local_dx;
       amrex::Real tauw, qw;
-      WallModel wm;
-      wm.parallel_wall_stress(u2_parallel, T2, rho2, Yw, h, muw, lamw, T_wall, tauw,
-                              qw);
+      wm->parallel_wall_stress(u2_parallel, T2, rho2, Yw, h, muw, lamw, T_wall,
+                               ltransparm, tauw, qw);
       if (!std::isnan(tauw) && !std::isnan(qw)) {
         // this accouts for the opposite normal vector directions in lo and hi walls
         const amrex::Real lohi = (iv[dir] == domlo) ? -1.0 : 1.0;
@@ -125,15 +135,13 @@ AMREX_GPU_DEVICE AMREX_FORCE_INLINE void apply_regular_wall_model(
   }
 }
 
-template <class WallModel>
+#if NUM_FIELD > 0
 AMREX_GPU_DEVICE AMREX_FORCE_INLINE void apply_regular_wall_model_sf(
   const amrex::IntVect& iv, const int dir, const bool lo_is_wall,
   const bool hi_is_wall, const int domlo, const int domhi,
-  const amrex::GpuArray<amrex::Real, AMREX_SPACEDIM> dx,
+  const amrex::GpuArray<amrex::Real, AMREX_SPACEDIM> dx, LESWallModel* const wm,
   const amrex::Array4<const amrex::Real>& q0, const bool is_isothermal,
-  const amrex::Real wall_temp,
-  const pele::physics::transport::TransParm<
-    pele::physics::EosType, pele::physics::PhysicsType::transport_type>* ltransparm,
+  const amrex::Real wall_temp, const d_trans_parm* ltransparm,
   const amrex::Array4<amrex::Real>& flx)
 {
   if ((iv[dir] == domhi + 1 && hi_is_wall) || (iv[dir] == domlo && lo_is_wall)) {
@@ -176,12 +184,11 @@ AMREX_GPU_DEVICE AMREX_FORCE_INLINE void apply_regular_wall_model_sf(
     // prevent numerical issues at u_parallel ~ 0 and extreme temperatures
     if (yplus > 11.0 && u_parallel > 100.0 && !(T2 < 90.0) && !(T2 > 4000.0) &&
         !(rho2 < 0.0)) {
-      WallModel wm;
       amrex::Real T_wall = is_isothermal ? wall_temp : -1.0;
       amrex::Real h = 1.5 * local_dx;
       amrex::Real tauw, qw;
-      wm.parallel_wall_stress(u_parallel, T2, rho2, Yw, h, muw, lamw, T_wall, tauw,
-                              qw);
+      wm->parallel_wall_stress(u_parallel, T2, rho2, Yw, h, muw, lamw, T_wall,
+                               ltransparm, tauw, qw);
       if (!std::isnan(tauw) && !std::isnan(qw)) {
         const amrex::Real lohi = iv[dir] == domlo ? -1.0 : 1.0;
         for (int nf = 1; nf <= NUM_FIELD; ++nf) {
@@ -194,5 +201,6 @@ AMREX_GPU_DEVICE AMREX_FORCE_INLINE void apply_regular_wall_model_sf(
     }
   }
 }
+#endif
 
 #endif

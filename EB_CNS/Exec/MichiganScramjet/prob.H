@@ -32,8 +32,8 @@ AMREX_GPU_DEVICE AMREX_FORCE_INLINE void bl_profile(const amrex::Real y,
                                                     amrex::Real& ei)
 {
   // Make boundary layer
-  amrex::Real d_wall = std::min(y, 2.54 - y); // dist from upper and lower walls
-  d_wall = std::min(d_wall, 1.905 - std::abs(z)); // dist from left and right walls
+  amrex::Real d_wall = amrex::min(y, 2.54_rt - y); // dist from upper and lower walls
+  d_wall = amrex::min(d_wall, 1.905_rt - std::abs(z)); // dist from left and right walls
   d_wall /= (0.1245 * 2.0); // d_wall/D
   const amrex::Real u_profile = (d_wall > 0.0) ? std::tanh(10.0 * d_wall) : 0.0; // u/u_inf
   u = pp.u * u_profile;
@@ -118,10 +118,10 @@ AMREX_GPU_DEVICE AMREX_FORCE_INLINE void bcnormal(
     amrex::Real T = pp.T;
     if (is_short_domain) {
       // Impose inflow velocity and some turbulence
-      amrex::Real d_wall = std::min(x[1], 2.54 - x[1]); // dist from upper and lower walls
-      d_wall = std::min(d_wall, 1.905 - std::abs(x[2])); // dist from left and right walls
+      amrex::Real d_wall = amrex::min(x[1], 2.54_rt - x[1]); // dist from upper and lower walls
+      d_wall = amrex::min(d_wall, 1.905_rt - std::abs(x[2])); // dist from left and right walls
       d_wall = d_wall > 0 ? d_wall : 1e-10;
-      u = std::max((48000 + 4000 * std::log(d_wall)) * (1.0 - std::exp(-d_wall / 0.025)), 0.0);
+      u = amrex::max((48000 + 4000 * std::log(d_wall)) * (1.0 - std::exp(-d_wall / 0.025)), 0.0);
       T = 996.0 * (1.0 - std::exp(-d_wall / 0.005)) + 300.0;
       auto eos = pele::physics::PhysicsType::eos();
       amrex::Real Y[NUM_SPECIES], p = 2700000;
@@ -204,6 +204,13 @@ AMREX_GPU_DEVICE AMREX_FORCE_INLINE void bcnormal(
   }
 
   for (int na = 0; na < NUM_AUX; ++na) { s_ext[UFA + na] = 0.0; }
+}
+
+AMREX_GPU_DEVICE AMREX_FORCE_INLINE void
+fill_ext_src(int i, int j, int k, Real time, GeometryData const& geomdata,
+             Array4<const Real> const& /*state*/, Array4<Real> const& ext_src,
+             ProbParm const& pp)
+{
 }
 
 AMREX_GPU_DEVICE AMREX_FORCE_INLINE void
@@ -385,7 +392,7 @@ prob_post_timestep(int i, int j, int k, const amrex::Real /*curtime*/,
 }
 
 #if NUM_AUX > 0
-AMREX_GPU_DEVICE AMREX_FORCE_INLINE void
+AMREX_FORCE_INLINE void
 prob_get_aux_name(amrex::Vector<std::string>& aux_name)
 {
   aux_name.resize(NUM_AUX);
@@ -419,10 +426,10 @@ prob_tag_error(int i, int j, int k, amrex::Array4<char> const& tagarr,
   const amrex::Real y = prob_lo[1] + (j + 0.5) * dx[1];
   const amrex::Real z = prob_lo[2] + (k + 0.5) * dx[2];
 
-  amrex::Real d_wall = std::min(y, 2.54 - y); // dist from upper and lower walls
-  d_wall = std::min(d_wall, 1.905 - std::abs(z)); // dist from left and right walls
+  amrex::Real d_wall = amrex::min(y, 2.54_rt - y); // dist from upper and lower walls
+  d_wall = amrex::min(d_wall, 1.905_rt - std::abs(z)); // dist from left and right walls
   if (level < 2 && d_wall > 0 && d_wall < 0.1245 && x < 0.5) { tagarr(i, j, k) = tagval; }
-  d_wall = std::min(y, 2.54 - y); // dist from upper and lower walls
+  d_wall = amrex::min(y, 2.54_rt - y); // dist from upper and lower walls
   if (level >= 2 && d_wall > 0 && d_wall < 0.1245 && x < -20) { tagarr(i, j, k) = tagval; }
 }
 

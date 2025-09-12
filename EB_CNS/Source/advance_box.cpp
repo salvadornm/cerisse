@@ -2,6 +2,7 @@
 #include "central_scheme.H"
 #include "diffusion.H"
 #include "hydro.H"
+#include "prob.H"
 #include "recon.H"
 #include "wall_model.H"
 
@@ -53,6 +54,26 @@ void CNS::compute_dSdt_box(Box const& bx, Array4<const Real>& sarr,
       vfluxfab[dir].setVal<RunOn::Device>(0.0);
     }
   }
+  
+  // To be captured in GPU kernels
+  auto const* gpu_trans_parm = trans_parms.device_trans_parm();
+  auto* const gpu_les_model = CNS::les_model;
+  // auto uptr = LESModel::create("WALE");
+  // auto const gpu_les_model = uptr.get();
+  const Real gpu_Cs = Cs;
+  // const Real gpu_C_I = C_I;
+  const Real gpu_Pr_T = Pr_T;
+  const Real gpu_Sc_T = Sc_T;
+  const int gpu_char_sys = char_sys;
+  const bool gpu_recon_char_var = recon_char_var;
+  const Real gpu_threshold = shock_sensor_threshold;
+  const Real gpu_plm_theta = plm_theta;
+  const Real gpu_teno_cutoff = teno_cutoff;
+  const bool gpu_eb_wall_model = eb_wall_model;
+  const RealBox gpu_no_wm_box = no_wm_box;
+  const bool gpu_eb_isothermal = eb_isothermal;
+  const Real gpu_eb_wall_temp = eb_wall_temp;
+  auto* const gpu_les_wm = les_wm;
 
   // Advance
 #if NUM_FIELD > 0
@@ -82,25 +103,25 @@ void CNS::compute_dSdt_box(Box const& bx, Array4<const Real>& sarr,
       if (do_visc) {
         BL_PROFILE("PelePhysics::get_transport_coeffs()");
         Array4<Real> chi; // dummy Soret effect coef
-        auto const* ltransparm = trans_parms.device_trans_parm();
         amrex::launch(bxg2, [=] AMREX_GPU_DEVICE(Box const& tbx) {
           auto trans = pele::physics::PhysicsType::transport();
           trans.get_transport_coeffs(tbx, qar_yin, qar_Tin, qar_rhoin, rhoD, chi, mu,
-                                     xi, lambda, ltransparm);
+                                     xi, lambda, gpu_trans_parm);
         });
       }
 
       // LES diffucsion coefs
       if (do_les) {
         BL_PROFILE("CNS::LES_transport_coeffs");
-        Real delta = std::pow(AMREX_D_TERM(dx[0], *dx[1], *dx[2]),
+        const Real delta = std::pow(AMREX_D_TERM(dx[0], *dx[1], *dx[2]),
                               Real(1.0) / Real(amrex::SpaceDim)); // LES filter width
+        // les_model->get_sgs_transport_coeffs(bxg2, qar_rhoin, rhoD, mu, xi, lambda,
+        //                                     dxinv, delta, Cs, C_I, Pr_T, Sc_T);
         amrex::ParallelFor(bxg2, [=] AMREX_GPU_DEVICE(int i, int j, int k) {
           Real mu_T, xi_T;
-          les_model->mu_T_cc(i, j, k, qar_rhoin, dxinv, delta, Cs, mu_T);
-          // les_model->xi_T_cc(i, j, k, qar_rhoin, dxinv, delta, C_I, xi_T);
-          xi_T = 0.0;
-          // TODO: this divu is calculated at cell centre, not face centre
+          gpu_les_model->mu_T_cc(i, j, k, qar_rhoin, dxinv, delta, gpu_Cs, mu_T);
+          // gpu_les_model->xi_T_cc(i, j, k, qar_rhoin, dxinv, delta, gpu_C_I, xi_T);
+          xi_T = 0.0; // TODO: this divu is calculated at cell centre, not face centre
           Real Y[NUM_SPECIES], cp;
           for (int n = 0; n < NUM_SPECIES; ++n) { Y[n] = qar_yin(i, j, k, n); }
           auto eos = pele::physics::PhysicsType::eos();
@@ -108,9 +129,9 @@ void CNS::compute_dSdt_box(Box const& bx, Array4<const Real>& sarr,
 
           mu(i, j, k) += mu_T;
           xi(i, j, k) += xi_T;
-          lambda(i, j, k) += cp * mu_T / Pr_T;
+          lambda(i, j, k) += cp * mu_T / gpu_Pr_T;
           for (int ns = 0; ns < NUM_SPECIES; ++ns) {
-            rhoD(i, j, k, ns) += mu_T / Sc_T;
+            rhoD(i, j, k, ns) += mu_T / gpu_Sc_T;
           }
         });
       }
@@ -118,11 +139,12 @@ void CNS::compute_dSdt_box(Box const& bx, Array4<const Real>& sarr,
       // Buffer region
       if (buffer_box.ok()) {
         const auto problo = geom.ProbLo();
+        const auto gpu_buffer_box = buffer_box;
         amrex::ParallelFor(bxg2, [=] AMREX_GPU_DEVICE(int i, int j, int k) {
-          RealVect pos{AMREX_D_DECL((i + 0.5) * dx[0] + problo[0],
+          const RealVect pos{AMREX_D_DECL((i + 0.5) * dx[0] + problo[0],
                                     (j + 0.5) * dx[1] + problo[1],
                                     (k + 0.5) * dx[2] + problo[2])};
-          if (buffer_box.contains(pos)) {
+          if (gpu_buffer_box.contains(pos)) {
             mu(i, j, k) += 0.1;
             xi(i, j, k) += 0.1;
             lambda(i, j, k) += 1e5;
@@ -162,7 +184,7 @@ void CNS::compute_dSdt_box(Box const& bx, Array4<const Real>& sarr,
           // 1. Convert primitive to characteristic at cell centre
           const Box& charbox = amrex::grow(bx, dir, 3);
           amrex::ParallelFor(charbox, [=] AMREX_GPU_DEVICE(int i, int j, int k) {
-            cns_ctochar(i, j, k, dir, q, w, char_sys);
+            cns_ctochar(i, j, k, dir, q, w, gpu_char_sys);
           });
           // 2. FD interpolation to cell face
           const Box& reconbox = amrex::grow(bx, dir, 1);
@@ -171,19 +193,17 @@ void CNS::compute_dSdt_box(Box const& bx, Array4<const Real>& sarr,
                              [=] AMREX_GPU_DEVICE(int i, int j, int k, int n,
                                                   auto captured_recon_scheme) {
                                cns_recon<captured_recon_scheme>(i, j, k, n, dir, w,
-                                                                wl, wr, plm_theta);
+                                                                wl, wr, gpu_plm_theta, gpu_teno_cutoff);
                              });
           // 3. Solve Riemann problem for fluxes at cell face
           amrex::ParallelFor(flxbx, [=] AMREX_GPU_DEVICE(int i, int j, int k) {
-            cns_riemann(i, j, k, dir, flx, q, wl, wr, char_sys, recon_char_var);
+            cns_riemann(i, j, k, dir, flx, q, wl, wr, gpu_char_sys, gpu_recon_char_var);
 
             const IntVect iv(AMREX_D_DECL(i, j, k));
             const IntVect ivd = IntVect::TheDimensionVector(dir);
             const bool do_high_order_diff =
-              (shock_sensor(iv - 2 * ivd) < shock_sensor_threshold) &&
-              (shock_sensor(iv - ivd) < shock_sensor_threshold) &&
-              (shock_sensor(iv) < shock_sensor_threshold) &&
-              (shock_sensor(iv + ivd) < shock_sensor_threshold);
+              (shock_sensor(iv - 2 * ivd) < gpu_threshold) && (shock_sensor(iv - ivd) < gpu_threshold) &&
+              (shock_sensor(iv) < gpu_threshold) && (shock_sensor(iv + ivd) < gpu_threshold);
             if (do_high_order_diff) { cns_afd_correction(i, j, k, dir, q, flx); }
           });
         } else {
@@ -200,7 +220,7 @@ void CNS::compute_dSdt_box(Box const& bx, Array4<const Real>& sarr,
         const bool lo_is_wall = phys_bc.lo(dir) == 5;
         const bool hi_is_wall = phys_bc.hi(dir) == 5;
         const int domlo = geom.Domain().smallEnd(dir);
-        const int domhi = geom.Domain().bigEnd(dir);
+        const int domhi = geom.Domain().bigEnd(dir);        
         
         amrex::ParallelFor(flxbx, [=] AMREX_GPU_DEVICE(int i, int j, int k) {
           const IntVect iv(AMREX_D_DECL(i, j, k));
@@ -209,15 +229,15 @@ void CNS::compute_dSdt_box(Box const& bx, Array4<const Real>& sarr,
           cns_diff(iv, dir, q, coefs, dxinv, flx_tmp);
 
 #if NUM_FIELD == 0
-          if (eb_wall_model) {
+          if (gpu_eb_wall_model) {
             // Wall model for regular solid boundaries (modifies flx_tmp)
             RealVect pos{AMREX_D_DECL((i + 0.5) * dx[0] + problo[0],
                                       (j + 0.5) * dx[1] + problo[1],
                                       (k + 0.5) * dx[2] + problo[2])};
-            if (!no_wm_box.contains(pos)) {
-              apply_regular_wall_model<EquilibriumODE>(
-                iv, dir, lo_is_wall, hi_is_wall, domlo, domhi, dx, q, coefs,
-                eb_isothermal, eb_wall_temp, flx_tmp);
+            if (!gpu_no_wm_box.contains(pos)) {
+              apply_regular_wall_model(iv, dir, lo_is_wall, hi_is_wall, domlo, domhi,
+                                       dx, gpu_les_wm, q, coefs, gpu_eb_isothermal,
+                                       gpu_eb_wall_temp, gpu_trans_parm, flx_tmp);
             }
           }
 #endif
@@ -287,11 +307,10 @@ void CNS::compute_dSdt_box(Box const& bx, Array4<const Real>& sarr,
                                     (j + 0.5) * dx[1] + problo[1],
                                     (k + 0.5) * dx[2] + problo[2])};
 
-          if (!no_wm_box.contains(pos)) {
-            auto const* ltransparm = CNS::trans_parms.device_trans_parm();
-            apply_regular_wall_model_sf<EquilibriumODE>(
-              iv, dir, lo_is_wall, hi_is_wall, domlo, domhi, dx, q0, eb_isothermal,
-              eb_wall_temp, ltransparm, vflx);
+          if (!gpu_no_wm_box.contains(pos)) {
+            apply_regular_wall_model_sf(iv, dir, lo_is_wall, hi_is_wall, domlo,
+                                        domhi, dx, gpu_les_wm, q0, gpu_eb_isothermal,
+                                        gpu_eb_wall_temp, gpu_trans_parm, vflx);
           }
         });
       } // eb_wall_model
@@ -314,12 +333,13 @@ void CNS::compute_dSdt_box(Box const& bx, Array4<const Real>& sarr,
 #endif
 
   // Compute flux divergence
+  AMREX_D_TERM(auto const& flx_arr_x = flxfab[0]->array();
+               , auto const& flx_arr_y = flxfab[1]->array();
+               , auto const& flx_arr_z = flxfab[2]->array();)
   amrex::ParallelFor(bx, ncomp,
                      [=] AMREX_GPU_DEVICE(int i, int j, int k, int n) noexcept {
                        cns_div(i, j, k, n, dsdt,
-                               AMREX_D_DECL(flxfab[0]->array(), flxfab[1]->array(),
-                                            flxfab[2]->array()),
-                               dxinv);
+                               AMREX_D_DECL(flx_arr_x, flx_arr_y, flx_arr_z), dxinv);
                      });
 
 #if NUM_FIELD > 0
