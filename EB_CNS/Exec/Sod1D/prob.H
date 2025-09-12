@@ -72,6 +72,32 @@ AMREX_GPU_DEVICE AMREX_FORCE_INLINE void bcnormal(
 }
 
 /**
+ * \brief Fill external source term.
+ *
+ * \warning This function will overwrite dsdt fab. Always use += instead of =.
+ *
+ * @param i         x position.
+ * @param j         y position.
+ * @param k         z position.
+ * @param time      time.
+ * @param geomdata  domain geometry data.
+ * @param state     state data.
+ * @param ext_src   external source term.
+ * @param prob_parm ProbParm data as defined in prob_parm.H and initialised in
+ * amrex_probinit.
+ */
+AMREX_GPU_DEVICE AMREX_FORCE_INLINE void fill_ext_src(
+  int i, int j, int k, amrex::Real /*time*/, amrex::GeometryData const& /*geomdata*/,
+  amrex::Array4<const amrex::Real> const& state,
+  amrex::Array4<amrex::Real> const& ext_src, ProbParm const& /*prob_parm*/)
+{
+  // Example
+  // const Real g = 9.81 * 100;
+  // ext_src(i, j, k, UMZ)   += g * state(i, j, k, URHO);
+  // ext_src(i, j, k, UEDEN) += g * state(i, j, k, UMZ);
+}
+
+/**
  * \brief Modify state data and/or add turbulence to fields after restart.
  *
  * @param i         x position.

@@ -9,12 +9,6 @@ void amrex_probinit(const int* /*init*/, const int* /*name*/, const int* /*namel
 }
 }
 
-void CNS::fill_ext_src(int i, int j, int k, Real time, GeometryData const& geomdata,
-                       Array4<const Real> const& /*state*/,
-                       Array4<Real> const& ext_src, ProbParm const& pp)
-{
-}
-
 void GraVent::build(const Geometry& geom, const int max_coarsening_level)
 {
   // Geometry configuration

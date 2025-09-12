@@ -93,6 +93,13 @@ AMREX_GPU_DEVICE AMREX_FORCE_INLINE void bcnormal(
 {
 }
 
+AMREX_GPU_DEVICE AMREX_FORCE_INLINE void fill_ext_src(
+  int i, int j, int k, amrex::Real time, amrex::GeometryData const& geomdata,
+  amrex::Array4<const amrex::Real> const& /*state*/,
+  amrex::Array4<amrex::Real> const& ext_src, ProbParm const& pp)
+{
+}
+
 /**
  * \brief Modify state data and/or add turbulence to fields after restart.
  *

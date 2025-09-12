@@ -34,5 +34,6 @@ USE_EB = FALSE
 USE_PMFDATA = TRUE
 
 # GNU Make
-include ./Make.package
+CEXE_headers += prob.H prob_parm.H
+CEXE_sources += prob.cpp
 include ../../Source/Make.CNS

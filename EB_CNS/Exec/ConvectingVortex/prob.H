@@ -83,6 +83,13 @@ AMREX_GPU_DEVICE AMREX_FORCE_INLINE void bcnormal(
 }
 
 AMREX_GPU_DEVICE AMREX_FORCE_INLINE void
+fill_ext_src(int i, int j, int k, amrex::Real t, amrex::GeometryData const& geomdata,
+             amrex::Array4<const amrex::Real> const& state,
+             amrex::Array4<amrex::Real> const& ext_src, ProbParm const& prob_parm)
+{
+}
+
+AMREX_GPU_DEVICE AMREX_FORCE_INLINE void
 prob_post_restart(int i, int j, int k, amrex::Array4<amrex::Real> const& state,
                   amrex::GeometryData const& geomdata, ProbParm const& prob_parm)
 {

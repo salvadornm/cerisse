@@ -52,6 +52,42 @@ prob_initdata(int i, int j, int k, amrex::Array4<amrex::Real> const& state,
   }
 }
 
+AMREX_GPU_DEVICE AMREX_FORCE_INLINE void fill_ext_src(
+  int i, int j, int k, amrex::Real time, amrex::GeometryData const& geomdata,
+  amrex::Array4<const amrex::Real> const& state,
+  amrex::Array4<amrex::Real> const& ext_src, ProbParm const& /*prob_parm*/)
+{
+  // Geometry
+  const amrex::Real* prob_lo = geomdata.ProbLo();
+  const amrex::Real* dx = geomdata.CellSize();
+  const amrex::Real x = prob_lo[0] + (i + 0.5) * dx[0];
+  const amrex::Real y = prob_lo[1] + (j + 0.5) * dx[1];
+  const amrex::Real z = prob_lo[2] + (k + 0.5) * dx[2];
+
+  // Get source term from MASA
+  amrex::Real source_term[5] = {0.0};
+  source_term[0] = masa_eval_3d_source_rho(x, y, z);
+  source_term[1] = masa_eval_3d_source_rho_u(x, y, z);
+  source_term[2] = masa_eval_3d_source_rho_v(x, y, z);
+  source_term[3] = masa_eval_3d_source_rho_w(x, y, z);
+  source_term[4] = masa_eval_3d_source_rho_e(x, y, z);
+
+  // Set the state
+  for (int nf = 0; nf <= NUM_FIELD; ++nf) {
+    ext_src(i, j, k, nf * NVAR + URHO) += source_term[0];
+    ext_src(i, j, k, nf * NVAR + UMX) += source_term[1];
+    ext_src(i, j, k, nf * NVAR + UMY) += source_term[2];
+    ext_src(i, j, k, nf * NVAR + UMZ) += source_term[3];
+    ext_src(i, j, k, nf * NVAR + UEDEN) += source_term[4];
+    amrex::Real rhoinv = 1.0 / state(i, j, k, nf * NVAR + URHO);
+    amrex::Real Y;
+    for (int n = 0; n < NUM_SPECIES; n++) {
+      Y = state(i, j, k, nf * NVAR + UFS + n) * rhoinv;
+      ext_src(i, j, k, nf * NVAR + UFS + n) += source_term[0] * Y;
+    }
+  }
+}
+
 AMREX_GPU_DEVICE AMREX_FORCE_INLINE void bcnormal(
   const amrex::Real* /*x[AMREX_SPACEDIM]*/, const amrex::Real* /*s_int[NVAR]*/,
   const amrex::Real* /*s_refl[NVAR]*/, amrex::Real* /*s_ext[NVAR]*/,

@@ -33,5 +33,6 @@ NUM_FIELD = 0
 NUM_AUX = 13 # for time averages
 
 # GNU Make
-include ./Make.package
+CEXE_headers += prob.H prob_parm.H
+CEXE_sources += prob.cpp
 include ../../Source/Make.CNS
