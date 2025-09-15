@@ -3,19 +3,20 @@
 
 #include <AMReX_Array4.H>
 #include <AMReX_REAL.H>
-#include <Factory.H>
 
 #include "index_macros.H"
 
 /**
  * @brief Base class to register eddy viscosity type LES models.
  */
-class LESModel : public pele::physics::Factory<LESModel>
+class LESModel
 {
 public:
   static const std::string base_identifier() { return "LESModel"; }
 
-  ~LESModel() override = default;
+  static void create(std::string selector, LESModel*& model);
+  
+  static void destroy(LESModel*& model);
 
   virtual AMREX_GPU_DEVICE void mu_T_cc(
     const int i, const int j, const int k, const amrex::Array4<const amrex::Real>& q,
@@ -35,126 +36,10 @@ public:
     const amrex::Real deltabar, const amrex::Real CI, amrex::Real& xi_T);
 };
 
-// void get_les_model(std::string model_name, LESModel* les_model_ptr)
-// {
-//   auto unique_ptr = LESModel::create(model_name);
-// #ifdef AMREX_USE_GPU
-//   amrex::Gpu::htod_memcpy_async(les_model_ptr, unique_ptr.get(),
-//                                 sizeof(LESModel)); // not trivially copyable
-// #else
-//   les_model_ptr = unique_ptr.data();
-// #endif
-// }
-
-/**
- * @brief Base class to register eddy viscosity type LES models.
- */
-// class LESModel : public pele::physics::Factory<LESModel>
-// {
-// public:
-//   static const std::string base_identifier() { return "LESModel"; }
-
-//   ~LESModel() override = default;
-
-//   void get_sgs_transport_coeffs(
-//     amrex::Box const& bx, amrex::Array4<const amrex::Real> const& q_in,
-//     amrex::Array4<amrex::Real> const& rhoD, amrex::Array4<amrex::Real> const& mu,
-//     amrex::Array4<amrex::Real> const& xi, amrex::Array4<amrex::Real> const&
-//     lambda, const amrex::GpuArray<amrex::Real, AMREX_SPACEDIM>& dxinv, const
-//     amrex::Real delta, const amrex::Real Cs, const amrex::Real C_I, const
-//     amrex::Real Pr_T, const amrex::Real Sc_T)
-//   {
-//     amrex::ParallelFor(bx, [q_in, rhoD, mu, xi, lambda, dxinv, delta, Cs, C_I,
-//     Pr_T,
-//                             Sc_T, this] AMREX_GPU_DEVICE(int i, int j, int k) {
-//       amrex::Real mu_T, xi_T;
-//       mu_T_cc(i, j, k, q_in, dxinv, delta, Cs, mu_T);
-//       // xi_T_cc(i, j, k, qar_rhoin, dxinv, delta, C_I, xi_T);
-//       xi_T = 0.0; // TODO: this divu is calculated at cell centre, not face centre
-//       amrex::Real Y[NUM_SPECIES], cp;
-//       for (int n = 0; n < NUM_SPECIES; ++n) { Y[n] = q_in(i, j, k, QFS + n); }
-//       auto eos = pele::physics::PhysicsType::eos();
-//       eos.RTY2Cp(q_in(i, j, k, QRHO), q_in(i, j, k, QTEMP), Y, cp);
-
-//       mu(i, j, k) += mu_T;
-//       xi(i, j, k) += xi_T;
-//       lambda(i, j, k) += cp * mu_T / Pr_T;
-//       for (int ns = 0; ns < NUM_SPECIES; ++ns) { rhoD(i, j, k, ns) += mu_T / Sc_T;
-//       }
-//     });
-//   }
-
-//   virtual AMREX_GPU_DEVICE AMREX_FORCE_INLINE void mu_T_cc(
-//     const int i, const int j, const int k, const amrex::Array4<const amrex::Real>&
-//     q, const amrex::GpuArray<amrex::Real, AMREX_SPACEDIM>& dxinv, const
-//     amrex::Real deltabar, const amrex::Real Cs, amrex::Real& mu_T) = 0;
-
-//   virtual AMREX_GPU_DEVICE AMREX_FORCE_INLINE void
-//   mu_T_fc(const amrex::Real dudx, const amrex::Real dudy, const amrex::Real dudz,
-//           const amrex::Real dvdx, const amrex::Real dvdy, const amrex::Real dvdz,
-//           const amrex::Real dwdx, const amrex::Real dwdy, const amrex::Real dwdz,
-//           const amrex::Real rho, const amrex::Real deltabar, const amrex::Real Cs,
-//           amrex::Real& mu_T) = 0;
-
-//   virtual AMREX_GPU_DEVICE AMREX_FORCE_INLINE void xi_T_cc(
-//     const int i, const int j, const int k, const amrex::Array4<const amrex::Real>&
-//     q, const amrex::GpuArray<amrex::Real, AMREX_SPACEDIM>& dxinv, const
-//     amrex::Real deltabar, const amrex::Real CI, amrex::Real& xi_T);
-// };
-
-/**
- * @brief Calculate the turbulent bulk viscosity.
- *        Note that velocity derivatives are evaluated at cell centre (cc).
- *
- * @param i,j,k     x,y,z index
- * @param q         primitive variables array
- * @param dxinv     cell size, used for calculating velocity derivatives
- * @param deltabar  filter width
- * @param CI        Yoshizawa constant
- * @param xi_T[out] output turbulent bulk viscosity
- */
-AMREX_GPU_DEVICE AMREX_FORCE_INLINE void LESModel::xi_T_cc(
-  const int i, const int j, const int k, const amrex::Array4<const amrex::Real>& q,
-  const amrex::GpuArray<amrex::Real, AMREX_SPACEDIM>& dxinv,
-  const amrex::Real deltabar, const amrex::Real CI, amrex::Real& xi_T)
-{
-  using amrex::Real;
-
-  // Calculate derivatives at cell centers, second order central difference
-  Real dUdx[3][3] = {{0.0}};
-  dUdx[0][0] = 0.5 * dxinv[0] * (q(i + 1, j, k, QU) - q(i - 1, j, k, QU)); // dudx
-  dUdx[1][0] = 0.5 * dxinv[0] * (q(i + 1, j, k, QV) - q(i - 1, j, k, QV)); // dvdx
-  dUdx[0][1] = 0.5 * dxinv[1] * (q(i, j + 1, k, QU) - q(i, j - 1, k, QU)); // dudy
-  dUdx[1][1] = 0.5 * dxinv[1] * (q(i, j + 1, k, QV) - q(i, j - 1, k, QV)); // dvdy
-#if AMREX_SPACEDIM == 3
-  dUdx[2][0] = 0.5 * dxinv[0] * (q(i + 1, j, k, QW) - q(i - 1, j, k, QW)); // dwdx
-  dUdx[2][1] = 0.5 * dxinv[1] * (q(i, j + 1, k, QW) - q(i, j - 1, k, QW)); // dwdy
-  dUdx[0][2] = 0.5 * dxinv[2] * (q(i, j, k + 1, QU) - q(i, j, k - 1, QU)); // dudz
-  dUdx[1][2] = 0.5 * dxinv[2] * (q(i, j, k + 1, QV) - q(i, j, k - 1, QV)); // dvdz
-  dUdx[2][2] = 0.5 * dxinv[2] * (q(i, j, k + 1, QW) - q(i, j, k - 1, QW)); // dwdz
-#endif
-
-  Real Sijmag2 = 0.0, div = 0.0;
-  for (int m = 0; m < AMREX_SPACEDIM; m++) {
-    for (int n = 0; n < AMREX_SPACEDIM; n++) {
-      Sijmag2 += (0.5 * (dUdx[m][n] + dUdx[n][m])) *
-                 (0.5 * (dUdx[m][n] + dUdx[n][m])); // Sij*Sij
-    }
-    div += dUdx[m][m]; // Skk
-  }
-  Sijmag2 *= 2.0;
-
-  if (std::abs(div) > std::numeric_limits<Real>::epsilon()) {
-    xi_T = 1.0 / 3.0 * q(i, j, k, QRHO) * CI * deltabar * deltabar * Sijmag2 / div;
-  } else {
-    xi_T = 0.0;
-  }
-}
-
 //
 // Declare LES models
 
-class Smagorinsky : public LESModel::Register<Smagorinsky>
+class Smagorinsky : public LESModel
 {
 public:
   static const std::string identifier() { return "Smagorinsky"; }
@@ -173,7 +58,7 @@ public:
 };
 
 // Nicoud & Ducros (1999) https://doi.org/10.1023/A:1009995426001
-class WALE : public LESModel::Register<WALE>
+class WALE : public LESModel
 {
 public:
   static const std::string identifier() { return "WALE"; }

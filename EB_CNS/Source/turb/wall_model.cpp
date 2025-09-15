@@ -11,6 +11,25 @@
 
 using namespace amrex;
 
+void LESWallModel::create(std::string selector, LESWallModel*& model) 
+{  
+  LESWallModel** tmp = (LESWallModel**)The_Arena()->alloc(sizeof(LESWallModel*));
+  if (selector == LawOfTheWall::identifier()) {
+    amrex::single_task([=] AMREX_GPU_DEVICE() { *tmp = new LawOfTheWall(); });
+  } else if (selector == EquilibriumODE::identifier()) {
+    amrex::single_task([=] AMREX_GPU_DEVICE() { *tmp = new EquilibriumODE(); });
+  } else {
+    amrex::Abort("Cannot find " + selector + " in " + base_identifier());
+  }
+  amrex::Gpu::copy(Gpu::deviceToHost, tmp, tmp + 1, &model);
+  The_Arena()->free(tmp);
+}
+
+void LESWallModel::destroy(LESWallModel*& model) {
+  auto local_model = model;
+  amrex::single_task([=] AMREX_GPU_DEVICE() { delete local_model; });
+}
+
 AMREX_GPU_DEVICE AMREX_FORCE_INLINE void LawOfTheWall::parallel_wall_stress(
   Real u, Real T, Real rho, Real Y[NUM_SPECIES], Real h, Real mu, Real lam,
   Real T_wall, const d_trans_parm* /*ltransparm*/, Real& tau, Real& q)
@@ -121,7 +140,7 @@ AMREX_GPU_DEVICE AMREX_FORCE_INLINE void EquilibriumODE::parallel_wall_stress(
   Real rho_0, tauw, tmp[n_grid], mu[n_grid], lam[n_grid], cp[n_grid],
     mut[n_grid]; // temporary variables
   int iter = 0, max_iter = 10;
-  LUSolver<n_grid, Real> lusolver;
+  // LUSolver<n_grid, Real> lusolver;
   while ((res_u > 0.01 * uwm || res_T > 0.01 * Twm) &&
          (iter < max_iter)) { // until within 1% error
     // compute coefficients
@@ -170,7 +189,8 @@ AMREX_GPU_DEVICE AMREX_FORCE_INLINE void EquilibriumODE::parallel_wall_stress(
     }
 
     // solve
-    lusolver.define(A);
+    // lusolver.define(A); // LUSolver::define is host-only
+    LUSolver<n_grid, Real> lusolver(A);
     lusolver(tmp, b.arr);
 
     res_u = 0.0;
@@ -225,8 +245,9 @@ AMREX_GPU_DEVICE AMREX_FORCE_INLINE void EquilibriumODE::parallel_wall_stress(
     }
 
     // solve
-    lusolver.define(A);
-    lusolver(tmp, b.arr);
+    // lusolver.define(A);
+    LUSolver<n_grid, Real> lusolver2(A);
+    lusolver2(tmp, b.arr);
     res_T = 0.0;
     for (int i = 0; i < n_grid; ++i) {
       res_T += std::abs(T[i] - tmp[i]) / Real(n_grid);
@@ -248,7 +269,7 @@ AMREX_GPU_DEVICE AMREX_FORCE_INLINE void EquilibriumODE::parallel_wall_stress(
     q = 0.0;
   }
 
-#ifdef WALLMODEL_DEBUG
-  trans_parms.deallocate();
-#endif
+// #ifdef WALLMODEL_DEBUG
+//   trans_parms.deallocate();
+// #endif
 }

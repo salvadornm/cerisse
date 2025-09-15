@@ -57,7 +57,7 @@ cns_ctoprim(int i, int j, int k, int ns, amrex::Array4<amrex::Real const> const&
   q(i, j, k, QTEMP) = u(i, j, k, ns + UTEMP);
   q(i, j, k, QWBAR) = wbar;
 
-#ifdef MONITOR_PROBLEM_CELL
+#if defined(MONITOR_PROBLEM_CELL) && !defined(AMREX_USE_GPU)
   // Monitor problem cell
   // std::ostringstream ss;
   std::ostream& ss = std::cout;
@@ -510,8 +510,8 @@ AMREX_GPU_DEVICE AMREX_FORCE_INLINE void cns_riemann(
   auto eos = pele::physics::PhysicsType::eos();
 
   if (recon_char_var &&
-      (!std::isgreater(wl(iv, WTHER), 0.0) ||
-       !std::isgreater(wr(iv, WTHER), 0.0))) { // isgreater() returns false with nan
+      (!(wl(iv, WTHER) > 0.0_rt) ||
+       !(wr(iv, WTHER) > 0.0_rt))) { // isgreater() returns false with nan
     // Limit reconstructed thermodynamic variable
     wl(iv, WTHER) = (sys == 0) ? q(iv - iv_dir, QC) : q(iv - iv_dir, QG);
     wr(iv, WTHER) = (sys == 0) ? q(iv, QC) : q(iv, QG);
@@ -559,8 +559,7 @@ AMREX_GPU_DEVICE AMREX_FORCE_INLINE void cns_riemann(
   cns_unpackchar(wr(iv, WRHO), wr(iv, WACO), wr(iv, WACO + 1), cr, r, g, rr, ur, pr,
                  sys);
 
-  if (!std::isgreater(rl, 0.0) || !std::isgreater(pl, 0.0) ||
-      !std::isgreater(rr, 0.0) || !std::isgreater(pr, 0.0) ||
+  if (!(rl > 0.0) || !(pl > 0.0) || !(rr > 0.0) || !(pr > 0.0) ||
       isnan(AMREX_D_TERM(ul + ur, +ut1l + ut1r, +ut2l + ut2r))) {
     // Revert to piecewise linear (Godunov) recon if any value is non-physical
     rl = q(iv - iv_dir, QRHO);

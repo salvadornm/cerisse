@@ -400,8 +400,7 @@ void CNS::enforce_consistent_state(MultiFab& S)
                 {
                   if (bx.contains(i + ix, j + iy, k + iz)) {
                     Real T_neighbour = s_arr(i + ix, j + iy, k + iz, UTEMP);
-                    if (std::isgreater(T_neighbour, min_temp) &&
-                        std::isless(T_neighbour, max_temp)
+                    if ((T_neighbour > min_temp) && (T_neighbour < max_temp)
 #if CNS_USE_EB
                         && flag_arr(i + ix, j + iy, k + iz).isRegular()
 #endif

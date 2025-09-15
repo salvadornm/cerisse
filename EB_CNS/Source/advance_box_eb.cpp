@@ -47,7 +47,8 @@ void CNS::compute_dSdt_box_eb(
   const auto dx = geom.CellSizeArray();
   const auto dxinv = geom.InvCellSizeArray();
   const bool do_diffusion = do_visc || do_les || buffer_box.ok();
-  const auto problo = geom.ProbLo();
+  const GpuArray<const Real, amrex::SpaceDim> problo = {
+    AMREX_D_DECL(geom.ProbLo(0), geom.ProbLo(1), geom.ProbLo(2))};
 
   // Prepare FABs to store data
   FArrayBox divcfab(bxg3, ncomp, The_Async_Arena()); // For redistribution
@@ -170,7 +171,6 @@ void CNS::compute_dSdt_box_eb(
 
       // Buffer region
       if (buffer_box.ok()) {
-        const auto problo = geom.ProbLo();
         const auto gpu_buffer_box = buffer_box;
         amrex::ParallelFor(bxg4, [=] AMREX_GPU_DEVICE(int i, int j, int k) {
           RealVect pos{AMREX_D_DECL((i + 0.5) * dx[0] + problo[0],

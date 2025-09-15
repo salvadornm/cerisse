@@ -2,7 +2,6 @@
 #define CNS_WALL_MODEL_H_
 
 #include <AMReX_REAL.H>
-#include <Factory.H>
 #include <PelePhysics.H>
 
 #include "index_macros.H"
@@ -10,12 +9,14 @@
 using d_trans_parm = pele::physics::transport::TransParm<
     pele::physics::EosType, pele::physics::PhysicsType::transport_type>;
 
-class LESWallModel : public pele::physics::Factory<LESWallModel>
+class LESWallModel
 {
 public:
   static const std::string base_identifier() { return "LESWallModel"; }
 
-  ~LESWallModel() override = default;
+  static void create(std::string selector, LESWallModel*& model);
+
+  static void destroy(LESWallModel*& model);
 
   /**
    * @brief Compute the parallel wall stress and heat flux
@@ -35,19 +36,9 @@ public:
     const d_trans_parm* ltransparm, amrex::Real& tau, amrex::Real& q) = 0;
 };
 
-// void get_les_wall_model(std::string model_name, LESWallModel* les_wm_ptr)
-// {
-//   auto unique_ptr = LESWallModel::create(model_name);
-// #ifdef AMREX_USE_GPU
-//   amrex::Gpu::htod_memcpy_async(les_wm_ptr, unique_ptr.get(), sizeof(LESWallModel));
-// #else
-//   les_wm_ptr = unique_ptr.data();
-// #endif
-// }
-
 // Algebric wall model
 
-class LawOfTheWall : public LESWallModel::Register<LawOfTheWall>
+class LawOfTheWall : public LESWallModel
 {
 public:
   static const std::string identifier() { return "LawOfTheWall"; }
@@ -60,7 +51,7 @@ public:
 
 // ODE wall model
 
-class EquilibriumODE : public LESWallModel::Register<EquilibriumODE>
+class EquilibriumODE : public LESWallModel
 {
 public:
   static const std::string identifier() { return "EquilibriumODE"; }

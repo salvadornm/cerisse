@@ -1,2 +1,2 @@
 CEXE_headers += LES.H PaSR.H wall_model.H
-CEXE_sources += Smagorinsky.cpp WALE.cpp wall_model.cpp
+CEXE_sources += LES.cpp wall_model.cpp

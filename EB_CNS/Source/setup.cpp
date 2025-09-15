@@ -119,20 +119,10 @@ void CNS::read_params()
   if (eb_wall_model) {
     std::string wall_model_name = "EquilibriumODE";
     pp.query("wall_model", wall_model_name);
-// #ifdef AMREX_USE_GPU
-//     les_wm = (LESWallModel*)The_Arena()->alloc(sizeof(LESWallModel));
-// #endif
-//     get_les_wall_model(wall_model_name, les_wm);
-    auto unique_ptr = LESWallModel::create(wall_model_name);
-#ifdef AMREX_USE_GPU
-    les_wm = (LESWallModel*)The_Arena()->alloc(sizeof(LESWallModel));
-    amrex::Gpu::htod_memcpy_async(les_wm, unique_ptr.release(), sizeof(LESWallModel));
-#else
-    les_wm = unique_ptr.release();
-#endif
+    LESWallModel::create(wall_model_name, les_wm);
 
     if (pp.queryarr("no_wm_in_box_lo", boxlo)) {
-      pp.getarr("no_wm_in_box_lo", boxhi);
+      pp.getarr("no_wm_in_box_hi", boxhi);
       no_wm_box.setLo(boxlo.data());
       no_wm_box.setHi(boxhi.data());
       if (!no_wm_box.ok()) { amrex::Abort("CNS: no_wm_box has negative volume"); }
@@ -353,18 +343,7 @@ void CNS::read_params()
   if (do_les || do_pasr) {
     std::string les_model_name;
     pp.get("les_model", les_model_name);
-// #ifdef AMREX_USE_GPU
-//     les_model = (LESModel*)The_Arena()->alloc(sizeof(LESModel));
-// #endif
-//     get_les_model(les_model_name, les_model);
-    auto unique_ptr = LESModel::create(les_model_name);
-#ifdef AMREX_USE_GPU
-    les_model = (LESModel*)The_Arena()->alloc(sizeof(LESModel));
-    amrex::Gpu::htod_memcpy_async(les_model, unique_ptr.release(),
-                                  sizeof(LESModel)); // not trivially copyable
-#else
-    les_model = unique_ptr.release();
-#endif
+    LESModel::create(les_model_name, les_model);
   }
 
   pp.query("do_nscbc", do_nscbc);
@@ -802,7 +781,8 @@ void CNS::variableCleanUp()
 #ifdef AMREX_USE_GPU
   The_Arena()->free(dp_refine_boxes);
   The_Arena()->free(dp_refine_boxes_max_lev);
-  The_Arena()->free(les_model);
-  The_Arena()->free(les_wm);
 #endif
+  
+  LESWallModel::destroy(les_wm);
+  LESModel::destroy(les_model);
 }

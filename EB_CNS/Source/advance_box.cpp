@@ -29,7 +29,8 @@ void CNS::compute_dSdt_box(Box const& bx, Array4<const Real>& sarr,
   const auto dx = geom.CellSizeArray();
   const auto dxinv = geom.InvCellSizeArray();
   const bool do_diffusion = do_visc || do_les || buffer_box.ok();
-  const auto problo = geom.ProbLo();
+  const GpuArray<const Real, amrex::SpaceDim> problo = {
+    AMREX_D_DECL(geom.ProbLo(0), geom.ProbLo(1), geom.ProbLo(2))};
 
   // Prepare FABs to store data
   FArrayBox qfab(bxg3, NPRIM, The_Async_Arena()); // Primitive variables
@@ -57,9 +58,7 @@ void CNS::compute_dSdt_box(Box const& bx, Array4<const Real>& sarr,
   
   // To be captured in GPU kernels
   auto const* gpu_trans_parm = trans_parms.device_trans_parm();
-  auto* const gpu_les_model = CNS::les_model;
-  // auto uptr = LESModel::create("WALE");
-  // auto const gpu_les_model = uptr.get();
+  auto* const gpu_les_model = les_model;
   const Real gpu_Cs = Cs;
   // const Real gpu_C_I = C_I;
   const Real gpu_Pr_T = Pr_T;
@@ -138,12 +137,11 @@ void CNS::compute_dSdt_box(Box const& bx, Array4<const Real>& sarr,
 
       // Buffer region
       if (buffer_box.ok()) {
-        const auto problo = geom.ProbLo();
         const auto gpu_buffer_box = buffer_box;
         amrex::ParallelFor(bxg2, [=] AMREX_GPU_DEVICE(int i, int j, int k) {
           const RealVect pos{AMREX_D_DECL((i + 0.5) * dx[0] + problo[0],
-                                    (j + 0.5) * dx[1] + problo[1],
-                                    (k + 0.5) * dx[2] + problo[2])};
+                                          (j + 0.5) * dx[1] + problo[1],
+                                          (k + 0.5) * dx[2] + problo[2])};
           if (gpu_buffer_box.contains(pos)) {
             mu(i, j, k) += 0.1;
             xi(i, j, k) += 0.1;
