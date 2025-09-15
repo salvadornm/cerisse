@@ -224,6 +224,7 @@ public:
   static amrex::Real nscbc_relax_T;
   static amrex::Real ambient_p;
   static amrex::BCRec phys_bc; // this has to be public for cns_bcfill to access
+  static amrex::Gpu::DeviceVector<amrex::BCRec> d_bcs;
 
 #ifndef AMREX_USE_CUDA
 protected:

@@ -422,7 +422,7 @@ void CNS::compute_dSdt_box_eb(
     Real fac_for_deltaR = 1.0;
     amrex::ApplyMLRedistribution(
       bx, ncomp, dsdt, divc, sarr, scratch, flag, AMREX_D_DECL(apx, apy, apz), vfrac,
-      AMREX_D_DECL(fcx, fcy, fcz), bcent, &phys_bc, geom, dt, redistribution_type,
+      AMREX_D_DECL(fcx, fcy, fcz), bcent, d_bcs.data(), geom, dt, redistribution_type,
       as_crse, rr_drho_crse, rr_flag_crse, as_fine, dm_as_fine, lev_mask,
       level_mask_not_covered, fac_for_deltaR, use_wts_in_divnc, 0, srd_max_order,
       target_volfrac, srd_update_scale);

@@ -11,6 +11,7 @@ ProbParm* CNS::d_prob_parm = nullptr;
 #ifdef USE_PROB_PARM_HOST
 ProbParmHost* CNS::prob_parm_host = nullptr;
 #endif
+Gpu::DeviceVector<BCRec> CNS::d_bcs;
 
 // using BndryFunc = StateDescriptor::BndryFunc;
 
@@ -585,6 +586,9 @@ void CNS::variableSetUp()
   bndryfunc.setRunOnGPU(true);
 
   desc_lst.setComponent(State_Type, 0, name, bcs, bndryfunc);
+
+  d_bcs.resize(bcs.size());
+  Gpu::copy(Gpu::hostToDevice, bcs.begin(), bcs.end(), d_bcs.begin());
 
   // Setup React_Type
   store_in_checkpoint = false;
