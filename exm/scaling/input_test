@@ -1,0 +1,75 @@
+amrex.fpe_trap_invalid=1
+# amrex.use_gpu_aware_mpi = 1
+
+# start time is assumed to be 0, unless re-starting
+max_step  = 100000
+stop_time = 0.56
+# One flow time @ M=0.1 = 0.04747963405s
+# One flow time @ M=1.0 = 4.74796e-3s
+#time_step = 0.20e-4 	t0 = 0.02879768262
+cfl = 0.3
+
+cns.order_rk  = -2
+cns.stages_rk = 2
+
+# computational domain 
+geometry.is_periodic = 1 1 1
+geometry.coord_sys   = 0  # 0 => cart, 1 => RZ  2=>spherical
+geometry.prob_lo     = 0.0     0.0     0.0
+geometry.prob_hi     = 6.28318     6.28318     6.28318
+
+# bc
+cns.lo_bc = -1 -1 -1
+cns.hi_bc = -1 -1 -1
+# verbosity
+cns.nstep_screen_output = 1
+cns.verbose   = 0       # 0=quiet, 1=verbose
+amr.v         = 1       # verbosity level 0=quiet, 1=verbose
+
+# REFINEMENT / REGRIDDING 
+amr.n_cell          = 128 128 128
+amr.max_level       = 0       # maximum level number allowed
+amr.ref_ratio       = 2       # refinement ratio
+amr.regrid_int      = 5000    # how often to regrid
+amr.blocking_factor = 8       # blocking factor
+amr.max_grid_size   = 64      # maximum size of any grid
+amr.n_error_buf     = 0 0 0 0 # number of buffer cells in error est
+amr.grid_eff        = 0.70    # what constitutes an efficient grid
+
+# CHECKPOINT FILES
+amr.checkpoint_files_output = 0   # 0=off, 1=o
+amr.check_file              = chk # root name of checkpoint file
+amr.check_int               = 100000 # number of timesteps between checkpoints
+
+# PLOTFILES
+amr.plot_files_output = 1
+amr.plot_file         = ./plot/plt # root name of plotfile
+amr.plot_int          = 200         # number of timesteps between plotfiles
+amr.derive_plot_vars  = pressure velocity temperature
+cns.screen_output     = 1000
+
+# DIAGNOSTICS
+amr.data_log = time_probe.log
+cns.record_probe = 1
+cns.time_probe_lev = 0
+cns.time_probe_int = 1
+cns.time_probes = KineticEnergy Enstrophy Density PressurePoint
+KineticEnergy.field_name = kinetic_energy
+KineticEnergy.box_lo = 0.0 0.0 0.0
+KineticEnergy.box_hi = 6.28318 6.28318 6.28318
+Enstrophy.field_name = enstrophy
+Enstrophy.box_lo = 0.0 0.0 0.0
+Enstrophy.box_hi = 6.28318 6.28318 6.28318
+Density.field_name = Density
+Density.box_lo = 0.0 0.0 0.0
+Density.box_hi = 6.28318 6.28318 6.28318
+PressurePoint.field_name = pressure
+PressurePoint.box_lo = 3.14159 3.14159 3.14159
+PressurePoint.box_hi = 3.19068 3.19068 3.19068
+### 
+
+amrex.the_arena_init_size=8 # in bytes
+amrex.the_device_arena_init_size=8
+amrex.the_managed_arena_init_size=8
+amrex.the_arena_is_managed=1
+amrex.abort_on_out_of_gpu_memory=1

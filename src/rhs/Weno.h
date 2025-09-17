@@ -290,10 +290,7 @@ class weno_t {
         cls->char2cons(roe_avg, fmR);
 
         for (int n = 0; n < cls_t::NCONS; ++n) {
-
-          
-          
-
+                
           flx(iv, n) = alpha * (fpL[n] - fmR[n]);
 
           // // snm
