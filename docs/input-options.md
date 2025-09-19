@@ -23,6 +23,7 @@ NOTE: In the tables below, DIM means the number of dimensions, Int means integer
 | --------------------------- | ------------- |:-------:| ------------------------------------------------------------ |
 | max_step                    | Int           |         | Maximum number of time steps to take                         |
 | stop_time                   | Real          |         | Maximum time to reach                                        |
+| rand_seed                   | Int           | 24      | Random seed for reproducibility                              |
 | geometry.is_periodic        | DIM * Int     | 0 0 0   | 1 for true, 0 for false (one value for each coordinate direction) |
 | geometry.coord_sys          | Int           | 0       | 0 = Cartesian; 1 = Cylindrical; 2 = Spherical (only support Cartesian) |
 | geometry.prob_lo            | DIM * Real    | 0 0 0   | Low corner of physical domain (physical not index space)     |
@@ -59,6 +60,7 @@ NOTE: In the tables below, DIM means the number of dimensions, Int means integer
 | amr.check_int               | Int           | -1      | Frequency of checkpoint file output; if -1 then no plotfiles will be   written |
 | amr.restart                 | String        |         | If present, then the name of checkpoint file to restart from |
 | amr.plotfile_on_restart     | Bool          | 0       | Write a plotfile when immediately after restart or not       |
+| print_inputs                | Bool          | 0       | Print all input parameters at the beginning of the run       |
 
 ### Other parameters
 

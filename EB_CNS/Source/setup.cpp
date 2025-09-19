@@ -589,6 +589,7 @@ void CNS::variableSetUp()
 
   d_bcs.resize(bcs.size());
   Gpu::copy(Gpu::hostToDevice, bcs.begin(), bcs.end(), d_bcs.begin());
+  // d_bcs.assign(bcs.begin(), bcs.end());
 
   // Setup React_Type
   store_in_checkpoint = false;
