@@ -43,11 +43,14 @@ amr.plot_file         = plot/plt # root name of plotfile
 amr.derive_plot_vars  = pressure velocity temperature
 amr.plot_int          = 100           # number of timesteps between plotfiles
 
-cns.order_rk = 3
-cns.stages_rk = 3
+# RK stepping 
+cns.order_rk  = 1
+cns.stages_rk = 1
+# Chemistry
 cns.reactor_type = "ReactorCvode"
-cvode.solve_type =  "fixed_point" #denseAJ_direct not available on GPU 
+cvode.solve_type = denseAJ_direct
 ode.clean_init_massfrac = 1
+
 
 # DIAGNOSTICS
 amr.data_log = probe.csv

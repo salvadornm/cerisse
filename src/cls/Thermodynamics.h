@@ -507,6 +507,27 @@ class multispecies_pele_gas_t {
       eos.PYT2R(P*pres_si2cgs, Y, T, R); R *= rho_cgs2si;
   }            
 
+  /**
+  *  @brief compute temperature from density and enthalpy and mass fractions
+  */
+ AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE void RHY2T(
+      const Real R, const Real H, const Real Y[NUM_SPECIES], Real& T) const {
+ 
+      auto eos = pele::physics::PhysicsType::eos();                   
+      eos.RHY2T(R*rho_si2cgs,H*specenergy_si2cgs, Y, T);
+  }     
+
+  /**
+  *  @brief compute pressure from density, temperature and mass fractions
+  */
+  AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE void RTY2P(
+      const Real R, const Real T, const Real Y[NUM_SPECIES],  Real& P) const {
+ 
+      auto eos = pele::physics::PhysicsType::eos();                   
+      eos.RTY2P(R*rho_si2cgs, T, Y, P);P *= pres_cgs2si;
+  }            
+
+
   //-------------------------------------------------------------------------------------
   // @brief Compute mole fraction array from mass fraction species array
   AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE void Y2X(const Real Y[NUM_SPECIES], Real (&X)[NUM_SPECIES]){

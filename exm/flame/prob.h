@@ -199,28 +199,28 @@ AMREX_GPU_DEVICE AMREX_FORCE_INLINE void prob_initdata(
   pele::physics::PMF::pmf(pmf_data,y1,y2,pmf_vals);
 
   // PMF--> T,u and Y (P is assumed constant)
-  // Tt  = pmf_vals[0];
-  // vxt = pmf_vals[1];
-  // for (int n = 0; n < NUM_SPECIES; ++n) {
-  //   Yt[n]   = max(pmf_vals[3+n],0.0);        
-  //   sumrhoY += Yt[n];
-  // }
+  Tt  = pmf_vals[0];
+  vxt = pmf_vals[1];
+  for (int n = 0; n < NUM_SPECIES; ++n) {
+    Yt[n]   = max(pmf_vals[3+n],0.0);        
+    sumrhoY += Yt[n];
+  }
   
   
   // fresh start
-  Tt  = prob_parm.T_u;
-  vxt = prob_parm.u_u;
-  for (int n = 0; n < NUM_SPECIES; ++n) {
-    Yt[n] = prob_parm.Y_0u[n];
-    sumrhoY += Yt[n];
-  }
+  // Tt  = prob_parm.T_u;
+  // vxt = prob_parm.u_u;
+  // for (int n = 0; n < NUM_SPECIES; ++n) {
+  //   Yt[n] = prob_parm.Y_0u[n];
+  //   sumrhoY += Yt[n];
+  //}
   // spark
   // Gaussian profile centered at interface, width 0.005
-  const amrex::Real center = yinterf;
-  const amrex::Real sigma  = 0.005;
-  // Gaussian value between 0 and 1
-  amrex::Real gauss = std::exp( - std::pow((y - center)/sigma, 2) );
-  Tt += 1000.0*gauss;
+  // const amrex::Real center = yinterf;
+  // const amrex::Real sigma  = 0.005;
+  // // Gaussian value between 0 and 1
+  // amrex::Real gauss = std::exp( - std::pow((y - center)/sigma, 2) );
+  // Tt += 1000.0*gauss;
 
 
 
@@ -235,9 +235,9 @@ AMREX_GPU_DEVICE AMREX_FORCE_INLINE void prob_initdata(
   cls.RYP2E(rhot, Yt, Pt, et);
 
   // debug
-  Real haux[NUM_SPECIES]={0.0};
-  cls.RTY2Hi(rhot, Tt, Yt, haux);
-  Real ht = 0.0; 
+  // Real haux[NUM_SPECIES]={0.0};
+  // cls.RTY2Hi(rhot, Tt, Yt, haux);
+  // Real ht = 0.0; 
   Real kin = Real(0.5) * vxt * vxt;
 
   // std::cout << " ------------------------------- " << std::endl;
@@ -272,7 +272,7 @@ AMREX_GPU_DEVICE AMREX_FORCE_INLINE void prob_initdata(
   state(i, j, k, cls.UMX) = Real(0.0);
   state(i, j, k, cls.UMY) = rhot* vxt;
   state(i, j, k, cls.UMZ) = Real(0.0);
-  state(i, j, k, cls.UET) = rhot * et + Real(0.5) * rhot * vxt * vxt;
+  state(i, j, k, cls.UET) = rhot * et + rhot * kin;
   for (int n = 0; n < NUM_SPECIES; ++n) {
     state(i, j, k, cls.UFS + n) = rhot * Yt[n];
   }
@@ -306,8 +306,8 @@ bcnormal(const Real x[AMREX_SPACEDIM], Real dratio, const Real s_int[ProbClosure
     case -1:  // EAST
       break;      
     case -2:   // NORTH
-    //  GlobalBC::bc_fixP(0.0,-1.0,0.0,&closures,prob_parm.p_u, s_int, s_ext);
-      GlobalBC::bc_subsonic_outflow_fixP(0.0,-1.0,0.0,&closures,prob_parm.p_u, s_int, s_ext);
+      GlobalBC::bc_fixP(0.0,-1.0,0.0,&closures,prob_parm.p_u, s_int, s_ext);
+    //  GlobalBC::bc_subsonic_outflow_fixP(0.0,-1.0,0.0,&closures,prob_parm.p_u, s_int, s_ext);
       break;
     default:
 

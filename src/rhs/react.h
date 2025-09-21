@@ -13,14 +13,30 @@ class reactor_t {
   bool m_initialized = false;
   std::unique_ptr<pele::physics::reactions::ReactorBase> m_reactor;
 
+  // reactor types (hardcoded) and specific options
+  inline static constexpr int therm_reactor_type = 1; // 1: U  2:H
+  inline static constexpr bool reactor_constant_pressure =false;
+  inline static constexpr bool pass_source_term   = false; 
+  inline static constexpr bool check_problem_cell = false; 
+  /// 
+
   reactor_t() {
     std::string reactor_type;
     {
       amrex::ParmParse pp("cns");
-      pp.get("reactor_type", reactor_type);
+      pp.get("reactor_type", reactor_type);  //bad name
     }
+
+    // printf(" Initialising reactor of type %s \n", reactor_type.c_str());
+
     m_reactor = pele::physics::reactions::ReactorBase::create(reactor_type);
-    m_reactor->init(1, 1);
+
+    if (!m_reactor) {
+      amrex::Abort("reactor_t(): Unknown reactor type " + reactor_type);
+    }
+
+    m_reactor->init(therm_reactor_type, 1); // create reactor solver
+
     m_initialized = true;
   };
 
@@ -65,15 +81,27 @@ class reactor_t {
 
     ///////////////////// Prepare for react /////////////////////
     FArrayBox tempf(bx, 2 * NUM_SPECIES + 4, The_Async_Arena());
-    auto const& rY = tempf.array(0);
+
+
+    //MultiFab STemp(bx, dm, NUM_SPECIES+3, 0);
+    //MultiFab FTemp(bx, dm, NUM_SPECIES+3, 0); 
+
+    // arrays of scalars + energy + temperature (THIS CAN BE DONE BETTER)
+    auto const& rY  = tempf.array(0);
     auto const& rEi = tempf.array(NUM_SPECIES);
-    auto const& T = tempf.array(NUM_SPECIES + 1);
+    auto const& T   = tempf.array(NUM_SPECIES + 1);
+
+    // source terms
     auto const& rYsrc  = tempf.array(NUM_SPECIES + 2);
     auto const& rEisrc = tempf.array(2 * NUM_SPECIES + 2);
     auto const& fc     = tempf.array(2 * NUM_SPECIES + 3);  // number of RHS eval (not used)
     IArrayBox maskf(bx, 1, The_Async_Arena());
     maskf.setVal<RunOn::Gpu>(1);
     auto const& mask = maskf.array();  // 1: do reaction, -1: skip reaction
+
+
+    const Real o_dt = 1.0 / dt;
+
 
     amrex::ParallelFor(bx, [=] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {
       const auto& cls = *cls_d;
@@ -82,38 +110,41 @@ class reactor_t {
 
       Real rho = prims(i, j, k, cls.QRHO);
       for (int ns = 0; ns < NUM_SPECIES; ++ns) {
-        rY(i, j, k, ns)    =   rho* prims(i, j, k, cls.QFS + ns) * rho_si2cgs;
-        rYsrc(i, j, k, ns) =   rhs(i, j, k, cls.UFS + ns) * rho_si2cgs;
-      }
+        rY(i, j, k, ns)    =   rho* prims(i, j, k, cls.QFS + ns) * rho_si2cgs;        
+      }      
       rEi(i, j, k) = rho * prims(i, j, k, cls.QEINT) * rhoenergy_si2cgs;
-
       T(i, j, k) = prims(i, j, k, cls.QT);
+      // Enthalpy (if reactor_type 2)
+      if constexpr (therm_reactor_type==2){
+        rEi(i,j,k)  +=  prims(i, j, k, cls.QPRES)*pres_si2cgs;   // rEi stores rhoHi
+      }          
       
-      Real mx = rho * prims(i, j, k, cls.QU);
-      Real my = rho * prims(i, j, k, cls.QV);
-      Real mz = rho * prims(i, j, k, cls.QW);
-      Real rke = Real(0.5) * (mx * mx + my * my + mz * mz) / rho;
-      for (int ns = 0; ns < NUM_SPECIES; ++ns) {
-        rho += rhs(i, j, k, cls.UFS + ns) * dt;
-      }
-      mx += rhs(i, j, k, cls.UMX) * dt;
-      my += rhs(i, j, k, cls.UMY) * dt;
-      mz += rhs(i, j, k, cls.UMZ) * dt;
-      Real rke_new = Real(0.5) * (mx * mx + my * my + mz * mz) / rho;
-      rEisrc(i, j, k) = (rhs(i, j, k, cls.UET) - (rke_new - rke) / dt) * rhoenergy_si2cgs;
-
-
-      // Temperature ..
-      // AMREX_ALWAYS_ASSERT(T(i, j, k) > 0.0);
-
-
-      // Enthalpy (if reactor_type 2), assumed Pressure cosntant across reaction 
-      // rEi     +=  prims(i, j, k, cls.QP)*pres_si2cgs;   // rEi stores rhoHi           
-      // assuming P constant across reaction step  d(rhoH) = d(rhoE) and rEisrc unaffected 
-      
-
+      // communicate source terms to solver
+      if constexpr(pass_source_term){
+        for (int ns = 0; ns < NUM_SPECIES; ++ns) {
+          rYsrc(i, j, k, ns) = rhs(i, j, k, cls.UFS + ns) * rho_si2cgs;
+        }        
+        Real mx = rho * prims(i, j, k, cls.QU);
+        Real my = rho * prims(i, j, k, cls.QV);
+        Real mz = rho * prims(i, j, k, cls.QW);
+        Real rke = Real(0.5) * (mx * mx + my * my + mz * mz) / rho;
+        for (int ns = 0; ns < NUM_SPECIES; ++ns) {
+          rho += rhs(i, j, k, cls.UFS + ns) * dt;
+        }
+        mx += rhs(i, j, k, cls.UMX) * dt;
+        my += rhs(i, j, k, cls.UMY) * dt;
+        mz += rhs(i, j, k, cls.UMZ) * dt;
+        Real rke_new = Real(0.5) * (mx * mx + my * my + mz * mz) / rho;
+        rEisrc(i, j, k) = (rhs(i, j, k, cls.UET) - (rke_new - rke) / dt) * rhoenergy_si2cgs;
+      }      
+      else {
+        rEisrc(i, j, k) = 0.0;
+        for (int ns = 0; ns < NUM_SPECIES; ++ns) {
+          rYsrc(i, j, k, ns) = 0.0;       
+        } 
+      }     
       // fill mask      
-      mask(i, j, k) = (T(i, j, k) > CNSConstants::min_react_temp) ? 1 : -1; // temp snm 
+      mask(i, j, k) = (T(i, j, k) > CNSConstants::min_react_temp) ? 1 : -1;
 
     });
 
@@ -130,6 +161,16 @@ class reactor_t {
 #endif
     amrex::Gpu::Device::streamSynchronize();  // Important
 
+    // Convert SI
+    ParallelFor(bx, [rY,rEi]
+      AMREX_GPU_DEVICE (int i, int j, int k) noexcept
+      {
+        for (int n = 0; n < NUM_SPECIES; n++) {
+          rY(i,j,k,n) *= rho_cgs2si;
+        }
+        rEi(i,j,k) *= rhoenergy_cgs2si;
+      });
+
 
     /// Compet LES properties
     // if (LES)
@@ -141,34 +182,93 @@ class reactor_t {
     amrex::ParallelFor(bx, [=] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {
       const auto& cls = *cls_d;
 
-
+      // only update rhs if mask != -1 (valid cell for reaction)
       if (mask(i, j, k) != -1) {
-        // Monitor problem cell, do not add reaction source  // CHECK
 
-        bool any_rY_unbounded = false;
-        bool temp_leq_zero = (T(i, j, k) <= 0.0);
-        for (int ns = 0; ns < NUM_SPECIES; ++ns) {
-          any_rY_unbounded |=
+        // rho     = prims(i, j, k, cls.QRHO);  //original rho
+        
+        bool problem_cell = false;      
+
+        // check for problematic cell after reaction
+        if constexpr (check_problem_cell) {
+          for (int ns = 0; ns < NUM_SPECIES; ++ns) {
+            problem_cell |=
               (rY(i, j, k, ns) < -1e-5 || rY(i, j, k, ns) > 1.0 + 1e-5 ||
                std::isnan(rY(i, j, k, ns)));
+          }
+          problem_cell =  problem_cell || (T(i, j, k) <= 0.0);        
         }
 
-          
-        if (any_rY_unbounded || temp_leq_zero) {
-          // printf("Post-reaction rY=[ ");
-          // for (int ns = 0; ns < NUM_SPECIES; ++ns)
-          //   printf(" %f", rY(i, j, k, ns));
-          // printf("], T=%f  @ (i,j,k) = (%d, %d, %d)", T(i, j, k), i, j, k);
-        } else {
-          // Update species source terms
-          for (int ns = 0; ns < NUM_SPECIES; ++ns) {
-            // rY is overwritten by rY + rYsrc * dt + chem_src * dt = rY +            
-            Real rY_init =  prims(i, j, k, cls.QRHO) * prims(i, j, k, cls.QFS + ns);
-            rhs(i, j, k, cls.UFS + ns) = (rY(i, j, k, ns) * rho_cgs2si - rY_init) / dt;
-          }          
+        // Monitor problem cell, do not add reaction source         
+        if (!problem_cell)
+        {
+          // Update species source terms ----------------------
+          const Real rho = prims(i, j, k, cls.QRHO);
+
+          // Option 1: constant pressure ----------- (h,P constant)
+          if constexpr(reactor_constant_pressure) 
+          {
+            Real Yt[NUM_SPECIES];
+            for (int n = 0; n < NUM_SPECIES; ++n) { Yt[n] = rY(i, j, k, n)/rho;}            
+            // enthalpy
+            const Real h = prims(i, j, k, cls.QEINT) + prims(i,j,k,cls.QPRES)/rho;
+            //calculate Pressure
+            // Real P;
+            // cls.RTY2P(rho, T(i,j,k), Yt, P);
+            // recalculate Temperatrue
+            cls.RHY2T(rho, h, Yt, T(i,j,k));
+            // recalculate rho based on new T and constant P
+            Real rhonew;
+            cls.PYT2R(prims(i,j,k,cls.QPRES),Yt,T(i,j,k),rhonew);
+
+            // pressure change
+            //const Real dPdt   = (P - prims(i,j,k,cls.QPRES))* o_dt;
+            // real density change
+            const Real drhodt = (rhonew - rho)* o_dt;
+            // mass correction  rho dY/dt + Y drho/dt
+            for (int ns = 0; ns < NUM_SPECIES; ++ns) {
+              rhs(i, j, k, cls.UFS + ns) +=  (Yt[ns]- prims(i, j, k, cls.QFS + ns))* o_dt;
+              rhs(i, j, k, cls.UFS + ns) +=  prims(i, j, k, cls.QFS + ns)* drhodt;                         
+            }
+            // energy correction   +=E drho/dt
+            rhs(i, j, k, cls.UET) +=  prims(i, j, k, cls.QEINT)*drhodt;
+           //rhs(i, j, k, cls.UET) +=  h*drhodt  - dPdt;
+
+     // debug snm      
+    //         if (i==12) {
+    // std::cout<< "  T= " << T(i,j,k) << " rho= " << rho ;
+    // std::cout<< "  h= " <<  h << " e= " << prims(i, j, k, cls.QEINT);
+    // std::cout<< "  rhoe= " <<  rho*prims(i, j, k, cls.QEINT) << " rhoh= " << rho*h;
+    // std::cout<< "  P= " << prims(i,j,k,cls.QPRES) << " pnew=" << P << std::endl;    
+     
+    // std::cout<< "  drho= " << rhonew - rho << " drhodt= " << drhodt << std::endl;
+    // std::cout << " rhs UET= " << rhs(i, j, k, cls.UET) << std::endl;
+
+    // }
+
+
+          }
+          else
+          // Option 2: constant volume ----------- (rho, e constant)
+          {
+            for (int ns = 0; ns < NUM_SPECIES; ++ns) {            
+              Real rY_init =  rho * prims(i, j, k, cls.QFS + ns);
+              if constexpr(pass_source_term){
+                rhs(i, j, k, cls.UFS + ns) = (rY(i, j, k, ns)  - rY_init) * o_dt;
+              }
+              else {
+                rhs(i, j, k, cls.UFS + ns) += (rY(i, j, k, ns) - rY_init) * o_dt; 
+              }            
+            }          
+          }
+      
+
         }
       }
     });
+
+    // clear memory
+    tempf.clear();
 
      
      // if LES multiply by something

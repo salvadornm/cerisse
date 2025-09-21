@@ -1,6 +1,6 @@
 # Simulation time
 # start time is assumed to be 0, unless re-starting
-max_step  = 500000
+max_step  = 50000
 stop_time = 0.1
 #cfl = 0.3
 time_step =1e-8
@@ -20,8 +20,8 @@ cns.lo_bc = -1  1
 cns.hi_bc = -1  1 
 
 # Verbose/screen output 
-cns.verbose          = 0    # Cerisse output    0=quiet, 1=verbose
-amr.v                = 0    # AMReX   output    0=quiet, 1=verbose
+cns.verbose          = 1    # Cerisse output    0=quiet, 1=verbose
+amr.v                = 1   # AMReX   output    0=quiet, 1=verbose
 
 # Refinement and regridding 
 amr.n_cell          = 4 1280 
