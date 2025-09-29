@@ -1,7 +1,7 @@
 # Simulation time
-max_step  =  100000
+max_step  =  200000
 stop_time =  0.5
-cfl = 0.1
+cfl = 0.05
 #time_step = 1.0e-6
 
 cns.order_rk  = -2 
@@ -38,12 +38,12 @@ amr.grid_eff          = 0.7    # what constitutes an efficient grid
 
 # Plot and checkpoint
 amr.checkpoint_files_output = 1
-amr.check_file              = tanh9/chk     # root name of checkpoint file
-amr.check_int               = 1000   # number of timesteps betw.  checkpoints
-amr.restart = chk20000
+amr.check_file              = react2/chk     # root name of checkpoint file
+amr.check_int               = 3000   # number of timesteps betw.  checkpoints
+amr.restart = chk100000
 amr.plot_files_output = 1
-amr.plot_file         = tanh9/plt    # root name of plotfile
-amr.plot_int          = 250          # number of timesteps between plotfiles
+amr.plot_file         = react2/plt    # root name of plotfile
+amr.plot_int          = 2000          # number of timesteps between plotfiles
 amr.derive_plot_vars  = pressure velocity temperature
 
 eb2.geom_type = "custom"
@@ -52,7 +52,7 @@ eb2.eb_weight  = 1.0
 eb2.redistribution_type = "FluxRedist"
 
 # DIAGNOSTICS
-amr.data_log = time_probe.log
+amr.data_log = time_probe_react.log
 cns.record_probe = 1 
 cns.time_probe_lev = 0 
 cns.time_probe_int = 1
@@ -66,3 +66,4 @@ cns.reactor_type = "ReactorCvode"
 cvode.solve_type =  "dense_direct"
 ode.clean_init_massfrac = 1
 
+cns.record_stats = 1

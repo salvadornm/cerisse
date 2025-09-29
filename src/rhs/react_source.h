@@ -116,7 +116,7 @@ class reactor_source_t {
       // fill mask      
       mask(i, j, k) = (T(i, j, k) > CNSConstants::min_react_temp) ? 1 : -1; // temp snm 
 
-      if (T(i,j,k) > Real(3000)) {
+      if (T(i,j,k) > Real(2500)) {
         amrex::Gpu::Atomic::Max(skip_react_ptr, 1);
       }
       //mask(i, j, k) = (T(i, j, k) > 500) ? 1 : -1; // temp snm 
