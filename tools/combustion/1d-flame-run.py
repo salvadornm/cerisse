@@ -20,7 +20,7 @@ specformat = 'mass'   # mole or mass
 units      = 'MKS'    #MKS or CGS
 
 # 1. Define gas mixture and mechanism
-gas = ct.Solution("Li.yaml")  # Use a mechanism that includes H2/Air combustion
+gas = ct.Solution("BD.yaml")  # Use a mechanism that includes H2/Air combustion
 
 # Define fuel and oxidizer mole fractions for a stoichiometric mixture
 fuel = "H2"
@@ -30,10 +30,10 @@ oxidizer = {"O2": 1.0, "N2": 3.76}  # Air composition (O2/N2 ratio of 1:3.76)
 P0           = ct.one_atm       # 1 atm [Pa]
 p            = P0               # pressure [Pa]
 tin          = 298.0            # unburned gas temperature [K]
-phi          = 0.5              # Eq. ratio [-] 
+phi          = 0.4              # Eq. ratio [-] 
 
 # Refined grid at inlet and outlet, 6 points in x-direction :
-domain_size  = 0.04             # Domain size [m] 
+domain_size  = 0.06             # Domain size [m] 
 #initial_grid = domain_size*np.array([0.0, 0.001, 0.01, 0.02, 0.029, 0.03],'d')/0.03 # m
 
 initial_grid = domain_size*np.array([0.0, 0.001, 0.3, 0.66, 0.98, 1.0]) # m
