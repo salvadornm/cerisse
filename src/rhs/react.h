@@ -102,7 +102,6 @@ class reactor_t {
 
     const Real o_dt = 1.0 / dt;
 
-
     amrex::ParallelFor(bx, [=] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {
       const auto& cls = *cls_d;
 
@@ -152,7 +151,7 @@ class reactor_t {
     /////////////////////////// React ///////////////////////////
     Real current_time = 0.0;
 
-    // Not necessary to start a stream here, however pelePhysics function only takes a stream. Practically, launch and execution overhead determines  efficiency effect -- https://stackoverflow.com/questions/27038162/how-bad-is-it-to-launch-many-small-kernels-in-cuda#:~:text=Launch%20overhead%3A%20The%20overhead%20of,as%20the%20kernel%20in%20question. Seems unlikely this kernel launch cost will outweigh execution costs.
+    // Not necessary to start a stream here, however pelePhysics function only takes a stream.     
 #ifdef AMREX_USE_GPU
     m_reactor->react(bx, rY, rYsrc, T, rEi, rEisrc, fc, mask, dt, current_time,
                      amrex::Gpu::gpuStream());
@@ -161,7 +160,7 @@ class reactor_t {
 #endif
     amrex::Gpu::Device::streamSynchronize();  // Important
 
-    // Convert SI
+    // Convert to SI units
     ParallelFor(bx, [rY,rEi]
       AMREX_GPU_DEVICE (int i, int j, int k) noexcept
       {
@@ -172,7 +171,7 @@ class reactor_t {
       });
 
 
-    /// Compet LES properties
+    /// Compute LES properties
     // if (LES)
     // {
     //   // do stuff compute taus sgs, Efficiency ...
@@ -208,45 +207,24 @@ class reactor_t {
           // Option 1: constant pressure ----------- (h,P constant)
           if constexpr(reactor_constant_pressure) 
           {
-            Real Yt[NUM_SPECIES];
-            for (int n = 0; n < NUM_SPECIES; ++n) { Yt[n] = rY(i, j, k, n)/rho;}            
+            Real Yk[NUM_SPECIES];
+            for (int n = 0; n < NUM_SPECIES; ++n) { Yk[n] = rY(i, j, k, n)/rho;}            
             // enthalpy
             const Real h = prims(i, j, k, cls.QEINT) + prims(i,j,k,cls.QPRES)/rho;
-            //calculate Pressure
-            // Real P;
-            // cls.RTY2P(rho, T(i,j,k), Yt, P);
-            // recalculate Temperatrue
-            cls.RHY2T(rho, h, Yt, T(i,j,k));
-            // recalculate rho based on new T and constant P
+            // recalculate Temperature
+            cls.RHY2T(rho, h, Yk, T(i,j,k));
+            // recalculate rho based on new T, Y and P (unchanged during reaction)
             Real rhonew;
-            cls.PYT2R(prims(i,j,k,cls.QPRES),Yt,T(i,j,k),rhonew);
-
-            // pressure change
-            //const Real dPdt   = (P - prims(i,j,k,cls.QPRES))* o_dt;
-            // real density change
+            cls.PYT2R(prims(i,j,k,cls.QPRES),Yk,T(i,j,k),rhonew);
+            // calculate density change drho/dt
             const Real drhodt = (rhonew - rho)* o_dt;
-            // mass correction  rho dY/dt + Y drho/dt
+            // mass rhs:   rho dY/dt + Y drho/dt
             for (int ns = 0; ns < NUM_SPECIES; ++ns) {
-              rhs(i, j, k, cls.UFS + ns) +=  (Yt[ns]- prims(i, j, k, cls.QFS + ns))* o_dt;
+              rhs(i, j, k, cls.UFS + ns) +=  rho*(Yk[ns]- prims(i, j, k, cls.QFS + ns))* o_dt;
               rhs(i, j, k, cls.UFS + ns) +=  prims(i, j, k, cls.QFS + ns)* drhodt;                         
             }
-            // energy correction   +=E drho/dt
-            rhs(i, j, k, cls.UET) +=  prims(i, j, k, cls.QEINT)*drhodt;
-           //rhs(i, j, k, cls.UET) +=  h*drhodt  - dPdt;
-
-     // debug snm      
-    //         if (i==12) {
-    // std::cout<< "  T= " << T(i,j,k) << " rho= " << rho ;
-    // std::cout<< "  h= " <<  h << " e= " << prims(i, j, k, cls.QEINT);
-    // std::cout<< "  rhoe= " <<  rho*prims(i, j, k, cls.QEINT) << " rhoh= " << rho*h;
-    // std::cout<< "  P= " << prims(i,j,k,cls.QPRES) << " pnew=" << P << std::endl;    
-     
-    // std::cout<< "  drho= " << rhonew - rho << " drhodt= " << drhodt << std::endl;
-    // std::cout << " rhs UET= " << rhs(i, j, k, cls.UET) << std::endl;
-
-    // }
-
-
+            // energy rhs:  h drho/dt
+            rhs(i, j, k, cls.UET) +=  h*drhodt;
           }
           else
           // Option 2: constant volume ----------- (rho, e constant)
