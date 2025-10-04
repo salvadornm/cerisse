@@ -37,7 +37,7 @@ typedef closures_dt<indicies_stat_t, transport_Pele_t , multispecies_pele_gas_t<
 struct ProbParm {  
   // inflow state for initialisation
   //const Real p_inflow    = pres_atm2si; //[Pa] inflow pressure (1 atm)  
-  const Real T_inflow    = 285.5; //[K]  
+  const Real T_inflow    = 298; //[K]  
   Real Y_inflow[NUM_SPECIES] = {1.0};
   ProbClosures pp_pc;
 
@@ -63,11 +63,11 @@ struct ProbParm {
   }
 
   // compute density and internal energy
-  const Real Q = 8.2994; // volumetric flow rate [kg /m2 s]
+  const Real Q = 8.665; // volumetric flow rate [kg /m2 s]
   
   // inside combustor state/exit
   const Real p_0     = pres_atm2si; //[Pa] inflow pressure (1 atm) 
-  const Real T_0     = 285.5;  //[K]  
+  const Real T_0     = 298;  //[K]  
   Real rho_0, eint_0;
 
   const Real vel_0[3]= {0.0,0.0,0.0}; // array of inside velocity [m/s]
@@ -357,12 +357,15 @@ class user_source_t {
         }                        
       }
 
+      // ignition
+
       const Real spark_time = 0.0010;
       const Real zlow = 0.046;
       const Real max_timestep = 2000;
       //const Real zhigh = 0.09; 
-      const bool Gaussian = true; 
-      if (Gaussian && z >= zlow) {
+      const bool ignite_on = true; 
+
+      if (ignite_on && z >= zlow) {
         const Real tmean = spark_time/2;  
         const Real xmean_spatial = 0; 
         const Real ymean_spatial = 0; 
@@ -380,7 +383,7 @@ class user_source_t {
         const Real y_max = ymean_spatial +  nsigma * y_sd;
         const Real z_max = zmean_spatial +  nsigma * z_sd;
 
-        // parameters for spaial gaussian in temrs of grid points
+        // parameters for gaussian in space in terms of grid points
 
         const Real i_mean = Real(std::round(float((xmean_spatial - prob_lo[0]) / dx[0] - Real(0.5)))); 
         const Real j_mean = Real(std::round(float((ymean_spatial - prob_lo[1]) / dx[1] - Real(0.5)))); 
@@ -390,13 +393,13 @@ class user_source_t {
         const Real j_sd = Real(std::round(std::abs(float(y_sd / dx[1]))));
         const Real k_sd = Real(std::round(std::abs(float(z_sd / dx[2]))));
 
-        // inverse tanh parameters
+        // tanh parameters
 
         const Real p = 0.99;
         const Real dt_goal = 6000; // number of timesteps before max source 
         const Real k_tanh = Real(std::atanh(float(p))) / dt_goal;
 
-        // internal nrj source compute
+        // internal nrj source computation
 
         if (x >= x_min && x <= x_max && y >= y_min && y <= y_max && z <= z_max && timestep <= max_timestep){
 
@@ -412,7 +415,7 @@ class user_source_t {
         Real gaussian_space = std::exp( -0.5 * ( (i - i_mean)*(i - i_mean)/(i_sd*i_sd) + (j - j_mean)*(j - j_mean)/(j_sd*j_sd) + 
                                   (k - k_mean)*(k - k_mean)/(k_sd*k_sd)));
 
-        // temporal distribution of nrj source
+        // temporal distribution of nrj source. choose gaussian or tanh.
 
         Real gaussian_time = std::exp( -0.5 * ((real_time - tmean)*(real_time - tmean)/(t_sd*t_sd) ));
         Real tanh_time = Real(std::tanh(float(k_tanh * timestep)));

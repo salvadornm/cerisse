@@ -33,7 +33,7 @@ tin          = 298.0            # unburned gas temperature [K]
 phi          = 0.4              # Eq. ratio [-] 
 
 # Refined grid at inlet and outlet, 6 points in x-direction :
-domain_size  = 0.06             # Domain size [m] 
+domain_size  = 0.145             # Domain size [m] 
 #initial_grid = domain_size*np.array([0.0, 0.001, 0.01, 0.02, 0.029, 0.03],'d')/0.03 # m
 
 initial_grid = domain_size*np.array([0.0, 0.001, 0.3, 0.66, 0.98, 1.0]) # m
