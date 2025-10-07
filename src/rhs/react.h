@@ -60,7 +60,7 @@ class reactor_t {
   void inline src(const Geometry& /*geomdata*/, const amrex::MFIter& mfi,
                   const amrex::Array4<const amrex::Real>& prims,
                   const amrex::Array4<amrex::Real>& rhs, const cls_t* cls_d,
-                  amrex::Real dt) {
+                  amrex::Real dt, amrex::Real /*real_time*/) {
     if (!m_initialized) amrex::Abort("reactor_t not initialised");
 
     // amrex::Print() << "reactor_t::src()" << std::endl;

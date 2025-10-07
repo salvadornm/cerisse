@@ -48,7 +48,7 @@ cns.order_rk  = 1
 cns.stages_rk = 1
 # Chemistry
 cns.reactor_type = "ReactorCvode"
-cvode.solve_type = denseAJ_direct
+cvode.solve_type = "fixed_point" #denseAJ_direct
 ode.clean_init_massfrac = 1
 
 

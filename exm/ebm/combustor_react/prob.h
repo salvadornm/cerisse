@@ -63,7 +63,7 @@ struct ProbParm {
   }
 
   // compute density and internal energy
-  const Real Q = 8.665; // volumetric flow rate [kg /m2 s]
+  const Real Q = 8.665; // volumetric flow rate [kg /m2 s] ??
   
   // inside combustor state/exit
   const Real p_0     = pres_atm2si; //[Pa] inflow pressure (1 atm) 
@@ -77,6 +77,31 @@ struct ProbParm {
   Real zexit = 0.135 ;//0.135;
 
 };
+
+// spark parametrs
+struct SparkParm{
+  const Real spark_time = 0.0010;  // spark duration
+  const Real t0 = 1.0;          // spark time 
+  const Real x0 = 0.0;          // spark position
+  const Real y0 = 0.0;
+  const Real z0 = 0.12;     
+  const Real a  = 4.0*std::sqrt(std::log(10));
+  const Real Tmax    = 3000.0;
+  const Real energy  = 10.0e-3; // 10 mJ
+  const Real pi = 3.14159265359;
+  //const Real ds   = std::sqrt(a/pi)*(energy);
+  const Real ds    = 3.0e-3;       // 3  mm
+  const Real dt    = 500e-3;     // 500 micros
+  const Real dt2   = dt*dt;     // 500 micros
+  const Real ds2   = ds*ds;     // 500 micros
+  const Real o_Volt = 0.25/(pi*pi*ds*ds*ds*dt);
+  const Real Cp0    =  1224; // [J/(kg K) assumed room temperature and phi=0.5
+  const Real  T0    = 300;
+  const Real  rho0  = 0.97 ;
+  const Real  ds0   = sqrt(a/pi)*std::pow(energy/(rho0*Cp0*(Tmax-T0)), 1.0/3.0);
+  // ds size that corresponds to a maximum temperature of Tmax, with given energy
+};
+
 
 // numerical method parameters
 /** 
@@ -196,25 +221,25 @@ bcnormal(const Real x[AMREX_SPACEDIM], Real dratio, const Real s_int[ProbClosure
 
   switch(face)
   {
-    case  3:  // LEFT
+    case  3:  // LEFT/BOTTOM  z
 	    {                  
       GlobalBC::bc_inlet_fixmassflow(0.0,0.0,1.0,&closures,
         prob_parm.Q,prob_parm.T_inflow,prob_parm.Y_inflow, s_int, s_ext);  
       break;
       }
-    case  2:  // SOUTH
+    case  2:  // SOUTH        y  
       GlobalBC::bc_fixP(0.0,1.0,0.0,&closures,prob_parm.p_0, s_int, s_ext); 
       break;
-    case  1:  // WEST
+    case  1:  // WEST         x  
       GlobalBC::bc_fixP(1.0,0.0,0.0,&closures,prob_parm.p_0, s_int, s_ext); 
       break;
-    case -1:  // EAST
+    case -1:  // EAST         x  
       GlobalBC::bc_fixP(-1.0,0.0,0.0,&closures,prob_parm.p_0, s_int, s_ext);  
       break;
-    case -2:  // NORTH
-      GlobalBC::bc_fixP(-1.0,0.0,0.0,&closures,prob_parm.p_0, s_int, s_ext); 
+    case -2:  // NORTH        y 
+      GlobalBC::bc_fixP(0.0,-1.0,0.0,&closures,prob_parm.p_0, s_int, s_ext); 
       break;
-    case -3:   //RIGHT 
+    case -3:   // RIGHT/TOP   z
       {
       GlobalBC::bc_fixP(0.0,0.0,-1.0,&closures,prob_parm.p_0, s_int, s_ext);  
 
@@ -289,7 +314,7 @@ class user_source_t {
   public:
 
 
-  // to use as a user source term, the function name must be rsrc:
+  // to use as a user source term, the function name must be src:
   // void inline src(const Geometry& geomdata, const amrex::MFIter &mfi,
   //                 const amrex::Array4<const amrex::Real> &prims,
   //                 const amrex::Array4<amrex::Real> &rhs, const cls_t *cls_d,
@@ -311,6 +336,9 @@ class user_source_t {
 
     ProbParm const prob_parm;
     const auto& cls = *cls_d;
+
+    SparkParm const spark;
+
 
     amrex::ParallelFor(bxg,
       [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept
@@ -345,7 +373,7 @@ class user_source_t {
                     + prims(i,j,k,cls.QW)*prims(i,j,k,cls.QW));
       Real Et  = prims(i,j,k,cls.QEINT) + kin;
     
-      bool buffer = (z > prob_parm.zexit) && (r > 0.05);
+      bool buffer = (z > prob_parm.zexit) && (r > 0.03);
 
       if (buffer){        
         rhs(i,j,k,cls.UMX) += prims(i,j,k,cls.QU)*drhodt;
@@ -357,77 +385,16 @@ class user_source_t {
         }                        
       }
 
-      // ignition
+      // ignition --------------------
+      const Real rs2 = (x- spark.x0)*(x- spark.x0) + (y- spark.y0)*(y- spark.y0) + (z- spark.z0)*(z- spark.z0);
 
-      const Real spark_time = 0.0010;
-      const Real zlow = 0.046;
-      const Real max_timestep = 2000;
-      //const Real zhigh = 0.09; 
-      const bool ignite_on = true; 
+      const bool ignite_on = false; 
 
-      if (ignite_on && z >= zlow) {
-        const Real tmean = spark_time/2;  
-        const Real xmean_spatial = 0; 
-        const Real ymean_spatial = 0; 
-        const Real zmean_spatial = 0.05; 
-
-        const Real t_sd = tmean/3.0;
-        const Real x_sd = 0.00175;
-        const Real y_sd = 0.00175; 
-        const Real z_sd = 0.00175;
-        
-        const Real nsigma = 3.0;
-        const Real x_min = xmean_spatial -  nsigma * x_sd;
-        const Real x_max = xmean_spatial +  nsigma * x_sd;
-        const Real y_min = ymean_spatial -  nsigma * y_sd;
-        const Real y_max = ymean_spatial +  nsigma * y_sd;
-        const Real z_max = zmean_spatial +  nsigma * z_sd;
-
-        // parameters for gaussian in space in terms of grid points
-
-        const Real i_mean = Real(std::round(float((xmean_spatial - prob_lo[0]) / dx[0] - Real(0.5)))); 
-        const Real j_mean = Real(std::round(float((ymean_spatial - prob_lo[1]) / dx[1] - Real(0.5)))); 
-        const Real k_mean = Real(std::round(float((zmean_spatial - prob_lo[2]) / dx[2] - Real(0.5)))); 
-
-        const Real i_sd = Real(std::round(std::abs(float(x_sd / dx[0]))));
-        const Real j_sd = Real(std::round(std::abs(float(y_sd / dx[1]))));
-        const Real k_sd = Real(std::round(std::abs(float(z_sd / dx[2]))));
-
-        // tanh parameters
-
-        const Real p = 0.99;
-        const Real dt_goal = 6000; // number of timesteps before max source 
-        const Real k_tanh = Real(std::atanh(float(p))) / dt_goal;
-
-        // internal nrj source computation
-
-        if (x >= x_min && x <= x_max && y >= y_min && y <= y_max && z <= z_max && timestep <= max_timestep){
-
-        const Real T_ignite = 1000;
-        Real rho_ignite, eint_ignite;
-        cls.PYT2R(pres, Y, T_ignite, rho_ignite);
-        cls.RYP2E(rho_ignite, Y, pres, eint_ignite);
-        eint_ignite = std::max((Real)0, eint_ignite - prims(i,j,k, cls.QEINT));
-        eint_ignite /= dt;
-
-        // spatial distribution of nrj source
-
-        Real gaussian_space = std::exp( -0.5 * ( (i - i_mean)*(i - i_mean)/(i_sd*i_sd) + (j - j_mean)*(j - j_mean)/(j_sd*j_sd) + 
-                                  (k - k_mean)*(k - k_mean)/(k_sd*k_sd)));
-
-        // temporal distribution of nrj source. choose gaussian or tanh.
-
-        Real gaussian_time = std::exp( -0.5 * ((real_time - tmean)*(real_time - tmean)/(t_sd*t_sd) ));
-        Real tanh_time = Real(std::tanh(float(k_tanh * timestep)));
-
-        // total nrj source 
-        
-        Real tanh_total = rho * gaussian_space * tanh_time * eint_ignite;
-        Real gauss_total = rho * gaussian_space * gaussian_time * eint_ignite;
-
-        rhs(i,j,k,cls.UET) += tanh_total;
-      }
-      }
+      if (ignite_on) {      
+        Real gauss_funt = std::exp( -0.5 * (real_time - spark.t0)*(real_time - spark.t0)/spark.dt2 );
+        Real gauss_funr = std::exp( -0.5 * rs2/spark.ds2 );        
+        rhs(i,j,k,cls.UET) += spark.energy*gauss_funt*gauss_funr*spark.o_Volt ;
+      }      
     
     });
 
