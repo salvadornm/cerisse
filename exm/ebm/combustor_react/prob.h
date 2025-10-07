@@ -19,6 +19,8 @@
 #endif
 
 #include <bc_types.h>
+#include <numbers>
+#include <cmath>
 
 // NTU Combustor-type for demonstration purposes
 // created by S Dupre and S Navarro-Martinez (2025)
@@ -28,14 +30,14 @@ using namespace amrex;
 
 namespace PROB {
 
-typedef closures_dt<indicies_t, visc_suth_t,cond_suth_t ,  multispecies_pele_gas_t<indicies_t>> ProbClosures;
+typedef closures_dt<indicies_stat_t, transport_Pele_t , multispecies_pele_gas_t<indicies_t>> ProbClosures;
 
 // problem parameters 
 
 struct ProbParm {  
   // inflow state for initialisation
   //const Real p_inflow    = pres_atm2si; //[Pa] inflow pressure (1 atm)  
-  const Real T_inflow    = 291.7;  //[K]  
+  const Real T_inflow    = 298; //[K]  
   Real Y_inflow[NUM_SPECIES] = {1.0};
   ProbClosures pp_pc;
 
@@ -61,12 +63,11 @@ struct ProbParm {
   }
 
   // compute density and internal energy
-  const Real Q = 8.2994; // volumetric flow rate [kg /m2 s]
+  const Real Q = 8.665; // volumetric flow rate [kg /m2 s]
   
   // inside combustor state/exit
   const Real p_0     = pres_atm2si; //[Pa] inflow pressure (1 atm) 
-  const Real p_bc    = p_0;
-  const Real T_0     = 285.5;  //[K]  
+  const Real T_0     = 298;  //[K]  
   Real rho_0, eint_0;
 
   const Real vel_0[3]= {0.0,0.0,0.0}; // array of inside velocity [m/s]
@@ -117,11 +118,11 @@ template <typename cls_t > class user_source_t;
 
 // define nuemrical scheme comment/uncomment to set up 
 //typedef rhs_dt<weno_t<ReconScheme::Teno5, ProbClosures>, viscous_t<viscous_param_t, ProbClosures>, user_source_t<ProbClosures> > ProbRHS;
-//typedef rhs_dt<weno_t<ReconScheme::Teno5, ProbClosures>, viscous_t<viscous_param_t, ProbClosures>, no_source_t> ProbRHS;
-
+//typedef rhs_dt<weno_t<ReconScheme::Teno5, ProbClosures>, viscous_t<viscous_param_t, ProbClosures>, reactor_source_t<user_source_t<ProbClosures>,ProbClosures >> ProbRHS;
+typedef rhs_dt<weno_t<ReconScheme::WenoZ5, ProbClosures>, viscous_t<viscous_param_t, ProbClosures>, reactor_source_t<user_source_t<ProbClosures>,ProbClosures >> ProbRHS;
 //typedef rhs_dt<riemann_t<false, ProbClosures>, viscous_t<viscous_param_t, ProbClosures>, user_source_t<ProbClosures> > ProbRHS;
-
-typedef rhs_dt<riemann_t<false, ProbClosures>, viscous_t<viscous_param_t, ProbClosures>, reactor_source_t<user_source_t<ProbClosures>,ProbClosures > > ProbRHS;
+//typedef rhs_dt<weno_t<ReconScheme::Teno5, ProbClosures>, viscous_t<viscous_param_t, ProbClosures>, reactor_source_t<user_source_t<ProbClosures>,ProbClosures >> ProbRHS;
+//typedef rhs_dt<riemann_t<false, ProbClosures>, viscous_t<viscous_param_t, ProbClosures>, reactor_source_t<user_source_t<ProbClosures>,ProbClosures > > ProbRHS;
 
 
 
@@ -161,14 +162,19 @@ prob_initdata(int i, int j, int k, Array4<Real> const &state,
   for(int idim=0;idim < AMREX_SPACEDIM;idim++) {u[idim]=prob_parm.vel_0[idim];}
   eint =  prob_parm.eint_0;
 
-  const Real r = sqrt(x*x + y*y + (z-0.1)*(z-0.1));
-  if (r< 0.01)
+  /**
+  const Real r = sqrt(x*x + y*y);
+  const Real z_low = 0.048;
+  const Real z_hi = 0.060;
+  Real rho_spark;
+  if (r <= 0.0095 && z >= z_low && z <= z_hi)
   {   
     Real Tspark = 1000.0;
-    cls.PYT2R(prob_parm.p_0,y_sp, Tspark, rhot);
-    cls.RYP2E(rhot, y_sp, prob_parm.p_0, eint); 
+    cls.PYT2R(prob_parm.p_0,y_sp, Tspark, rho_spark);
+    cls.RYP2E(rho_spark, y_sp, prob_parm.p_0, eint); 
   }
-  
+  */
+
   Real kin = Real(0.5) * rhot * (u[0] * u[0] + u[1] * u[1] + u[2]*u[2]);
   //state(i, j, k, cls.URHO) = rhot;
   state(i, j, k, cls.UMX)  = rhot * u[0];
@@ -197,20 +203,20 @@ bcnormal(const Real x[AMREX_SPACEDIM], Real dratio, const Real s_int[ProbClosure
       break;
       }
     case  2:  // SOUTH
-      GlobalBC::bc_fixP(0.0,1.0,0.0,&closures,prob_parm.p_bc, s_int, s_ext); 
+      GlobalBC::bc_fixP(0.0,1.0,0.0,&closures,prob_parm.p_0, s_int, s_ext); 
       break;
     case  1:  // WEST
-      GlobalBC::bc_fixP(1.0,0.0,0.0,&closures,prob_parm.p_bc, s_int, s_ext); 
+      GlobalBC::bc_fixP(1.0,0.0,0.0,&closures,prob_parm.p_0, s_int, s_ext); 
       break;
     case -1:  // EAST
-      GlobalBC::bc_fixP(-1.0,0.0,0.0,&closures,prob_parm.p_bc, s_int, s_ext);  
+      GlobalBC::bc_fixP(-1.0,0.0,0.0,&closures,prob_parm.p_0, s_int, s_ext);  
       break;
     case -2:  // NORTH
-      GlobalBC::bc_fixP(-1.0,0.0,0.0,&closures,prob_parm.p_bc, s_int, s_ext); 
+      GlobalBC::bc_fixP(-1.0,0.0,0.0,&closures,prob_parm.p_0, s_int, s_ext); 
       break;
     case -3:   //RIGHT 
       {
-      GlobalBC::bc_fixP(0.0,0.0,-1.0,&closures,prob_parm.p_bc, s_int, s_ext);  
+      GlobalBC::bc_fixP(0.0,0.0,-1.0,&closures,prob_parm.p_0, s_int, s_ext);  
 
       //GlobalBC::bc_subsonic_outflow_fixP(0.0,0.0,-1.0,&closures,prob_parm.p_0, s_int, s_ext);  
       break;  
@@ -253,19 +259,25 @@ user_tagging(int i, int j, int k, int nt_level, auto &tagfab,
   // Real gradrho= Real(0.5)*sqrt(drhox*drhox+drhoy*drhoy)*o_over_rhot;        
 
 
-  switch (level)
+ switch (level)
   {
     case 0:
-      refine = (z < prob_parm.zexit) && (r < 0.025) ;    // refine combustor    
+      //refine= (z > 0.035) && (z < 0.07);
+      refine = (z < prob_parm.zexit); 
+      //refine = (z < prob_parm.zexit) && (r < 0.025) ;    // refine combustor    
       break;
     case 1:
-      //refine= (z > 0.035) && (z < 0.07);
-      break;      
+      refine= (z > 0.035) && (z < 0.07);    
+      // refine = (z < prob_parm.zexit); 
+      break;
+    case 2:
+      // refine= (z > 0.035) && (z < 0.07);    
+      break;  
+      
     default:
 
     break;
    }
-    
 
   tagfab(i,j,k) = refine;
 
@@ -288,16 +300,17 @@ class user_source_t {
   void inline rsrc(const Geometry& geomdata, const amrex::MFIter &mfi,
                   const amrex::Array4<const amrex::Real> &prims,
                   const amrex::Array4<amrex::Real> &rhs, const cls_t *cls_d,
-                  amrex::Real dt){
+                  amrex::Real dt, amrex::Real real_time){
 
     const Box& bxg = mfi.tilebox();
     // const Box& bxg = mfi.growntilebox(cls_t::NGHOST);
     const Real *prob_lo = geomdata.ProbLo();
     const Real *dx = geomdata.CellSize();
 
+    Real timestep = real_time / dt;
+
     ProbParm const prob_parm;
     const auto& cls = *cls_d;
-
 
     amrex::ParallelFor(bxg,
       [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept
@@ -309,10 +322,11 @@ class user_source_t {
       const Real r = sqrt(x*x + y*y + (z-prob_parm.zexit)*(z-prob_parm.zexit));
       
       // pressure relax  if P > P0  P drops and to keep T constant rho drops
-      const Real tau_relax = 100.0*dt; 
+      const Real tau_relax = 50.0*dt; 
       const Real coef =dt/tau_relax;
+      Real pres = prims(i,j,k,cls.QPRES);
 
-      const Real dP = (prob_parm.p_bc- prims(i,j,k,cls.QPRES))*coef;
+      const Real dP = (prob_parm.p_0- pres)*coef;
     
       const Real T = prims(i,j,k,cls.QT); // dT =0
       const Real rho  = prims(i, j, k, cls.QRHO);
@@ -331,7 +345,7 @@ class user_source_t {
                     + prims(i,j,k,cls.QW)*prims(i,j,k,cls.QW));
       Real Et  = prims(i,j,k,cls.QEINT) + kin;
     
-      bool buffer = (z > prob_parm.zexit) && (r > 0.035);
+      bool buffer = (z > prob_parm.zexit) && (r > 0.05);
 
       if (buffer){        
         rhs(i,j,k,cls.UMX) += prims(i,j,k,cls.QU)*drhodt;
@@ -343,8 +357,79 @@ class user_source_t {
         }                        
       }
 
+      // ignition
 
-      });
+      const Real spark_time = 0.0010;
+      const Real zlow = 0.046;
+      const Real max_timestep = 2000;
+      //const Real zhigh = 0.09; 
+      const bool ignite_on = true; 
+
+      if (ignite_on && z >= zlow) {
+        const Real tmean = spark_time/2;  
+        const Real xmean_spatial = 0; 
+        const Real ymean_spatial = 0; 
+        const Real zmean_spatial = 0.05; 
+
+        const Real t_sd = tmean/3.0;
+        const Real x_sd = 0.00175;
+        const Real y_sd = 0.00175; 
+        const Real z_sd = 0.00175;
+        
+        const Real nsigma = 3.0;
+        const Real x_min = xmean_spatial -  nsigma * x_sd;
+        const Real x_max = xmean_spatial +  nsigma * x_sd;
+        const Real y_min = ymean_spatial -  nsigma * y_sd;
+        const Real y_max = ymean_spatial +  nsigma * y_sd;
+        const Real z_max = zmean_spatial +  nsigma * z_sd;
+
+        // parameters for gaussian in space in terms of grid points
+
+        const Real i_mean = Real(std::round(float((xmean_spatial - prob_lo[0]) / dx[0] - Real(0.5)))); 
+        const Real j_mean = Real(std::round(float((ymean_spatial - prob_lo[1]) / dx[1] - Real(0.5)))); 
+        const Real k_mean = Real(std::round(float((zmean_spatial - prob_lo[2]) / dx[2] - Real(0.5)))); 
+
+        const Real i_sd = Real(std::round(std::abs(float(x_sd / dx[0]))));
+        const Real j_sd = Real(std::round(std::abs(float(y_sd / dx[1]))));
+        const Real k_sd = Real(std::round(std::abs(float(z_sd / dx[2]))));
+
+        // tanh parameters
+
+        const Real p = 0.99;
+        const Real dt_goal = 6000; // number of timesteps before max source 
+        const Real k_tanh = Real(std::atanh(float(p))) / dt_goal;
+
+        // internal nrj source computation
+
+        if (x >= x_min && x <= x_max && y >= y_min && y <= y_max && z <= z_max && timestep <= max_timestep){
+
+        const Real T_ignite = 1000;
+        Real rho_ignite, eint_ignite;
+        cls.PYT2R(pres, Y, T_ignite, rho_ignite);
+        cls.RYP2E(rho_ignite, Y, pres, eint_ignite);
+        eint_ignite = std::max((Real)0, eint_ignite - prims(i,j,k, cls.QEINT));
+        eint_ignite /= dt;
+
+        // spatial distribution of nrj source
+
+        Real gaussian_space = std::exp( -0.5 * ( (i - i_mean)*(i - i_mean)/(i_sd*i_sd) + (j - j_mean)*(j - j_mean)/(j_sd*j_sd) + 
+                                  (k - k_mean)*(k - k_mean)/(k_sd*k_sd)));
+
+        // temporal distribution of nrj source. choose gaussian or tanh.
+
+        Real gaussian_time = std::exp( -0.5 * ((real_time - tmean)*(real_time - tmean)/(t_sd*t_sd) ));
+        Real tanh_time = Real(std::tanh(float(k_tanh * timestep)));
+
+        // total nrj source 
+        
+        Real tanh_total = rho * gaussian_space * tanh_time * eint_ignite;
+        Real gauss_total = rho * gaussian_space * gaussian_time * eint_ignite;
+
+        rhs(i,j,k,cls.UET) += tanh_total;
+      }
+      }
+    
+    });
 
   };
 };
