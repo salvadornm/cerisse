@@ -2,7 +2,7 @@
 max_step  =  10000
 stop_time =  0.5
 cfl = 0.3
-#time_step = 5.0e-7
+#time_step = 1.0e-6
 
 cns.order_rk  = -2 
 cns.stages_rk = 2
@@ -40,7 +40,7 @@ amr.grid_eff          = 0.7    # what constitutes an efficient grid
 amr.checkpoint_files_output = 1
 amr.check_file              = chk     # root name of checkpoint file
 amr.check_int               = 5000   # number of timesteps betw.  checkpoints
-amr.restart = chk05000
+#amr.restart = chk100000
 amr.plot_files_output = 1
 amr.plot_file         = ./plot/plt    # root name of plotfile
 amr.plot_int          = 100          # number of timesteps between plotfiles

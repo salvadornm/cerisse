@@ -25,9 +25,8 @@ void CNS::compute_rhs(MultiFab& statemf, Real dt, FluxRegister* fr_as_crse, Flux
   const PROB::ProbClosures* cls_d = CNS::d_prob_closures;
   const PROB::ProbClosures& cls_h = *CNS::h_prob_closures;
 
-  // keep track of time
-  static Real dt_current = 0;
-  dt_current += dt;
+  // time
+  const Real cur_time = state[State_Type].curTime();
 
   //...................................................................
   for (MFIter mfi(statemf, false); mfi.isValid(); ++mfi) {
@@ -171,7 +170,7 @@ void CNS::compute_rhs(MultiFab& statemf, Real dt, FluxRegister* fr_as_crse, Flux
 #endif 
 
     // Source terms
-    prob_rhs.src(geom,mfi, prims, state, cls_d, dt, dt_current);
+    prob_rhs.src(geom,mfi, prims, state, cls_d, dt, cur_time);
 
     // Set solid point RHS to 0  (state hold RHS at this point)
 #if AMREX_USE_GPIBM || CNS_USE_EB

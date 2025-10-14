@@ -30,7 +30,7 @@ using namespace amrex;
 
 namespace PROB {
 
-typedef closures_dt<indicies_stat_t, transport_Pele_t , multispecies_pele_gas_t<indicies_t>> ProbClosures;
+typedef closures_dt<indicies_t, transport_Pele_t , multispecies_pele_gas_t<indicies_t>> ProbClosures;
 
 // problem parameters 
 
@@ -79,21 +79,20 @@ struct ProbParm {
 };
 
 // spark parametrs
-struct SparkParm{
-  const Real spark_time = 0.0010;  // spark duration
-  const Real t0 = 1.0;          // spark time 
+struct SparkParm{  
+  const Real t0 = 0.004;          // spark time 
   const Real x0 = 0.0;          // spark position
   const Real y0 = 0.0;
-  const Real z0 = 0.12;     
+  const Real z0 = 0.06;     
   const Real a  = 4.0*std::sqrt(std::log(10));
   const Real Tmax    = 3000.0;
-  const Real energy  = 10.0e-3; // 10 mJ
+  const Real energy  = 2000.0e-3; // 100 mJ
   const Real pi = 3.14159265359;
   //const Real ds   = std::sqrt(a/pi)*(energy);
-  const Real ds    = 3.0e-3;       // 3  mm
-  const Real dt    = 500e-3;     // 500 micros
-  const Real dt2   = dt*dt;     // 500 micros
-  const Real ds2   = ds*ds;     // 500 micros
+  const Real ds    = 5.0e-3;    // 5  mm
+  const Real dt    = 0.5e-3;    // 0.5 ms
+  const Real dt2   = dt*dt;     // 
+  const Real ds2   = ds*ds;     // 
   const Real o_Volt = 0.25/(pi*pi*ds*ds*ds*dt);
   const Real Cp0    =  1224; // [J/(kg K) assumed room temperature and phi=0.5
   const Real  T0    = 300;
@@ -332,12 +331,14 @@ class user_source_t {
     const Real *prob_lo = geomdata.ProbLo();
     const Real *dx = geomdata.CellSize();
 
-    Real timestep = real_time / dt;
-
     ProbParm const prob_parm;
     const auto& cls = *cls_d;
 
     SparkParm const spark;
+
+    Real gauss_funt = std::exp( -0.5 * (real_time - spark.t0)*(real_time - spark.t0)/spark.dt2 );
+
+    //printf("time=%e spark.t0=%e gauss_funt %e spark.dt=%e\n", real_time, spark.t0, gauss_funt, spark.dt);
 
 
     amrex::ParallelFor(bxg,
@@ -388,13 +389,13 @@ class user_source_t {
       // ignition --------------------
       const Real rs2 = (x- spark.x0)*(x- spark.x0) + (y- spark.y0)*(y- spark.y0) + (z- spark.z0)*(z- spark.z0);
 
-      const bool ignite_on = false; 
 
-      if (ignite_on) {      
-        Real gauss_funt = std::exp( -0.5 * (real_time - spark.t0)*(real_time - spark.t0)/spark.dt2 );
+      // const bool ignite_on = false; 
+
+      // if (ignite_on) {      
         Real gauss_funr = std::exp( -0.5 * rs2/spark.ds2 );        
         rhs(i,j,k,cls.UET) += spark.energy*gauss_funt*gauss_funr*spark.o_Volt ;
-      }      
+      // }      
     
     });
 
