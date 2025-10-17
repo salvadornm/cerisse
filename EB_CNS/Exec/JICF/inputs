@@ -1,0 +1,125 @@
+# ====================================================== #
+#                  CERISSE INPUT SCRIPT                  #
+# ====================================================== #
+max_step = 20000
+stop_time = 0.1
+#amrex.fpe_trap_invalid = 1
+#fab.init_snan = 1
+
+# ================ COMPUTATIONAL DOMAIN ================ #
+geometry.is_periodic = 0 0 0
+geometry.coord_sys   = 0
+geometry.prob_lo     = -20.0    0.0   -20.0
+geometry.prob_hi     =  76.0   40.0    20.0
+amr.n_cell           =    96     40      40
+
+# ================ BOUNDARY CONDITIONS ================= #
+# 0 = Interior             3 = Symmetry
+# 1 = Inflow / UserBC      4 = SlipWall = 3
+# 2 = Outflow (FOExtrap)   5 = NoSlipWall (adiabatic)
+cns.lo_bc = 1 1 2
+cns.hi_bc = 2 2 2
+
+# ==================== WHAT PHYSICS ==================== #
+cns.do_hydro = 1
+cns.do_visc  = 1
+cns.do_react = 0
+# cns.do_vpdf = 1
+# cns.do_spdf = 1
+cns.eb_wall_model = 1
+cns.wall_model = LawOfTheWall
+#cns.no_wm_in_box_lo = -0.5 -0.5 -0.5
+#cns.no_wm_in_box_hi =  0.5  0.5  0.5
+#cns.do_les = 1
+#cns.les_model = WALE
+
+# ==================== WHAT NUMERICS =================== #
+cns.cfl = 0.3
+cns.dt_cutoff = 5.e-20
+cns.recon_scheme = 5
+cns.char_sys = 0
+cns.recon_char_var = 1
+cns.clip_temp = 90
+cns.use_hybrid_scheme = 1
+cns.use_high_order_corr = 1
+cns.shock_sensor_threshold = 0.8
+
+# ================== REACTION SETTINGS ================= #
+cns.chem_integrator = "ReactorCvode"
+cvode.solve_type = "denseAJ_direct"
+ode.clean_init_massfrac = 1
+cns.use_typical_vals_chem = 0
+cns.min_react_temp = 300
+cns.update_heat_release = 1
+# cns.rk_reaction_iter = 0
+
+# ================ VERBOSITY & DIAGNOSIS =============== #
+cns.v = 0 # 0/1/2
+amr.v = 1
+print_inputs = 0
+
+# ==================== LOAD BALANCE ==================== #
+amr.loadbalance_with_workestimates = 1 # loadbalance_int = regrid_int
+
+# =============== REFINEMENT / REGRIDDING ============== #
+amr.max_level       = 3     # maximum level number allowed
+amr.ref_ratio       = 2 2 2 # refinement ratio
+amr.regrid_int      = 50    # how often to regrid
+amr.blocking_factor = 8
+amr.max_grid_size   = 32
+amr.n_error_buf     = 2 2 2 # number of buffer cells in error est
+amr.grid_eff        = 0.8
+
+# ================== TAGGING CRITERIA ================== #
+cns.refinement_indicators = magvort gradp #YH2 refinebox
+# For shocks
+cns.gradp.field_name = pressure
+cns.gradp.adjacent_difference_greater = 1.7e5
+cns.gradp.max_level = 3
+# For fuel
+#cns.YH2.field_name = Y_H2
+#cns.YH2.value_greater = 0.03 # 0.1
+#cns.YH2.max_level = 3
+# For boundary layer and shear layer
+cns.magvort.vorticity_greater = 1.5e4 # 1.3e5 2e5
+cns.magvort.max_level = 3
+# Near injector
+#cns.refinebox.in_box_lo = -1.0 -0.0 -1.0
+#cns.refinebox.in_box_hi =  1.0  2.0  1.0
+#cns.refinebox.max_level = 3
+
+# ==================== OUTPUT FILES ==================== #
+amr.checkpoint_files_output = 1
+amr.check_file = chk
+amr.check_int  = 500
+#amr.check_per # interval physical time between checkpoints
+
+amr.plot_files_output = 1
+amr.plot_file  = plt
+amr.plot_int   = 250
+#amr.plot_per # interval physical time between plotfiles
+amr.plot_vars        = density Temp heatRelease #rho_E
+amr.derive_plot_vars = pressure velocity MachNumber magvort shock_sensor
+cns.plot_rhoy = 0
+cns.plot_molefrac = 0
+cns.plot_massfrac = 1
+cns.plot_fields = 0
+
+# ================= PROBLEM PARAMETERS ================= #
+prob.M         = 1.2    # inflow Mach number
+prob.p         = 2.5e6  # inflow pressure [Ba]
+prob.T         = 800.0  # inflow temperature [K]
+prob.theta0    = 2.0    # initial BL thickness [cm]
+prob.mom_ratio = 1.0    # jet momentum ratio
+prob.T_j       = 800.0  # jet static temperature [K]
+prob.r_j       = 0.5    # jet radius [cm]
+#prob.A = 
+#prob.M_j = 
+#prob.profile = 
+#prob.do_spark = 
+prob.record_statistics = 0
+prob.clean_aux_on_restart = 0
+
+#amr.plotfile_on_restart = 1
+#amr.regrid_on_restart = 1
+#amr.restart = chk05000
