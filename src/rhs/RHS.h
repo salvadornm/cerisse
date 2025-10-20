@@ -15,10 +15,13 @@
 // viscous templates
 #include <DiffusionCD.h>
 #include <viscous.h>
+#include <viscousLES.h>
+
 
 #ifdef USE_PELEPHYSICS
 #include "react.h"
 #include "react_source.h"
+#include "react_sourceLES.h"
 #endif
 
 // _dt stands for derived type

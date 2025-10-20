@@ -123,6 +123,8 @@ struct viscous_param_t {
 
   static constexpr bool use_LES= false;
 
+
+
 };
 
 struct wall_param {
@@ -143,10 +145,14 @@ template <typename cls_t > class user_source_t;
 // define nuemrical scheme comment/uncomment to set up 
 //typedef rhs_dt<weno_t<ReconScheme::Teno5, ProbClosures>, viscous_t<viscous_param_t, ProbClosures>, user_source_t<ProbClosures> > ProbRHS;
 //typedef rhs_dt<weno_t<ReconScheme::Teno5, ProbClosures>, viscous_t<viscous_param_t, ProbClosures>, reactor_source_t<user_source_t<ProbClosures>,ProbClosures >> ProbRHS;
-typedef rhs_dt<weno_t<ReconScheme::WenoZ5, ProbClosures>, viscous_t<viscous_param_t, ProbClosures>, reactor_source_t<user_source_t<ProbClosures>,ProbClosures >> ProbRHS;
+
 //typedef rhs_dt<riemann_t<false, ProbClosures>, viscous_t<viscous_param_t, ProbClosures>, user_source_t<ProbClosures> > ProbRHS;
 //typedef rhs_dt<weno_t<ReconScheme::Teno5, ProbClosures>, viscous_t<viscous_param_t, ProbClosures>, reactor_source_t<user_source_t<ProbClosures>,ProbClosures >> ProbRHS;
 //typedef rhs_dt<riemann_t<false, ProbClosures>, viscous_t<viscous_param_t, ProbClosures>, reactor_source_t<user_source_t<ProbClosures>,ProbClosures > > ProbRHS;
+
+// USED
+//typedef rhs_dt<weno_t<ReconScheme::WenoZ5, ProbClosures>, viscousLES_t<user_source_t<ProbClosures>, ProbClosures>, reactor_sourceLES_t<user_source_t<ProbClosures>,ProbClosures >> ProbRHS;
+typedef rhs_dt<riemann_t<false, ProbClosures>, viscousLES_t<user_source_t<ProbClosures>, ProbClosures>, reactor_sourceLES_t<user_source_t<ProbClosures>,ProbClosures >> ProbRHS;
 
 
 
@@ -312,6 +318,15 @@ template <typename cls_t>
 class user_source_t {
   public:
 
+  // ATF options
+  bool static constexpr ATF = true; // use adaptive thickening factor
+  static constexpr Real thickfactor = 2.0; // thickening factor
+  //
+
+  // viscous options
+  static constexpr int order = 2;                  // order numerical scheme   
+  static constexpr bool use_LES= false;
+
 
   // to use as a user source term, the function name must be src:
   // void inline src(const Geometry& geomdata, const amrex::MFIter &mfi,
@@ -341,6 +356,10 @@ class user_source_t {
     //printf("time=%e spark.t0=%e gauss_funt %e spark.dt=%e\n", real_time, spark.t0, gauss_funt, spark.dt);
 
 
+    const Real tau_relax = 50.0*5.e-5;
+    const Real coef =dt/tau_relax;
+ 
+
     amrex::ParallelFor(bxg,
       [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept
       {
@@ -351,8 +370,6 @@ class user_source_t {
       const Real r = sqrt(x*x + y*y + (z-prob_parm.zexit)*(z-prob_parm.zexit));
       
       // pressure relax  if P > P0  P drops and to keep T constant rho drops
-      const Real tau_relax = 50.0*dt; 
-      const Real coef =dt/tau_relax;
       Real pres = prims(i,j,k,cls.QPRES);
 
       const Real dP = (prob_parm.p_0- pres)*coef;
@@ -387,16 +404,38 @@ class user_source_t {
       }
 
       // ignition --------------------
-      const Real rs2 = (x- spark.x0)*(x- spark.x0) + (y- spark.y0)*(y- spark.y0) + (z- spark.z0)*(z- spark.z0);
+      // const Real rs2 = (x- spark.x0)*(x- spark.x0) + (y- spark.y0)*(y- spark.y0) + (z- spark.z0)*(z- spark.z0);
+      // Real gauss_funr = std::exp( -0.5 * rs2/spark.ds2 );        
+      // rhs(i,j,k,cls.UET) += spark.energy*gauss_funt*gauss_funr*spark.o_Volt ;
 
+      //if (z > 0.06) 
+      if (T > 3000.0)
+      {
+        const Real Ts = 3000; 
+        //const Real Ps = prob_parm.p_0;
+        Real Etarget = 0.0;
+        Real rhos = 0.0;
+        cls.PYT2R(pres,Y,Ts,rhos);  
+        cls.RYP2E(rhos,Y,pres,Etarget);
 
-      // const bool ignite_on = false; 
+        Real tau = 0.01*tau_relax;
 
-      // if (ignite_on) {      
-        Real gauss_funr = std::exp( -0.5 * rs2/spark.ds2 );        
-        rhs(i,j,k,cls.UET) += spark.energy*gauss_funt*gauss_funr*spark.o_Volt ;
-      // }      
-    
+        rhs(i,j,k,cls.UET) += (rhos*Etarget - rho*prims(i,j,k,cls.QEINT))/tau;
+
+      }
+
+      for (int ns = 0; ns < cls.NCONS; ns++) {
+      if (std::isnan(prims(i, j, k, ns))) {
+        printf("rsrc: nan prims at i=%d j=%d k=%d ns=%d\n",i,j,k,ns);
+        amrex::Abort("rsrc: nan prims");
+      }
+      }
+
+      if ((i==48) && (j==41) && (k==40)) {
+        printf("rsrc: problematic cell at i=%d j=%d k=%d\n",i,j,k);
+        printf(" T= %e P= %e rho= %e\n", T, pres, rho);
+      }
+
     });
 
   };

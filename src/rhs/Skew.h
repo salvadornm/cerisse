@@ -158,8 +158,19 @@ class skew_t {
     }
     
     // sensor variables (denisty and pressure by default)
+    // sensor variables
+    // const int NVARSEN=2;
+    // int NSEN[2];
     NSEN[0] = cls_t::QRHO;
     NSEN[1] = cls_t::QPRES;
+
+    // (manual sensor) param::manualsensor
+    // const int NVARSEN=param::NVARSEN;
+    // int NSEN[NVARSEN];
+    //  for (int nv=0; nv<NVARSEN; nv++) {
+    //  NSEN[nv] = param::NSEN[nv];    
+    // }
+    // 
 
     // no masking
     for (int l = 0; l < AMREX_SPACEDIM; l++) {  

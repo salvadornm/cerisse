@@ -116,7 +116,7 @@ class reactor_source_t {
       // fill mask      
       mask(i, j, k) = (T(i, j, k) > CNSConstants::min_react_temp) ? 1 : -1; // temp snm 
 
-      if (T(i,j,k) > Real(2500)) {
+      if (T(i,j,k) > Real(3000)) {
         amrex::Gpu::Atomic::Max(skip_react_ptr, 1);
       }
       //mask(i, j, k) = (T(i, j, k) > 500) ? 1 : -1; // temp snm 
@@ -149,6 +149,7 @@ class reactor_source_t {
     // }
 
     //////////////////////// Unpack data ////////////////////////
+
     amrex::ParallelFor(bx, [=] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {
       const auto& cls = *cls_d;
 
@@ -175,6 +176,7 @@ class reactor_source_t {
           for (int ns = 0; ns < NUM_SPECIES; ++ns) {
             // rY is overwritten by rY + rYsrc * dt + chem_src * dt = rY +            
             Real rY_init =  prims(i, j, k, cls.QRHO) * prims(i, j, k, cls.QFS + ns);
+
             rhs(i, j, k, cls.UFS + ns) = (rY(i, j, k, ns) * rho_cgs2si - rY_init) / dt;
           }          
         }

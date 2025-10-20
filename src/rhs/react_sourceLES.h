@@ -1,14 +1,14 @@
-#ifndef REACT_H
-#define REACT_H
+#ifndef REACT_SOURCELES_H
+#define REACT_SOURCELES_H
 
 #include <PelePhysics.H>
 #include <ReactorBase.H>
 #include <Constants.h>
 #include <CNSconstants.h>
 
-// template <int reactor_type, typename cls_t>
-template <typename cls_t>
-class reactor_t {
+// use ::  .., reactor_sourceLES<user_source_t, ProbClosures> >;
+template <typename source_t, typename cls_t >
+class reactor_sourceLES_t {
  public:
   bool m_initialized = false;
   std::unique_ptr<pele::physics::reactions::ReactorBase> m_reactor;
@@ -20,31 +20,28 @@ class reactor_t {
   inline static constexpr bool check_problem_cell = false; 
   /// 
 
-  reactor_t() {
+  reactor_sourceLES_t() {
     std::string reactor_type;
     {
       amrex::ParmParse pp("cns");
-      pp.get("reactor_type", reactor_type);  //bad name
+      pp.get("reactor_type", reactor_type);
     }
-
     m_reactor = pele::physics::reactions::ReactorBase::create(reactor_type);
-
+    
     if (!m_reactor) {
       amrex::Abort("reactor_t(): Unknown reactor type " + reactor_type);
     }
-
     m_reactor->init(therm_reactor_type, 1); // create reactor solver
-
     m_initialized = true;
   };
 
-  ~reactor_t() {
+  ~reactor_sourceLES_t() {
     if (m_initialized) m_reactor->close();
   }
 
   /**
    * @brief Calculate chemical reaction source term, adding to the
-   * right-hand-side (rhs) array.
+   * right-hand-side (rhs) array, as well as calling the pass source term (defiend in prob)
    *
    * @tparam cls_t The problem closure class typename.
    * @param mfi    The MFIter object representing the current grid patch.
@@ -55,10 +52,10 @@ class reactor_t {
    * @param dt     The time step size. (react() requires it to be non-const)
    */
   // https://www.codeproject.com/Articles/48575/How-to-Define-a-Template-Class-in-a-h-File-and-Imp
-  void inline src(const Geometry& /*geomdata*/, const amrex::MFIter& mfi,
+  void inline src(const Geometry& geomdata, const amrex::MFIter& mfi,
                   const amrex::Array4<const amrex::Real>& prims,
                   const amrex::Array4<amrex::Real>& rhs, const cls_t* cls_d,
-                  amrex::Real dt, amrex::Real /*real_time*/) {
+                  amrex::Real dt, amrex::Real real_time) {
     if (!m_initialized) amrex::Abort("reactor_t not initialised");
 
     // amrex::Print() << "reactor_t::src()" << std::endl;
@@ -79,28 +76,27 @@ class reactor_t {
 
     ///////////////////// Prepare for react /////////////////////
     FArrayBox tempf(bx, 2 * NUM_SPECIES + 4, The_Async_Arena());
-
-
-    //MultiFab STemp(bx, dm, NUM_SPECIES+3, 0);
-    //MultiFab FTemp(bx, dm, NUM_SPECIES+3, 0); 
-
-    // arrays of scalars + energy + temperature (THIS CAN BE DONE BETTER)
-    auto const& rY  = tempf.array(0);
+    auto const& rY = tempf.array(0);
     auto const& rEi = tempf.array(NUM_SPECIES);
-    auto const& T   = tempf.array(NUM_SPECIES + 1);
-
-    // source terms
+    auto const& T = tempf.array(NUM_SPECIES + 1);
     auto const& rYsrc  = tempf.array(NUM_SPECIES + 2);
     auto const& rEisrc = tempf.array(2 * NUM_SPECIES + 2);
     auto const& fc     = tempf.array(2 * NUM_SPECIES + 3);  // number of RHS eval (not used)
     IArrayBox maskf(bx, 1, The_Async_Arena());
     maskf.setVal<RunOn::Gpu>(1);
-    auto const& mask = maskf.array();  // 1: do reaction, -1: skip reaction
 
+    IArrayBox maskf_noreact(bx, 1, The_Async_Arena());
+    amrex::Gpu::DeviceScalar<int> skip_react(0);
+    int* skip_react_ptr = skip_react.dataPtr();
+    auto const& mask_noreact = maskf_noreact.array();
+
+
+    auto const& mask = maskf.array();  // 1: do reaction, -1: skip reaction
 
     const Real o_dt = 1.0 / dt;
 
-    amrex::ParallelFor(bx, [=] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {
+    // prepare input
+     amrex::ParallelFor(bx, [=] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {
       const auto& cls = *cls_d;
 
       // [rY, rEi, T, rYsrc, rEisrc] convert to CGS!!
@@ -143,8 +139,12 @@ class reactor_t {
       // fill mask      
       mask(i, j, k) = (T(i, j, k) > CNSConstants::min_react_temp) ? 1 : -1;
 
-    });
+      //mask(i, j, k) = (T(i, j, k) > 3000.0) ? -1 : mask(i,j,k);
+      if (T(i,j,k) > 2500.0) {
+        mask(i, j, k) = -1;
+      }
 
+    });
 
     /////////////////////////// React ///////////////////////////
     Real current_time = 0.0;
@@ -157,23 +157,27 @@ class reactor_t {
     m_reactor->react(bx, rY, rYsrc, T, rEi, rEisrc, fc, mask, dt, current_time);
 #endif
     amrex::Gpu::Device::streamSynchronize();  // Important
-
     // Convert to SI units
-    ParallelFor(bx, [rY,rEi]
-      AMREX_GPU_DEVICE (int i, int j, int k) noexcept
+    ParallelFor(bx, [rY,rEi] AMREX_GPU_DEVICE (int i, int j, int k) noexcept
       {
         for (int n = 0; n < NUM_SPECIES; n++) {
           rY(i,j,k,n) *= rho_cgs2si;
         }
         rEi(i,j,k) *= rhoenergy_cgs2si;
       });
-
+    /////////////////////////////////////////////////////////////
 
     /// Compute LES properties
     // if (LES)
     // {
     //   // do stuff compute taus sgs, Efficiency ...
     // }
+
+
+    // ATF options    (by default no ATF)
+    constexpr amrex::Real Fthick = (source_t::ATF ? source_t::thickfactor : amrex::Real(1.0));
+    const amrex::Real o_F = amrex::Real(1.0) / Fthick;
+    //
 
     //////////////////////// Unpack dat + Update RHS ////////////////////////
     amrex::ParallelFor(bx, [=] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {
@@ -225,15 +229,15 @@ class reactor_t {
           else
           // Option 2: constant volume ----------- (rho, e constant)
           {
-            for (int ns = 0; ns < NUM_SPECIES; ++ns) {            
-              Real rY_init =  rho * prims(i, j, k, cls.QFS + ns);
+            for (int ns = 0; ns < NUM_SPECIES; ++ns) {                          
+              Real Wchem = (rY(i, j, k, ns) - rho * prims(i, j, k, cls.QFS + ns)) * o_dt;
               if constexpr(pass_source_term){
-                rhs(i, j, k, cls.UFS + ns) = (rY(i, j, k, ns)  - rY_init) * o_dt;
+                rhs(i, j, k, cls.UFS + ns) = Wchem*o_F;
               }
               else {
-                rhs(i, j, k, cls.UFS + ns) += (rY(i, j, k, ns) - rY_init) * o_dt; 
-              }            
-            }          
+                rhs(i, j, k, cls.UFS + ns) += Wchem*o_F;
+              }
+            }
           }
       
 
@@ -249,10 +253,10 @@ class reactor_t {
      // if LES multiply by something
 
 
-    // TODO: Record runtime for load balancing
-  
-    // Real sum_fc = tempf.sum<RunOn::Device>(2 * NUM_SPECIES + 3, 1);
-    // amrex::Print() << " # RHS eval = " << sum_fc << "\n";
+    // call user source term (passed as argument)
+    //  - assume source_t is a user_source_t is lightweight (no persistent state, just logic),
+    source_t{}.rsrc(geomdata,mfi, prims, rhs, cls_d, dt, real_time);
+
   }
 };
 
