@@ -128,7 +128,7 @@ class viscousLES_t {
     if constexpr (param::use_LES)
     {
       Real Delta = cls->calc_delta(dx); // compute filter width
-      Real mu_sgs,cond_sgs, diff_sgs;
+      //Real mu_sgs,cond_sgs, diff_sgs;
       // loop over cells (including enough ghost to build stencil)  
       const Box& bxgs = mfi.growntilebox(halfsten);   
       // BEWARE cannot go over all the ghost cell !! 
@@ -136,6 +136,11 @@ class viscousLES_t {
       // for viscous order 4, LES order can be  2
       // for viscous order 6, LES cannot be used
       amrex::ParallelFor( bxgs, [=, *this] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {
+
+        // Per-thread mutable outputs:
+        Real mu_sgs  = 0.0;
+        Real cond_sgs = 0.0;
+        Real diff_sgs = 0.0;
 
         Real Cp_o_Pr = lam_arr(i,j,k)/(mu_arr(i,j,k)+1.e-15); 
         cls-> compute_sgsterms(i,j,k,prims, dxinv, Delta, Cp_o_Pr,  mu_sgs, cond_sgs, diff_sgs);
@@ -154,14 +159,14 @@ class viscousLES_t {
       auto const& flx = flxt[dir]->array(); 
 
       // Yosihizawa model  tau_kk
-      if constexpr (param::use_LES)
-      {
-        Real Delta = cls->calc_delta(dx); // compute filter width
-        amrex::ParallelFor(bxgnodal,
-                  [=,*this] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {                     
-                    flx(i,j,k,cls_t::UMX+dir) += cls->compute_xisgs(i,j,k,dir,prims, dxinv, Delta);
-                  });        
-      }
+      // if constexpr (param::use_LES)
+      // {
+      //   Real Delta = cls->calc_delta(dx); // compute filter width
+      //   amrex::ParallelFor(bxgnodal,
+      //             [=,*this] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {                     
+      //               flx(i,j,k,cls_t::UMX+dir) += cls->compute_xisgs(i,j,k,dir,prims, dxinv, Delta);
+      //             });        
+      // }
 
       // compute diffusion fluxes
 #if (AMREX_USE_GPIBM || CNS_USE_EB )   

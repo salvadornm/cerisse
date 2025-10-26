@@ -157,12 +157,14 @@ class skew_t {
       break;
     }
     
-    // sensor variables (denisty and pressure by default)
-    // sensor variables
-    // const int NVARSEN=2;
-    // int NSEN[2];
+    // inside skew_t() constructor
     NSEN[0] = cls_t::QRHO;
     NSEN[1] = cls_t::QPRES;
+#if NUM_SPECIES > 1    
+    for (int nv = 2; nv < NVARSEN; nv++) {
+      NSEN[nv] = cls_t::QFS + (nv - 2);
+    }
+#endif
 
     // (manual sensor) param::manualsensor
     // const int NVARSEN=param::NVARSEN;
@@ -547,8 +549,16 @@ class skew_t {
   int halfsten = order / 2;
 
   // sensor variables
-  const int NVARSEN=2;
-  int NSEN[2];
+  // const int NVARSEN=2;
+  // int NSEN[2];
+  // sensor variables (denisty and pressure by default)
+#if NUM_SPECIES > 1    
+    static constexpr int NVARSEN = 2 + NUM_SPECIES;
+#else
+    constexpr int NVARSEN=2;
+#endif    
+    int NSEN[NVARSEN];
+
   // masking sensor  
   typedef Array2D<int, 0, AMREX_SPACEDIM, 0, 2> arrIntCoeff_t;
   arrIntCoeff_t mask_sen;

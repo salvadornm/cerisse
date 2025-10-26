@@ -30,32 +30,61 @@ using namespace amrex;
 
 namespace PROB {
 
-typedef closures_dt<indicies_t, transport_Pele_t , multispecies_pele_gas_t<indicies_t>> ProbClosures;
+
+// LES closures
+
+struct LESparm {
+  // Smagorinsky constant
+  static constexpr Real Cs = 0.1;
+  static constexpr int order = 2; // order of the numerical scheme for LES
+  static constexpr Real Scsgs = 0.4; // turbulent Schmidt number
+  static constexpr Real Pr_o_Prsgs = 0.1; // turbulent Prandtl number  
+  static constexpr bool fixDelta = false; // use fixed filter width
+};
+
+
+typedef closures_dt<indicies_t, transport_Pele_t , multispecies_pele_gas_t<indicies_t>, Smagorinsky_t<LESparm,indicies_t>>ProbClosures;
+//typedef closures_dt<indicies_t, transport_Pele_t , multispecies_pele_gas_t<indicies_t>> ProbClosures;
 
 // problem parameters 
 
 struct ProbParm {  
   // inflow state for initialisation
   //const Real p_inflow    = pres_atm2si; //[Pa] inflow pressure (1 atm)  
-  const Real T_inflow    = 298; //[K]  
-  Real Y_inflow[NUM_SPECIES] = {1.0};
+  const Real T_inflow    = 298.0; //[K]  
+  Real Y_inflow[NUM_SPECIES] = {0.0};
+  Real Y_burn[NUM_SPECIES] = {0.0};
   ProbClosures pp_pc;
+
+  const Real Tburn = 2197.0; //[K] burned gas temperature
 
   ProbParm () {
   #if USE_PELEPHYSICS
   Y_inflow[H_ID] = 0; 
-  Y_inflow[H2_ID] = 0.013; 
+  Y_inflow[H2_ID] = 0.014468; 
   Y_inflow[O_ID] = 0; 
   Y_inflow[OH_ID] = 0; 
   Y_inflow[H2O_ID] = 0; 
-  Y_inflow[O2_ID] = 0.227; 
+  Y_inflow[O2_ID] = 0.22963; 
   Y_inflow[HO2_ID] = 0; 
   Y_inflow[H2O2_ID] = 0;  
-  Y_inflow[N2_ID] = 0.76; 
+  Y_inflow[N2_ID] = 0.7559; 
   Y_inflow[AR_ID] = 0; 
   Y_inflow[HE_ID] = 0; 
   Y_inflow[CO_ID] = 0; 
   Y_inflow[CO2_ID] = 0; 
+   
+  //
+  Y_burn[H_ID] = 1.4666e-05; 
+  Y_burn[H2_ID] = 9.9468e-05; 
+  Y_burn[O_ID] = 0.0009379; 
+  Y_burn[OH_ID] = 0.0055107; 
+  Y_burn[H2O_ID] = 0.12534; 
+  Y_burn[O2_ID] = 0.11219; 
+  Y_burn[HO2_ID] = 5.1687e-06; 
+  Y_burn[H2O2_ID] = 4.4871e-07 ;  
+  Y_burn[N2_ID] = 0.7559; 
+  
   #endif
 
   pp_pc.PYT2R(p_0, Y_inflow, T_0, rho_0);
@@ -80,17 +109,17 @@ struct ProbParm {
 
 // spark parametrs
 struct SparkParm{  
-  const Real t0 = 0.004;          // spark time 
+  const Real t0 = 0.0085;          // spark time 
   const Real x0 = 0.0;          // spark position
   const Real y0 = 0.0;
-  const Real z0 = 0.06;     
+  const Real z0 = 0.08;     
   const Real a  = 4.0*std::sqrt(std::log(10));
   const Real Tmax    = 3000.0;
   const Real energy  = 2000.0e-3; // 100 mJ
   const Real pi = 3.14159265359;
   //const Real ds   = std::sqrt(a/pi)*(energy);
-  const Real ds    = 5.0e-3;    // 5  mm
-  const Real dt    = 0.5e-3;    // 0.5 ms
+  const Real ds    = 4.0e-3;    // 5  mm
+  const Real dt    = 1.0e-3;    // 0.5 ms
   const Real dt2   = dt*dt;     // 
   const Real ds2   = ds*ds;     // 
   const Real o_Volt = 0.25/(pi*pi*ds*ds*ds*dt);
@@ -102,19 +131,16 @@ struct SparkParm{
 };
 
 
-// numerical method parameters
-/** 
-struct const_viscparm_t {
+// numerical method parameters 
+struct skewparm_t {
 
   public:
 
-  //static constexpr bool dissipation = true;         // no dissipation
-  //static constexpr int  order = 4;                  // order numerical scheme   
-  //static constexpr Real C2skew=0.5,C4skew=0.016;   // Skew symmetric default
-  static constexpr Real viscosity = 1.846e-5;
-  static constexpr Real conductivity = 0.02624;
+  static constexpr bool dissipation = true;         // no dissipation
+  static constexpr int  order = 4;                  // order numerical scheme   (2 or 4)
+  static constexpr Real C2skew=0.1,C4skew=0.016;    // Skew symmetric default  (0.5)
 };
-*/
+
 
 struct viscous_param_t {
 
@@ -152,8 +178,8 @@ template <typename cls_t > class user_source_t;
 
 // USED
 //typedef rhs_dt<weno_t<ReconScheme::WenoZ5, ProbClosures>, viscousLES_t<user_source_t<ProbClosures>, ProbClosures>, reactor_sourceLES_t<user_source_t<ProbClosures>,ProbClosures >> ProbRHS;
-typedef rhs_dt<riemann_t<false, ProbClosures>, viscousLES_t<user_source_t<ProbClosures>, ProbClosures>, reactor_sourceLES_t<user_source_t<ProbClosures>,ProbClosures >> ProbRHS;
-
+//typedef rhs_dt<riemann_t<false, ProbClosures>, viscousLES_t<user_source_t<ProbClosures>, ProbClosures>, reactor_sourceLES_t<user_source_t<ProbClosures>,ProbClosures >> ProbRHS;
+typedef rhs_dt<skew_t<skewparm_t, ProbClosures>, viscousLES_t<user_source_t<ProbClosures>, ProbClosures>, reactor_sourceLES_t<user_source_t<ProbClosures>,ProbClosures >> ProbRHS;
 
 
 // define type of wall and EBM class
@@ -204,6 +230,18 @@ prob_initdata(int i, int j, int k, Array4<Real> const &state,
     cls.RYP2E(rho_spark, y_sp, prob_parm.p_0, eint); 
   }
   */
+
+  // put burn condistions
+  
+  if (z > 0.08)
+  { 
+    for (int n=0; n < NUM_SPECIES; n++) {
+      y_sp[n] = prob_parm.Y_burn[n];
+    }     
+    cls.PYT2R(prob_parm.p_0,y_sp, prob_parm.Tburn, rhot);
+    cls.RYP2E(rhot, y_sp, prob_parm.p_0, eint);
+  }
+
 
   Real kin = Real(0.5) * rhot * (u[0] * u[0] + u[1] * u[1] + u[2]*u[2]);
   //state(i, j, k, cls.URHO) = rhot;
@@ -292,9 +330,12 @@ user_tagging(int i, int j, int k, int nt_level, auto &tagfab,
  switch (level)
   {
     case 0:
-      //refine= (z > 0.035) && (z < 0.07);
-      refine = (z < prob_parm.zexit); 
+      //refine=  (z < 0.20) && (r < 0.05);    
+      //refine = (z < prob_parm.zexit); 
       //refine = (z < prob_parm.zexit) && (r < 0.025) ;    // refine combustor    
+
+       refine = ( z < 0.065) && (z > 0.040) && (r < 0.023);    // refine injector exit
+
       break;
     case 1:
       refine= (z > 0.035) && (z < 0.07);    
@@ -320,12 +361,17 @@ class user_source_t {
 
   // ATF options
   bool static constexpr ATF = true; // use adaptive thickening factor
-  static constexpr Real thickfactor = 2.0; // thickening factor
+  static constexpr Real thickfactor = 5.0; // thickening factor
+
+  bool static constexpr do_reactions = true;
   //
 
   // viscous options
   static constexpr int order = 2;                  // order numerical scheme   
-  static constexpr bool use_LES= false;
+  static constexpr bool use_LES= true;
+
+
+
 
 
   // to use as a user source term, the function name must be src:
@@ -356,7 +402,7 @@ class user_source_t {
     //printf("time=%e spark.t0=%e gauss_funt %e spark.dt=%e\n", real_time, spark.t0, gauss_funt, spark.dt);
 
 
-    const Real tau_relax = 50.0*5.e-5;
+    const Real tau_relax = 5.e-6;
     const Real coef =dt/tau_relax;
  
 
@@ -391,7 +437,7 @@ class user_source_t {
                     + prims(i,j,k,cls.QW)*prims(i,j,k,cls.QW));
       Real Et  = prims(i,j,k,cls.QEINT) + kin;
     
-      bool buffer = (z > prob_parm.zexit) && (r > 0.03);
+      bool buffer = (z > prob_parm.zexit) && (r > 0.06);
 
       if (buffer){        
         rhs(i,j,k,cls.UMX) += prims(i,j,k,cls.QU)*drhodt;
@@ -408,33 +454,40 @@ class user_source_t {
       // Real gauss_funr = std::exp( -0.5 * rs2/spark.ds2 );        
       // rhs(i,j,k,cls.UET) += spark.energy*gauss_funt*gauss_funr*spark.o_Volt ;
 
-      //if (z > 0.06) 
+      //if ((z > 0.045) && (z < prob_parm.zexit))
       if (T > 3000.0)
       {
-        const Real Ts = 3000; 
-        //const Real Ps = prob_parm.p_0;
+        const Real Ts = 3000.0;       
         Real Etarget = 0.0;
         Real rhos = 0.0;
         cls.PYT2R(pres,Y,Ts,rhos);  
         cls.RYP2E(rhos,Y,pres,Etarget);
 
-        Real tau = 0.01*tau_relax;
+        Real tau = 5.0e-6; //5e-3 slow relaxation
 
         rhs(i,j,k,cls.UET) += (rhos*Etarget - rho*prims(i,j,k,cls.QEINT))/tau;
 
       }
 
-      for (int ns = 0; ns < cls.NCONS; ns++) {
-      if (std::isnan(prims(i, j, k, ns))) {
-        printf("rsrc: nan prims at i=%d j=%d k=%d ns=%d\n",i,j,k,ns);
-        amrex::Abort("rsrc: nan prims");
-      }
-      }
+      //  if ((z > 0.045) && (z < prob_parm.zexit))
+      // {
+      //   for (int sp = 0; sp < NUM_SPECIES; sp++) {
+      //     rhs(i,j,k, cls.UFS + sp) += rho*0.01-prims(i,j,k, cls.QFS + sp);
+      //   } 
+      // }
+      
 
-      if ((i==48) && (j==41) && (k==40)) {
-        printf("rsrc: problematic cell at i=%d j=%d k=%d\n",i,j,k);
-        printf(" T= %e P= %e rho= %e\n", T, pres, rho);
-      }
+      // for (int ns = 0; ns < cls.NCONS; ns++) {
+      // if (std::isnan(prims(i, j, k, ns))) {
+      //   printf("rsrc: nan prims at i=%d j=%d k=%d ns=%d\n",i,j,k,ns);
+      //   amrex::Abort("rsrc: nan prims");
+      // }
+      // }
+
+      // if ((i==48) && (j==41) && (k==40)) {
+      //   printf("rsrc: problematic cell at i=%d j=%d k=%d\n",i,j,k);
+      //   printf(" T= %e P= %e rho= %e\n", T, pres, rho);
+      // }
 
     });
 

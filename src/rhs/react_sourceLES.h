@@ -15,7 +15,7 @@ class reactor_sourceLES_t {
 
   // reactor types (hardcoded) and specific options
   inline static constexpr int therm_reactor_type = 1; // 1: U  2:H
-  inline static constexpr bool reactor_constant_pressure =false;
+  inline static constexpr bool reactor_constant_pressure = false;
   inline static constexpr bool pass_source_term   = false; 
   inline static constexpr bool check_problem_cell = false; 
   /// 
@@ -140,15 +140,22 @@ class reactor_sourceLES_t {
       mask(i, j, k) = (T(i, j, k) > CNSConstants::min_react_temp) ? 1 : -1;
 
       //mask(i, j, k) = (T(i, j, k) > 3000.0) ? -1 : mask(i,j,k);
-      if (T(i,j,k) > 2500.0) {
-        mask(i, j, k) = -1;
-      }
+      // if (T(i,j,k) > 3000.0) {
+      //   mask(i, j, k) = -1;
+      // }
+
+      // snm
+      if (k > 80) mask(i, j, k) = -1;  //  skip reaction in upper domain
 
     });
 
     /////////////////////////// React ///////////////////////////
     Real current_time = 0.0;
 
+    // smm
+    constexpr bool do_react = source_t::do_reactions; // temp
+
+    if (do_react) {
     // Not necessary to start a stream here, however pelePhysics function only takes a stream.     
 #ifdef AMREX_USE_GPU
     m_reactor->react(bx, rY, rYsrc, T, rEi, rEisrc, fc, mask, dt, current_time,
@@ -157,6 +164,8 @@ class reactor_sourceLES_t {
     m_reactor->react(bx, rY, rYsrc, T, rEi, rEisrc, fc, mask, dt, current_time);
 #endif
     amrex::Gpu::Device::streamSynchronize();  // Important
+      } // end do react
+
     // Convert to SI units
     ParallelFor(bx, [rY,rEi] AMREX_GPU_DEVICE (int i, int j, int k) noexcept
       {
