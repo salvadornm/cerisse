@@ -31,7 +31,8 @@ Version 1 created by: Enson Un, Salvador Navarro-Martinez
     ```
 4. (Optional) Disable some PelePhysics constraints and aborts
     ```bash
-    ./Tools/scripts/pp_modify.sh
+    cd EB_CNS/Tools/scripts
+    ./pp_modify.sh
     ```
 
 Or download a release from [here](https://github.com/salvadornm/cerisse/releases).
