@@ -146,17 +146,12 @@ struct viscous_param_t {
 
   public:
   static constexpr int order = 2;                  // order numerical scheme   
-
   static constexpr bool use_LES= false;
-
-
-
 };
 
 struct wall_param {
 
   public:
-
 
   static constexpr Real Twall = 285.5;                // wall temperature (if isothermal used)
   static constexpr bool solve_diffwall = true;      // solve viscous effects at walls
@@ -165,16 +160,6 @@ struct wall_param {
 
 
 template <typename cls_t > class user_source_t;
-
-//typedef closures_dt<indicies_t, transport_const_t<const_viscparm_t>, calorifically_perfect_gas_t<indicies_t>> ProbClosures;
-
-// define nuemrical scheme comment/uncomment to set up 
-//typedef rhs_dt<weno_t<ReconScheme::Teno5, ProbClosures>, viscous_t<viscous_param_t, ProbClosures>, user_source_t<ProbClosures> > ProbRHS;
-//typedef rhs_dt<weno_t<ReconScheme::Teno5, ProbClosures>, viscous_t<viscous_param_t, ProbClosures>, reactor_source_t<user_source_t<ProbClosures>,ProbClosures >> ProbRHS;
-
-//typedef rhs_dt<riemann_t<false, ProbClosures>, viscous_t<viscous_param_t, ProbClosures>, user_source_t<ProbClosures> > ProbRHS;
-//typedef rhs_dt<weno_t<ReconScheme::Teno5, ProbClosures>, viscous_t<viscous_param_t, ProbClosures>, reactor_source_t<user_source_t<ProbClosures>,ProbClosures >> ProbRHS;
-//typedef rhs_dt<riemann_t<false, ProbClosures>, viscous_t<viscous_param_t, ProbClosures>, reactor_source_t<user_source_t<ProbClosures>,ProbClosures > > ProbRHS;
 
 // USED
 //typedef rhs_dt<weno_t<ReconScheme::WenoZ5, ProbClosures>, viscousLES_t<user_source_t<ProbClosures>, ProbClosures>, reactor_sourceLES_t<user_source_t<ProbClosures>,ProbClosures >> ProbRHS;
@@ -233,7 +218,7 @@ prob_initdata(int i, int j, int k, Array4<Real> const &state,
 
   // put burn condistions
   
-  if (z > 0.08)
+  if (z > 0.07)
   { 
     for (int n=0; n < NUM_SPECIES; n++) {
       y_sp[n] = prob_parm.Y_burn[n];
@@ -334,12 +319,18 @@ user_tagging(int i, int j, int k, int nt_level, auto &tagfab,
       //refine = (z < prob_parm.zexit); 
       //refine = (z < prob_parm.zexit) && (r < 0.025) ;    // refine combustor    
 
-       refine = ( z < 0.065) && (z > 0.040) && (r < 0.023);    // refine injector exit
+      //refine = ( z < 0.07) && (z > 0.035) && (r < 0.03);    // refine injector exit
+
+      refine = (z < 0.15);
 
       break;
     case 1:
       refine= (z > 0.035) && (z < 0.07);    
       // refine = (z < prob_parm.zexit); 
+
+      // refine based on T
+
+
       break;
     case 2:
       // refine= (z > 0.035) && (z < 0.07);    
@@ -348,7 +339,9 @@ user_tagging(int i, int j, int k, int nt_level, auto &tagfab,
     default:
 
     break;
-   }
+  }
+
+ // refine = true; // temp
 
   tagfab(i,j,k) = refine;
 
@@ -395,11 +388,9 @@ class user_source_t {
     ProbParm const prob_parm;
     const auto& cls = *cls_d;
 
-    SparkParm const spark;
-
-    Real gauss_funt = std::exp( -0.5 * (real_time - spark.t0)*(real_time - spark.t0)/spark.dt2 );
-
-    //printf("time=%e spark.t0=%e gauss_funt %e spark.dt=%e\n", real_time, spark.t0, gauss_funt, spark.dt);
+    // for spark
+    //SparkParm const spark;
+    //Real gauss_funt = std::exp( -0.5 * (real_time - spark.t0)*(real_time - spark.t0)/spark.dt2 );
 
 
     const Real tau_relax = 5.e-6;
@@ -449,12 +440,13 @@ class user_source_t {
         }                        
       }
 
-      // ignition --------------------
+      // spark ignition --------------------
       // const Real rs2 = (x- spark.x0)*(x- spark.x0) + (y- spark.y0)*(y- spark.y0) + (z- spark.z0)*(z- spark.z0);
       // Real gauss_funr = std::exp( -0.5 * rs2/spark.ds2 );        
       // rhs(i,j,k,cls.UET) += spark.energy*gauss_funt*gauss_funr*spark.o_Volt ;
 
-      //if ((z > 0.045) && (z < prob_parm.zexit))
+      
+      // damps energy if T > 3000 K
       if (T > 3000.0)
       {
         const Real Ts = 3000.0;       
@@ -468,26 +460,6 @@ class user_source_t {
         rhs(i,j,k,cls.UET) += (rhos*Etarget - rho*prims(i,j,k,cls.QEINT))/tau;
 
       }
-
-      //  if ((z > 0.045) && (z < prob_parm.zexit))
-      // {
-      //   for (int sp = 0; sp < NUM_SPECIES; sp++) {
-      //     rhs(i,j,k, cls.UFS + sp) += rho*0.01-prims(i,j,k, cls.QFS + sp);
-      //   } 
-      // }
-      
-
-      // for (int ns = 0; ns < cls.NCONS; ns++) {
-      // if (std::isnan(prims(i, j, k, ns))) {
-      //   printf("rsrc: nan prims at i=%d j=%d k=%d ns=%d\n",i,j,k,ns);
-      //   amrex::Abort("rsrc: nan prims");
-      // }
-      // }
-
-      // if ((i==48) && (j==41) && (k==40)) {
-      //   printf("rsrc: problematic cell at i=%d j=%d k=%d\n",i,j,k);
-      //   printf(" T= %e P= %e rho= %e\n", T, pres, rho);
-      // }
 
     });
 
