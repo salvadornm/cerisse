@@ -1,0 +1,75 @@
+# Simulation time
+max_step  =  25000
+stop_time =  0.5
+cfl = 0.3
+#time_step = 5.0e-7
+
+cns.order_rk  = -2 
+cns.stages_rk = 2
+
+# Geometry 
+geometry.is_periodic = 0 0 0
+geometry.coord_sys   = 0  
+geometry.prob_lo     = -0.09 -0.09  0.0   
+geometry.prob_hi     =  0.09  0.09  0.27        
+
+# BC
+cns.lo_bc = 1 1 1
+cns.hi_bc = 1 1 1 
+
+
+# output screen
+cns.screen_output = 0 # 0=quiet, 1=verbose
+cns.verbose       = 1 # 0=quiet, 1=verbose
+amr.v             = 1 # 0=quiet,1= verbose
+
+# Refinement and regridding 
+amr.n_cell            = 96 96 144 
+amr.max_level         = 0     # maximum level number allowed
+amr.ref_ratio         = 2      # refinement ratio per level
+amr.regrid_int        = 100    # how often to regrid per level
+amr.blocking_factor_x = 8      # blocking factor in x per level
+amr.blocking_factor_y = 8      # blocking factor in y per level
+amr.blocking_factor_z = 8
+amr.max_grid_size_x   = 64     # maximum grid size in x per level
+amr.max_grid_size_y   = 64     # maximum grid size in y per level
+amr.max_grid_size_z   = 64
+amr.n_error_buf       = 4      # number of buffer cells in error est
+amr.grid_eff          = 0.7    # what constitutes an efficient grid
+
+# Plot and checkpoint
+amr.checkpoint_files_output = 1
+amr.check_file              = chk     # root name of checkpoint file
+amr.check_int               = 5000   # number of timesteps betw.  checkpoints
+#amr.restart = chk15000
+amr.plot_files_output = 1
+amr.plot_file         = ./plot/plt    # root name of plotfile
+amr.plot_int          = 50          # number of timesteps between plotfiles
+amr.derive_plot_vars  = pressure velocity temperature
+
+eb2.geom_type = "custom"
+
+eb2.eb_weight  = 1.0
+eb2.redistribution_type = "FluxRedist"
+
+# DIAGNOSTICS
+amr.data_log = time_probe_react.log
+cns.record_probe = 1 
+cns.time_probe_lev = 0 
+cns.time_probe_int = 1
+cns.time_probes = PressurePoint Temperature
+PressurePoint.field_name = pressure
+PressurePoint.box_lo = -0.01 -0.01 0.125
+PressurePoint.box_hi = 0.01 0.01 0.13
+Temperature.field_name = temperature
+Temperature.box_lo = -0.01 -0.01 0.125
+Temperature.box_hi = 0.01 0.01 0.13
+
+# Chemical Options
+#cns.reactor_type = "ReactorCvode"
+cns.reactor_type = "ReactorNull"
+cvode.solve_type =  "dense_direct"
+ode.clean_init_massfrac = 1
+
+# STATS
+cns.record_stats = 1
