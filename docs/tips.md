@@ -42,6 +42,30 @@ where the `/home/snm/...`coresponds to the installation dir
 
 ### Running on Imperial's HPC
 
+To run on Imperial's CX3, you need to load the following modules
+
+```bash
+$ module load tools/prod intel/2025a CMake/3.31.3-GCCcore-14.2.0
+```
+CMake is only needed for `make TPL`. Load as well `CUDA/12.8.0` if using GPU.
+
+A typical job script looks like this:
+
+```bash
+#PBS -l select=4:ncpus=64:mpiprocs=64:mem=128gb
+#PBS -l walltime=24:00:00
+#PBS -N name_of_the_job
+
+module load tools/prod intel/2025a
+
+cd $PBS_O_WORKDIR
+
+mpirun -v6 ./Cerisse3d.gnu.MPI.ex inputs
+```
+Note two differences with the old CX2 scripts: 1) `mpiprocs` is now specified in the `select` line; 2) `-v6` flag is added to `mpirun`. Also note that the new capability nodes have 64 cores instead of 128 as in CX2.
+
+#### Legacy (iimpi/2020a)
+
 To run on Imperial's CX2/3, you need to load the following modules
 
 ```bash
@@ -67,7 +91,7 @@ cd $PBS_O_WORKDIR
 mpirun ./Cerisse3d.gnu.MPI.ex inputs
 ```
 
-NOTE: There is an issue with MPI version >2020b on CX3 that causes deadlocks when writing chk or plt files.
+~~NOTE: There is an issue with MPI version >2020b on CX3 that causes deadlocks when writing chk or plt files.~~ (appears resolved)
 
 #### Legacy (intel-2019.8.254)
 
@@ -100,3 +124,8 @@ When debugging, it is sometimes useful to plot a MultiFab. This can be done usin
 ```
 
 You can plot more than one variable by adding more `ncomp` in the MultiFab and appending the variable name list.
+
+### Notes for using GPU
+Sometimes, the compiler may not be able to detect the right CUDA architecture, resulting in a `named symbol not found` error. To resolve this, specify the correct `CUDA_ARCH` in `GNUmakefile`. You can use `nvidia-smi` to find out the GPU [compute capability](https://developer.nvidia.com/cuda-gpus).
+
+During runtime, if `out of memory` error is encountered, try adjusting the `amrex.the_arena_init_size` in the `inputs` file.

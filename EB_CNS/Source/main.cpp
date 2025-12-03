@@ -21,7 +21,6 @@ void initialize_EB2(const Geometry& geom, const int required_level,
 int main(int argc, char* argv[])
 {
   amrex::Initialize(argc, argv);
-  amrex::ResetRandomSeed(24); // TODO: change this to runtime input
 
   amrex::Print() << R"(
                     ____ _______   __ ____________                    
@@ -50,6 +49,15 @@ int main(int argc, char* argv[])
     pp.query("max_step", max_step);
     pp.query("strt_time", strt_time);
     pp.query("stop_time", stop_time);
+
+    Real rand_seed = 24;
+    pp.query("rand_seed", rand_seed);
+    amrex::ResetRandomSeed(ULong(rand_seed)); // for reproducibility
+
+    bool print_inputs = false;
+    pp.query("print_inputs", print_inputs);
+    if (print_inputs && ParallelDescriptor::IOProcessor())
+      ParmParse::prettyPrintTable(std::cout);
   }
 
   if (strt_time < 0.0) { amrex::Abort("MUST SPECIFY a non-negative strt_time"); }

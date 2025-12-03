@@ -66,6 +66,7 @@ bcnormal(const amrex::Real x[AMREX_SPACEDIM], const amrex::Real s_int[LEN_STATE]
   s_ext[UMZ] = 0.0;
   s_ext[UEDEN] = prob_parm.rhoe + 0.5 * prob_parm.rho * prob_parm.u * prob_parm.u;
   s_ext[UFS] = prob_parm.rho;
+  s_ext[UTEMP] = prob_parm.T;
 }
 
 AMREX_GPU_DEVICE AMREX_FORCE_INLINE void

@@ -1,31 +1,36 @@
 #include "wall_model.H"
 
 #include <AMReX_LUSolver.H>
-#include <PelePhysics.H>
 
-#ifndef WALLMODEL_DEBUG
-#include "CNS.H"
-#else
-#include <PelePhysics.H>
-#endif
+// #ifndef WALLMODEL_DEBUG
+// #include "CNS.H"
+// #else
+// #include <PelePhysics.H>
+// #endif
 
 using namespace amrex;
 
-void LESWallModel::create(std::string selector, LESWallModel*& model) 
-{  
+void LESWallModel::create(std::string selector, LESWallModel*& model)
+{
+  // allocate space for pointer on device
   LESWallModel** tmp = (LESWallModel**)The_Arena()->alloc(sizeof(LESWallModel*));
   if (selector == LawOfTheWall::identifier()) {
+    // create class instance on device
     amrex::single_task([=] AMREX_GPU_DEVICE() { *tmp = new LawOfTheWall(); });
   } else if (selector == EquilibriumODE::identifier()) {
     amrex::single_task([=] AMREX_GPU_DEVICE() { *tmp = new EquilibriumODE(); });
   } else {
     amrex::Abort("Cannot find " + selector + " in " + base_identifier());
   }
+  // pass the device pointer to host
   amrex::Gpu::copy(Gpu::deviceToHost, tmp, tmp + 1, &model);
+  // free device pointer
   The_Arena()->free(tmp);
 }
 
 void LESWallModel::destroy(LESWallModel*& model) {
+  if (model == nullptr) return;
+  // free the class instance on device
   auto local_model = model;
   amrex::single_task([=] AMREX_GPU_DEVICE() { delete local_model; });
 }

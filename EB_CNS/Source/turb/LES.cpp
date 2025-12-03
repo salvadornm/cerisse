@@ -4,19 +4,25 @@ using namespace amrex;
 
 void LESModel::create(std::string selector, LESModel*& model)
 {
+  // allocate space for pointer on device
   LESModel** tmp = (LESModel**)The_Arena()->alloc(sizeof(LESModel*));
   if (selector == Smagorinsky::identifier()) {
+    // create class instance on device
     amrex::single_task([=] AMREX_GPU_DEVICE() { *tmp = new Smagorinsky(); });
   } else if (selector == WALE::identifier()) {
     amrex::single_task([=] AMREX_GPU_DEVICE() { *tmp = new WALE(); });
   } else {
     amrex::Abort("Cannot find " + selector + " in " + base_identifier());
   }
+  // pass the device pointer to host
   amrex::Gpu::copy(Gpu::deviceToHost, tmp, tmp + 1, &model);
+  // free device pointer
   The_Arena()->free(tmp);
 }
 
 void LESModel::destroy(LESModel*& model) {
+  if (model == nullptr) return;
+  // free the class instance on device
   auto local_model = model;
   amrex::single_task([=] AMREX_GPU_DEVICE() { delete local_model; });
 }
