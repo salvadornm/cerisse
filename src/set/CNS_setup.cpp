@@ -30,12 +30,17 @@ static int tang_vel_bc[] = {BCType::int_dir,      BCType::ext_dir,
                             BCType::reflect_even, BCType::reflect_odd,
                             BCType::ext_dir};
 
+// If AMReX returns a negative BC (e.g. -1), treat as Interior (0) (this is to avoid weird errors while using periodic BCs)
+inline int safe_bc_index(int bc) {    
+  return (bc < 0 ? 0 : bc);
+}
+
 static void set_scalar_bc(BCRec& bc, const BCRec* phys_bc) {
   const int* lo_bc = phys_bc->lo();
   const int* hi_bc = phys_bc->hi();
   for (int i = 0; i < AMREX_SPACEDIM; i++) {
-    bc.setLo(i, scalar_bc[lo_bc[i]]);
-    bc.setHi(i, scalar_bc[hi_bc[i]]);
+    bc.setLo(i, scalar_bc[safe_bc_index(lo_bc[i])]);
+    bc.setHi(i, scalar_bc[safe_bc_index(hi_bc[i])]);
   }
 }
 
@@ -43,15 +48,15 @@ static void set_x_vel_bc(BCRec& bc, const BCRec* phys_bc) {
   const int* lo_bc = phys_bc->lo();
   const int* hi_bc = phys_bc->hi();
 
-  bc.setLo(0, norm_vel_bc[lo_bc[0]]);
-  bc.setHi(0, norm_vel_bc[hi_bc[0]]);
+  bc.setLo(0, norm_vel_bc[safe_bc_index(lo_bc[0])]);
+  bc.setHi(0, norm_vel_bc[safe_bc_index(hi_bc[0])]);
 #if (AMREX_SPACEDIM >= 2)
-  bc.setLo(1, tang_vel_bc[lo_bc[1]]);
-  bc.setHi(1, tang_vel_bc[hi_bc[1]]);
+  bc.setLo(1, tang_vel_bc[safe_bc_index(lo_bc[1])]);
+  bc.setHi(1, tang_vel_bc[safe_bc_index(hi_bc[1])]);
 #endif
 #if (AMREX_SPACEDIM == 3)
-  bc.setLo(2, tang_vel_bc[lo_bc[2]]);
-  bc.setHi(2, tang_vel_bc[hi_bc[2]]);
+  bc.setLo(2, tang_vel_bc[safe_bc_index(lo_bc[2])]);
+  bc.setHi(2, tang_vel_bc[safe_bc_index(hi_bc[2])]);
 #endif
 }
 
@@ -59,15 +64,15 @@ static void set_y_vel_bc(BCRec& bc, const BCRec* phys_bc) {
   const int* lo_bc = phys_bc->lo();
   const int* hi_bc = phys_bc->hi();
 
-  bc.setLo(0, tang_vel_bc[lo_bc[0]]);
-  bc.setHi(0, tang_vel_bc[hi_bc[0]]);
+  bc.setLo(0, tang_vel_bc[safe_bc_index(lo_bc[0])]);
+  bc.setHi(0, tang_vel_bc[safe_bc_index(hi_bc[0])]);
 #if (AMREX_SPACEDIM >= 2)
-  bc.setLo(1, norm_vel_bc[lo_bc[1]]);
-  bc.setHi(1, norm_vel_bc[hi_bc[1]]);
+  bc.setLo(1, norm_vel_bc[safe_bc_index(lo_bc[1])]);
+  bc.setHi(1, norm_vel_bc[safe_bc_index(hi_bc[1])]);
 #endif
 #if (AMREX_SPACEDIM == 3)
-  bc.setLo(2, tang_vel_bc[lo_bc[2]]);
-  bc.setHi(2, tang_vel_bc[hi_bc[2]]);
+  bc.setLo(2, tang_vel_bc[safe_bc_index(lo_bc[2])]);
+  bc.setHi(2, tang_vel_bc[safe_bc_index(hi_bc[2])]);
 #endif
 }
 
@@ -75,16 +80,16 @@ static void set_z_vel_bc(BCRec& bc, const BCRec* phys_bc) {
   const int* lo_bc = phys_bc->lo();
   const int* hi_bc = phys_bc->hi();
 
-  bc.setLo(0, tang_vel_bc[lo_bc[0]]);
-  bc.setHi(0, tang_vel_bc[hi_bc[0]]);
-#if (AMREX_SPACEDIM >= 2)  
-  bc.setLo(1, tang_vel_bc[lo_bc[1]]);
-  bc.setHi(1, tang_vel_bc[hi_bc[1]]);
-#endif  
-#if (AMREX_SPACEDIM == 3)  
-  bc.setLo(2, norm_vel_bc[lo_bc[2]]);
-  bc.setHi(2, norm_vel_bc[hi_bc[2]]);
-#endif  
+  bc.setLo(0, tang_vel_bc[safe_bc_index(lo_bc[0])]);
+  bc.setHi(0, tang_vel_bc[safe_bc_index(hi_bc[0])]);
+#if (AMREX_SPACEDIM >= 2)
+  bc.setLo(1, tang_vel_bc[safe_bc_index(lo_bc[1])]);
+  bc.setHi(1, tang_vel_bc[safe_bc_index(hi_bc[1])]);
+#endif
+#if (AMREX_SPACEDIM == 3)
+  bc.setLo(2, norm_vel_bc[safe_bc_index(lo_bc[2])]);
+  bc.setHi(2, norm_vel_bc[safe_bc_index(hi_bc[2])]);
+#endif
 
 }
 

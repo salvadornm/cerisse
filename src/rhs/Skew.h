@@ -555,7 +555,7 @@ class skew_t {
 #if NUM_SPECIES > 1    
     static constexpr int NVARSEN = 2 + NUM_SPECIES;
 #else
-    constexpr int NVARSEN=2;
+    static  constexpr int NVARSEN=2;
 #endif    
     int NSEN[NVARSEN];
 
