@@ -18,7 +18,7 @@ class riemann_t {
 #if (AMREX_USE_GPIBM || CNS_USE_EB )  
  void inline eflux_ibm(const Geometry& geom, const MFIter& mfi,
                     const Array4<Real>& prims, std::array<FArrayBox*, AMREX_SPACEDIM> const &flxt,
-                    const Array4<Real>& rhs, const cls_t* cls,const Array4<bool>& ibMarkers) {
+                    const Array4<Real>& rhs, const cls_t* cls,const Array4<uint8_t>& ibMarkers) {
 
 #else
   void inline eflux(const Geometry& geom, const MFIter& mfi,
@@ -218,7 +218,7 @@ class riemann_t {
 #if (AMREX_USE_GPIBM || CNS_USE_EB )
   AMREX_GPU_DEVICE AMREX_FORCE_INLINE void cns_slope_x(
       int i, int j, int k, const Array4<Real>& dq, const Array4<Real>& q,
-      const cls_t& cls, const Array4<bool>& marker) const {
+      const cls_t& cls, const Array4<uint8_t>& marker) const {
 #else
   AMREX_GPU_DEVICE AMREX_FORCE_INLINE void cns_slope_x(
       int i, int j, int k, const Array4<Real>& dq, const Array4<Real>& q,
@@ -293,7 +293,7 @@ class riemann_t {
 #if (AMREX_USE_GPIBM || CNS_USE_EB )
   AMREX_GPU_DEVICE AMREX_FORCE_INLINE void cns_slope_y(
       int i, int j, int k, const Array4<Real>& dq, const Array4<Real>& q,
-      const cls_t& cls, const Array4<bool>& marker) const {
+      const cls_t& cls, const Array4<uint8_t>& marker) const {
 #else
   AMREX_GPU_DEVICE AMREX_FORCE_INLINE void cns_slope_y(
       int i, int j, int k, const Array4<Real>& dq, const Array4<Real>& q,
@@ -363,7 +363,7 @@ class riemann_t {
 #if (AMREX_USE_GPIBM || CNS_USE_EB )
   AMREX_GPU_DEVICE AMREX_FORCE_INLINE void cns_slope_z(
       int i, int j, int k, const Array4<Real>& dq, const Array4<Real>& q,
-      const cls_t& cls, const Array4<bool>& marker) const {
+      const cls_t& cls, const Array4<uint8_t>& marker) const {
 #else
   AMREX_GPU_DEVICE AMREX_FORCE_INLINE void cns_slope_z(
       int i, int j, int k, const Array4<Real>& dq, const Array4<Real>& q,

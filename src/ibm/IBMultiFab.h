@@ -10,7 +10,7 @@
 /// \param marker_t type of marker field (bool or Real) 
 ///
 template<typename marker_t, typename gp_t>
-class IBFab: public BaseFab<bool> {
+class IBFab: public BaseFab<marker_t> {
  public:
   gp_t gpData;  
 
@@ -57,7 +57,7 @@ class IBMultiFab : public FabArray<IBFab<marker_t,gp_t>> {
 
       IBFab<marker_t,gp_t>& ibfab = this->get(mfi);
       // const FArrayBox& realfab = mf.get(mfi);
-      const Array4<bool>& ibMarkers = ibfab.array();    // boolean array
+      const Array4<marker_t>& ibMarkers = ibfab.array();    // marker array
       const Array4<Real>& realfield = mf.array(mfi);  // real array
 
       amrex::ParallelFor(
