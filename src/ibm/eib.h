@@ -1661,8 +1661,10 @@ private:
       
       // constructs AABB tree and computes internal KD-tree
       // data structure to accelerate distance queries
+      SegmentContainer segments = extract_edges(geom_a[i]);
       tree_pa[i] = 
-        new Tree(geom_a[i].edges_begin(), geom_a[i].edges_end());
+        new Tree(segments.begin(), segments.end());
+      tree_pa[i]->build();
       tree_pa[i]->accelerate_distance_queries();
       Print() << "AABB tree constructed" << std::endl;
 
@@ -1710,7 +1712,8 @@ private:
       Print() << "Plane equations per face computed" << std::endl;
 
       // make inside/outside function for current geometry only
-      inout_fa[i] = new inside_t(geom_a[i]);
+      //inout_fa[i] = new inside_t(geom_a[i]);
+      inout_fa[i] = new inside_t(*tree_pa[i]);
       Print() << "In out testing function constructed for geometry " << files_a[i] << "\n";
       
       //compute total face count across all geometries

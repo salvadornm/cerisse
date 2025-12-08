@@ -82,20 +82,65 @@ using FT     = Kernel::FT;
     using Point         = Kernel::Point_2;
     using Vector_CGAL   = Kernel::Vector_2;
     using Segment       = Kernel::Segment_2;
-    using Polygon       = CGAL::Polygon_2<Kernel>;
-    using GeomType      = Polygon;
+    
+    // Custom Polygon2D class wrapping CGAL::Polygon_2 and edge storage
+    class Polygon2D {
+    private:
+        CGAL::Polygon_2<Kernel>  poly_;
+        std::vector<Segment>     edges_;
+
+    public:
+        Polygon2D() = default;
+
+        // Vertex operations
+        void clear()                     { poly_.clear(); edges_.clear(); }
+        void push_back(const Point& p)   { poly_.push_back(p); }
+        std::size_t size() const         { return poly_.size(); }
+        const Point& vertex(std::size_t i) const { return poly_.vertex(i); }
+
+        // Rebuild edges from vertices (must be called after adding all vertices)
+        void finalize() {
+            edges_.clear();
+            edges_.reserve(poly_.size());
+            for (auto it = poly_.edges_begin(); it != poly_.edges_end(); ++it) {
+                edges_.push_back(*it);
+            }
+        }
+
+        // Edge iterators (for AABB tree)
+        auto edges_begin() const { return edges_.cbegin(); }
+        auto edges_end()   const { return edges_.cend(); }
+
+        // Vertex iterators (for check_ibm_geometry_consistency)
+        auto vertices_begin() const { return poly_.vertices_begin(); }
+        auto vertices_end()   const { return poly_.vertices_end(); }
+
+        // Properties
+        bool is_simple() const             { return poly_.is_simple(); }
+        bool is_clockwise_oriented() const { return poly_.is_clockwise_oriented(); }
+        void reverse_orientation()         { poly_.reverse_orientation(); finalize(); }
+        void swap(Polygon2D& o) noexcept   { poly_.swap(o.poly_); edges_.swap(o.edges_); }
+
+        // Inside/outside test
+        CGAL::Bounded_side bounded_side(const Point& p) const {
+            return poly_.bounded_side(p);
+        }
+    };
+
+    using Polygon   = Polygon2D;
+    using GeomType  = Polygon2D;
+    using SegmentIterator = std::vector<Segment>::const_iterator;
 
     // AABB tree primitives (tree built over polygon edges)
-    using Edge_iterator = Polygon::Edge_const_iterator;
-    using Primitive     = CGAL::AABB_segment_primitive_2<Kernel, Edge_iterator>;
-    using Traits        = CGAL::AABB_traits_2<Kernel, Primitive>;
-    using Tree          = CGAL::AABB_tree<Traits>;
+    using Primitive        = CGAL::AABB_segment_primitive_2<Kernel, SegmentIterator>;
+    using Traits           = CGAL::AABB_traits_2<Kernel, Primitive>;
+    using Tree             = CGAL::AABB_tree<Traits>;
 
     // Query result type: (closest point, primitive ID)
     using Point_and_primitive_id = Tree::Point_and_primitive_id;
 
-    // Face descriptor for 2D (edge iterator)
-    using elm_descriptor = Edge_iterator;
+    // Face descriptor for 2D (SegmentIterator)
+    using elm_descriptor = SegmentIterator;
     using PrimitiveID = Tree::Primitive_id;
 
     //----------------------------------------------------------------------------
@@ -103,7 +148,7 @@ using FT     = Kernel::FT;
     //----------------------------------------------------------------------------
     /// \brief Functor for testing if a point is inside a 2D polygon.
     ///
-    /// This class wraps CGAL::bounded_side_2 and provides a unified interface
+    /// This class wraps Polygon2D::bounded_side and provides a unified interface
     /// compatible with the 3D Side_of_triangle_mesh class.
     ///
     /// Requirements:
@@ -112,7 +157,7 @@ using FT     = Kernel::FT;
     ///
     /// Usage:
     ///   \code
-    ///   Polygon poly = ...;
+    ///   Polygon2D poly = ...;
     ///   inside_t tester(poly);
     ///   Point query(1.0, 2.0);
     ///   if (tester(query) == CGAL::ON_BOUNDED_SIDE) {
@@ -121,39 +166,33 @@ using FT     = Kernel::FT;
     ///   \endcode
     class inside_t {
     private:
-        const Polygon* poly = nullptr;
+        const Polygon2D* poly_ = nullptr;
 
     public:
         /// Default constructor (creates uninitialized tester)
         inside_t() = default;
 
-        /// Construct from a polygon reference
-        /// \param p Reference to a CGAL Polygon_2 (must outlive this object)
-        explicit inside_t(const Polygon& p) : poly(&p) {
-            AMREX_ASSERT_WITH_MESSAGE(poly != nullptr, "inside_t: null polygon pointer");
+        /// Construct from a Polygon2D reference
+        /// \param p Reference to a Polygon2D (must outlive this object)
+        explicit inside_t(const Polygon2D& p) : poly_(&p) {
+            AMREX_ASSERT_WITH_MESSAGE(poly_ != nullptr, "inside_t: null polygon pointer");
             
-            if (poly->is_clockwise_oriented()) {
+            if (poly_->is_clockwise_oriented()) {
                 amrex::Abort("inside_t: Polygon must be counter-clockwise oriented");
             }
         }
 
         /// Check if this tester is properly initialized
         bool is_valid() const { 
-            return poly != nullptr; 
+            return poly_ != nullptr; 
         }
 
         /// Test if a point is inside, outside, or on the boundary
         /// \param p Query point
         /// \return CGAL::ON_BOUNDED_SIDE, CGAL::ON_BOUNDARY, or CGAL::ON_UNBOUNDED_SIDE
         CGAL::Bounded_side operator()(const Point& p) const {
-            AMREX_ASSERT_WITH_MESSAGE(poly != nullptr, "inside_t: Cannot query uninitialized tester");
-            
-            return CGAL::bounded_side_2(
-                poly->vertices_begin(),
-                poly->vertices_end(),
-                p,
-                Kernel()
-            );
+            AMREX_ASSERT_WITH_MESSAGE(poly_ != nullptr, "inside_t: Cannot query uninitialized tester");
+            return poly_->bounded_side(p);
         }
     };
 
@@ -196,7 +235,7 @@ using FT     = Kernel::FT;
 // 2D Polygon File Reader (inline bool read_polygon_2d)
 //----------------------------------------------------------------------------
 /// \brief Reads a 2D polygon from a text file.
-///        (Can be extended to other 2D mesh formats in the future.)
+///        (to be constructed: extend to other 2D mesh formats in the future.)
 ///
 /// File Format:
 ///   - One vertex per line
@@ -227,7 +266,7 @@ using FT     = Kernel::FT;
 ///
 /// \return true on success, false if file cannot be opened, input is invalid,
 ///         or the polygon fails validation.
-inline bool read_polygon_2d(const std::string& filename, Polygon& poly, Real dx = -1.0)
+inline bool read_polygon_2d(const std::string& filename, Polygon2D& poly, Real dx = -1.0)
 {
     poly.clear();
     
@@ -311,14 +350,12 @@ inline bool read_polygon_2d(const std::string& filename, Polygon& poly, Real dx 
     //   so that each resulting segment has length approximately |p1-p0| / nseg,
     //   which is <= dx. This avoids creating very short "leftover" segments.
     if (dx > Real(0)) {
-        Polygon refined;
-        refined.clear();
-        refined.reserve(original_n);  // Reserve at least the original number of vertices
+        Polygon2D refined;
 
         const std::size_t n = poly.size();
         for (std::size_t i = 0; i < n; ++i) {
-            const Point& p0 = poly[i];
-            const Point& p1 = poly[(i + 1) % n];
+            const Point& p0 = poly.vertex(i);
+            const Point& p1 = poly.vertex((i + 1) % n);
 
             Real x0 = p0.x();
             Real y0 = p0.y();
@@ -355,10 +392,14 @@ inline bool read_polygon_2d(const std::string& filename, Polygon& poly, Real dx 
 
     // Enforce counter-clockwise orientation for consistency.
     // CGAL (and many geometric algorithms) commonly expect CCW polygons.
+    // Note: reverse_orientation() internally calls finalize()
     if (poly.is_clockwise_oriented()) {
         poly.reverse_orientation();
         amrex::Print() << "Info: Reversed polygon orientation to CCW in " 
                        << filename << "\n";
+    } else {
+        // If not reversed, we still need to build edges
+        poly.finalize();
     }
     
     if (dx > Real(0)) {
@@ -476,7 +517,7 @@ struct SurfElem {
 /// Using a single pass ensures that the integer indices in idxmap perfectly align
 /// with the array indices in `surfelem` and `localframe`.
 ///
-/// \param geom       The input geometry (Polygon_2 or Polyhedron_3).
+/// \param geom       The input geometry (Polygon2D or Polyhedron).
 /// \param surfelem   Output vector for surface element properties (appended to).
 /// \param localframe Output vector for local frames (appended to).
 /// \param idxmap     Output map from PrimitiveID to integer index (cleared before use).
