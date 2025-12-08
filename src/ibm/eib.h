@@ -60,7 +60,7 @@ struct gpData_t {
   Gpu::ManagedVector<Array1D<Real, 0, IDIM>> ib_xyz;                // IB point coordinates
   Gpu::ManagedVector<Real> disGP;                                   // Distance from IB point to ghost point
   Gpu::ManagedVector<int> geomIdx;                                  // Geometry index
-  Gpu::ManagedVector<int> faceIdx;                                  // face/edge element index
+  Gpu::ManagedVector<int> elemIdx;                                  // face/edge element index
   //Gpu::ManagedVector<Array2D<Real, 0, IDIM, 0, IDIM>> localframe;   // Local orthonormal frame matrix: columes = {normal, tangent1(, tangent2)}
   //Gpu::ManagedVector<Array1D<Real, 0, IDIM>> normal;                // Surface normal vectors
   //Gpu::ManagedVector<Array1D<Real, 0, IDIM>> tangent1;              // First tangent vectors
@@ -161,7 +161,7 @@ public:
   Gpu::ManagedVector<LocalFrame> LocalFrame_a;              // local orthonormal frame matrix (flattened)
   Gpu::ManagedVector<SurfElem> SurfElem_a;                  // surface element area and coordinates (flattened)
   Gpu::ManagedVector<int> geom_offsets;                     // Start index for each geometry in flattened arrays
-  Vector<std::map<PrimitiveID, int>> idxmap_a;              // face/edge element index per geometry
+  Vector<std::map<PrimitiveID, int>> IdxMap_a;              // face/edge element index per geometry
   Vector<inside_t*> inout_fa;                               // in out testing function per geometry
 
   // surface related data
@@ -195,7 +195,7 @@ public:
     LocalFrame_a.clear();
     SurfElem_a.clear();
     geom_offsets.clear();
-    idxmap_a.clear();
+    IdxMap_a.clear();
 
     surfdata_a.clear();
     intfaces_in_fab.clear();  
@@ -288,7 +288,7 @@ public:
         gpData.imp_ip_ijk.clear();
         gpData.ib_xyz.clear();
         gpData.geomIdx.clear();
-        gpData.faceIdx.clear();
+        gpData.elemIdx.clear();
         gpData.imp_xyz.clear();
         gpData.imp_ijk.clear();
         //gpData.closest_cgal.clear();
@@ -349,13 +349,12 @@ public:
           ghost = ghost || (!ibMarkers(i,   j,   k-1, 0));
           ghost = ghost || (!ibMarkers(i,   j,   k+1, 0));
 #endif
-          ibMarkers(i, j, k, 1) = ghost;
           ibFab.gpData.ngps += ghost;
 
           if (ghost) {
             // store GP index
-            ibFab.gpData.gp_ijk.push_back(make_vec<int>(i, j, k));
-            ibMarkers(i, j, k, 0) = static_cast<uint8_t>(ii + 1);
+            //ibFab.gpData.gp_ijk.push_back(make_vec<int>(i, j, k));
+            ibMarkers(i, j, k, 1) = ibMarkers(i, j, k, 0);
           } else {
             ibMarkers(i, j, k, 1) = static_cast<uint8_t>(0);
           }
@@ -378,7 +377,7 @@ public:
     //EIB_SHRINK(gpData.tangent2);
     EIB_SHRINK(gpData.ib_xyz);
     EIB_SHRINK(gpData.geomIdx);
-    EIB_SHRINK(gpData.faceIdx);
+    EIB_SHRINK(gpData.elemIdx);
     //EIB_SHRINK(gpData.closest_cgal);
     EIB_SHRINK(gpData.imp_xyz);
     EIB_SHRINK(gpData.imp_ijk);
@@ -432,6 +431,7 @@ void initialiseGPs(int lev) {
         Real z = prob_lo[2] + (0.5_rt + k) * dx_a[lev][2];
         Point gp(x, y, z);
 #endif
+        ibFab.gpData.gp_ijk.push_back(make_vec<int>(i, j, k));
         
         // find and store geometery index for this GP.
         // Since this is a ghost point, it must be a solid point, 
@@ -448,8 +448,8 @@ void initialiseGPs(int lev) {
 
         // map PrimitiveID to integer index and store that.
         PrimitiveID elm = closest_elem.second;
-        int f_idx = idxmap_a[geomIdx].at(elm);
-        ibFab.gpData.faceIdx.push_back(f_idx);
+        int f_idx = IdxMap_a[geomIdx].at(elm);
+        ibFab.gpData.elemIdx.push_back(f_idx);
 
         // This closest point (cp) is between the face plane and the gp
         Point cp = closest_elem.first;
@@ -546,13 +546,14 @@ void computeGPs(const MFIter& mfi,
 
   // Ghost-point related data (geometry + interpolation)
   auto const gp_ijk        = ibFab.gpData.gp_ijk.data();
-  auto const imp_ijk       = ibFab.gpData.imp_ijk.data();
   auto const imp_ipweights = ibFab.gpData.imp_ipweights.data();
   auto const imp_ip_ijk    = ibFab.gpData.imp_ip_ijk.data();
   auto const disGP         = ibFab.gpData.disGP.data();
   auto const disIM         = ibFab.gpData.disIM.data();
-  auto const localframe    = ibFab.gpData.localframe.data();
   auto const ib_xyz        = ibFab.gpData.ib_xyz.data();
+  auto const elemIdx       = ibFab.gpData.elemIdx.data();
+
+  auto const* lf_ptr = LocalFrame_a.data();
 
   // Local copy of prims on grown box (GPU-friendly source field)
   const Box& bxg = mfi.growntilebox(cls->NGHOST);
@@ -570,20 +571,21 @@ void computeGPs(const MFIter& mfi,
   ParallelFor(ngps, [=, copy=this] AMREX_GPU_DEVICE (int ii) noexcept
   {
     // --------------------------------------------------------------------
-    // 1) Reconstruct local orthonormal frame from stored 2D/3D localframe
+    // 1) Reconstruct local orthonormal frame from stored LocalFrame_a
     //     localframe(ii)(row, col): row = {0: n, 1: t1, (2: t2 in 3D)}
     // --------------------------------------------------------------------
-    Array1D<Real, 0, AMREX_SPACEDIM - 1> nvec, t1vec, t2vec;
-    for (int d = 0; d < AMREX_SPACEDIM; ++d) {
-        nvec(d)  = localframe[ii](0,d);
-        t1vec(d) = localframe[ii](1,d);
-#if (AMREX_SPACEDIM == 3)
-        t2vec(d) = localframe[ii](2,d);
+    int elem_idx = elemIdx[ii];
+    const auto& frame = lf_ptr[elem_idx];
+
+#if (AMREX_SPACEDIM == 2)
+    Array1D<Real, 0, AMREX_SPACEDIM - 1>  nvec = {   frame.normal[0],   frame.normal[1] };
+    Array1D<Real, 0, AMREX_SPACEDIM - 1> t1vec = { frame.tangent1[0], frame.tangent1[1] };
+    Array1D<Real, 0, AMREX_SPACEDIM - 1> t2vec = { 0.0, 0.0 }; 
 #else
-        // In 2D, t2 is not used; keep as zero for interface compatibility.
-        t2vec(d) = Real(0.0);
+    Array1D<Real, 0, AMREX_SPACEDIM - 1>  nvec = {   frame.normal[0],   frame.normal[1],   frame.normal[2] };
+    Array1D<Real, 0, AMREX_SPACEDIM - 1> t1vec = { frame.tangent1[0], frame.tangent1[1], frame.tangent1[2] };
+    Array1D<Real, 0, AMREX_SPACEDIM - 1> t2vec = { frame.tangent2[0], frame.tangent2[1], frame.tangent2[2] };
 #endif
-      }
 
       // --------------------------------------------------------------------
       // 2) Storage for primitive variables along the normal:
@@ -610,7 +612,7 @@ void computeGPs(const MFIter& mfi,
       wallmodel::compute_surfIB(ib_xyz[ii], nvec, primsNormal, cls);
 
       // 6) Extrapolate from surface/image points back to ghost point along n
-      copy->extrapolate(primsNormal, disGP[ii], disIM[ii]);
+      copy->extrapolate<eorder_tparm>(primsNormal, disGP[ii], disIM[ii]);
 
       // 7) Transform ghost-point velocity back to global coordinates
       int idx = 0;
@@ -640,10 +642,10 @@ void computeGPs(const MFIter& mfi,
       cls->ensurePTYfillq(P, T, Y, ux, uy, uz, Q);
 
       // 10) Write ghost-cell primitive variables back into prims
-      int i = gp_ijk;
-      int j = gp_ijk;
+      int i = gp_ijk[ii](0);
+      int j = gp_ijk[ii](1);
 #if (AMREX_SPACEDIM == 3)
-      int k = gp_ijk;
+      int k = gp_ijk[ii](2);
 #else
       int k = 0;  // in 2D, k-index is always 0
 #endif
@@ -652,10 +654,9 @@ void computeGPs(const MFIter& mfi,
           prims(i,j,k,n) = Q[n];
       }
   }); // end ParallelFor over ghost points
-  }
+}
 
-
-
+/** 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // \brief compute surface indexes and store them (core, fab, lev)
 // is independet of geomenries, it will store faces 
@@ -1176,19 +1177,100 @@ void compute_surface_props(MultiFab& stateprops,const cls_t* cls,int lev) {
     amrex::Print() << "----------------------------------\n";
 
   }
-  //////////////////////////////////////////////////////////////////
 
+//////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////
+*/
 private:
-  // Taylor expansion around IB point (only up to QLS)
-  AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
-  void extrapolate(Array2D<Real,0,eorder_tparm+1,0,cls_t::NPRIM-1>& stateNormal, Real dgp, Real dim) {
-    Real sgn_dgp = -dgp ; // negative sign as taylor expansion is around IB point, IM and GP are in opposite directions
-    for (int kk=0; kk<= cls_t::QLS; kk++) {
-      // Linear
-      Real c1 = stateNormal(1,kk);
-      Real c2 = (stateNormal(2,kk) - stateNormal(1,kk))/dim;
-      stateNormal(0,kk) = c1 + c2*sgn_dgp;
-    }
+  /**
+   * \brief Extrapolates primitive variables from Image Points/Surface to the Ghost Point.
+   *
+   * This function solves a linear system (or uses simple linear interpolation) to determine
+   * the state at the Ghost Point (primsNormal(0, :)) based on the states at the Surface (1)
+   * and Image Points (2...).
+   *
+   * It assumes a polynomial profile P(d) = a + b*d + c*d^2 ... along the normal.
+   *
+   * \tparam order_t  Number of image points used (extrapolation order).
+   * \param prims     Array of primitive variables along the normal.
+   *                  Row 0: Ghost Point (Output)
+   *                  Row 1: Surface Point (Input, from wall model)
+   *                  Row 2..order_t+1: Image Points (Input, interpolated)
+   * \param disGP     Distance from Surface to Ghost Point (> 0).
+   * \param disIM     Array of distances from Surface to Image Points.
+   */
+  template <int order_t>
+  AMREX_GPU_DEVICE AMREX_FORCE_INLINE
+  void extrapolate(Array2D<Real, 0, order_t + 1, 0, cls_t::NPRIM - 1>& prims,
+                   const Real disGP,
+                   const Array1D<Real, 0, order_t - 1>& disIM) const
+  {
+      // only extrapolate up to QLS (Last Species), skipping aux vars like QC, QG, QEINT.
+      // Aux vars will be recomputed later via EOS (ensurePTYfillq).
+      for (int n = 0; n <= cls_t::QLS; ++n) {
+          
+          // ----------------------------------------------------------------
+          // CASE 1: Linear Extrapolation (order_t == 1)
+          // Uses Surface Point (1) and First Image Point (2)
+          // ----------------------------------------------------------------
+          if constexpr (order_t == 1) {
+              // Slope = (Val_IM1 - Val_Surf) / (dist_IM1 - 0)
+              // Val_GP = Val_Surf + Slope * (-disGP)
+              // Note: GP is at distance -disGP relative to surface normal direction
+              
+              Real val_surf = prims(1, n);
+              Real val_im1  = prims(2, n);
+              Real d_im1    = disIM(0);
+
+              Real slope = (val_im1 - val_surf) / d_im1;
+              prims(0, n) = val_surf - slope * disGP;
+          }
+          
+          // ----------------------------------------------------------------
+          // CASE 2: Quadratic Extrapolation (order_t == 2)
+          // Uses Surface Point (1), IM1 (2), IM2 (3)
+          // P(x) = c0 + c1*x + c2*x^2
+          // ----------------------------------------------------------------
+          else if constexpr (order_t == 2) {
+              // x0 = 0 (Surface), u0 = prims(1,n)
+              // x1 = disIM(0),    u1 = prims(2,n)
+              // x2 = disIM(1),    u2 = prims(3,n)
+              // Target: x = -disGP
+              
+              Real u0 = prims(1, n);
+              Real u1 = prims(2, n);
+              Real u2 = prims(3, n);
+              
+              Real x1 = disIM(0);
+              Real x2 = disIM(1);
+              
+              // Lagrange polynomial or direct solution
+              // L0(x) = (x-x1)(x-x2) / ( (0-x1)(0-x2) )
+              // L1(x) = (x-0)(x-x2)  / ( (x1-0)(x1-x2) )
+              // L2(x) = (x-0)(x-x1)  / ( (x2-0)(x2-x1) )
+              
+              Real x = -disGP;
+              
+              Real L0 = (x - x1) * (x - x2) / (x1 * x2);
+              Real L1 = x * (x - x2) / (x1 * (x1 - x2));
+              Real L2 = x * (x - x1) / (x2 * (x2 - x1));
+              
+              prims(0, n) = u0 * L0 + u1 * L1 + u2 * L2;
+          }
+          
+          // ----------------------------------------------------------------
+          // Higher Order (to be constructed as needed)
+          // ----------------------------------------------------------------
+          else {
+              // For higher orders might need a generic Lagrange solver
+              // or least squares. For now, default to linear to be safe.
+              Real val_surf = prims(1, n);
+              Real val_im1  = prims(2, n);
+              Real d_im1    = disIM(0);
+              Real slope = (val_im1 - val_surf) / d_im1;
+              prims(0, n) = val_surf - slope * disGP;
+          }
+      }
   }
 
   /*//////////////////////////////////////////////////////////////////////////
@@ -1552,7 +1634,7 @@ private:
     this->LocalFrame_a.clear();
     this->SurfElem_a.clear();
     this->geom_offsets.resize(this->ngeom);
-    this->idxmap_a.resize(this->ngeom);
+    this->IdxMap_a.resize(this->ngeom);
     this->inout_fa.resize(this->ngeom);
     this->ntotalfaces = 0;
 
@@ -1640,7 +1722,7 @@ private:
     this->geom_offsets[i] = static_cast<int>(this->LocalFrame_a.size());
 
     // build local frame, surface element area and index mapping
-    build_geometry_cache(geom_a[i], SurfElem_a, LocalFrame_a, idxmap_a[i], this->geom_offsets[i]);
+    build_geometry_cache(geom_a[i], SurfElem_a, LocalFrame_a, IdxMap_a[i], this->geom_offsets[i]);
     } // end loop over geometries
 
     // Check for geometry consistency (no intersections, no containment)

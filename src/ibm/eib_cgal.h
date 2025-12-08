@@ -27,7 +27,7 @@
 
     // CGAL header for inout testing in 2D
     #include <CGAL/Polygon_2.h>
-    #include <CGAL/bounded_side_2.h>
+    #include <CGAL/Polygon_2_algorithms.h>
 
     // CGAL header for CGAL::do_intersect in 2D
     #include <CGAL/intersections.h>
@@ -473,44 +473,42 @@ struct SurfElem {
 /// It populates the surface element data (centroid, size), the local orthonormal frames,
 /// and the mapping from CGAL PrimitiveID to integer index.
 ///
-/// Using a single pass ensures that the integer indices in `id_map` perfectly align
-/// with the array indices in `elem_data` and `frame_data`.
+/// Using a single pass ensures that the integer indices in idxmap perfectly align
+/// with the array indices in `surfelem` and `localframe`.
 ///
 /// \param geom       The input geometry (Polygon_2 or Polyhedron_3).
-/// \param elem_data  Output vector for surface element properties (appended to).
-/// \param frame_data Output vector for local frames (appended to).
-/// \param id_map     Output map from PrimitiveID to integer index (cleared before use).
+/// \param surfelem   Output vector for surface element properties (appended to).
+/// \param localframe Output vector for local frames (appended to).
+/// \param idxmap     Output map from PrimitiveID to integer index (cleared before use).
 /// \param offset     Global index offset for this geometry (default 0).
 inline void build_geometry_cache(
     const GeomType& geom,
-    amrex::Gpu::ManagedVector<SurfElem>& elem_data,
-    amrex::Gpu::ManagedVector<LocalFrame>& frame_data,
-    std::map<PrimitiveID, int>& id_map,
+    amrex::Gpu::ManagedVector<SurfElem>& surfelem,
+    amrex::Gpu::ManagedVector<LocalFrame>& localframe,
+    std::map<PrimitiveID, int>& idxmap,
     int offset = 0)
 {
     // Clear map for this geometry
-    id_map.clear();
+    idxmap.clear();
 
 #if (AMREX_SPACEDIM == 2)
     // -----------------------------------------------------------------------
     // 2D Implementation (Polygon edges)
     // -----------------------------------------------------------------------
     std::size_t n_elems = geom.size();
-    // elem_data.reserve(elem_data.size() + n_elems);
-    // frame_data.reserve(frame_data.size() + n_elems);
 
     int local_idx = 0;
     for (auto eit = geom.edges_begin(); eit != geom.edges_end(); ++eit, ++local_idx) {
         // --- 1. ID Mapping ---
         PrimitiveID pid = eit;
-        id_map[pid] = offset + local_idx;
+        idxmap[pid] = offset + local_idx;
 
         // --- 2. SurfElem (Centroid & Length) ---
         Segment s = *eit;
         Point mid = CGAL::midpoint(s.source(), s.target());
         Real len = std::sqrt(s.squared_length());
         Real c[2] = { mid.x(), mid.y() };
-        elem_data.push_back(SurfElem(c, len));
+        surfelem.push_back(SurfElem(c, len));
 
         // --- 3. LocalFrame (Normal & Tangent) ---
         Vector_CGAL t_vec = s.to_vector();
@@ -529,7 +527,7 @@ inline void build_geometry_cache(
 
         Real n_arr[2]  = { n.x(), n.y() };
         Real t1_arr[2] = { t1.x(), t1.y() };
-        frame_data.push_back(LocalFrame(n_arr, t1_arr));
+        localframe.push_back(LocalFrame(n_arr, t1_arr));
     }
 
 #elif (AMREX_SPACEDIM == 3)
@@ -537,15 +535,15 @@ inline void build_geometry_cache(
     // 3D Implementation (Polyhedron faces)
     // -----------------------------------------------------------------------
     std::size_t n_elems = geom.size_of_facets();
-    // elem_data.reserve(elem_data.size() + n_elems);
-    // frame_data.reserve(frame_data.size() + n_elems);
+    // surfelem.reserve(surfelem.size() + n_elems);
+    // localframe.reserve(localframe.size() + n_elems);
 
     int local_idx = 0;
     for (auto f = faces(geom).first; f != faces(geom).second; ++f, ++local_idx) {
         // --- 1. ID Mapping ---
         elm_descriptor fd = *f;
         PrimitiveID pid = fd;
-        id_map[pid] = offset + local_idx;
+        idxmap[pid] = offset + local_idx;
 
         // --- 2. SurfElem (Centroid & Area) ---
         auto h = fd->halfedge();
@@ -562,7 +560,7 @@ inline void build_geometry_cache(
         }
 
         Real c[3] = { cent.x(), cent.y(), cent.z() };
-        elem_data.push_back(SurfElem(c, area));
+        surfelem.push_back(SurfElem(c, area));
 
         // --- 3. LocalFrame (Normal, Tangent1, Tangent2) ---
         Vector_CGAL n = PMP::compute_face_normal(*f, geom);
@@ -585,7 +583,7 @@ inline void build_geometry_cache(
         Real n_arr[3]  = { n.x(), n.y(), n.z() };
         Real t1_arr[3] = { t1.x(), t1.y(), t1.z() };
         Real t2_arr[3] = { t2.x(), t2.y(), t2.z() };
-        frame_data.push_back(LocalFrame(n_arr, t1_arr, t2_arr));
+        localframe.push_back(LocalFrame(n_arr, t1_arr, t2_arr));
     }
 #endif
 }

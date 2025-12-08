@@ -1018,7 +1018,7 @@ void CNS::writePlotFilePost(const std::string &dir, std::ostream &os) {
 
 #if AMREX_USE_GPIBM
 
-  writeSurfFile();
+  //writeSurfFile();
 
   // // claculate and  write surface data  
   // int istep = parent->levelSteps(0);
@@ -1073,7 +1073,7 @@ void CNS::writePlotFilePost(const std::string &dir, std::ostream &os) {
 #endif
 }
 
-
+/** 
 // this subroutine is called from the main loop (WORK IN PROGRESS)
 // should be called per level
 #if AMREX_USE_GPIBM
@@ -1126,3 +1126,4 @@ void CNS::writeSurfFile( ) {
   }
 }
 #endif
+*/
