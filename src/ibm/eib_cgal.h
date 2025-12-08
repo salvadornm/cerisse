@@ -92,6 +92,14 @@ using FT     = Kernel::FT;
     public:
         Polygon2D() = default;
 
+        // Enable explicit copy semantics
+        Polygon2D(const Polygon2D&) = default;
+        Polygon2D& operator=(const Polygon2D&) = default;
+
+        // Move semantics (for efficient poly = std::move(refined))
+        Polygon2D(Polygon2D&&) = default;
+        Polygon2D& operator=(Polygon2D&&) = default;
+
         // Vertex operations
         void clear()                     { poly_.clear(); edges_.clear(); }
         void push_back(const Point& p)   { poly_.push_back(p); }
@@ -119,7 +127,6 @@ using FT     = Kernel::FT;
         bool is_simple() const             { return poly_.is_simple(); }
         bool is_clockwise_oriented() const { return poly_.is_clockwise_oriented(); }
         void reverse_orientation()         { poly_.reverse_orientation(); finalize(); }
-        void swap(Polygon2D& o) noexcept   { poly_.swap(o.poly_); edges_.swap(o.edges_); }
 
         // Inside/outside test
         CGAL::Bounded_side bounded_side(const Point& p) const {
@@ -385,9 +392,7 @@ inline bool read_polygon_2d(const std::string& filename, Polygon2D& poly, Real d
         }
 
         // Replace the original polygon with the refined one.
-        // Refinement only adds points along existing edges, so
-        // simplicity (no self-intersections) is preserved.
-        poly.swap(refined);
+        poly = std::move(refined);
     }
 
     // Enforce counter-clockwise orientation for consistency.

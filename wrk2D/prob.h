@@ -51,12 +51,12 @@ struct ProbParm
   Real eint_r  = rho_r*Cv*T_r;
  
   // centre of sphere (should be same with STL file)
-  Real x0 = 1.0; Real y0 = 2.0; 
+  Real x0 = 0.0; Real y0 = 0.0; 
 #if (AMREX_SPACEDIM == 3)
-  Real z0 = 2.0;
+  Real z0 = 0.0;
 #endif
   // initial shock position  
-  Real xshock = 0.72;  
+  Real xshock = -0.9;  
 
 };
 
@@ -100,9 +100,9 @@ typedef closures_dt<indicies_t, transport_const_t<methodparm_t>,
 // NUMERICAL SCHEME + EQNS TO SOLVE   (Euler/NS/Source)                 
 
 //typedef rhs_dt<rusanov_t<ProbClosures>, no_diffusive_t, no_source_t > ProbRHS;
-//typedef rhs_dt<riemann_t<false, ProbClosures>, no_diffusive_t, no_source_t > ProbRHS;
+typedef rhs_dt<riemann_t<false, ProbClosures>, no_diffusive_t, no_source_t > ProbRHS;
 //typedef rhs_dt<skew_t<skewparm_t,ProbClosures>, no_diffusive_t, no_source_t > ProbRHS;
-typedef rhs_dt<skew_t<skewparm_t,ProbClosures>, viscous_t<methodparm_t, ProbClosures>, no_source_t > ProbRHS;
+//typedef rhs_dt<skew_t<skewparm_t,ProbClosures>, viscous_t<methodparm_t, ProbClosures>, no_source_t > ProbRHS;
 
 
 // IBM templates

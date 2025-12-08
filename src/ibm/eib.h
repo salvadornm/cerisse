@@ -1638,19 +1638,19 @@ private:
     this->inout_fa.resize(this->ngeom);
     this->ntotalfaces = 0;
 
+    // Determine minimum dx across all levels for setting polygon tolerance
+    Real min_dx = std::numeric_limits<Real>::max();
+    for (int lev = 0; lev < dx_a.size(); ++lev) {
+        for (int d = 0; d < AMREX_SPACEDIM; ++d) {
+            min_dx = std::min(min_dx, dx_a[lev][d]);
+        }
+    }
+    min_dx *= Real(0.5);
+
     for (int i = 0; i < ngeom; i++) {
       Print() << "----------------------------------" << std::endl;
 
 #if (AMREX_SPACEDIM == 2)
-
-      // Determine minimum dx across all levels for setting polygon tolerance
-      Real min_dx = std::numeric_limits<Real>::max();
-      for (int lev = 0; lev < dx_a.size(); ++lev) {
-          for (int d = 0; d < AMREX_SPACEDIM; ++d) {
-              min_dx = std::min(min_dx, dx_a[lev][d]);
-          }
-      }
-      min_dx *= Real(0.5);
 
       // Read 2D polygon from file
       if (!read_polygon_2d(files_a[i], geom_a[i], min_dx)) {
@@ -1661,9 +1661,9 @@ private:
       
       // constructs AABB tree and computes internal KD-tree
       // data structure to accelerate distance queries
-      SegmentContainer segments = extract_edges(geom_a[i]);
-      tree_pa[i] = 
-        new Tree(segments.begin(), segments.end());
+      // Note: geom_a[i] is Polygon2D, which holds a persistent polygon 
+      // and a vector of segments which we use its iterators directly.
+      tree_pa[i] = new Tree(geom_a[i].edges_begin(), geom_a[i].edges_end());
       tree_pa[i]->build();
       tree_pa[i]->accelerate_distance_queries();
       Print() << "AABB tree constructed" << std::endl;
@@ -1702,6 +1702,7 @@ private:
       // data structure to accelerate distance queries
       tree_pa[i] =
         new Tree(faces(geom_a[i]).first, faces(geom_a[i]).second, geom_a[i]);
+      tree_pa[i]->build(); 
       tree_pa[i]->accelerate_distance_queries();
       Print() << "AABB tree constructed" << std::endl;
 
