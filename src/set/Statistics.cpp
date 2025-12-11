@@ -45,6 +45,9 @@ void CNS::computeStats(){
   
   // closures
   const PROB::ProbClosures& cls_h = *CNS::h_prob_closures;
+
+  // grab host copy of the base index for thermodynamic stats
+  int index_therm = CNS::INDEX_THERM;
                         
   // storing stats 
   for (MFIter mfi(S, false); mfi.isValid(); ++mfi) {
@@ -59,7 +62,9 @@ void CNS::computeStats(){
     Array4<Real> const& prims= primf.array();
     // from state variable to primitives (Thermodynamic closure) also update ghost
     cls_h.cons2prims(mfi, state_cons, prims); 
-    amrex::ParallelFor(bx, [=](int i, int j, int k) {       
+    amrex::ParallelFor(bx,
+                    [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept {
+
       Real rho = prims(i,j,k,cls_h.QRHO);
       //Real o_rho = 1.0/rho;
       // reset array  (so is sum (u*dt)
@@ -92,12 +97,12 @@ void CNS::computeStats(){
                        
         Real P = prims(i, j, k, cls_h.QPRES);
         Real T = prims(i, j, k, cls_h.QT);            
-        data_stats(i, j, k, INDEX_THERM)   += P*dt;
-        data_stats(i, j, k, INDEX_THERM+1) += T*dt;
-        data_stats(i, j, k, INDEX_THERM+2) += rho*dt;
-        data_stats(i, j, k, INDEX_THERM+3) += P*P*dt;
-        data_stats(i, j, k, INDEX_THERM+4) += T*T*dt;
-        data_stats(i, j, k, INDEX_THERM+5) += rho*rho*dt;    
+        data_stats(i, j, k, index_therm)   += P*dt;
+        data_stats(i, j, k, index_therm+1) += T*dt;
+        data_stats(i, j, k, index_therm+2) += rho*dt;
+        data_stats(i, j, k, index_therm+3) += P*P*dt;
+        data_stats(i, j, k, index_therm+4) += T*T*dt;
+        data_stats(i, j, k, index_therm+5) += rho*rho*dt;    
       }
     
       // store mean values  

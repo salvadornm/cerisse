@@ -6,12 +6,8 @@
 #include <eib.h>
 #endif
 
-#include <mandebug.h>
 
 using namespace amrex;
-
-
-
 
 // Since we do not want to use expensive cudaMemCopy, we are storing all our
 // data on the GPU to begin with. Concurrency on GPU using streams, parallel

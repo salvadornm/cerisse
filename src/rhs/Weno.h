@@ -5,8 +5,6 @@
 
 #include "Closures.h"
 
-#include "mandebug.h" //temp snm
-
 #define POWER2(x) ((x) * (x))
 #define POWER6(x) ((x) * (x) * (x) * (x) * (x) * (x))
 
