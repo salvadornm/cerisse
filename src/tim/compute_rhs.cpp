@@ -23,6 +23,9 @@ void CNS::compute_rhs(MultiFab& statemf, Real dt, FluxRegister* fr_as_crse, Flux
 
   // time
   const Real cur_time = state[State_Type].curTime();
+  
+  PROB::ProbRHS prob_rhs;  //  local RHS object, lives only in this function
+  prob_rhs.init_coeffs();  // initialize diffusion coefficients if needed
 
   //...................................................................
   for (MFIter mfi(statemf, false); mfi.isValid(); ++mfi) {

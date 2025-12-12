@@ -184,7 +184,8 @@ inline void derdissipation(const Box& bx, FArrayBox& derfab, int dcomp, int /*nc
                          const FArrayBox& datfab, const Geometry& geomdata,
                          Real /*time*/, const int* /*bcrec*/,
                          const int /*level*/) {
-  auto const dat = datfab.const_array();
+
+  // auto const dat = datfab.const_array(); // not used
   auto dissip = derfab.array(dcomp);
 
   amrex::FArrayBox vortfab(bx, 1, The_Async_Arena());

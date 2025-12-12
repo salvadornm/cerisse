@@ -54,6 +54,11 @@ public:
 class no_diffusive_t
 {
 public:
+
+  // No-op init, so ProbRHS::init_coeffs() is always valid
+  AMREX_GPU_HOST
+  void init_coeffs() {}
+
   template<typename... Args>
 #if (AMREX_USE_GPIBM || CNS_USE_EB )   
   //void dflux_ibm(Args&&... args) {}

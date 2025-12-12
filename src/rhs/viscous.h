@@ -16,19 +16,32 @@ class viscous_t {
 
   public:
   
+  // trivial ctor/dtor
   AMREX_GPU_HOST_DEVICE
-  viscous_t() {
-    calc_CDcoeffs<param::order>(INTcoef,CDcoef);
-  }
+  constexpr viscous_t() = default;
 
   AMREX_GPU_HOST_DEVICE
-  ~viscous_t() {}
+  ~viscous_t() = default;
 
-  // vars accessed by functions 
-  //int order_sch=param::order;  
+  // half stencil size 
+  int halfsten = param::order / 2;
+
+#if NUM_SPECIES > 1
   typedef Array1D<Real, 0, param::order> arrayNumCoef;
   arrayNumCoef CDcoef,INTcoef;
-  int halfsten = param::order / 2;
+  // Host-only initialization of arrays
+  AMREX_GPU_HOST
+  void init_coeffs()
+  {
+    calc_CDcoeffs<param::order>(INTcoef, CDcoef);
+  }
+#else
+  // No-op init, so ProbRHS::init_coeffs() is always valid
+  AMREX_GPU_HOST
+  void init_coeffs() {}
+#endif
+   
+
 
 #if (AMREX_USE_GPIBM || CNS_USE_EB )  
   void inline dflux_ibm(const Geometry& geom, const MFIter& mfi,
