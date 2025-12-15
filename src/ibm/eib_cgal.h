@@ -492,20 +492,21 @@ struct LocalFrame {
 };
 
 //============================================================================
-// Surface Element Data Structure (Centroid & Size)
+// Surface Element Data Structure (Geom id, Centroid & Size)
 //============================================================================
 /// \brief Stores geometric properties of a surface element (face in 3D, edge in 2D).
 struct SurfElem {
+    int geomIdx;         // Standard int (4 bytes) to avoid padding issues and allow large counts
     Real centroid[AMREX_SPACEDIM];
-    Real size;        // Area in 3D, Length in 2D
+    Real measure;        // Area in 3D, Length in 2D
 
     AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
-    SurfElem() : size(0.0) {
+    SurfElem() : geomIdx(-1), measure(0.0) {
         for (int i = 0; i < AMREX_SPACEDIM; ++i) centroid[i] = 0.0;
     }
 
     AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
-    SurfElem(const Real* c, Real s) : size(s) {
+    SurfElem(const Real* c, Real s, int g_idx) : geomIdx(g_idx), measure(s) {
         for (int i = 0; i < AMREX_SPACEDIM; ++i) centroid[i] = c[i];
     }
 };
@@ -527,12 +528,14 @@ struct SurfElem {
 /// \param localframe Output vector for local frames (appended to).
 /// \param idxmap     Output map from PrimitiveID to integer index (cleared before use).
 /// \param offset     Global index offset for this geometry (default 0).
+/// \param geomIdx    Index of the geometry (body) being processed.
 inline void build_geometry_cache(
     const GeomType& geom,
     amrex::Gpu::ManagedVector<SurfElem>& surfelem,
     amrex::Gpu::ManagedVector<LocalFrame>& localframe,
     std::map<PrimitiveID, int>& idxmap,
-    int offset = 0)
+    int offset = 0,
+    int geomIdx = -1)
 {
     // Clear map for this geometry
     idxmap.clear();
@@ -554,7 +557,7 @@ inline void build_geometry_cache(
         Point mid = CGAL::midpoint(s.source(), s.target());
         Real len = std::sqrt(s.squared_length());
         Real c[2] = { mid.x(), mid.y() };
-        surfelem.push_back(SurfElem(c, len));
+        surfelem.push_back(SurfElem(c, len, geomIdx));
 
         // --- 3. LocalFrame (Normal & Tangent) ---
         Vector_CGAL t_vec = s.to_vector();
@@ -606,7 +609,7 @@ inline void build_geometry_cache(
         }
 
         Real c[3] = { cent.x(), cent.y(), cent.z() };
-        surfelem.push_back(SurfElem(c, area));
+        surfelem.push_back(SurfElem(c, area, geomIdx));
 
         // --- 3. LocalFrame (Normal, Tangent1, Tangent2) ---
         Vector_CGAL n = PMP::compute_face_normal(*f, geom);

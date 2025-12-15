@@ -603,7 +603,11 @@ void CNS::post_regrid(int lbase, int new_finest) {
   IBM::ib.build_mf(grids, dmap, level);
   IBM::ib.computeMarkers(level);
   IBM::ib.initialiseGPs(level);
-  //if (plot_surf) IBM::ib.compute_surface_index(level);
+  if (plot_surf && level == new_finest) {
+    for (int l = new_finest; l >= 0; --l) {
+      IBM::ib.compute_surface_index(l);
+    }
+  }
 #endif
 
 #ifdef CNS_USE_EB
@@ -702,7 +706,11 @@ amrex::Print() << " recreate markers " << std::endl;
   IBM::ib.build_mf(grids, dmap, level);
   IBM::ib.computeMarkers(level);
   IBM::ib.initialiseGPs(level);
-  //if (plot_surf) IBM::ib.compute_surface_index(level);
+  if (plot_surf && level == parent->finestLevel()) {
+    for (int l = parent->finestLevel(); l >= 0; --l) {
+      IBM::ib.compute_surface_index(l);
+    }
+  }
 #endif
 
 #ifdef CNS_USE_EB
