@@ -13,14 +13,9 @@
 #include <eib_cgal.h>
 
 // Helper for integer power
-template <int Base, int Exp>
-struct IntPow {
-    static constexpr int value = Base * IntPow<Base, Exp - 1>::value;
-};
-template <int Base>
-struct IntPow<Base, 0> {
-    static constexpr int value = 1;
-};
+AMREX_GPU_HOST_DEVICE constexpr int ipow(int base, int exp) {
+    return (exp == 0) ? 1 : base * ipow(base, exp - 1);
+}
 
 //----------------------------------------------------------------------------
 // index dimension
@@ -68,7 +63,7 @@ struct gpData_t {
   int ngps;    
 
   // ideal number of interpolation points for each image point
-  static constexpr int  N_InterP = IntPow<iorder_tparm + 1, AMREX_SPACEDIM>::value;
+  static constexpr int  N_InterP = ipow(iorder_tparm + 1, AMREX_SPACEDIM);
 
   // closest surface point (ib point) and face ID
   //Vector<Point_and_primitive_id> closest_cgal;  
@@ -165,7 +160,7 @@ struct surfData_t{
   int filled_elems;
 
   // ideal number of interpolation points for each image point
-  static constexpr int  N_InterP = IntPow<iorder_tparm_surf + 1, AMREX_SPACEDIM>::value;
+  static constexpr int  N_InterP = ipow(iorder_tparm_surf + 1, AMREX_SPACEDIM);
 
   // Surface identification
   Gpu::ManagedVector<int> elemIdx;      // Global face index across all geometries
@@ -334,6 +329,13 @@ struct FaceCSR {
   }
 };
 
+// Enumeration used by functions check_interpolation_stencil to determine behavior when a check fails.
+enum class CheckMode {
+    Silent,      // Do not output anything, just return status
+    Warn,        // Output a warning message, return status
+    Abort        // Abort execution immediately on failure
+};
+
 //===================================================================================
 ///-------------------------------- main class --------------------------------------
 ///
@@ -355,15 +357,8 @@ public:
   static constexpr Real cim_surf  = param::alpha_surf;
 
   // ideal number of interpolation points for each image point(ghost point extrapolation and surface reconstruction)
-  static constexpr int  N_InterP      = IntPow<iorder_tparm + 1, AMREX_SPACEDIM>::value;
-  static constexpr int  N_InterP_surf = IntPow<iorder_tparm_surf + 1, AMREX_SPACEDIM>::value;
-
-  // Enumeration used by functions check_interpolation_stencil to determine behavior when a check fails.
-  enum class CheckMode {
-      Silent,      // Do not output anything, just return status
-      Warn,        // Output a warning message, return status
-      Abort        // Abort execution immediately on failure
-  };
+  static constexpr int  N_InterP      = ipow(iorder_tparm + 1, AMREX_SPACEDIM);
+  static constexpr int  N_InterP_surf = ipow(iorder_tparm_surf + 1, AMREX_SPACEDIM);
 
   using GPDATA = gpData_t<eorder_tparm, iorder_tparm>;
   using SURFDATA = surfData_t<eorder_tparm_surf, iorder_tparm_surf>;
@@ -383,12 +378,13 @@ public:
   int ngeom = 0;                                            // number of geometries
   Vector<GeomType> geom_a;                                  // IB explicit geometry
   Vector<Tree*> tree_pa;                                    // AABB tree per geometry
+  Vector<inside_t*> inout_fa;                               // in out testing function per geometry
+
   Gpu::ManagedVector<LocalFrame> LocalFrame_a;              // local orthonormal frame matrix (flattened)
   Gpu::ManagedVector<SurfElem> SurfElem_a;                  // surface element area and coordinates (flattened)
   Gpu::ManagedVector<int> geom_offsets;                     // Start index for each geometry in flattened arrays
   Vector<std::map<PrimitiveID, int>> IdxMap_a;              // face/edge element index per geometry
-  Vector<inside_t*> inout_fa;                               // in out testing function per geometry
-
+ 
   // surface related data
   int ntotalfaces = 0;                                      // number of faces/edges across all geometries
   SURFDATA surfdata_soa;                                    // surface/edge data (SoA structure)
@@ -403,29 +399,16 @@ public:
     for (auto*& p : bmf_a) {
       if (p) { delete p; p = nullptr; }
     }
-    bmf_a.clear();
 
     // Release CGAL AABB trees
     for (auto*& t : tree_pa) {
       if (t) { delete t; t = nullptr; }
     }
-    tree_pa.clear();
 
     // Release inside/outside testers
     for (auto*& f : inout_fa) {
         if (f) { delete f; f = nullptr; }
     }
-    inout_fa.clear();
-
-    // Clear containers holding geometry and associated data
-    geom_a.clear();
-    LocalFrame_a.clear();
-    SurfElem_a.clear();
-    geom_offsets.clear();
-    IdxMap_a.clear();
-
-    surfdata_soa.clear();
-    faces_per_level.clear();
   }
 
   /**
@@ -843,7 +826,7 @@ public:
 
   int const ngps = ibFab.gpData.ngps;
 
-  ParallelFor(ngps, [=, copy=this] AMREX_GPU_DEVICE (int ii) noexcept
+  ParallelFor(ngps, [=] AMREX_GPU_DEVICE (int ii) noexcept
   {
     // --------------------------------------------------------------------
     // 1) Reconstruct local orthonormal frame from stored LocalFrame_a
@@ -876,22 +859,22 @@ public:
     }
 
     // 3) Interpolate primitive variables at all image points from prims0
-    copy->interpolateIMs<eorder_tparm, iorder_tparm>(imp_ip_ijk[ii], imp_ipweights[ii], prims0, primsNormal);
+    eib_t::interpolateIMs<eorder_tparm, iorder_tparm>(imp_ip_ijk[ii], imp_ipweights[ii], prims0, primsNormal);
 
     // 4) Transform velocities at image points (> 1) to local frame
     for (int iip = 2; iip < 2 + eorder_tparm; ++iip) {
-        copy->global2local<eorder_tparm>(iip, primsNormal, nvec, t1vec, t2vec);
+        eib_t::global2local<eorder_tparm>(iip, primsNormal, nvec, t1vec, t2vec);
     }
 
     // 5) Apply wall model at IB surface to set surface states (u, P, T, Y, ...)
     wallmodel::compute_surfIB(ib_xyz[ii], nvec, primsNormal, cls);
 
     // 6) Extrapolate from surface/image points back to ghost point along n
-    copy->extrapolate<eorder_tparm>(primsNormal, imp_ninterp[ii], disGP[ii], disIM[ii]);
+    eib_t::extrapolate<eorder_tparm>(primsNormal, imp_ninterp[ii], disGP[ii], disIM[ii]);
 
     // 7) Transform ghost-point velocity back to global coordinates
     int idx = 0;
-    copy->local2global<eorder_tparm>(idx, primsNormal, nvec, t1vec, t2vec);
+    eib_t::local2global<eorder_tparm>(idx, primsNormal, nvec, t1vec, t2vec);
 
     // 8) Extract primitive variables at ghost point (slot 0)
     Real P = primsNormal(0, cls_t::QPRES);
@@ -1232,9 +1215,13 @@ public:
           int local_idx  = csr.face_indices[k];
           int global_idx = surfdata_soa.elemIdx[local_idx];
 
-          if (surfdata_soa.rank[global_idx] != myrank || 
-              surfdata_soa.lev[global_idx] != lev ||
-              surfdata_soa.ifab[global_idx] != ifab) {
+          if (!surfdata_soa.owned(global_idx, lev, ifab)) {
+              amrex::Print() << "Error in computeSURFs: face ownership mismatch.\n"
+                             << "  Indices (Local, Global): (" << local_idx << ", " << global_idx << ")\n"
+                             << "  Current (Rank, Lev, Fab): (" << myrank << ", " << lev << ", " << ifab << ")\n"
+                             << "  Stored  (Rank, Lev, Fab): (" << surfdata_soa.rank[global_idx] << ", " 
+                             << surfdata_soa.lev[global_idx] << ", " << surfdata_soa.ifab[global_idx] << ")\n"
+                             << "  Found: " << surfdata_soa.elemfound[global_idx] << "\n";
               amrex::Abort("Error in computeSURFs: face ownership mismatch");
           }
           
@@ -1289,12 +1276,12 @@ public:
                   }
               }
           }
-          interpolateIMs<eorder_tparm_surf, iorder_tparm_surf>(ip_ijk, ipweights, prims, primsNormal);
+          eib_t::interpolateIMs<eorder_tparm_surf, iorder_tparm_surf>(ip_ijk, ipweights, prims, primsNormal);
 
           // 5. Transform Image Point Velocities to Local Frame
           // -----------------------------------------------
           for (int iip = 2; iip < 2 + eorder_tparm_surf; ++iip) {
-              global2local<eorder_tparm_surf>(iip, primsNormal, nvec, t1vec, t2vec);
+              eib_t::global2local<eorder_tparm_surf>(iip, primsNormal, nvec, t1vec, t2vec);
           }
 
           // 6. Apply Wall Model
@@ -1971,7 +1958,7 @@ private:
     * \param[in]  dxyz        Grid spacing in each dimension.
     * \param[in]  ibFab       Marker array indicating fluid (0) or solid (1) state.
     *///////////////////////////////////////////////////////////////////
-  template <int eorder_t, int iorder_t, typename IPDATA, int N_InterP = IntPow<iorder_t + 1, AMREX_SPACEDIM>::value, int GP_OR_SURF = is_gpData_t<IPDATA>::value ? 1 : 0>
+  template <int eorder_t, int iorder_t, typename IPDATA, int N_InterP = ipow(iorder_t + 1, AMREX_SPACEDIM), int GP_OR_SURF = is_gpData_t<IPDATA>::value ? 1 : 0>
   AMREX_FORCE_INLINE //AMREX_GPU_HOST_DEVICE
   void computeIPweights(
       Array2D<Real,0,eorder_t-1,0,N_InterP-1>&                     weights,
@@ -2109,9 +2096,9 @@ private:
   *   1 : IB/surface reference point
   *   2..(1+eorder_t) : image points along the normal
   *////////////////////////////////////////////////////////////////
-  template <int eorder_t, int iorder_t, int N_InterP = IntPow<iorder_t + 1, AMREX_SPACEDIM>::value>
+  template <int eorder_t, int iorder_t, int N_InterP = ipow(iorder_t + 1, AMREX_SPACEDIM)>
   AMREX_FORCE_INLINE AMREX_GPU_HOST_DEVICE
-  void interpolateIMs(
+  static void interpolateIMs(
       const Array3D< int, 0, eorder_t - 1, 0, N_InterP - 1, 0, AMREX_SPACEDIM-1>&  imp_ip_ijk,
       const Array2D<Real, 0, eorder_t - 1, 0, N_InterP - 1>&                       imp_ipweights,
       const Array4<Real>&                                                          prims,
@@ -2163,9 +2150,9 @@ private:
    *//////////////////////////////////////////////////////////////
   template <int eorder_t>
   AMREX_FORCE_INLINE AMREX_GPU_HOST_DEVICE
-  void extrapolate(Array2D<Real, 0, eorder_t + 1, 0, cls_t::NPRIM - 1>& prims, 
+  static void extrapolate(Array2D<Real, 0, eorder_t + 1, 0, cls_t::NPRIM - 1>& prims, 
              const Array1D< int, 0, eorder_t - 1>& imp_ninterp,
-             const Real disGP, const Array1D<Real, 0, eorder_t - 1>& disIM) const
+             const Real disGP, const Array1D<Real, 0, eorder_t - 1>& disIM)
   {
       // Determine effective order based on INTERP_THRESHOLD
       int eff_order = eorder_t;
@@ -2249,7 +2236,7 @@ private:
    *////////////////////////////////////////////////////////////////
   template <int eorder_t>
   AMREX_FORCE_INLINE AMREX_GPU_HOST_DEVICE 
-  void global2local(
+  static void global2local(
       int iip,
       Array2D<Real,0,eorder_t+1,0,cls_t::NPRIM-1>& primsNormal,
       const Array1D<Real,0,AMREX_SPACEDIM-1>& norm,
@@ -2302,7 +2289,7 @@ private:
    *////////////////////////////////////////////////////////////////
   template <int eorder_t>
   AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
-  void local2global(
+  static void local2global(
       int jj,
       Array2D<Real,0,eorder_t+1,0,cls_t::NPRIM-1>& primsNormal,
       const Array1D<Real,0,AMREX_SPACEDIM-1>& norm,
