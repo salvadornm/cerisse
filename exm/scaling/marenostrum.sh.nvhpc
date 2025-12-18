@@ -1,0 +1,19 @@
+#!/bin/bash
+#SBATCH --job-name=cerisse2_job
+#SBATCH -D .
+#SBATCH --output=mpi_%j.out
+#SBATCH --error=mpi_%j.err
+#SBATCH --ntasks=2
+#SBATCH --cpus-per-task=20
+#SBATCH --time=00:05:00
+#SBATCH --gres=gpu:2
+
+export I_MPI_SHM_CMA=0 # disable CMA to avoid intel_transport_recv cma_read_nbytes assert
+
+export SRUN_CPUS_PER_TASK=${SLURM_CPUS_PER_TASK}
+
+module purge
+module load bsc/1.0 nvidia-hpc-sdk
+mpirun -np 4 main3d.nvhpc.MPI.CUDA.ex input_mare
+
+

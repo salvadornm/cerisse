@@ -17,13 +17,11 @@ class viscousLES_t {
   public:
   
   AMREX_GPU_HOST_DEVICE
-  viscousLES_t() {
-    calc_CDcoeffs<param::order>(INTcoef,CDcoef);
-  }
+  constexpr viscousLES_t() = default;
 
   AMREX_GPU_HOST_DEVICE
-  ~viscousLES_t() {}
-
+  ~viscousLES_t() = default;
+  
   // vars accessed by functions 
   //int order_sch=param::order;  
   int halfsten = param::order / 2;
