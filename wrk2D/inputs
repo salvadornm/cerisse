@@ -2,7 +2,7 @@
 #                                 INPUT FILE
 #------------------------------------------------------------------------------#
 # start time is assumed to be 0, unless re-starting
-max_step  = 20000
+max_step  = 100000
 stop_time = 10.0
 #time_step = 1.0e-5
 cfl = 0.3
@@ -23,9 +23,9 @@ cns.verbose = 1       # 0=quiet, 1=verbose
 #-------------------------------- IMMERSED BOUNDARY ---------------------------#
 ib.filename = circle1.dat circle2.dat circle3.dat circle4.dat circle5.dat circle6.dat circle7.dat 
 ib.move = 0
-ib.plot_surf = 0
-ib.surf_file = plot/surf
-ib.surf_int  = 1
+ib.plot_surf = 1
+ib.surf_file = ./plot/surf
+ib.surf_int  = 2
 #-------------------------------- COMPUTATIONAL DOMAIN ------------------------#
 geometry.is_periodic = 0 0 
 geometry.coord_sys   = 0  # 0 => cart, 1 => RZ  2=>spherical
@@ -49,12 +49,12 @@ amr.grid_eff        = 0.85     # what constitutes an efficient grid
 #-------------------------------- PLOTFILES -----------------------------------#
 amr.plot_files_output = 1
 amr.plot_file         = ./plot/plt # root name of plotfile
-amr.plot_int          = 500     # number of timesteps between plotfiles
+amr.plot_int          = 5     # number of timesteps between plotfiles
 amr.derive_plot_vars  = pressure velocity temperature
 amr.v = 1 # 0=quiet, 1=verbose
 
 amr.checkpoint_files_output = 1
 amr.check_file              = chk    # root name of checkpoint file
 amr.check_int               = 500    # number of timesteps between checkpoints
-amr.restart                 = chk10000
+amr.restart                 = chk31000
 amrex.the_arena_is_managed=1 # NOTE: computing markers on CPU relies on this option

@@ -88,7 +88,11 @@ struct ibmparm_t {
 
   static constexpr int  interp_order = 1;
   static constexpr int  extrap_order = 1;
-  static constexpr Real alpha= 0.6;      
+  static constexpr Real alpha = 0.6;   
+  
+  static constexpr int  interp_order_surf = 1;
+  static constexpr int  extrap_order_surf = 1;
+  static constexpr Real alpha_surf = 0.6; 
 };
 
 
