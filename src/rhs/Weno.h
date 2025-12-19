@@ -271,7 +271,7 @@ class weno_t {
                         const amrex::Array4<const bool>& ibMarkers)
 #else
   void inline eflux(const amrex::Geometry& geom, const amrex::MFIter& mfi,
-                    const amrex::Array4<const amrex::Real>& prims,
+                    const amrex::Array4<const amrex::Real>& prims_in,
                     std::array<FArrayBox*, AMREX_SPACEDIM> const &flxt,
                     const amrex::Array4<amrex::Real>& rhs, const cls_t* cls)
 #endif
@@ -291,8 +291,9 @@ class weno_t {
         IntVect iv(AMREX_D_DECL(i, j, k));
         IntVect ivd(IntVect::TheDimensionVector(dir));
 
-#if (AMREX_USE_GPIBM || CNS_USE_EB )
         int gl = ng, gr = ng;  // ghost point position on left and right
+#if (AMREX_USE_GPIBM || CNS_USE_EB )
+        
         for (int mm = 0; mm < ng; ++mm) {
           if (ibMarkers(iv + mm * ivd, 0)) gr = amrex::min(gr, mm);
           if (ibMarkers(iv - (mm + 1) * ivd, 0)) gl = amrex::min(gl, mm);

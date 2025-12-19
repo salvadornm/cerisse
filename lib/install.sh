@@ -96,7 +96,7 @@ case  $1 in
     echo "  safe          Install using release versions of AMREX+PelePhysics"
     echo "  amrex         Install AMREX release version: $AMREXVERSION "
     echo "  pelephys      Install PelePhysics release version: $PELEPVERSION "
-    echo "  cgal          Download CGAL and Boost release versions: $CGALVERSION $BOOSTVERSION "
+    echo "  cgal download Download CGAL and Boost release versions: $CGALVERSION $BOOSTVERSION "
     echo "  cgal install  Install CGAL and Boost in install/ directory "
     exit
 esac
