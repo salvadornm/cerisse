@@ -33,9 +33,9 @@ def generate_circle_dat(
 
 if __name__ == "__main__":
     generate_circle_dat(
-        center=(0.7, 0.0),   # 圆心
-        radius=0.1,         # 半径
-        n_points=1000,       # 点数
+        center=(0.7, 0.0),   # Circle Center
+        radius=0.1,          # Radius
+        n_points=1000,       # Number of Points
         filename="circle7.dat",
         plot=True
     )

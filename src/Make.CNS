@@ -35,6 +35,10 @@ include $(AMR_SOLVER)/src/cls/Make.package
 INCLUDE_LOCATIONS += $(AMR_SOLVER)/src/cls/
 VPATH_LOCATIONS   += $(AMR_SOLVER)/src/cls/
 
+include $(AMR_SOLVER)/src/fsi/Make.package
+INCLUDE_LOCATIONS += $(AMR_SOLVER)/src/fsi/
+VPATH_LOCATIONS   += $(AMR_SOLVER)/src/fsi/
+
 # ---------   IBM  -------------------- 
 ifeq ($(USE_GPIBM),TRUE)    
   #  default options for libray

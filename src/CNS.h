@@ -87,6 +87,10 @@ class CNS : public amrex::AmrLevel {
   // Gridding ----------------------------------------------------------------
   virtual void post_regrid(int lbase, int new_finest) override;
 
+#ifdef AMREX_USE_GPIBM
+  void rebuildIBM();
+#endif
+
   // Error estimation for regridding.
   // virtual void errorEst (int lev, TagBoxArray& tags, Real time, int ngrow);
   virtual void errorEst(amrex::TagBoxArray& tb, int clearval, int tagval,
@@ -115,9 +119,9 @@ class CNS : public amrex::AmrLevel {
   virtual void writePlotFilePost(const std::string& dir,
                                  std::ostream& os) override;
 
-//#if AMREX_USE_GPIBM
-//  virtual void writeSurfFile( );
-//#endif
+#if AMREX_USE_GPIBM
+  virtual void writeSurfFile();
+#endif
 
   // diagnostics
   static bool record_probe;

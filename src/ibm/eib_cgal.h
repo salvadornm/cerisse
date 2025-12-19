@@ -496,7 +496,7 @@ struct LocalFrame {
 //============================================================================
 /// \brief Stores geometric properties of a surface element (face in 3D, edge in 2D).
 struct SurfElem {
-    int geomIdx;         // Standard int (4 bytes) to avoid padding issues and allow large counts
+    int geomIdx;         // Standard int (4 bytes) to avoid padding issues
     Real centroid[AMREX_SPACEDIM];
     Real measure;        // Area in 3D, Length in 2D
 

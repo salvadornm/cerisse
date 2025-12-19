@@ -4,6 +4,9 @@
 #include <CNS_K.h>
 #include <prob.h>
 
+#include <fsi/Kinematics.h>
+#include <fsi/RigidBodyProperties.h>
+
 using namespace amrex;
 
 bool CNS::verbose = true;
@@ -560,21 +563,58 @@ void CNS::postCoarseTimeStep(Real time) {
   // amrex::Print() << " oo CNS::postCoarseTimeStep " << std::endl;
 
 #if AMREX_USE_GPIBM
-  // if (ib_move) {
-  //   IBM::ib.moveGeom();
-  //   // reallocate variables?
-  //   // Print() << parent->finestLevel() << std::endl;
-  //   for (int lev=0; lev <= parent->finestLevel(); lev++) {
-  //     IBM::ib.computeMarkers(0);
-  //     IBM::ib.initialiseGPs(0);
-  //   }
-  // }
+  // Loop over all levels to compute surface data (for plotting and/or FSI loads)
+  for (int lev = 0; lev <= parent->finestLevel(); ++lev) {
+      CNS& level_obj = dynamic_cast<CNS&>(parent->getLevel(lev));
+      
+      int istep = parent->levelSteps(0);
+      
+      if (plot_surf && (istep % surf_int == 0)) {
+          // This computes SURFs and writes to file
+          level_obj.writeSurfFile();
+      } else {
+          // ComputeSURFs only (needed for FSI loads)
+          MultiFab& Sdata = level_obj.get_new_data(State_Type); 
+          int ncons = CNS::d_prob_closures->NCONS;
+          int nghost= CNS::d_prob_closures->NGHOST;
+          Real cur_time = level_obj.state[State_Type].curTime();
+          
+          FillPatch(level_obj, Sdata, nghost, cur_time, State_Type, 0, ncons);
+          const PROB::ProbClosures* cls_d = CNS::d_prob_closures;
+          IBM::ib.computeSURFs(Sdata, cls_d, lev);
+      }
+  }
 
-  // plot surface is handled in writePlotFilePost 
-  // if (plot_surf) {
-  //   writeSurfFile( );
-  // }
+  // Calculate and print FSI loads and properties
+  if (ParallelDescriptor::IOProcessor()) {
+      amrex::Print() << "\n=== FSI Loads (Step " << parent->levelSteps(0) << ", Time " << time << ") ===\n";
+  }
 
+  auto& ib = IBM::ib;
+  int ngeom = ib.ngeom;
+
+  for (int i = 0; i < ngeom; ++i) {
+      // 1. Rigid Body Properties
+      Real rho_solid = 1.0; // Placeholder density
+      auto props = FSI::RigidBodyProperties::computeProperties(ib.geom_a[i], rho_solid);
+
+      // 2. Aerodynamic Loads
+      auto loads = FSI::Kinematics::computeLoads(i, props.xcenter);
+
+      // 3. Output
+      if (ParallelDescriptor::IOProcessor()) {
+          amrex::Print() << "Geometry " << i << ":\n";
+          amrex::Print() << "  Mass: " << props.mass << "\n";
+          amrex::Print() << "  Center of Mass: " << props.xcenter << "\n";
+          amrex::Print() << "  Inertia Tensor:\n";
+          for(int r=0; r<3; ++r) {
+              amrex::Print() << "    [ " << props.inertia[r][0] << ", " << props.inertia[r][1] << ", " << props.inertia[r][2] << " ]\n";
+          }
+          amrex::Print() << "  Fluid Force: " << loads.force << "\n";
+          amrex::Print() << "  Fluid Moment (about CM): " << loads.moment << "\n";
+          amrex::Print() << "----------------------------------------\n";
+      }
+  }
 #endif
 
    // make sure species sum to 1??
@@ -593,21 +633,11 @@ void CNS::postCoarseTimeStep(Real time) {
 
 // Gridding -------------------------------------------------------------------
 // Called for each level from 0,1...nlevs-1
+
 void CNS::post_regrid(int lbase, int new_finest) {
 
-  //amrex::Print() << " oo CNS::post_regrid " << std::endl;
-  
-
 #ifdef AMREX_USE_GPIBM
-  IBM::ib.destroy_mf(level);
-  IBM::ib.build_mf(grids, dmap, level);
-  IBM::ib.computeMarkers(level);
-  IBM::ib.initialiseGPs(level);
-  if (plot_surf && level == parent->finestLevel()) {
-    for (int lev = parent->finestLevel(); lev >= 0; --lev) {
-      IBM::ib.computeSurfIndexs(lev);
-    }
-}
+  rebuildIBM();
 #endif
 
 #ifdef CNS_USE_EB
@@ -702,15 +732,7 @@ amrex::Print() << " recreate markers " << std::endl;
 
 
 #ifdef AMREX_USE_GPIBM
-  IBM::ib.destroy_mf(level);
-  IBM::ib.build_mf(grids, dmap, level);
-  IBM::ib.computeMarkers(level);
-  IBM::ib.initialiseGPs(level);
-  if (plot_surf && level == parent->finestLevel()) {
-     for (int lev = parent->finestLevel(); lev >= 0; --lev) {
-        IBM::ib.computeSurfIndexs(lev);
-     }
-  }
+  rebuildIBM();
 #endif
 
 #ifdef CNS_USE_EB
@@ -1025,15 +1047,31 @@ void CNS::writePlotFile(const std::string &dir, std::ostream &os,
 void CNS::writePlotFilePost(const std::string &dir, std::ostream &os) {
 
 #if AMREX_USE_GPIBM
+  // writeSurfFile();
+#endif
 
-  //writeSurfFile();
+}
 
-  // // claculate and  write surface data  
+// this subroutine is called from the main loop 
+// should be called per level
+#if AMREX_USE_GPIBM
+
+void CNS::rebuildIBM() {
+  IBM::ib.destroy_mf(level);
+  IBM::ib.build_mf(grids, dmap, level);
+  IBM::ib.computeMarkers(level);
+  IBM::ib.initialiseGPs(level);
+  if (plot_surf && level == parent->finestLevel()) {
+     for (int lev = parent->finestLevel(); lev >= 0; --lev) {
+        IBM::ib.computeSurfIndexs(lev);
+     }
+  }
+}
+
+void CNS::writeSurfFile() {
+      
+  // claculate and  write surface data  
   int istep = parent->levelSteps(0);
-
-  // Print() << " istep= " << istep << " surf_int= " << surf_int << std::endl;
-
-  // Print()<< "should print ? " << (istep % surf_int == 0) << std::endl;
 
   if (plot_surf && (istep % surf_int == 0))  {
      
@@ -1058,69 +1096,13 @@ void CNS::writePlotFilePost(const std::string &dir, std::ostream &os) {
     // Only gather and write on the finest level to ensure all levels are processed
     if (this->level == parent->finestLevel()){
       // collect data to rank 0
-      IBM::ib.gather_surfdata_to_rank0(); 
+      IBM::ib.gatherSurfData(); 
 
       if (amrex::ParallelDescriptor::IOProcessor()){
-        IBM::ib.write_vtk(time, istep, surf_filename); 
-      } 
-    }
-
-  }
-
-#endif
-}
-
-/** 
-// this subroutine is called from the main loop (WORK IN PROGRESS)
-// should be called per level
-#if AMREX_USE_GPIBM
-void CNS::writeSurfFile( ) {
-      
-  // claculate and  write surface data  
-  int istep = parent->levelSteps(0);
-
-  if (istep % surf_int == 0)  {
-     
-    MultiFab& Sdata = get_new_data(State_Type); 
-
-    int ncons = CNS::d_prob_closures->NCONS;
-    int nghost= CNS::d_prob_closures->NGHOST;
-
-    Real time = parent->cumTime();
-
-    if (this->level == parent->maxLevel()) {
-      Print() << "Computing surface properties ";
-      Print() << " at time= " << time << " and step= " << istep << std::endl;
-    }
-    
-    FillPatch(*this, Sdata, nghost, time, State_Type, 0, ncons);
-
-    const PROB::ProbClosures* cls_d = CNS::d_prob_closures;
-
-    IBM::ib.computeSURFs(Sdata,cls_d,this->level); // computed at each level. From low to high.
-
-    const int igeom=0; // put in a loop
-
-    // collect data to rank 0
-    IBM::ib.gather_surfdata_to_rank0(this->level); 
-
-    if (this->level == parent->maxLevel()){
-
-      // select name file
-      std::ostringstream sname;
-      sname << surf_filename << igeom << "_"
-          << std::setw(3) << std::setfill('0') << istep
-          << ".vtk";
-      std::string surf_name = sname.str();
-
-      Print() << "Writing surface data to file: " << surf_name << std::endl;
-      
-      if (amrex::ParallelDescriptor::IOProcessor()){
-        IBM::ib.plot_surface(time,igeom,surf_name); 
+        IBM::ib.plotSURF(time, istep, surf_filename); 
       } 
     }
 
   }
 }
 #endif
-*/
