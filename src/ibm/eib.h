@@ -90,94 +90,92 @@ struct gpData_t {
 
   // Helper function to resize all vectors
   void resize(int n) {
-      ngps = n;
-      
-      gp_ijk.resize(n);
-      ib_xyz.resize(n);
-      disGP.resize(n);
-      
-      geomIdx.resize(n);
-      elemIdx.resize(n);
+        ngps = n;
+        
+        gp_ijk.resize(n);
+        ib_xyz.resize(n);
+        disGP.resize(n);
+        
+        geomIdx.resize(n);
+        elemIdx.resize(n);
 
-      imp_xyz.resize(n);
-      imp_ijk.resize(n);
-      disIM.resize(n);
-      
-      imp_ninterp.resize(n);
-      imp_ip_ijk.resize(n);
-      imp_ipweights.resize(n);
+        imp_xyz.resize(n);
+        imp_ijk.resize(n);
+        disIM.resize(n);
+        
+        imp_ninterp.resize(n);
+        imp_ip_ijk.resize(n);
+        imp_ipweights.resize(n);
+  }
+
+  // Helper function to reserve memory for all vectors
+  void reserve(int n) {
+        gp_ijk.reserve(n);
+        ib_xyz.reserve(n);
+        disGP.reserve(n);
+        
+        geomIdx.reserve(n);
+        elemIdx.reserve(n);
+
+        imp_xyz.reserve(n);
+        imp_ijk.reserve(n);
+        disIM.reserve(n);
+        
+        imp_ninterp.reserve(n);
+        imp_ip_ijk.reserve(n);
+        imp_ipweights.reserve(n);
   }
 
   // Clear and free memory
   void clear() {
-      ngps = 0;
-      
-      gp_ijk.clear();      // gp_ijk.shrink_to_fit();
-      ib_xyz.clear();      // ib_xyz.shrink_to_fit();
-      disGP.clear();       // disGP.shrink_to_fit();
-      
-      geomIdx.clear();     // geomIdx.shrink_to_fit();
-      elemIdx.clear();     // elemIdx.shrink_to_fit();
+        ngps = 0;
 
-      imp_xyz.clear();     // imp_xyz.shrink_to_fit();
-      imp_ijk.clear();     // imp_ijk.shrink_to_fit();
-      disIM.clear();       // disIM.shrink_to_fit();
-      
-      imp_ninterp.clear(); // imp_ninterp.shrink_to_fit();
-      imp_ip_ijk.clear();  // imp_ip_ijk.shrink_to_fit();
-      imp_ipweights.clear(); // imp_ipweights.shrink_to_fit();
+        gp_ijk.clear();      
+        ib_xyz.clear();      
+        disGP.clear();       
+
+        geomIdx.clear();     
+        elemIdx.clear();
+
+        imp_xyz.clear();     
+        imp_ijk.clear();     
+        disIM.clear();       
+
+        imp_ninterp.clear(); 
+        imp_ip_ijk.clear();  
+        imp_ipweights.clear(); 
   }
 
   // Explicitly release memory
   void shrink() {
-      gp_ijk.shrink_to_fit();
-      ib_xyz.shrink_to_fit();
-      disGP.shrink_to_fit();
-      
-      geomIdx.shrink_to_fit();
-      elemIdx.shrink_to_fit();
+        gp_ijk.shrink_to_fit();
+        ib_xyz.shrink_to_fit();
+        disGP.shrink_to_fit();
+        
+        geomIdx.shrink_to_fit();
+        elemIdx.shrink_to_fit();
 
-      imp_xyz.shrink_to_fit();
-      imp_ijk.shrink_to_fit();
-      disIM.shrink_to_fit();
-      
-      imp_ninterp.shrink_to_fit();
-      imp_ip_ijk.shrink_to_fit();
-      imp_ipweights.shrink_to_fit();
+        imp_xyz.shrink_to_fit();
+        imp_ijk.shrink_to_fit();
+        disIM.shrink_to_fit();
+        
+        imp_ninterp.shrink_to_fit();
+        imp_ip_ijk.shrink_to_fit();
+        imp_ipweights.shrink_to_fit();
   }
-
 };
 
 //----------------------------------------------------------------------------
-// \brief Class to store surface data (SoA structure)
-// surface data container used for reconstruction and output
-// \param eorder_tparm_surf Number of image points used for surfdata reconstruction
+// \brief Class to store image point data for surface reconstruction (SoA structure)
+// \param eorder_tparm_surf Number of image points used for surface reconstruction
 //
 template <int eorder_tparm_surf, int iorder_tparm_surf>
-struct surfData_t{
-  // CPU only attributes
-  surfData_t() : filled_elems(0) {}
-  int filled_elems;
-
+struct surfImp_t {
   // ideal number of interpolation points for each image point
   static constexpr int  N_InterP = ipow(iorder_tparm_surf + 1, AMREX_SPACEDIM);
 
   // Surface identification
   Gpu::ManagedVector<int> elemIdx;      // Global face index across all geometries
-  Gpu::ManagedVector<int> geomIdx;      // Geometry index
-  
-  // Indexing info
-  Gpu::ManagedVector<int> ifab;         // Local FAB index on this MPI rank
-  Gpu::ManagedVector<int> lev;          // AMR level
-  Gpu::ManagedVector<int> rank;         // Owning MPI rank
-  Gpu::ManagedVector<int> elemfound;    // Whether this face has been located (int for GPU compatibility)
-
-  // Surface fields (per face)
-  Gpu::ManagedVector<Real> pressure;    // reconstructed local surface pressure
-  Gpu::ManagedVector<Real> tau1;        // reconstructed local surface shear stress 1
-  Gpu::ManagedVector<Real> tau2;        // reconstructed local surface shear stress 2
-  Gpu::ManagedVector<Real> temperature; // reconstructed temperature
-  Gpu::ManagedVector<Real> dTdn;        // reconstructed grad(T)·n
 
   // Image point data (per face)
   Gpu::ManagedVector<Array2D<Real, 0, eorder_tparm_surf - 1, 0, IDIM>> imp_xyz;                       // Physical-space coordinates of image points placed along the outward normal
@@ -188,116 +186,158 @@ struct surfData_t{
   Gpu::ManagedVector<Array1D< int, 0, eorder_tparm_surf - 1>> imp_ninterp;                            // Actual number of interpolation points used for each image point
   Gpu::ManagedVector<Array3D< int, 0, eorder_tparm_surf - 1, 0, N_InterP - 1, 0, IDIM>> imp_ip_ijk;   // Indices of the 8-point interpolation stencil for each image point
   Gpu::ManagedVector<Array2D<Real, 0, eorder_tparm_surf - 1, 0, N_InterP - 1>> imp_ipweights;         // Trilinear interpolation weights for the 8-point stencil of each image point
+
+  void resize(int n) {
+        elemIdx.resize(n);
+        imp_xyz.resize(n);
+        imp_ijk.resize(n);
+        disIM.resize(n);
+        imp_ninterp.resize(n);
+        imp_ip_ijk.resize(n);
+        imp_ipweights.resize(n);
+  }
+
+  void clear() {
+        elemIdx.clear();
+        imp_xyz.clear();
+        imp_ijk.clear();
+        disIM.clear();
+        imp_ninterp.clear();
+        imp_ip_ijk.clear();
+        imp_ipweights.clear();
+  }
+
+  void shrink() {
+        // Only shrink if capacity is significantly larger than size (e.g. > 4x)
+        // to avoid frequent reallocations (memory jitter).
+        if (elemIdx.capacity() > static_cast<std::size_t>(4 * elemIdx.size())) {
+            elemIdx.shrink_to_fit();
+            imp_xyz.shrink_to_fit();
+            imp_ijk.shrink_to_fit();
+            disIM.shrink_to_fit();
+            imp_ninterp.shrink_to_fit();
+            imp_ip_ijk.shrink_to_fit();
+            imp_ipweights.shrink_to_fit();
+        }
+  }
+};
+
+//----------------------------------------------------------------------------
+// \brief Class to store surface physical data and identification (SoA structure)
+// surface data container used for reconstruction and output
+//
+struct surfPhys_t {
+
+  // CPU only attributes
+  surfPhys_t() : filled_elems(0) {}
+  int filled_elems;
+
+  // Indexing info
+  Gpu::ManagedVector<int> elemIdx;      // Global face index across all geometries
+  Gpu::ManagedVector<int> ifab;         // Local FAB index on this MPI rank
+  Gpu::ManagedVector<int> lev;          // AMR level
+  Gpu::ManagedVector<int> rank;         // Owning MPI rank
+  Gpu::ManagedVector<int> elemfound;    // Whether this face has been located (int for GPU compatibility)
+  Gpu::ManagedVector<int> ip_quality;   // number of fluid interpolation points used for the first image point
+  //elemfound: 0 = outside this level, 1 = owned/valid, -1 = reserved by other rank
+
+  // Surface fields (per face)
+  Gpu::ManagedVector<Real> pressure;    // reconstructed local surface pressure
+  Gpu::ManagedVector<Real> tau1;        // reconstructed local surface shear stress 1
+  Gpu::ManagedVector<Real> tau2;        // reconstructed local surface shear stress 2
+  Gpu::ManagedVector<Real> temperature; // reconstructed temperature
+  Gpu::ManagedVector<Real> dTdn;        // reconstructed grad(T)·n
   
   // Helper function to resize all vectors
   // Note: resize() initializes new elements to 0 / default constructor.
   // If you need specific default values (e.g. -1 for indices), set them manually after resize.
   void resize(int n) {
-      int old_n = elemIdx.size();
-      
-      elemIdx.resize(n);
-      geomIdx.resize(n);
+    int old_n = elemIdx.size();
+    
+    elemIdx.resize(n);
+    ifab.resize(n);
+    lev.resize(n);
+    rank.resize(n);
+    elemfound.resize(n);
+    
+    pressure.resize(n);
+    tau1.resize(n);
+    tau2.resize(n);
+    temperature.resize(n);
+    dTdn.resize(n);
+    ip_quality.resize(n);
 
-      ifab.resize(n);
-      lev.resize(n);
-      rank.resize(n);
-      elemfound.resize(n);
-      
-      pressure.resize(n);
-      tau1.resize(n);
-      tau2.resize(n);
-      temperature.resize(n);
-      dTdn.resize(n);
-
-      imp_xyz.resize(n);
-      imp_ijk.resize(n);
-      disIM.resize(n);
-      imp_ninterp.resize(n);
-      imp_ip_ijk.resize(n);
-      imp_ipweights.resize(n);
-
-      // Initialize new elements with specific defaults if n > old_n
-      if (n > old_n) {
-          // Use parallel for or standard fill for initialization
-          // Here we use simple loops for safety, assuming this runs on CPU during setup
-          for (int i = old_n; i < n; ++i) {
-              ifab[i] = -1;
-              lev[i]  = -1;
-              rank[i] = -99;
-              elemfound[i] = 0; // false
-          }
-      }
+    // Initialize new elements with specific defaults if n > old_n
+    if (n > old_n) {
+        // Use parallel for or standard fill for initialization
+        // Here we use simple loops for safety, assuming this runs on CPU during setup
+        for (int i = old_n; i < n; ++i) {
+            ifab[i] = -1;
+            lev[i]  = -1;
+            rank[i] = -99;
+            elemfound[i] = 0; // false
+            ip_quality[i] = -1;
+        }
+    }
   }
 
   // Clear and free memory
   void clear() {
-      filled_elems = 0;
-      
-      // clear() only sets size to 0 but keeps capacity.
-      elemIdx.clear(); // elemIdx.shrink_to_fit();
-      geomIdx.clear(); // geomIdx.shrink_to_fit();
-
-      ifab.clear();    // ifab.shrink_to_fit();
-      lev.clear();     // lev.shrink_to_fit();
-      rank.clear();    // rank.shrink_to_fit();
-      elemfound.clear(); // elemfound.shrink_to_fit();
-      
-      pressure.clear(); // pressure.shrink_to_fit();
-      tau1.clear();     // tau1.shrink_to_fit();
-      tau2.clear();     // tau2.shrink_to_fit();
-      temperature.clear(); // temperature.shrink_to_fit();
-      dTdn.clear();     // dTdn.shrink_to_fit();
-
-      imp_xyz.clear();  // imp_xyz.shrink_to_fit();
-      imp_ijk.clear();  // imp_ijk.shrink_to_fit();
-      disIM.clear();    // disIM.shrink_to_fit();
-      imp_ninterp.clear(); // imp_ninterp.shrink_to_fit();
-      imp_ip_ijk.clear();  // imp_ip_ijk.shrink_to_fit();
-      imp_ipweights.clear(); // imp_ipweights.shrink_to_fit();
+        filled_elems = 0;
+        
+        // clear() only sets size to 0 but keeps capacity.
+        elemIdx.clear();
+        ifab.clear();    
+        lev.clear();     
+        rank.clear();   
+        elemfound.clear();
+        
+        pressure.clear(); 
+        tau1.clear();     
+        tau2.clear();     
+        temperature.clear(); 
+        dTdn.clear();     
+        ip_quality.clear();     
   }
 
   // Explicitly release memory
   void shrink() {
-      elemIdx.shrink_to_fit();
-      geomIdx.shrink_to_fit();
-      ifab.shrink_to_fit();
-      lev.shrink_to_fit();
-      rank.shrink_to_fit();
-      elemfound.shrink_to_fit();
-      
-      pressure.shrink_to_fit();
-      tau1.shrink_to_fit();
-      tau2.shrink_to_fit();
-      temperature.shrink_to_fit();
-      dTdn.shrink_to_fit();
-
-      imp_xyz.shrink_to_fit();
-      imp_ijk.shrink_to_fit();
-      disIM.shrink_to_fit();
-      imp_ninterp.shrink_to_fit();
-      imp_ip_ijk.shrink_to_fit();
-      imp_ipweights.shrink_to_fit();
+    if (elemIdx.capacity() > static_cast<std::size_t>(4 * elemIdx.size())) {
+        elemIdx.shrink_to_fit();
+        ifab.shrink_to_fit();
+        lev.shrink_to_fit();
+        rank.shrink_to_fit();
+        elemfound.shrink_to_fit();
+        
+        pressure.shrink_to_fit();
+        tau1.shrink_to_fit();
+        tau2.shrink_to_fit();
+        temperature.shrink_to_fit();
+        dTdn.shrink_to_fit();
+        ip_quality.shrink_to_fit();
+    }
   }
 
   // Reset metadata for regrid
   void reset() {
-      int n = elemIdx.size();
-      // Use parallel for or standard fill for initialization
-      // Here we use simple loops for safety, assuming this runs on CPU during setup
-      for (int i = 0; i < n; ++i) {
-          ifab[i] = -1;
-          lev[i]  = -1;
-          rank[i] = -99;
-          elemfound[i] = 0; // false
-      }
+    int n = elemIdx.size();
+    // Use parallel for or standard fill for initialization
+    // Here we use simple loops for safety, assuming this runs on CPU during setup
+    for (int i = 0; i < n; ++i) {
+        ifab[i] = -1;
+        lev[i]  = -1;
+        rank[i] = -1;
+        elemfound[i] = 0; // false
+        ip_quality[i] = -1;
+    }
   }
 
   AMREX_FORCE_INLINE
   bool owned(int f_idx, int lev, int ifab) const noexcept
   {
-      return elemfound[f_idx] &&
-            this->lev[f_idx]  == lev &&
-            this->ifab[f_idx] == ifab;
+        return elemfound[f_idx] == 1 &&
+                this->lev[f_idx]  == lev &&
+                this->ifab[f_idx] == ifab;
   }
 
 };
@@ -319,13 +359,13 @@ struct FaceCSR {
 
   // Clear and free memory
   void clear() {
-      fab_offsets.clear();  
-      face_indices.clear();
+        fab_offsets.clear();  
+        face_indices.clear();
   }
 
   void shrink() {
-      fab_offsets.shrink_to_fit();
-      face_indices.shrink_to_fit();
+        fab_offsets.shrink_to_fit();
+        face_indices.shrink_to_fit();
   }
 };
 
@@ -353,7 +393,7 @@ public:
   static constexpr Real cim = param::alpha;
   
   static constexpr int  iorder_tparm_surf = param::interp_order_surf; // number of weighted points used for image point construction
-  static constexpr int  eorder_tparm_surf = param::extrap_order_surf; // number of image points used for surfdata reconstruction
+  static constexpr int  eorder_tparm_surf = param::extrap_order_surf; // number of image points used for surface reconstruction
   static constexpr Real cim_surf  = param::alpha_surf;
 
   // ideal number of interpolation points for each image point(ghost point extrapolation and surface reconstruction)
@@ -361,7 +401,7 @@ public:
   static constexpr int  N_InterP_surf = ipow(iorder_tparm_surf + 1, AMREX_SPACEDIM);
 
   using GPDATA = gpData_t<eorder_tparm, iorder_tparm>;
-  using SURFDATA = surfData_t<eorder_tparm_surf, iorder_tparm_surf>;
+  using SURFIMP = surfImp_t<eorder_tparm_surf, iorder_tparm_surf>;
 
   // MultiFabs pointer to Amr class instance
   Amr* amr_p;                                             
@@ -372,7 +412,8 @@ public:
   Vector<IntVect> rratio_a;                                 // vector of refinement ratio per level in each direction
   Vector<GpuArray<Real, AMREX_SPACEDIM>> dx_a;              // vector of cell sizes per level in each direction
   Vector<Real> diag_a;                                      // vector of cell diagonal length per level
-  Vector<Real> di_a;                                        // image point distance per level
+  Vector<Real> di_a;                                        // image point distance per level for ghost point extrapolation
+  Vector<Real> di_a_surf;                                   // image point distance per level for surface reconstruction
 
   // geometry related data
   int ngeom = 0;                                            // number of geometries
@@ -387,7 +428,8 @@ public:
  
   // surface related data
   int ntotalfaces = 0;                                      // number of faces/edges across all geometries
-  SURFDATA surfdata_soa;                                    // surface/edge data (SoA structure)
+  SURFIMP surfimp_soa;                                      // face/edge image point information (SoA structure)
+  surfPhys_t surfphys_soa;                                  // face/edge physical data and identification (SoA structure)
   Vector<FaceCSR> faces_per_level;                          // faces integers per fab and per level [lev] (CSR format)
 
   /** 
@@ -437,13 +479,17 @@ public:
     }
 
     di_a.resize(lmax + 1);
+    di_a_surf.resize(lmax + 1);
     diag_a.resize(lmax + 1);
+
     for (int i = 0; i <= lmax; i++) {
       diag_a[i] = std::sqrt(
         AMREX_D_TERM( std::pow(dx_a[i][0], 2),
                       + std::pow(dx_a[i][1], 2),
                       + std::pow(dx_a[i][2], 2)) );
+
       di_a[i] = cim * diag_a[i];
+      di_a_surf[i] = cim_surf * diag_a[i];
     }
 
     // read geometry from file
@@ -569,11 +615,6 @@ public:
         } // end if solid
       }); // end LoopOnCpu for ghost markers
 
-  // After constructing the ghost point lists for this FAB, optionally
-  // reclaim excess capacity from previous high-water allocations.
-  // Since we are using clear() at the beginning of the loop (implied or explicit),
-  // shrink_to_fit() inside clear() handles memory reclamation.
-  // The EIB_SHRINK macro is no longer needed here.
     } // end MFIter
   } // end computeMarkers
 
@@ -603,20 +644,7 @@ public:
 
       // Reserve memory to avoid reallocations during push_back
       if (gpData.ngps > 0) {
-          gpData.gp_ijk.reserve(gpData.ngps);
-          gpData.disGP.reserve(gpData.ngps);
-          gpData.ib_xyz.reserve(gpData.ngps);
-
-          gpData.geomIdx.reserve(gpData.ngps);
-          gpData.elemIdx.reserve(gpData.ngps);
-
-          gpData.imp_xyz.reserve(gpData.ngps);
-          gpData.imp_ijk.reserve(gpData.ngps);
-          gpData.disIM.reserve(gpData.ngps);
-
-          gpData.imp_ninterp.reserve(gpData.ngps);
-          gpData.imp_ipweights.reserve(gpData.ngps);
-          gpData.imp_ip_ijk.reserve(gpData.ngps);       
+          gpData.reserve(gpData.ngps);
       }
 
       const Box& bxg = mfi.growntilebox(cls_t::NGHOST);
@@ -763,6 +791,9 @@ public:
           gpData.imp_ipweights.push_back(imp_ipweights);
           gpData.imp_ip_ijk.push_back(imp_ip_ijk);
 
+          // reset ghost marker to the number of interp points for first image point
+          ibMarkers(i, j, k, 1) = static_cast<uint8_t>(imp_ninterp(0)); 
+
           } //end if (ibMarkers(i,j,k,1))
       });//end loop on bx
     
@@ -773,7 +804,8 @@ public:
       // Optional: Shrink memory if capacity is significantly larger than size
       // This prevents memory bloat if the number of ghost points decreases drastically
       // while avoiding frequent reallocations when the number of points is stable.
-      if (gpData.gp_ijk.capacity() > static_cast<std::size_t>(4 * gpData.ngps)) {
+      auto capacity = gpData.gp_ijk.capacity();
+      if (capacity > 4 * gpData.ngps && capacity > 1000) {
           gpData.shrink();
       }
     } //end MFIter
@@ -929,27 +961,31 @@ public:
     // local rank of this process
     int myrank = amrex::ParallelDescriptor::MyProc();
     amrex::Print()  << "Compute Surface Index at LEVEL " << lev  << std::endl;
-    auto& mfab = *bmf_a[lev];
-    const int nfab_local = mfab.local_size();
 
-    const BoxArray& ba = mfab.boxArray();
+    auto& mfab = *bmf_a[lev];
+
+    const BoxArray& ba_global     = mfab.boxArray();
     const DistributionMapping& dm = mfab.DistributionMap();
+
+    const int nfab_local  = mfab.local_size();
+    const int nfab_global = ba_global.size();
 
     const auto prob_lo = amr_p->Geom(lev).ProbLoArray();
     const auto& domain = amr_p->Geom(lev).Domain();
 
     // ========================================================================
-    // Phase 0: Initialize surfdata_soa
+    // Phase 0: Initialize surfimp_soa structure
     // ========================================================================
-    // Ensure surfdata_soa is sized correctly and reset (replicated storage)
+    // Ensure surfimp_soa is sized correctly and reset (replicated storage)
     // The surface data structure is build from finest to coarsest level, so reset only at the finest level.
     if (lev == amr_p->finestLevel()) {
-      if (surfdata_soa.elemIdx.size() != ntotalfaces) {
-        surfdata_soa.resize(ntotalfaces);
+      if ((surfimp_soa.elemIdx.size() != ntotalfaces) || (surfphys_soa.elemIdx.size() != ntotalfaces)) {
+        surfimp_soa.resize(ntotalfaces);
+        surfphys_soa.resize(ntotalfaces);
       } 
 
-      // If size is already correct, reset metadata at level 0
-      surfdata_soa.reset();
+      // If size is already correct, reset metadata at level finestLevel
+      surfphys_soa.reset();
     }
     
     // ========================================================================
@@ -958,117 +994,113 @@ public:
     
     // fab arrays and boxes for fast access
     Vector<Array4<uint8_t const>> fab_markers(nfab_local);
-    Vector<Box> fab_bx(nfab_local);
     Vector<Box> fab_bxg(nfab_local);
     
+    // Map from global box index to local fab index
+    // Initialize with -1 (not local)
+    Vector<int> global_to_local_fab(nfab_global, -1);
+
     int faces_found = 0;
-    int faces_notfound = 0;
+    int faces_out_domain = 0;
+    int faces_out_level  = 0;
+    int faces_out_rank   = 0;
+    int faces_in_finer   = 0;
 
     for (MFIter mfi(mfab, false); mfi.isValid(); ++mfi) {
 
         int lidx = mfi.LocalIndex();
+        int gidx = mfi.index(); // Global index of the box
         
         fab_markers[lidx] = mfab.const_array(mfi);
-        fab_bx[lidx] = mfi.tilebox();
         fab_bxg[lidx] = mfi.growntilebox(cls_t::NGHOST);
+
+        global_to_local_fab[gidx] = lidx;
     }
 
-    // Optimization: Cache the last found local FAB index to exploit spatial locality
-    int cached_local_fab = 0;
-
-    // ========================================================================
-    // Fast cell->FAB lookup using BoxArray
-    // Returns local_fab index if the cell (i,j,k) are contained in that valid box.
-    // Otherwise returns -1.
-    // (i,j,k) indicates the cell that contain face or edge centroid.
-    // ========================================================================
-    auto find_local_fab_for_cell = [&](int i, int j, int k) -> int {
-      
-      IntVect iv(AMREX_D_DECL(i, j, k));
-
-      // Check if points are inside global domain first
-      if (!domain.contains(iv)) 
-          return -1;
-
-      // --------------------------------------------------------------------
-      // Search valid box
-      // Optimization: Check cached index first, then iterate ONLY local boxes
-      // --------------------------------------------------------------------
-      
-      // 1. Check cached index
-      if (cached_local_fab >= 0 && cached_local_fab < nfab_local) {
-         if (fab_bx[cached_local_fab].contains(iv)) {
-             return cached_local_fab;
-         }
-      }
-
-      // 2. Linear search over local FABs (much faster than looping over all global boxes)
-      for (int lidx = 0; lidx < nfab_local; ++lidx) {
-          if (lidx == cached_local_fab) continue; // Already checked
-
-          if (fab_bx[lidx].contains(iv)) {
-              cached_local_fab = lidx; // Update cache
-              return lidx;
-          }
-      }
-      return -1;  // Not found
-    };
-    
     // ========================================================================
     // Phase 2: Process all surface elements
     // ========================================================================
 
+    // Cache for box intersections to avoid repeated allocations
+    std::vector<std::pair<int, Box>> isects;
+
     // Loop over all surface elements (faces/edges)
     for (int f_idx = 0; f_idx < ntotalfaces; ++f_idx) {
 
-      // Prevent overwriting data by a coarser level if it was already processed
-      if (surfdata_soa.elemfound[f_idx] && surfdata_soa.lev[f_idx] > lev) {
+      // Prevent overwriting data by a coarser level if it was already processed (whatever by MyProc process or others)
+      if (surfphys_soa.elemfound[f_idx] && surfphys_soa.lev[f_idx] > lev) {
+          faces_in_finer++;
           continue; 
       }
-      
+
       // Get geometry data from pre-computed arrays
       const LocalFrame& localframe = LocalFrame_a[f_idx];
       const SurfElem& surfelem = SurfElem_a[f_idx];
 
-      // Determine geometry index directly from SurfElem
-      int geomIdx = surfelem.geomIdx;
-
       Array1D<Real, 0, AMREX_SPACEDIM - 1> surf_xyz;
       Array1D< int, 0, AMREX_SPACEDIM - 1> surf_ijk;
-
+      
+      // Compute face/edge centroid coordinates and indices
       for (int d = 0; d < AMREX_SPACEDIM; ++d) {
         surf_xyz(d) = surfelem.centroid[d];
         surf_ijk(d) = static_cast<int>(std::floor(
                       (surf_xyz(d) - prob_lo[d]) / dx_a[lev][d]));
       }
 
-      // Check if this face is owned by this process and return local_fab index
-#if (AMREX_SPACEDIM == 3)
-      int local_fab = find_local_fab_for_cell(surf_ijk(0), surf_ijk(1), surf_ijk(2));
-#else
-      int local_fab = find_local_fab_for_cell(surf_ijk(0), surf_ijk(1), 0);
+#if (AMREX_SPACEDIM == 2)
+      IntVect iv(surf_ijk(0), surf_ijk(1));
+#elif (AMREX_SPACEDIM == 3)
+      IntVect iv(surf_ijk(0), surf_ijk(1), surf_ijk(2));
 #endif
 
-      if (local_fab < 0) {
-          // This surface element is not owned by this process
+      // 1. Check if point is in global domain
+      if (!domain.contains(iv)) {
+        faces_out_domain++;
+        continue;
+      }
+
+      // 2. Find global box index using BoxArray::intersections
+      // This uses the internal hash map for O(1) lookup
+      ba_global.intersections(Box(iv, iv), isects, true, IntVect::TheZeroVector());
+      if (isects.empty()) {
+          faces_out_level++; // face/edge not found in this level
+          continue;
+      }
+      int gidx       = isects[0].first;
+      int owner_rank = dm[gidx];
+      int local_fab  = global_to_local_fab[gidx];
+
+      // Store ownership metadata: Global Box Index, Level, and Owner Rank
+      surfphys_soa.ifab[f_idx] = local_fab;
+      surfphys_soa.rank[f_idx] = owner_rank;
+      surfphys_soa.lev[f_idx] = lev;
+
+      // 3. Check if this box is local to this process
+      if (owner_rank != myrank) {
+          // This surface element is not owned by this process but elsewhere this level 
           // continue to next element
-          faces_notfound++;
+          surfphys_soa.elemfound[f_idx] = -1; 
+          faces_out_rank++;
           continue;
       }
 
-      // Store basic metadata
-      surfdata_soa.elemIdx[f_idx] = f_idx;
-      surfdata_soa.geomIdx[f_idx] = geomIdx;
-      surfdata_soa.ifab[f_idx] = local_fab;
-      surfdata_soa.lev[f_idx] = lev;
-      surfdata_soa.rank[f_idx] = myrank;
-      surfdata_soa.elemfound[f_idx] = 1; // true
+      surfphys_soa.elemfound[f_idx] = 1; // true
+      faces_found++;
+
+      // Store basic metadata if element is found locally
+      // Currently, elemIdx[f_idx] is identical to f_idx because surface elements are replicated on all ranks.
+      // However, in a future distributed implementation where each rank only stores a subset of faces,
+      // f_idx (local loop index) will differ from the global elemIdx.
+      // We explicitly store elemIdx to maintain the mapping to the global geometry.
+      surfimp_soa.elemIdx[f_idx] = f_idx;
+      surfphys_soa.elemIdx[f_idx] = f_idx;
 
 #if (AMREX_SPACEDIM == 2)
       Point surf_centroid(surf_xyz(0), surf_xyz(1));
 #else
       Point surf_centroid(surf_xyz(0), surf_xyz(1), surf_xyz(2));
 #endif
+
       // local fab information
       auto const ibMarkers = fab_markers[local_fab];
       auto const bxg = fab_bxg[local_fab];
@@ -1103,10 +1135,10 @@ public:
           // if no candidates has fluid points more than INTERP_THRESHOLD_SURF, abort
           // =======================================================
           search_optimal_image_point<eorder_tparm_surf, iorder_tparm_surf>(
-                                  cp_start, localframe, 
-                                  lev, prob_lo, bxg, ibMarkers, 
-                                  surfdata_soa, f_idx,
-                                  imp_xyz, imp_ijk, disIM, imp_ninterp);
+                                        cp_start, localframe, 
+                                        lev, prob_lo, bxg, ibMarkers, 
+                                        surfimp_soa, f_idx,
+                                        imp_xyz, imp_ijk, disIM, imp_ninterp);
         } 
         else {
           // =======================================================
@@ -1117,25 +1149,28 @@ public:
           //   - mark as invalid if it leaves the box, set number of interp points to -1.
           // =======================================================
           search_image_point<eorder_tparm_surf, iorder_tparm_surf>(
-                                  jj, cp_start, localframe, 
-                                  lev, prob_lo, bxg, ibMarkers, 
-                                  surfdata_soa, f_idx,
-                                  imp_xyz, imp_ijk, disIM, imp_ninterp);
+                                    jj, cp_start, localframe, 
+                                    lev, prob_lo, bxg, ibMarkers, 
+                                    surfimp_soa, f_idx,
+                                    imp_xyz, imp_ijk, disIM, imp_ninterp);
         } // end if 
       } // end loop on image points
 
       // Push computed image point data
-      surfdata_soa.imp_xyz[f_idx] = imp_xyz;
-      surfdata_soa.imp_ijk[f_idx] = imp_ijk;
-      surfdata_soa.disIM[f_idx] = disIM;
-      surfdata_soa.imp_ninterp[f_idx] = imp_ninterp;
+      surfimp_soa.imp_xyz[f_idx] = imp_xyz;
+      surfimp_soa.imp_ijk[f_idx] = imp_ijk;
+      surfimp_soa.disIM[f_idx] = disIM;
+      surfimp_soa.imp_ninterp[f_idx] = imp_ninterp;
+      
+      // interpolation quality based on first image point
+      surfphys_soa.ip_quality[f_idx] = imp_ninterp(0); 
 
       // Compute and push interpolation weights
       // We need to allocate space for weights first
       Array3D< int, 0, eorder_tparm_surf - 1, 0, N_InterP_surf - 1, 0, IDIM> imp_ip_ijk;
       Array2D<Real, 0, eorder_tparm_surf - 1, 0, N_InterP_surf - 1> imp_ipweights;
 
-      computeIPweights<eorder_tparm_surf, iorder_tparm_surf, SURFDATA>(
+      computeIPweights<eorder_tparm_surf, iorder_tparm_surf, SURFIMP>(
           imp_ipweights, 
           imp_ip_ijk, 
           imp_xyz, 
@@ -1143,19 +1178,20 @@ public:
           imp_ninterp,
           prob_lo, dx_a[lev], ibMarkers);
           
-      surfdata_soa.imp_ip_ijk[f_idx] = imp_ip_ijk;
-      surfdata_soa.imp_ipweights[f_idx] = imp_ipweights;
+      surfimp_soa.imp_ip_ijk[f_idx] = imp_ip_ijk;
+      surfimp_soa.imp_ipweights[f_idx] = imp_ipweights;
 
-      faces_found++;
     } // end loop over faces
 
-    amrex::AllPrint() << "Compute Surface Index Summary at LEVEL " << lev << " on Rank " << myrank << ":\n"
-                      << faces_found << " faces found, " << faces_notfound << " not found\n";
+    // amrex::AllPrint() << "Surface Index Summary at LEVEL " << lev << " on Rank " << myrank << ":\n"
+    //                   << faces_found << " faces found, " << faces_out_domain << " out of domain, "
+    //                   << faces_out_level << " out of level, " << faces_out_rank << " out of rank, "
+    //                   << faces_in_finer << " in finer level\n";
     
     // Surface construct from finest level to coarsest level right now, 
     // so build csr when level == 0,
     // If reverse order is preferred, build csr when level == amr_p->finestLevel().
-    if (lev == 0) build_faces_csr();
+    if (lev == 0) buildCSR();
 
   }
 
@@ -1208,20 +1244,20 @@ public:
           // ------------------------
           // local_idx: Index in the SoA arrays (currently same as global_idx)
           // TODO: csr.face_indices[k] stores the SoA index local_idx.
-          //  - current replicated mode: local_idx == global face id (f_idx)
+          //  - current replicated mode: local_idx = global face id (f_idx)
           //  - future local-only mode : local_idx is [0, nlocalfaces), and we use
-          //  - surfdata_soa.global_id[local_idx] to recover the global face id.
+          //  - surfimp_soa.elemIdx[local_idx] to recover the global face id.
           // global_idx: Unique ID of the face/edge in the geometry
           int local_idx  = csr.face_indices[k];
-          int global_idx = surfdata_soa.elemIdx[local_idx];
+          int global_idx = surfphys_soa.elemIdx[local_idx];
 
-          if (!surfdata_soa.owned(global_idx, lev, ifab)) {
+          if (!surfphys_soa.owned(local_idx, lev, ifab)) {
               amrex::Print() << "Error in computeSURFs: face ownership mismatch.\n"
                              << "  Indices (Local, Global): (" << local_idx << ", " << global_idx << ")\n"
                              << "  Current (Rank, Lev, Fab): (" << myrank << ", " << lev << ", " << ifab << ")\n"
-                             << "  Stored  (Rank, Lev, Fab): (" << surfdata_soa.rank[global_idx] << ", " 
-                             << surfdata_soa.lev[global_idx] << ", " << surfdata_soa.ifab[global_idx] << ")\n"
-                             << "  Found: " << surfdata_soa.elemfound[global_idx] << "\n";
+                             << "  Stored  (Rank, Lev, Fab): (" << surfphys_soa.rank[global_idx] << ", " 
+                             << surfphys_soa.lev[global_idx] << ", " << surfphys_soa.ifab[global_idx] << ")\n"
+                             << "  Found: " << surfphys_soa.elemfound[global_idx] << "\n";
               amrex::Abort("Error in computeSURFs: face ownership mismatch");
           }
           
@@ -1239,9 +1275,9 @@ public:
           Array1D<Real, 0, AMREX_SPACEDIM - 1> t1vec = { localframe.tangent1[0], localframe.tangent1[1], localframe.tangent1[2] };
           Array1D<Real, 0, AMREX_SPACEDIM - 1> t2vec = { localframe.tangent2[0], localframe.tangent2[1], localframe.tangent2[2] };
 #endif
-          auto const ip_ijk    = surfdata_soa.imp_ip_ijk[local_idx];
-          auto const ipweights = surfdata_soa.imp_ipweights[local_idx];
-          auto const disIM     = surfdata_soa.disIM[local_idx];
+          auto const ip_ijk    = surfimp_soa.imp_ip_ijk[local_idx];
+          auto const ipweights = surfimp_soa.imp_ipweights[local_idx];
+          auto const disIM     = surfimp_soa.disIM[local_idx];
 
           // 3. Initialize Primitive Variables Array along Normal
           // --------------------------------------------------
@@ -1259,27 +1295,10 @@ public:
 
           // 4. Interpolate State at Image Points
           // ------------------------------------
-          // Debug check for stencil bounds
-          for (int iim = 0; iim < eorder_tparm_surf; ++iim) {
-              for (int iip = 0; iip < gpData_t<eorder_tparm_surf, iorder_tparm_surf>::N_InterP; ++iip) {
-                  if (ipweights(iim, iip) != 0.0) {
-                      int ii = ip_ijk(iim, iip, 0);
-                      int jj = ip_ijk(iim, iip, 1);
-                      int kk = (AMREX_SPACEDIM == 3) ? ip_ijk(iim, iip, 2) : 0;
-                      if (!bxg.contains(IntVect(AMREX_D_DECL(ii,jj,kk)))) {
-                          amrex::Print() << "CRITICAL ERROR: Stencil point " << IntVect(AMREX_D_DECL(ii,jj,kk)) 
-                                         << " in level " << surfdata_soa.lev[local_idx]
-                                         << " is outside FAB box " << bxg 
-                                         << " for face " << global_idx << " on Level " << lev << "\n";
-                          amrex::Abort("Stencil out of bounds in computeSURFs");
-                      }
-                  }
-              }
-          }
           eib_t::interpolateIMs<eorder_tparm_surf, iorder_tparm_surf>(ip_ijk, ipweights, prims, primsNormal);
 
           // 5. Transform Image Point Velocities to Local Frame
-          // -----------------------------------------------
+          // --------------------------------------------------
           for (int iip = 2; iip < 2 + eorder_tparm_surf; ++iip) {
               eib_t::global2local<eorder_tparm_surf>(iip, primsNormal, nvec, t1vec, t2vec);
           }
@@ -1318,11 +1337,11 @@ public:
           // 8. Store Results in SoA
           // -----------------------
           // Note: We store the original pressure/temperature (scalars, invariant)
-          surfdata_soa.pressure[local_idx]    = primsNormal(1, cls_t::QPRES); 
-          surfdata_soa.temperature[local_idx] = primsNormal(1, cls_t::QT);          
-          surfdata_soa.dTdn[local_idx]        = dTdn;
-          surfdata_soa.tau1[local_idx]        = tau1_val;
-          surfdata_soa.tau2[local_idx]        = tau2_val;                      
+          surfphys_soa.pressure[local_idx]    = primsNormal(1, cls_t::QPRES); 
+          surfphys_soa.temperature[local_idx] = primsNormal(1, cls_t::QT);          
+          surfphys_soa.dTdn[local_idx]        = dTdn;
+          surfphys_soa.tau1[local_idx]        = tau1_val;
+          surfphys_soa.tau2[local_idx]        = tau2_val;                      
 
       } // end loop over faces in this FAB
 
@@ -1332,124 +1351,148 @@ public:
   /**
    * \brief Gather all surface data to Rank 0 for output.
    *
-   * This function collects surface data from all MPI ranks into the `surfdata_soa` structure on Rank 0.
-   * It handles the case where a surface element might be covered by multiple AMR levels (and thus multiple ranks).
-   * The strategy is "Highest Level Wins":
-   * 1. All ranks participate to determine which rank holds the data from the finest (highest) AMR level for each face.
-   * 2. Only the "winning" rank contributes its data to the final reduction.
-   * 3. Rank 0 gathers the consolidated data.
+   * This function collects surface data from all MPI ranks into the `surfphys_soa` structure on Rank 0.
+   * It assumes that each face is owned by at most one rank (or ownership is already resolved).
+   * Rank 0 gathers the consolidated data using MPI Gatherv to minimize communication overhead.
+   * 
+   * The process involves:
+   * 1. Packing local owned faces into a compact structure (SurfOut).
+   * 2. Gathering the count of owned faces from each rank to Rank 0.
+   * 3. Calculating displacements for Gatherv.
+   * 4. Gathering the actual data bytes using Gatherv.
+   * 5. Unpacking the data on Rank 0 back into the SoA structure.
    */
-  void gather_surfdata_to_rank0() {
+  void gatherSurfData() {
 
       int nprocs = amrex::ParallelDescriptor::NProcs();
       if (nprocs == 1) return; // Serial execution: data is already on Rank 0
 
-      // IMPORTANT: We must use the global number of faces for MPI collective operations.
-      // All ranks must agree on the array size 'n'.
-      int n = surfdata_soa.elemIdx.size(); 
-      if (n == 0) return;
-
-      // ======================================================================
-      // Step 1: Determine Ownership (Highest Level Wins)
-      // ======================================================================
-      // We need to find, for each face, which rank has it at the highest level.
-      // We use MPI_Allreduce with MPI_MAXLOC on {level, rank} pairs.
-      
-      struct IntPair { int lev; int rank; };
-      Vector<IntPair> local_lr(n);
-      Vector<IntPair> global_lr(n);
-
       int my_rank = amrex::ParallelDescriptor::MyProc();
-
-      // Fill local buffer
-      for (int i = 0; i < n; ++i) {
-          if (surfdata_soa.elemfound[i]) {
-              local_lr[i] = { surfdata_soa.lev[i], my_rank };
-          } else {
-              local_lr[i] = { -1, my_rank };
-          }
-      }
-
       MPI_Comm comm = amrex::ParallelDescriptor::Communicator();
-      
-      // Perform reduction. 
-      MPI_Allreduce(local_lr.data(), global_lr.data(), n, MPI_2INT, MPI_MAXLOC, comm);
 
-      // ======================================================================
-      // Step 2: Gather Data Fields
-      // ======================================================================
-      // Now that everyone knows who the winner is for each face, we reduce the actual data.
-      
-      auto reduce_field = [&](amrex::Gpu::ManagedVector<Real>& field) {
-          Vector<Real> send_buf(n, 0.0);
-          
-          for (int i = 0; i < n; ++i) {
-              int max_lev = global_lr[i].lev;
-              int winner  = global_lr[i].rank;
-              
-              // If I am the winner and the face is valid (level >= 0)
-              if (my_rank == winner && max_lev >= 0) {
-                  send_buf[i] = field[i];
-              }
-          }
+      if(ntotalfaces <= 0) {
+          amrex::Abort("gatherSurfData: ntotalfaces must be positive");
+      }
 
-          if (my_rank == 0) {
-              Vector<Real> recv_buf(n);
-              // Reduce to Rank 0
-              MPI_Reduce(send_buf.data(), recv_buf.data(), n, MPI_DOUBLE, MPI_SUM, 0, comm);
-              
-              // Copy result back to the SoA structure
-              for(int i=0; i<n; ++i) field[i] = recv_buf[i];
-          } else {
-              // Non-root ranks just send
-              MPI_Reduce(send_buf.data(), nullptr, n, MPI_DOUBLE, MPI_SUM, 0, comm);
-          }
+      // Structure for packing data to send to Rank 0
+      // This struct must be trivially copyable to be safely sent via MPI as raw bytes.
+      struct SurfOut {
+        int elem;      // face index (global)
+        int lev;       // AMR level
+        int rank;      // Owning rank
+        int ipq;       // Interpolation quality (number of fluid points)
+        Real p, T, dTdn, tau1, tau2; // Physical quantities
       };
+      // Ensure the struct is safe for raw memory copy (MPI)
+      static_assert(std::is_trivially_copyable<SurfOut>::value, "SurfOut must be trivially copyable for MPI");
 
-      // Reduce all physical fields of interest
-      reduce_field(surfdata_soa.pressure);
-      reduce_field(surfdata_soa.temperature);
-      reduce_field(surfdata_soa.dTdn);
-      reduce_field(surfdata_soa.tau1);
-      reduce_field(surfdata_soa.tau2);
+      // ======================================================================
+      // Step 1: Pack local owned faces
+      // ======================================================================
+      std::vector<SurfOut> send;
+      // Reserve memory: use filled_elems if available, otherwise a heuristic
+      send.reserve(surfphys_soa.filled_elems > 0 ? surfphys_soa.filled_elems : 1024);
 
-      // Gather imp_ninterp (first component)
-      {
-          Vector<int> send_buf(n, 0);
-          for (int i = 0; i < n; ++i) {
-              int max_lev = global_lr[i].lev;
-              int winner  = global_lr[i].rank;
-              if (my_rank == winner && max_lev >= 0) {
-                  send_buf[i] = surfdata_soa.imp_ninterp[i](0);
-              }
-          }
+      for (int i = 0; i < ntotalfaces; ++i) {
+          // Only pack faces that are owned by this rank (elemfound == 1)
+          if (surfphys_soa.elemfound[i] != 1) continue;
 
-          if (my_rank == 0) {
-              Vector<int> recv_buf(n);
-              MPI_Reduce(send_buf.data(), recv_buf.data(), n, MPI_INT, MPI_SUM, 0, comm);
-              for(int i=0; i<n; ++i) surfdata_soa.imp_ninterp[i](0) = recv_buf[i];
-          } else {
-              MPI_Reduce(send_buf.data(), nullptr, n, MPI_INT, MPI_SUM, 0, comm);
-          }
+          SurfOut s{}; // Value-initialization to zero-out padding
+          s.elem = surfphys_soa.elemIdx[i];
+          s.lev  = surfphys_soa.lev[i];
+          s.rank = surfphys_soa.rank[i];
+          s.ipq  = surfphys_soa.ip_quality[i];
+          s.p    = surfphys_soa.pressure[i];
+          s.T    = surfphys_soa.temperature[i];
+          s.dTdn = surfphys_soa.dTdn[i];
+          s.tau1 = surfphys_soa.tau1[i];
+          s.tau2 = surfphys_soa.tau2[i];
+          send.push_back(s);
+      }
+
+      int nlocal = static_cast<int>(send.size());
+
+      // ======================================================================
+      // Step 2: Gather counts on root
+      // ======================================================================
+      // Rank 0 needs to know how many bytes to receive from each rank
+      std::vector<int> counts = amrex::ParallelDescriptor::Gather(nlocal, 0);
+
+      // ======================================================================
+      // Step 3: Compute displacements & total size
+      // ======================================================================
+      std::vector<int> displs;
+      int total = 0;
+      if (my_rank == 0) {
+          displs.resize(nprocs, 0);
+          // Calculate displacements for Gatherv (prefix sum of counts)
+          for (int r = 1; r < nprocs; ++r) displs[r] = displs[r-1] + counts[r-1];
+          // Calculate total number of elements to receive
+          for (int r = 0; r < nprocs; ++r) total += counts[r];
       }
 
       // ======================================================================
-      // Step 3: Update Metadata on Rank 0
+      // Step 4: Gatherv bytes (robust, no custom MPI datatype)
+      // ======================================================================
+      const int typesize = sizeof(SurfOut);
+      
+      // Cast to char* for byte-wise transmission
+      // Use std::vector<char> for maximum compatibility and to avoid amrex::Vector issues
+      std::vector<char> sendbuf(reinterpret_cast<char*>(send.data()),
+                                reinterpret_cast<char*>(send.data()) + nlocal * typesize);
+
+      std::vector<char> recvbuf;
+      std::vector<int> counts_b, displs_b;
+      char* recvptr = nullptr;
+
+      if (my_rank == 0) {
+          recvbuf.resize(total * typesize);
+          recvptr = recvbuf.data();
+
+          counts_b.resize(nprocs);
+          displs_b.resize(nprocs);
+          // Convert counts and displacements to bytes
+          for (int r = 0; r < nprocs; ++r) {
+              if (counts[r] < 0) amrex::Abort("gatherSurfData: negative count detected");
+              // Check for integer overflow before multiplication
+              if (counts[r] > std::numeric_limits<int>::max() / typesize) {
+                  amrex::Abort("gatherSurfData: Gatherv byte count overflow");
+              }
+              counts_b[r] = counts[r] * typesize;
+              displs_b[r] = displs[r] * typesize;
+          }
+      }
+
+      // Perform the gather operation
+      amrex::ParallelDescriptor::Gatherv(sendbuf.data(), nlocal * typesize,
+                                         recvptr, counts_b, displs_b, 0);
+
+      // ======================================================================
+      // Step 5: Unpack on root back into SoA
       // ======================================================================
       if (my_rank == 0) {
-          for (int i = 0; i < n; ++i) {
-              int max_lev = global_lr[i].lev;
-              int winner  = global_lr[i].rank;
-              
-              if (max_lev >= 0) {
-                  surfdata_soa.lev[i]       = max_lev;
-                  surfdata_soa.rank[i]      = winner;
-                  surfdata_soa.elemfound[i] = 1;
-              } else {
-                  // Face not found on any rank (should not happen if geometry is contained in domain)
-                  surfdata_soa.elemfound[i] = 0;
+          auto* rec = reinterpret_cast<const SurfOut*>(recvbuf.data());
+
+          // Iterate through all received records and populate the SoA structure
+          for (int k = 0; k < total; ++k) {
+              const auto& s = rec[k];
+              const int i = s.elem;
+
+              // Robustness checks
+              if (i < 0 || i >= ntotalfaces) {
+                  amrex::Abort("gatherSurfData: received face index out of range");
               }
-          } 
+
+              surfphys_soa.lev[i]         = s.lev;
+              surfphys_soa.rank[i]        = s.rank;
+              surfphys_soa.ip_quality[i]  = s.ipq;
+
+              surfphys_soa.pressure[i]    = s.p;
+              surfphys_soa.temperature[i] = s.T;
+              surfphys_soa.dTdn[i]        = s.dTdn;
+              surfphys_soa.tau1[i]        = s.tau1;
+              surfphys_soa.tau2[i]        = s.tau2;
+          }
       } // end if my_rank == 0
   }
 
@@ -1457,28 +1500,47 @@ public:
    * \brief Write surface mesh and data to VTK (.vtp) files.
    *        Outputs one file per geometry.
    * 
-   * \param time Current simulation time.
-   * \param step Current time step number.
+   * This function generates a VTK PolyData XML file (.vtp) for each immersed boundary geometry.
+   * It writes the surface mesh (vertices and polygons) and associated physical data (pressure,
+   * temperature, shear stress, etc.) stored in the `surfphys_soa` structure.
+   * 
+   * The output format is ASCII XML for simplicity and compatibility.
+   * 
+   * \param time   Current simulation time.
+   * \param step   Current time step number.
+   * \param prefix Output filename prefix (e.g., "plot/surf").
    */
-  void write_vtk(const amrex::Real time, int step, const std::string& prefix) {
+  void plotSURF(const amrex::Real time, int step, const std::string& prefix) {
       
-      // Only Rank 0 writes the file
+      // Only Rank 0 writes the file (serial I/O)
       if (amrex::ParallelDescriptor::MyProc() != 0) return;
 
-      // Create directory if needed
+      // Parse prefix to get base directory and filename prefix
+      std::string base_dir = ".";
+      std::string file_prefix = prefix;
+      
       auto pos = prefix.find_last_of("/\\");
       if (pos != std::string::npos) {
-          std::string dir = prefix.substr(0, pos);
-          if (!amrex::UtilCreateDirectory(dir, 0755)) {
-              amrex::Print() << "Error: Could not create directory " << dir << "\n";
+          base_dir = prefix.substr(0, pos);
+          file_prefix = prefix.substr(pos + 1);
+          
+          // Ensure base directory exists
+          if (!amrex::UtilCreateDirectory(base_dir, 0755)) {
+              amrex::Print() << "Error: Could not create directory " << base_dir << "\n";
           }
       }
 
       // Loop over each geometry and write a separate file
       for (int i = 0; i < ngeom; ++i) {
           
-          // Construct filename: prefix_geom0_00100.vtp
-          std::string filename = amrex::Concatenate(prefix + "_geom" + std::to_string(i) + "_", step, 5) + ".vtp";
+          // Create geometry specific directory: base_dir/geom{i}
+          std::string geom_dir = base_dir + "/geom" + std::to_string(i);
+          if (!amrex::UtilCreateDirectory(geom_dir, 0755)) {
+               amrex::Print() << "Error: Could not create directory " << geom_dir << "\n";
+          }
+
+          // Construct filename: geom_dir/prefix{i}_{step}.vtp
+          std::string filename = amrex::Concatenate(geom_dir + "/" + file_prefix + std::to_string(i) + "_", step, 5) + ".vtp";
           amrex::Print() << "Writing surface data for geometry " << i << " to " << filename << " ...\n";
 
           std::ofstream ofs(filename);
@@ -1487,7 +1549,9 @@ public:
               continue;
           }
 
-          // 1. Count points and cells for THIS geometry only
+          // ==================================================================
+          // 1. Count Points and Cells
+          // ==================================================================
           long long n_points = 0;
           long long n_cells = 0;
 #if (AMREX_SPACEDIM == 3)
@@ -1499,13 +1563,17 @@ public:
           n_cells  = geom_a[i].size(); 
 #endif
 
+          // ==================================================================
           // 2. Write VTK XML Header
+          // ==================================================================
           ofs << "<?xml version=\"1.0\"?>\n";
           ofs << "<VTKFile type=\"PolyData\" version=\"1.0\" byte_order=\"LittleEndian\" header_type=\"UInt64\">\n";
           ofs << "  <PolyData>\n";
           ofs << "    <Piece NumberOfPoints=\"" << n_points << "\" NumberOfPolys=\"" << n_cells << "\">\n";
 
-          // 3. Write Points
+          // ==================================================================
+          // 3. Write Points (Vertices)
+          // ==================================================================
           ofs << "      <Points>\n";
           ofs << "        <DataArray type=\"Float64\" Name=\"Points\" NumberOfComponents=\"3\" format=\"ascii\">\n";
 #if (AMREX_SPACEDIM == 3)
@@ -1522,8 +1590,12 @@ public:
           ofs << "\n        </DataArray>\n";
           ofs << "      </Points>\n";
 
-          // 4. Write Polys (Connectivity)
+          // ==================================================================
+          // 4. Write Polys (Connectivity and Offsets)
+          // ==================================================================
           ofs << "      <Polys>\n";
+          
+          // 4a. Connectivity: List of vertex indices for each polygon
           ofs << "        <DataArray type=\"Int64\" Name=\"connectivity\" format=\"ascii\">\n";
 #if (AMREX_SPACEDIM == 3)
           // Build a map from vertex handle to local index (0..V-1) for this geometry
@@ -1550,7 +1622,7 @@ public:
 #endif
           ofs << "\n        </DataArray>\n";
           
-          // Write Offsets
+          // 4b. Offsets: Cumulative count of vertices per polygon
           ofs << "        <DataArray type=\"Int64\" Name=\"offsets\" format=\"ascii\">\n";
           long long current_offset = 0;
 #if (AMREX_SPACEDIM == 3)
@@ -1575,16 +1647,19 @@ public:
           ofs << "\n        </DataArray>\n";
           ofs << "      </Polys>\n";
 
-          // 5. Write Cell Data
+          // ==================================================================
+          // 5. Write Cell Data (Physical Properties)
+          // ==================================================================
           ofs << "      <CellData Scalars=\"Pressure\">\n";
           
+          // Helper lambda to write scalar fields (Real)
           auto write_scalar_field = [&](const std::string& name, const amrex::Gpu::ManagedVector<Real>& field) {
               ofs << "        <DataArray type=\"Float64\" Name=\"" << name << "\" format=\"ascii\">\n";
               
               // Use geom_offsets to find where this geometry's data starts in the global SoA
               int start_idx = geom_offsets[i];
               
-              // Safety check
+              // Safety check for array bounds
               if (start_idx + n_cells > static_cast<long long>(field.size())) {
                   amrex::Print() << "Warning: Data field " << name << " size mismatch. Writing zeros.\n";
                   for(int k=0; k<n_cells; ++k) ofs << "0.0 ";
@@ -1597,13 +1672,12 @@ public:
               ofs << "\n        </DataArray>\n";
           };
 
+          // Helper lambda to write integer fields
           auto write_int_field = [&](const std::string& name, const amrex::Gpu::ManagedVector<int>& field) {
               ofs << "        <DataArray type=\"Int32\" Name=\"" << name << "\" format=\"ascii\">\n";
               
-              // Use geom_offsets to find where this geometry's data starts in the global SoA
               int start_idx = geom_offsets[i];
               
-              // Safety check
               if (start_idx + n_cells > static_cast<long long>(field.size())) {
                   amrex::Print() << "Warning: Data field " << name << " size mismatch. Writing zeros.\n";
                   for(int k=0; k<n_cells; ++k) ofs << "0 ";
@@ -1616,28 +1690,20 @@ public:
               ofs << "\n        </DataArray>\n";
           };
 
-          write_scalar_field("Pressure", surfdata_soa.pressure);
-          write_scalar_field("Temperature", surfdata_soa.temperature);
-          write_scalar_field("Tau1", surfdata_soa.tau1);
-          write_scalar_field("Tau2", surfdata_soa.tau2);
-          write_scalar_field("dTdn", surfdata_soa.dTdn);
+          // Write physical fields
+          write_scalar_field("Pressure",    surfphys_soa.pressure);
+          write_scalar_field("Temperature", surfphys_soa.temperature);
+          write_scalar_field("Tau1",        surfphys_soa.tau1);
+          write_scalar_field("Tau2",        surfphys_soa.tau2);
+          write_scalar_field("dTdn",        surfphys_soa.dTdn);
           
-          write_int_field("Rank", surfdata_soa.rank);
-          write_int_field("Level", surfdata_soa.lev);
+          // Write metadata fields
+          write_int_field("Rank",  surfphys_soa.rank);
+          write_int_field("Level", surfphys_soa.lev);
 
-          // Write N_Interp for first image point
-          ofs << "        <DataArray type=\"Int32\" Name=\"N_Interp_IP0\" format=\"ascii\">\n";
-          int start_idx = geom_offsets[i];
-          if (start_idx + n_cells > static_cast<long long>(surfdata_soa.imp_ninterp.size())) {
-               for(int k=0; k<n_cells; ++k) ofs << "0 ";
-          } else {
-              for(int k=0; k<n_cells; ++k) {
-                  int global_idx = start_idx + k;
-                  // Access the first element (index 0) of the Array1D
-                  ofs << surfdata_soa.imp_ninterp[global_idx](0) << " ";
-              }
-          }
-          ofs << "\n        </DataArray>\n";
+          // Write Interpolation Quality (IP_quality)
+          // Note: This is stored in a separate vector, so we handle it explicitly or via helper if types match
+          write_int_field("IP_quality", surfphys_soa.ip_quality);
 
           ofs << "      </CellData>\n";
           ofs << "    </Piece>\n";
@@ -1646,8 +1712,7 @@ public:
           
           ofs.close();
       }
-  }
-
+  }  
 
 //============================================================================
 ///--------------------------- private functions -----------------------------
@@ -1818,27 +1883,27 @@ private:
         Real p_x = 0.0, p_y = 0.0, p_z = 0.0;
 
         if constexpr (GP_OR_SURF == 1) {
-             current_geom = ipData.geomIdx[f_idx];
-             current_elem = ipData.elemIdx[f_idx];
-             point_label = "Ghost Point";
-             
-             int gp_i = ipData.gp_ijk[f_idx](0);
-             int gp_j = ipData.gp_ijk[f_idx](1);
-             p_x = prob_lo[0] + (0.5_rt + gp_i) * dx_a[lev][0];
-             p_y = prob_lo[1] + (0.5_rt + gp_j) * dx_a[lev][1];
+            current_geom = ipData.geomIdx[f_idx];
+            current_elem = ipData.elemIdx[f_idx];
+            point_label = "Ghost Point";
+            
+            int gp_i = ipData.gp_ijk[f_idx](0);
+            int gp_j = ipData.gp_ijk[f_idx](1);
+            p_x = prob_lo[0] + (0.5_rt + gp_i) * dx_a[lev][0];
+            p_y = prob_lo[1] + (0.5_rt + gp_j) * dx_a[lev][1];
 #if (AMREX_SPACEDIM == 3)
-             int gp_k = ipData.gp_ijk[f_idx](2);
-             p_z = prob_lo[2] + (0.5_rt + gp_k) * dx_a[lev][2];
+            int gp_k = ipData.gp_ijk[f_idx](2);
+            p_z = prob_lo[2] + (0.5_rt + gp_k) * dx_a[lev][2];
 #endif
         } else {
-             current_geom = ipData.geomIdx[f_idx];
-             current_elem = ipData.elemIdx[f_idx];
-             point_label = "Surface Point";
-             
-             p_x = cp_start[0];
-             p_y = cp_start[1];
+            current_geom = getGeomIdx(f_idx);
+            current_elem = ipData.elemIdx[f_idx];
+            point_label = "Surface Point";
+            
+            p_x = cp_start[0];
+            p_y = cp_start[1];
 #if (AMREX_SPACEDIM == 3)
-             p_z = cp_start[2];
+            p_z = cp_start[2];
 #endif
         }
         
@@ -2333,7 +2398,7 @@ private:
    * \param i, j, k   Indices of the bottom-left corner of the interpolation stencil.
    * \param bx        The box to check against.
    * \param lev       Current AMR level (for logging).
-   * \param ipData    Reference to the ghost point data structure (used to extract context like geomIdx).
+   * \param ipData    Reference to the image point data (used to extract context like geomIdx).
    * \param mode      Action to take on failure (Silent, Warn, or Abort).
    * 
    * \return true if the stencil is valid (inside bxg), false otherwise.
@@ -2370,7 +2435,7 @@ private:
              current_geom = ipData.geomIdx[f_idx];
              current_elem = ipData.elemIdx[f_idx];
         } else {
-             current_geom = ipData.geomIdx[f_idx];
+             current_geom = getGeomIdx(f_idx);
              current_elem = ipData.elemIdx[f_idx];
         }
 
@@ -2424,22 +2489,22 @@ private:
    *  3. Fill the face indices into the CSR structure.
    */////////////////////////////////////////////////////////////////
   AMREX_FORCE_INLINE //AMREX_GPU_HOST_DEVICE
-  void build_faces_csr()
+  void buildCSR()
   {
 
-    const int myrank  = amrex::ParallelDescriptor::MyProc();
-    const int nlevels = amr_p->finestLevel() + 1;
+    const int myrank = amrex::ParallelDescriptor::MyProc();
+    const int nlevel = amr_p->finestLevel() + 1;
 
     faces_per_level.clear();
-    faces_per_level.resize(nlevels);
+    faces_per_level.resize(nlevel);
 
     // Cache the number of local FABs per level 
-    Vector<int> nfab_per_level(nlevels);
+    Vector<int> nfab_per_level(nlevel);
 
     // ------------------------------------------------------------
     // 0) Initialization: Prepare CSR structure for each level
     // ------------------------------------------------------------
-    for (int lev = 0; lev < nlevels; ++lev) {
+    for (int lev = 0; lev < nlevel; ++lev) {
 
       const int nfab_local = bmf_a[lev]->local_size();
       nfab_per_level[lev] = nfab_local;
@@ -2456,14 +2521,14 @@ private:
     for (int f = 0; f < ntotalfaces; ++f) {
 
       // Skip if face is not found or does not belong to this rank
-      if (!surfdata_soa.elemfound[f]) continue;
-      if (surfdata_soa.rank[f] != myrank) continue;
+      if (surfphys_soa.elemfound[f] != 1) continue;
+      if (surfphys_soa.rank[f] != myrank) continue;
 
-      const int lev = surfdata_soa.lev[f];
+      const int lev = surfphys_soa.lev[f];
       // Safety check: ensure level is valid
-      if (lev < 0 || lev >= nlevels) continue;
+      if (lev < 0 || lev >= nlevel) continue;
 
-      const int ifab = surfdata_soa.ifab[f];
+      const int ifab = surfphys_soa.ifab[f];
       // Safety check: ensure FAB index is valid
       if (ifab < 0 || ifab >= nfab_per_level[lev]) continue;
 
@@ -2475,9 +2540,9 @@ private:
     // 2) Pass-2: Prefix Sum (Compute Offsets) & Allocation
     // ------------------------------------------------------------
     // 'cursor' tracks the current write position for each FAB during the fill pass
-    Vector<Vector<int>> cursor(nlevels);
+    Vector<Vector<int>> cursor(nlevel);
 
-    for (int lev = 0; lev < nlevels; ++lev) {
+    for (int lev = 0; lev < nlevel; ++lev) {
 
       auto& csr = faces_per_level[lev];
       const int nfab_local = nfab_per_level[lev];
@@ -2504,13 +2569,13 @@ private:
     for (int f = 0; f < ntotalfaces; ++f) {
 
       // Same filtering as Pass-1
-      if (!surfdata_soa.elemfound[f]) continue;
-      if (surfdata_soa.rank[f] != myrank) continue;
+      if (surfphys_soa.elemfound[f] != 1) continue;
+      if (surfphys_soa.rank[f] != myrank) continue;
 
-      const int lev = surfdata_soa.lev[f];
-      if (lev < 0 || lev >= nlevels) continue;
+      const int lev = surfphys_soa.lev[f];
+      if (lev < 0 || lev >= nlevel) continue;
 
-      const int ifab = surfdata_soa.ifab[f];
+      const int ifab = surfphys_soa.ifab[f];
       if (ifab < 0 || ifab >= nfab_per_level[lev]) continue;
 
       // Get the current write position for this FAB and increment it
@@ -2521,13 +2586,30 @@ private:
     }
 
     // Update filled_elems count
-    surfdata_soa.filled_elems = 0;
-    for (int lev = 0; lev < nlevels; ++lev) {
+    surfphys_soa.filled_elems = 0;
+    for (int lev = 0; lev < nlevel; ++lev) {
       auto& csr = faces_per_level[lev];
-      surfdata_soa.filled_elems += csr.face_indices.size();
+      surfphys_soa.filled_elems += csr.face_indices.size();
     }
-
   }   
+
+  /*////////////////////////////////////////////////////////////////
+   * \brief Helper function to find geometry index from element index
+   * \param elemIdx The global element index
+   * \return The geometry index (0 to ngeom-1)
+   *////////////////////////////////////////////////////////////////
+  AMREX_FORCE_INLINE //AMREX_GPU_HOST_DEVICE
+  int getGeomIdx(int elemIdx) const 
+  {
+    if (elemIdx < 0 || elemIdx >= ntotalfaces) return -1;
+
+    for (int i = 0; i < ngeom; ++i) {
+        if (elemIdx >= geom_offsets[i] && elemIdx < geom_offsets[i+1]) {
+            return i;
+        }
+    }
+    return -1;
+  }
 
   /*////////////////////////////////////////////////////////////////
    * \brief Reads geometry files and initializes CGAL data structures.
@@ -2569,7 +2651,7 @@ private:
     this->tree_pa.resize(this->ngeom);
     this->LocalFrame_a.clear();
     this->SurfElem_a.clear();
-    this->geom_offsets.resize(this->ngeom);
+    this->geom_offsets.resize(this->ngeom + 1);
     this->IdxMap_a.resize(this->ngeom);
     this->inout_fa.resize(this->ngeom);
     this->ntotalfaces = 0;
@@ -2668,6 +2750,9 @@ private:
     build_geometry_cache(geom_a[i], SurfElem_a, LocalFrame_a, IdxMap_a[i], this->geom_offsets[i], i);
     } // end loop over geometries
 
+    // Store the final offset (total number of faces)
+    this->geom_offsets[ngeom] = static_cast<int>(this->LocalFrame_a.size());
+
     // Sanity check: verify that the cache grew by the expected amount
     if ((static_cast<int>(SurfElem_a.size()) != ntotalfaces) || (static_cast<int>(LocalFrame_a.size()) != ntotalfaces)) {
         amrex::Print() << "Error: Mismatch in geometry cache size for geom " << "\n"
@@ -2686,8 +2771,10 @@ private:
     if (plot_surf) {
 
       Print() << "Total number of faces across all geometries: " << ntotalfaces << std::endl;
-      // Initialize surfdata container to this total; safe defaults
-      surfdata_soa.resize(ntotalfaces); // TODO: using sparse surfdata_soa 
+      // Initialize surface data container to this total; safe defaults
+      surfimp_soa.resize(ntotalfaces); 
+      surfphys_soa.resize(ntotalfaces);
+
     }
   } // end read_geom
 
