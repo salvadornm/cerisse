@@ -84,7 +84,13 @@ struct ibmparm_t {
 
   static constexpr int  interp_order = 1;
   static constexpr int  extrap_order = 1;
-  static constexpr Real alpha= 0.6;      
+  static constexpr Real alpha= 0.6; 
+  
+  // surface parameters
+  static constexpr int  interp_order_surf = 1;
+  static constexpr int  extrap_order_surf = 1;
+  static constexpr Real alpha_surf= 0.6;
+
 };
 
 
@@ -156,7 +162,7 @@ void prob_initdata (int i, int j, int k, amrex::Array4<amrex::Real> const& state
 
 AMREX_GPU_DEVICE AMREX_FORCE_INLINE 
 void user_tagging(int i, int j, int k, int nt, auto& tagfab, const auto &sdatafab, 
-                  const Array4<bool>&ibfab, const auto& geomdata, 
+                  const Array4<const unsigned char>& ibfab, const auto& geomdata, 
                   const ProbParm& pparm , int level) {
 
   const Real* prob_lo = geomdata.ProbLo();                  
