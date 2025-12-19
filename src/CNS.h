@@ -115,9 +115,9 @@ class CNS : public amrex::AmrLevel {
   virtual void writePlotFilePost(const std::string& dir,
                                  std::ostream& os) override;
 
-#if AMREX_USE_GPIBM
-  virtual void writeSurfFile( );
-#endif
+//#if AMREX_USE_GPIBM
+//  virtual void writeSurfFile( );
+//#endif
 
   // diagnostics
   static bool record_probe;

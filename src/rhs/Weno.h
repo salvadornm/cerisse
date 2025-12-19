@@ -2,6 +2,7 @@
 #define Weno_H
 
 #include <AMReX_FArrayBox.H>
+#include <limits>
 
 #include "Closures.h"
 
@@ -69,16 +70,41 @@ struct WenoZ5 {
    * \return Reconstructed value at i-1/2.
    */
   static AMREX_GPU_DEVICE AMREX_FORCE_INLINE amrex::Real recon(
-      const amrex::Real s[5]) noexcept {
+    const amrex::Real s[5], const int gl, const int gr) noexcept {
     using amrex::Real;
     constexpr Real eps = 1e-40;
     Real vr[3], beta[3], tmp;
+    Real optimal_weight[3] = {3.0, 6.0, 1.0};
 
+    // Near-wall masking via linear (optimal) weights: disable stencils crossing IB
+    if (gr == 1) {
+      optimal_weight[0] = 1.0; // keep S0
+      optimal_weight[1] = 1.0; // keep S1
+      optimal_weight[2] = 0.0; // drop S2 (uses i+2)
+    }
+    if (gr == 0) {
+      optimal_weight[0] = 1.0; // keep S0
+      optimal_weight[1] = 0.0; // drop S1
+      optimal_weight[2] = 0.0; // drop S2
+    }
+    if (gl == 0) {
+      optimal_weight[0] = 0.0; // drop S0 (uses i-2)
+      optimal_weight[1] = 3.0; // favor S1
+      optimal_weight[2] = 1.0; // keep S2
+    }
+
+    //optimal_weight[0] = 3.0; 
+    //optimal_weight[1] = 6.0; 
+    //optimal_weight[2] = 1.0; 
+    
     smoothness_indicator(s, beta);
     tmp = std::abs(beta[2] - beta[0]);
-    beta[2] = 1.0 + tmp / (eps + beta[2]);
-    beta[1] = (1.0 + tmp / (eps + beta[1])) * 6.0;
-    beta[0] = (1.0 + tmp / (eps + beta[0])) * 3.0;
+    if (gr==1) tmp = std::abs(beta[1] - beta[0]);
+    if (gl==0) tmp = std::abs(beta[2] - beta[1]);
+
+    beta[2] = (1.0 + tmp / (eps + beta[2])) * optimal_weight[2];
+    beta[1] = (1.0 + tmp / (eps + beta[1])) * optimal_weight[1];
+    beta[0] = (1.0 + tmp / (eps + beta[0])) * optimal_weight[0];
     tmp = 1.0 / (beta[2] + beta[1] + beta[0]);
 
     linear_polynomial_recon(s, vr);
@@ -95,23 +121,48 @@ struct Teno5 : public WenoZ5 {
    * \return Reconstructed value at i-1/2.
    */
   static AMREX_GPU_DEVICE AMREX_FORCE_INLINE amrex::Real recon(
-      const amrex::Real s[5]) noexcept {
+      const amrex::Real s[5], const int gl, const int gr) noexcept {
     using amrex::Real;
 
     constexpr Real eps = std::numeric_limits<Real>::epsilon();
     constexpr Real cutoff = 1e-4;
     Real vr[3], beta[3], tmp;
+    Real optimal_weight[3] = {3.0, 6.0, 1.0};
+
+    // Near-wall masking via linear (optimal) weights: disable stencils crossing IB
+    if (gr == 1) {
+      optimal_weight[0] = 1.0; // keep S0
+      optimal_weight[1] = 1.0; // keep S1
+      optimal_weight[2] = 0.0; // drop S2 (uses i+2)
+    }
+    if (gr == 0) {
+      optimal_weight[0] = 1.0; // keep S0
+      optimal_weight[1] = 0.0; // drop S1
+      optimal_weight[2] = 0.0; // drop S2
+    }
+    if (gl == 0) {
+      optimal_weight[0] = 0.0; // drop S0 (uses i-2)
+      optimal_weight[1] = 3.0; // favor S1
+      optimal_weight[2] = 1.0; // keep S2
+    }
+
+    //optimal_weight[0] = 3.0; 
+    //optimal_weight[1] = 6.0; 
+    //optimal_weight[2] = 1.0; 
     
     smoothness_indicator(s, beta);
     tmp = std::abs(std::abs(beta[2] - beta[0]) -
                    (beta[2] + 4.0 * beta[1] + beta[0]) / 6.0);
+    if (gr==1) tmp = std::abs(beta[1] - beta[0]);
+    if (gl==0) tmp = std::abs(beta[2] - beta[1]);
+
     beta[2] = POWER6(1.0 + tmp / (eps + beta[2]));
     beta[1] = POWER6(1.0 + tmp / (eps + beta[1]));
     beta[0] = POWER6(1.0 + tmp / (eps + beta[0]));
     tmp = 1.0 / (beta[2] + beta[1] + beta[0]);
-    beta[2] = beta[2] * tmp < cutoff ? 0.0 : 1.0;
-    beta[1] = beta[1] * tmp < cutoff ? 0.0 : 6.0;
-    beta[0] = beta[0] * tmp < cutoff ? 0.0 : 3.0;
+    beta[2] = beta[2] * tmp < cutoff ? 0.0 : optimal_weight[2];
+    beta[1] = beta[1] * tmp < cutoff ? 0.0 : optimal_weight[1];
+    beta[0] = beta[0] * tmp < cutoff ? 0.0 : optimal_weight[0];
     tmp = 1.0 / (beta[2] + beta[1] + beta[0]);
 
     linear_polynomial_recon(s, vr);
@@ -154,7 +205,7 @@ struct Teno6 {
    * \return Reconstructed value at i-1/2.
    */
   static AMREX_GPU_DEVICE AMREX_FORCE_INLINE amrex::Real recon(
-      const amrex::Real s[6]) noexcept {
+      const amrex::Real s[6], int /*gl*/, int /*gr*/) noexcept {
     using amrex::Real;
 
     constexpr Real eps = std::numeric_limits<Real>::epsilon();
@@ -241,27 +292,28 @@ class weno_t {
         IntVect ivd(IntVect::TheDimensionVector(dir));
 
 #if (AMREX_USE_GPIBM || CNS_USE_EB )
-        Real prims_ptr[2 * ng * cls_t::NPRIM];
-        Dim3 prims_begin = (iv - ng * ivd).dim3();
-        Dim3 prims_end = (iv + (ng - 1) * ivd).dim3();
-        prims_end.x += 1;
-        prims_end.y += 1;
-        prims_end.z += 1;
-        Array4<Real> prims(prims_ptr, prims_begin, prims_end, cls_t::NPRIM);
-        if (!fill_solid_prims(iv, ivd, dir, prims_in, prims, ibMarkers)) {
+        int gl = ng, gr = ng;  // ghost point position on left and right
+        for (int mm = 0; mm < ng; ++mm) {
+          if (ibMarkers(iv + mm * ivd, 0)) gr = amrex::min(gr, mm);
+          if (ibMarkers(iv - (mm + 1) * ivd, 0)) gl = amrex::min(gl, mm);
+        }
+        if (gl == 0 && gr == 0) {
           return;  // skip solid cells
+        }
+        if ((gl == 0 && gr == 1) || (gl == 1 && gr == 0)) {
+          AMREX_ASSERT_WITH_MESSAGE(false, "Cell is fluid but both neighbors are solid: no valid stencil");
         }
 #endif
 
-        const Real alpha = cls->max_char_speed(iv, dir, ng, prims);
-        const auto roe_avg = cls->roe_avg_state(iv, dir, prims);
+        const Real alpha = cls->max_char_speed(iv, dir, ng, prims_in);
+        const auto roe_avg = cls->roe_avg_state(iv, dir, prims_in);
 
         Real cons[cls_t::NCONS], f[cls_t::NCONS], fp[2 * ng][cls_t::NCONS],
             fm[2 * ng][cls_t::NCONS];
         for (int m = 0; m < 2 * ng; ++m) {
           // LLF splitting into left- and right-running fluxes
-          cls->prims2flux(iv + (m - ng) * ivd, dir, prims, f);
-          cls->prims2cons(iv + (m - ng) * ivd, prims, cons);
+          cls->prims2flux(iv + (m - ng) * ivd, dir, prims_in, f);
+          cls->prims2cons(iv + (m - ng) * ivd, prims_in, cons);
 
           for (int n = 0; n < cls_t::NCONS; ++n) {
             fp[m][n] = 0.5 * (cons[n] + f[n] / alpha);
@@ -277,10 +329,10 @@ class weno_t {
         Real fpL[cls_t::NCONS], fmR[cls_t::NCONS], s[2 * ng];
         for (int n = 0; n < cls_t::NCONS; ++n) {
           Scheme::left_stencil(n, fp, s);
-          fpL[n] = Scheme::recon(s);
+          fpL[n] = Scheme::recon(s, gr, gl);
 
           Scheme::right_stencil(n, fm, s);
-          fmR[n] = Scheme::recon(s);
+          fmR[n] = Scheme::recon(s, gl, gr);
         }
 
         // Convert back to conservative variables
@@ -290,19 +342,6 @@ class weno_t {
         for (int n = 0; n < cls_t::NCONS; ++n) {
                 
           flx(iv, n) = alpha * (fpL[n] - fmR[n]);
-
-          // // snm
-          //  if (amrex::isnan( flx(iv, n) ) )
-          //  {
-          //   printf(" DIR=%d i=%d j=%d k=%d n=%d\n",dir,i,j,k,n);
-          //   printf(" flkx=%f \n",flx(iv, n));
-          //   printf(" alpha=%f \n",alpha);
-          //   printf(" fpL=%f  fmR=%f \n",fpL[n],fmR[n]);            
-          //   std::cout << " ibm0= " << ibMarkers(i,j,k,0) << " \n" ;
-          //   std::cout << " ibm1= " << ibMarkers(i,j,k,1) << " \n" ;
-          //   printarray_point(" crash point ",i,j,k,cls_t::NPRIM,prims);            
-          //   amrex::Abort();              
-          //  } 
 
         }
       });

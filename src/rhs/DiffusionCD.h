@@ -77,7 +77,7 @@ class diffusiveheat_t {
 #if (AMREX_USE_GPIBM || CNS_USE_EB )    
   void inline dflux_ibm(const Geometry& geom, const MFIter& mfi,
             const Array4<Real>& prims, const Array4<Real>& flx,
-            const Array4<Real>& rhs, const cls_t* cls,const Array4<bool>& ibMarkers) {
+            const Array4<Real>& rhs, const cls_t* cls,const Array4<uint8_t>& ibMarkers) {
 #else
   void inline dflux(const Geometry& geom, const MFIter& mfi,
             const Array4<Real>& prims, const Array4<Real>& flx,
@@ -168,7 +168,7 @@ class diffusiveheat_t {
       amrex::Array4<const amrex::Real> const& /* mu_arr */,
       amrex::Array4<const amrex::Real> const& lam_arr,
       amrex::GpuArray<amrex::Real, amrex::SpaceDim> const& dxinv,
-      const cls_t* /* cls */,const Array4<bool>& ibMarkers) const {
+      const cls_t* /* cls */,const Array4<uint8_t>& ibMarkers) const {
     
       // NOT IMPLEMENTED YET  
       fx(i, j, k, cls_t::UET) += 0.0;

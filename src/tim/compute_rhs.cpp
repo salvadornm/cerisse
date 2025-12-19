@@ -73,8 +73,8 @@ void CNS::compute_rhs(MultiFab& statemf, Real dt, FluxRegister* fr_as_crse, Flux
     // combine arrays if IBM & EBM are used together 
 #if (AMREX_USE_GPIBM || CNS_USE_EB )   
     //create auxiliary aray
-    BaseFab<bool> fab(bxg,2);
-    Array4<bool> const& geoMarkers = fab.array();    
+    BaseFab<uint8_t> fab(bxg,2);
+    Array4<uint8_t> const& geoMarkers = fab.array();    
 #endif
     // extract markers
 #ifdef AMREX_USE_GPIBM

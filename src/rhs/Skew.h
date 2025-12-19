@@ -195,7 +195,7 @@ class skew_t {
 #if (AMREX_USE_GPIBM || CNS_USE_EB )  
  void inline eflux_ibm(const Geometry& /*geom*/, const MFIter& mfi,
                     const Array4<Real>& prims, std::array<FArrayBox*, AMREX_SPACEDIM> const &flxt,
-                    const Array4<Real>& cons, const cls_t* cls,const Array4<bool>& ibMarkers) {
+                    const Array4<Real>& cons, const cls_t* cls,const Array4<uint8_t>& ibMarkers) {
 
 #else
   void inline eflux(const Geometry& /*geom*/, const MFIter& mfi,
@@ -322,7 +322,7 @@ class skew_t {
   // .............................................................
   AMREX_GPU_DEVICE AMREX_FORCE_INLINE void flux_dir_ibm(
     int i, int j, int k, int Qdir,const GpuArray<int, 3>& vdir, const Array4<Real>& cons, const Array4<Real>& prims,
-    const Array4<Real>& /*lambda_max*/, const Array4<Real>& flx, const cls_t* cls, const Array4<bool>& marker) const {
+    const Array4<Real>& /*lambda_max*/, const Array4<Real>& flx, const cls_t* cls, const Array4<uint8_t>& marker) const {
         
     Real V[order],P[order];
     Real U[order][cls_t::NCONS];
@@ -389,7 +389,7 @@ class skew_t {
   AMREX_GPU_DEVICE AMREX_FORCE_INLINE void fluxdissip_dir_ibm(
     int i, int j, int k, int Qdir,const GpuArray<int, 3>& vdir, const Array4<Real>& cons,
     const Array4<Real>& prims, const Array4<Real>& /*lambda*/, const Array4<Real>& flx,
-    const cls_t* /*cls*/,const Array4<bool>& marker) const {
+    const cls_t* /*cls*/,const Array4<uint8_t>& marker) const {
 
     int il= i-vdir[0]; int jl= j-vdir[1]; int kl= k-vdir[2];
     const bool close_to_wall  = marker(i,j,k,1) || marker(il,jl,kl,1);          //  flux close to a GP (IBM) or a cut-cell (EB)

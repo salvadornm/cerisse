@@ -603,7 +603,11 @@ void CNS::post_regrid(int lbase, int new_finest) {
   IBM::ib.build_mf(grids, dmap, level);
   IBM::ib.computeMarkers(level);
   IBM::ib.initialiseGPs(level);
-  if (plot_surf) IBM::ib.compute_surface_index(level);
+  if (plot_surf && level == parent->finestLevel()) {
+    for (int lev = parent->finestLevel(); lev >= 0; --lev) {
+      IBM::ib.computeSurfIndexs(lev);
+    }
+}
 #endif
 
 #ifdef CNS_USE_EB
@@ -702,7 +706,11 @@ amrex::Print() << " recreate markers " << std::endl;
   IBM::ib.build_mf(grids, dmap, level);
   IBM::ib.computeMarkers(level);
   IBM::ib.initialiseGPs(level);
-  if (plot_surf) IBM::ib.compute_surface_index(level);
+  if (plot_surf && level == parent->finestLevel()) {
+     for (int lev = parent->finestLevel(); lev >= 0; --lev) {
+        IBM::ib.computeSurfIndexs(lev);
+     }
+  }
 #endif
 
 #ifdef CNS_USE_EB
@@ -1018,62 +1026,51 @@ void CNS::writePlotFilePost(const std::string &dir, std::ostream &os) {
 
 #if AMREX_USE_GPIBM
 
-  writeSurfFile();
+  //writeSurfFile();
 
   // // claculate and  write surface data  
-  // int istep = parent->levelSteps(0);
+  int istep = parent->levelSteps(0);
 
   // Print() << " istep= " << istep << " surf_int= " << surf_int << std::endl;
 
   // Print()<< "should print ? " << (istep % surf_int == 0) << std::endl;
 
-  // if (plot_surf && (istep % surf_int == 0))  {
+  if (plot_surf && (istep % surf_int == 0))  {
      
-  //   MultiFab& Sdata = get_new_data(State_Type); 
+    MultiFab& Sdata = get_new_data(State_Type); 
 
-  //   int ncons = CNS::d_prob_closures->NCONS;
-  //   int nghost= CNS::d_prob_closures->NGHOST;
+    int ncons = CNS::d_prob_closures->NCONS;
+    int nghost= CNS::d_prob_closures->NGHOST;
 
-  //   Real time = parent->cumTime();
+    Real time = parent->cumTime();
 
-  //   if (this->level == parent->maxLevel()) {
-  //     Print() << "Computing surface properties ";
-  //     Print() << " at time= " << time << " and step= " << istep << std::endl;
-  //   }
+    if (this->level == parent->maxLevel()) {
+      Print() << "Computing surface properties ";
+      Print() << " at time= " << time << " and step= " << istep << std::endl;
+    }
     
-  //   FillPatch(*this, Sdata, nghost, time, State_Type, 0, ncons);
+    FillPatch(*this, Sdata, nghost, time, State_Type, 0, ncons);
 
-  //   const PROB::ProbClosures* cls_d = CNS::d_prob_closures;
+    const PROB::ProbClosures* cls_d = CNS::d_prob_closures;
 
-  //   IBM::ib.compute_surface_props(Sdata,cls_d,this->level); // computed at each level. From low to high.
+    IBM::ib.computeSURFs(Sdata,cls_d,this->level); // computed at each level. From low to high.
 
-  //   const int igeom=0; // put in a loop
+    // Only gather and write on the finest level to ensure all levels are processed
+    if (this->level == parent->finestLevel()){
+      // collect data to rank 0
+      IBM::ib.gather_surfdata_to_rank0(); 
 
-  //   // collect data to rank 0
-  //   IBM::ib.gather_surfdata_to_rank0(this->level); 
+      if (amrex::ParallelDescriptor::IOProcessor()){
+        IBM::ib.write_vtk(time, istep, surf_filename); 
+      } 
+    }
 
-  //   if (this->level == parent->maxLevel()){
-
-  //     // select name file
-  //     std::ostringstream sname;
-  //     sname << surf_filename << igeom << "_"
-  //         << std::setw(3) << std::setfill('0') << istep
-  //         << ".vtk";
-  //     std::string surf_name = sname.str();
-
-  //     Print() << "Writing surface data to file: " << surf_name << std::endl;
-      
-  //     if (amrex::ParallelDescriptor::IOProcessor()){
-  //       IBM::ib.plot_surface(time,igeom,surf_name); 
-  //     } 
-  //   }
-
-  // }
+  }
 
 #endif
 }
 
-
+/** 
 // this subroutine is called from the main loop (WORK IN PROGRESS)
 // should be called per level
 #if AMREX_USE_GPIBM
@@ -1100,7 +1097,7 @@ void CNS::writeSurfFile( ) {
 
     const PROB::ProbClosures* cls_d = CNS::d_prob_closures;
 
-    IBM::ib.compute_surface_props(Sdata,cls_d,this->level); // computed at each level. From low to high.
+    IBM::ib.computeSURFs(Sdata,cls_d,this->level); // computed at each level. From low to high.
 
     const int igeom=0; // put in a loop
 
@@ -1126,3 +1123,4 @@ void CNS::writeSurfFile( ) {
   }
 }
 #endif
+*/
