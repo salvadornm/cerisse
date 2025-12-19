@@ -43,7 +43,7 @@ struct LESparm {
 };
 
 
-typedef closures_dt<indicies_t, transport_Pele_t , multispecies_pele_gas_t<indicies_t>, Smagorinsky_t<LESparm,indicies_t>>ProbClosures;
+typedef closures_dt<indicies_stat_t, transport_Pele_t , multispecies_pele_gas_t<indicies_t>, Smagorinsky_t<LESparm,indicies_t>>ProbClosures;
 //typedef closures_dt<indicies_t, transport_Pele_t , multispecies_pele_gas_t<indicies_t>> ProbClosures;
 
 // problem parameters 
@@ -217,16 +217,18 @@ prob_initdata(int i, int j, int k, Array4<Real> const &state,
   */
 
   // put burn condistions
-  
-  if (z > 0.07)
-  { 
-    for (int n=0; n < NUM_SPECIES; n++) {
-      y_sp[n] = prob_parm.Y_burn[n];
-    }     
-    cls.PYT2R(prob_parm.p_0,y_sp, prob_parm.Tburn, rhot);
-    cls.RYP2E(rhot, y_sp, prob_parm.p_0, eint);
+  bool comb_init = false;
+  if (comb_init)
+  {
+    if (z > 0.07)
+    { 
+      for (int n=0; n < NUM_SPECIES; n++) {
+        y_sp[n] = prob_parm.Y_burn[n];
+      }     
+      cls.PYT2R(prob_parm.p_0,y_sp, prob_parm.Tburn, rhot);
+      cls.RYP2E(rhot, y_sp, prob_parm.p_0, eint);
+    }
   }
-
 
   Real kin = Real(0.5) * rhot * (u[0] * u[0] + u[1] * u[1] + u[2]*u[2]);
   //state(i, j, k, cls.URHO) = rhot;
@@ -325,7 +327,9 @@ user_tagging(int i, int j, int k, int nt_level, auto &tagfab,
 
       break;
     case 1:
-      refine= (z > 0.035) && (z < 0.07);    
+      refine= (z > 0.035) && (z < 0.07) && (x < 0.015) && (x > -0.015) && (y < 0.015) && (y > -0.015);
+
+
       // refine = (z < prob_parm.zexit); 
 
       // refine based on T

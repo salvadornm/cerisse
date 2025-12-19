@@ -30,9 +30,9 @@ ENSURE_MASSFRACSUM = TRUE
 AMREX_NO_PROBINIT=TRUE
 #CUDA_ARCH=8.0
 
-AMR_SOLVER = $(abspath ../../../)
-AMREX_HOME = $(abspath ../../../lib/amrex)
-PELE_PHYSICS_HOME = $(abspath ../../../lib/PelePhysics)
+AMR_SOLVER = $(abspath ../../../../)
+AMREX_HOME = $(abspath ../../../../lib/amrex)
+PELE_PHYSICS_HOME = $(abspath ../../../../lib/PelePhysics)
 
 CEXE_headers += prob.h
 CEXE_sources += eb_geometry.cpp

@@ -6,12 +6,8 @@
 #include <eib.h>
 #endif
 
-#include <mandebug.h>
 
 using namespace amrex;
-
-
-
 
 // Since we do not want to use expensive cudaMemCopy, we are storing all our
 // data on the GPU to begin with. Concurrency on GPU using streams, parallel
@@ -24,6 +20,12 @@ void CNS::compute_rhs(MultiFab& statemf, Real dt, FluxRegister* fr_as_crse, Flux
   // Variables
   const PROB::ProbClosures* cls_d = CNS::d_prob_closures;
   const PROB::ProbClosures& cls_h = *CNS::h_prob_closures;
+
+  // time
+  const Real cur_time = state[State_Type].curTime();
+  
+  PROB::ProbRHS prob_rhs;  //  local RHS object, lives only in this function
+  prob_rhs.init_coeffs();  // initialize diffusion coefficients if needed
 
   //...................................................................
   for (MFIter mfi(statemf, false); mfi.isValid(); ++mfi) {
@@ -167,7 +169,7 @@ void CNS::compute_rhs(MultiFab& statemf, Real dt, FluxRegister* fr_as_crse, Flux
 #endif 
 
     // Source terms
-    prob_rhs.src(geom,mfi, prims, state, cls_d, dt);
+    prob_rhs.src(geom,mfi, prims, state, cls_d, dt, cur_time);
 
     // Set solid point RHS to 0  (state hold RHS at this point)
 #if AMREX_USE_GPIBM || CNS_USE_EB

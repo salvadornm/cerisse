@@ -139,17 +139,11 @@ prob_initdata(int i, int j, int k, Array4<Real> const &state,
   // local vars
   Real rhot,eint,u[3];
 
-  if (z < prob_parm.zin) {
-    rhot =  prob_parm.rho_inflow;    
-    for(int idim=0;idim < AMREX_SPACEDIM;idim++) {u[idim]=prob_parm.vel_in[idim];}
-    eint =  prob_parm.eint_inflow;
-  }
-  else {
-    rhot =  prob_parm.rho_0;    
-    for(int idim=0;idim < AMREX_SPACEDIM;idim++) {u[idim]=prob_parm.vel_0[idim];}
-    eint =  prob_parm.eint_0;
-  }
   
+  rhot =  prob_parm.rho_inflow;    
+  for(int idim=0;idim < AMREX_SPACEDIM;idim++) {u[idim]=prob_parm.vel_in[idim];}
+  eint =  prob_parm.eint_inflow;
+
   Real kin = Real(0.5) * rhot * (u[0] * u[0] + u[1] * u[1] + u[2]*u[2]);
   state(i, j, k, cls.URHO) = rhot;
   state(i, j, k, cls.UMX)  = rhot * u[0];
@@ -216,7 +210,10 @@ user_tagging(int i, int j, int k, int nt_level, auto &tagfab,
 
 
   bool refine = false;
-  
+  //std::cout << "refined!" << std::endl; 
+  //refine = (z < prob_parm.zexit); 
+
+
   // // refine exit of injector
   // refine= (z > 0.035) && (z < 0.07);
   // // refine close to exit  (avoid corner problem)
@@ -238,9 +235,12 @@ user_tagging(int i, int j, int k, int nt_level, auto &tagfab,
   switch (level)
   {
     case 0:
-      refine = (((z < prob_parm.zexit) || (r2 < 0.025) ) && (r < 0.025) )  ;    // refine combustor    
+      std::cout << "refined!" << std::endl; 
+      refine = (z < prob_parm.zexit);
+      //refine = (((z < prob_parm.zexit) || (r2 < 0.025) ) && (r < 0.025) )  ;    // refine combustor    
       break;
     case 1:
+      std::cout << " second level reached " << std::endl;
       //refine= (z > 0.035) && (z < 0.07);
       break;      
     default:
@@ -260,7 +260,7 @@ class user_source_t {
   void inline src(const Geometry& geomdata, const amrex::MFIter &mfi,
                   const amrex::Array4<const amrex::Real> &prims,
                   const amrex::Array4<amrex::Real> &rhs, const cls_t *cls_d,
-                  amrex::Real dt){
+                  amrex::Real dt,amrex::Real /*time*/){
 
     //const Box bx = mfi.tilebox();
     const Box& bxg = mfi.growntilebox(cls_t::NGHOST);

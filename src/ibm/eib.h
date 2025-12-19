@@ -891,22 +891,22 @@ public:
     }
 
     // 3) Interpolate primitive variables at all image points from prims0
-    eib_t::interpolateIMs<eorder_tparm, iorder_tparm>(imp_ip_ijk[ii], imp_ipweights[ii], prims0, primsNormal);
+    copy->template interpolateIMs<eorder_tparm, iorder_tparm>(imp_ip_ijk[ii], imp_ipweights[ii], prims0, primsNormal);
 
     // 4) Transform velocities at image points (> 1) to local frame
     for (int iip = 2; iip < 2 + eorder_tparm; ++iip) {
-        eib_t::global2local<eorder_tparm>(iip, primsNormal, nvec, t1vec, t2vec);
+        copy->template global2local<eorder_tparm>(iip, primsNormal, nvec, t1vec, t2vec);
     }
 
     // 5) Apply wall model at IB surface to set surface states (u, P, T, Y, ...)
     wallmodel::compute_surfIB(ib_xyz[ii], nvec, primsNormal, cls);
 
     // 6) Extrapolate from surface/image points back to ghost point along n
-    eib_t::extrapolate<eorder_tparm>(primsNormal, imp_ninterp[ii], disGP[ii], disIM[ii]);
+    copy->template extrapolate<eorder_tparm>(primsNormal, imp_ninterp[ii], disGP[ii], disIM[ii]);
 
     // 7) Transform ghost-point velocity back to global coordinates
     int idx = 0;
-    eib_t::local2global<eorder_tparm>(idx, primsNormal, nvec, t1vec, t2vec);
+    copy->template local2global<eorder_tparm>(idx, primsNormal, nvec, t1vec, t2vec);
 
     // 8) Extract primitive variables at ghost point (slot 0)
     Real P = primsNormal(0, cls_t::QPRES);

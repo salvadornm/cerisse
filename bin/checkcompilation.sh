@@ -27,7 +27,7 @@ MAKE_DIRS=(
 )
 	
 # make instruction
-MAKECOMP="make -j4"
+MAKECOMP="make -j8"
 
 echo "Checking  Cerisse Examples (be patient) ..."
 echo "  "

@@ -25,12 +25,12 @@ amr.v             = 1 # 0=quiet,1= verbose
 
 # Refinement and regridding 
 amr.n_cell            = 96 96 144 
-amr.max_level         = 1      # maximum level number allowed
+amr.max_level         = 0     # maximum level number allowed
 amr.ref_ratio         = 2      # refinement ratio per level
 amr.regrid_int        = 100    # how often to regrid per level
-amr.blocking_factor_x = 2      # blocking factor in x per level
-amr.blocking_factor_y = 2      # blocking factor in y per level
-amr.blocking_factor_z = 2
+amr.blocking_factor_x = 8      # blocking factor in x per level
+amr.blocking_factor_y = 8      # blocking factor in y per level
+amr.blocking_factor_z = 8
 amr.max_grid_size_x   = 64     # maximum grid size in x per level
 amr.max_grid_size_y   = 64     # maximum grid size in y per level
 amr.max_grid_size_z   = 64
@@ -66,9 +66,10 @@ Temperature.box_lo = -0.01 -0.01 0.125
 Temperature.box_hi = 0.01 0.01 0.13
 
 # Chemical Options
-cns.reactor_type = "ReactorCvode"
+#cns.reactor_type = "ReactorCvode"
+cns.reactor_type = "ReactorNull"
 cvode.solve_type =  "dense_direct"
 ode.clean_init_massfrac = 1
 
 # STATS
-cns.record_stats = 0
+cns.record_stats = 1

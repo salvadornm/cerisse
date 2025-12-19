@@ -119,7 +119,7 @@ struct methodparm_t {
 
 using ProbClosures = closures_dt< indicies_t, transport_Pele_t, multispecies_pele_gas_t<indicies_t> >;
 
-using ProbRHS = rhs_dt< riemann_t<false, ProbClosures>, viscous_t<methodparm_t, ProbClosures>, reactor_t<ProbClosures> >;
+using ProbRHS = rhs_dt< riemann_t<false, ProbClosures>, viscous_t<methodparm_t, ProbClosures>, no_source_t>;
 //using ProbRHS = rhs_dt< riemann_t<false, ProbClosures>, viscous_t<methodparm_t, ProbClosures>, no_source_t>;
 //using ProbRHS = rhs_dt< riemann_t<false, ProbClosures>, no_diffusive_t, reactor_t<ProbClosures> >;
 
@@ -188,6 +188,7 @@ AMREX_GPU_DEVICE AMREX_FORCE_INLINE void prob_initdata(
 
   // PMF--> T,u and Y (P is assumed constant)
   Tt  = pmf_vals[0];
+  std::cout << pmf_vals[0] << std::endl;
   vxt = pmf_vals[1];
   Real sumrhoY = 0.0;
   for (int n = 0; n < NUM_SPECIES; ++n) {

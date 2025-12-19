@@ -1,4 +1,6 @@
+#AMREXVERSION=25.09
 AMREXVERSION=23.11
+#PELEPVERSION=25.04
 PELEPVERSION=23.03
 CGALVERSION=6.0.1
 BOOSTVERSION=1.81.0
@@ -88,13 +90,13 @@ case  $1 in
     make && make install
     ;;
   *)
-	  echo " no option selected [git/safe/amrex/pelephys/cgal]"
+    echo " no option selected [git/safe/amrex/pelephys/cgal]"
     echo "Options:"
-	  echo "  git           Install using git clone latest AMREX+PelePhysics"    
+    echo "  git           Install using git clone latest AMREX+PelePhysics"    
     echo "  safe          Install using release versions of AMREX+PelePhysics"
     echo "  amrex         Install AMREX release version: $AMREXVERSION "
     echo "  pelephys      Install PelePhysics release version: $PELEPVERSION "
-    echo "  cgal          Download CGAL and Boost release versions: $CGALVERSION $BOOSTVERSION "
+    echo "  cgal download Download CGAL and Boost release versions: $CGALVERSION $BOOSTVERSION "
     echo "  cgal install  Install CGAL and Boost in install/ directory "
     exit
 esac

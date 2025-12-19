@@ -28,7 +28,7 @@ class LES_t {
    * \return Delta
   */
   AMREX_GPU_DEVICE AMREX_FORCE_INLINE Real calc_delta(
-  const GpuArray<Real, AMREX_SPACEDIM>& dx){
+  const GpuArray<Real, AMREX_SPACEDIM>& dx) const{
 
     if constexpr (param::fixDelta) {
       return(param::Delta);
@@ -109,7 +109,7 @@ class Smagorinsky_t : public LES_t<param, idx_t> {
   */
   AMREX_GPU_DEVICE AMREX_FORCE_INLINE void visc_sgs(
   const int i, const int j, const int k, const Array4<const Real>& q,
-  const GpuArray<Real, AMREX_SPACEDIM>& dxinv, const Real delta, Real& mu_T)
+  const GpuArray<Real, AMREX_SPACEDIM>& dxinv, const Real delta, Real& mu_T) const
   {
     // Calculate derivatives at cell centers uisng  central differences
     const amrex::IntVect iv{AMREX_D_DECL(i, j, k)};
@@ -129,7 +129,7 @@ class Smagorinsky_t : public LES_t<param, idx_t> {
       }
     }
     Sijmag = std::sqrt(2.0 * Sijmag);
-    mu_T = q(i, j, k, this->QRHO) * param::Cs * param::Cs * delta * delta * Sijmag;
+    mu_T = q(i, j, k, idx_t::QRHO) * param::Cs * param::Cs * delta * delta * Sijmag;
   }
   /**
    * \brief calculates sub-grid conductivity
@@ -138,7 +138,7 @@ class Smagorinsky_t : public LES_t<param, idx_t> {
   */
   AMREX_GPU_DEVICE AMREX_FORCE_INLINE void cond_sgs(
   const int i, const int j, const int k, const Array4<const Real>& q,
-  const GpuArray<Real, AMREX_SPACEDIM>& dxinv, const Real delta, const Real& Cp_o_Pr, Real& cond_T)
+  const GpuArray<Real, AMREX_SPACEDIM>& dxinv, const Real delta, const Real& Cp_o_Pr, Real& cond_T)  const
   {
     Real mu_T;
     visc_sgs(i,j,k,q,dxinv,delta,mu_T);
@@ -151,7 +151,7 @@ class Smagorinsky_t : public LES_t<param, idx_t> {
   */
   AMREX_GPU_DEVICE AMREX_FORCE_INLINE void diff_sgs(
   const int i, const int j, const int k, const Array4<const Real>& q,
-  const GpuArray<Real, AMREX_SPACEDIM>& dxinv,const Real delta, Real& rhoD_T)
+  const GpuArray<Real, AMREX_SPACEDIM>& dxinv,const Real delta, Real& rhoD_T) const
   {
     Real mu_T;
     visc_sgs(i,j,k,q,dxinv,delta,mu_T);
@@ -165,7 +165,7 @@ class Smagorinsky_t : public LES_t<param, idx_t> {
   AMREX_GPU_DEVICE AMREX_FORCE_INLINE void compute_sgsterms(
   const int i, const int j, const int k, const Array4<const Real>& q,
   const GpuArray<Real, AMREX_SPACEDIM>& dxinv, const Real delta, const Real& Cp_o_Pr, 
-  Real& mu_T, Real& cond_T, Real& rhoD_T)
+  Real& mu_T, Real& cond_T, Real& rhoD_T) const
   {
     visc_sgs(i,j,k,q,dxinv,delta,mu_T);
     cond_T = mu_T*param::Pr_o_Prsgs*Cp_o_Pr;
@@ -178,7 +178,7 @@ class Smagorinsky_t : public LES_t<param, idx_t> {
   */
   AMREX_GPU_DEVICE AMREX_FORCE_INLINE void tau_sgs(
   const int i, const int j, const int k, const Array4<const Real>& q,
-  const GpuArray<Real, AMREX_SPACEDIM>& dxinv,const Real delta, Real& tau_T)
+  const GpuArray<Real, AMREX_SPACEDIM>& dxinv,const Real delta, Real& tau_T) const
   {
     Real mu_T;
     visc_sgs(i,j,k,q,dxinv,delta,mu_T);
@@ -261,7 +261,7 @@ public :
   AMREX_GPU_DEVICE AMREX_FORCE_INLINE void compute_sgsterms(
   const int i, const int j, const int k, const Array4<const Real>& q,
   const GpuArray<Real, AMREX_SPACEDIM>& dxinv, const Real delta, const Real& Cp_o_Pr, 
-  Real& mu_T, Real& cond_T, Real& rhoD_T)
+  Real& mu_T, Real& cond_T, Real& rhoD_T) const
   {
     visc_sgs(i,j,k,q,dxinv,delta,mu_T);
     cond_T = mu_T*this->Pr_o_Prsgs*Cp_o_Pr;
