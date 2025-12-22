@@ -4,8 +4,10 @@
 #include <CNS_K.h>
 #include <prob.h>
 
+#ifdef CNS_USE_FSI
 #include <fsi/Kinematics.h>
 #include <fsi/RigidBodyProperties.h>
+#endif
 
 using namespace amrex;
 
@@ -593,6 +595,7 @@ void CNS::postCoarseTimeStep(Real time) {
   auto& ib = IBM::ib;
   int ngeom = ib.ngeom;
 
+#ifdef CNS_USE_FSI
   for (int i = 0; i < ngeom; ++i) {
       // 1. Rigid Body Properties
       Real rho_solid = 1.0; // Placeholder density
@@ -615,6 +618,8 @@ void CNS::postCoarseTimeStep(Real time) {
           amrex::Print() << "----------------------------------------\n";
       }
   }
+#endif
+
 #endif
 
    // make sure species sum to 1??

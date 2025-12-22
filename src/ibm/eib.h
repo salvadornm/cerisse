@@ -858,6 +858,8 @@ public:
 
   int const ngps = ibFab.gpData.ngps;
 
+  auto* copy = this;   // or: const auto* copy = this;
+
   ParallelFor(ngps, [=] AMREX_GPU_DEVICE (int ii) noexcept
   {
     // --------------------------------------------------------------------
