@@ -143,10 +143,7 @@ class reactor_sourceLES_t {
       // if (T(i,j,k) > 3000.0) {
       //   mask(i, j, k) = -1;
       // }
-
-      // snm
-      if (k > 80) mask(i, j, k) = -1;  //  skip reaction in upper domain
-
+     
     });
 
     /////////////////////////// React ///////////////////////////

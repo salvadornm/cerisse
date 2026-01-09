@@ -183,9 +183,6 @@ class reactor_source_t {
       }
     });
 
-     
-     // if LES multiply by something
-
 
     // call user source term (passed as argument)
     //  - assume source_t is a user_source_t is lightweight (no persistent state, just logic),
