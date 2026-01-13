@@ -45,7 +45,7 @@ class viscousLES_t {
 #if (AMREX_USE_GPIBM || CNS_USE_EB )  
   void inline dflux_ibm(const Geometry& geom, const MFIter& mfi,
             const Array4<Real>& prims, std::array<FArrayBox*, AMREX_SPACEDIM> const &flxt,            
-            const Array4<Real>& /*cons*/, const cls_t* cls,const Array4<bool>& ibMarkers) {
+            const Array4<Real>& /*cons*/, const cls_t* cls,const Array4<uint8_t>& ibMarkers) {
 #else
   void inline dflux(const Geometry& geom, const MFIter& mfi,
             const Array4<Real>& prims, std::array<FArrayBox*, AMREX_SPACEDIM> const &flxt, 
@@ -384,7 +384,7 @@ class viscousLES_t {
       amrex::Array4<amrex::Real> const& flx,
       amrex::Array4<const amrex::Real> const& coeffs,
       amrex::GpuArray<amrex::Real, AMREX_SPACEDIM> const& dxinv,
-      const cls_t* cls, const Array4<bool>& marker) const {
+      const cls_t* cls, const Array4<uint8_t>& marker) const {
     
     using amrex::Real;
     const amrex::IntVect iv{AMREX_D_DECL(i, j, k)};

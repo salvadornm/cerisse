@@ -20,7 +20,7 @@ USE_EB = TRUE
 # PelePhysics
 EOS_MODEL := FUEGO
 TRANSPORT_MODEL := SIMPLE
-CHEMISTRY_MODEL := BurkeDryer
+CHEMISTRY_MODEL := LiDryer
 USE_PELEPHYSICS = TRUE
 
 # Cerisse Option ensure sumY=1

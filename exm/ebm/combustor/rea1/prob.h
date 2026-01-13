@@ -37,8 +37,8 @@ struct LESparm {
   // Smagorinsky constant
   static constexpr Real Cs = 0.1;
   static constexpr int order = 2; // order of the numerical scheme for LES
-  static constexpr Real Scsgs = 0.4; // turbulent Schmidt number
-  static constexpr Real Pr_o_Prsgs = 0.1; // turbulent Prandtl number  
+  static constexpr Real Scsgs = 0.4 ; //0.4 // turbulent Schmidt number
+  static constexpr Real Pr_o_Prsgs = 0.1; //0.1 // turbulent Prandtl number  
   static constexpr bool fixDelta = false; // use fixed filter width
 };
 
@@ -56,7 +56,7 @@ struct ProbParm {
   Real Y_burn[NUM_SPECIES] = {0.0};
   ProbClosures pp_pc;
 
-  const Real Tburn = 2197.0; //[K] burned gas temperature
+  const Real Tburn = 2207.0; //[K] burned gas temperature
 
   ProbParm () {
   #if USE_PELEPHYSICS
@@ -69,21 +69,17 @@ struct ProbParm {
   Y_inflow[HO2_ID] = 0; 
   Y_inflow[H2O2_ID] = 0;  
   Y_inflow[N2_ID] = 0.7559; 
-  Y_inflow[AR_ID] = 0; 
-  Y_inflow[HE_ID] = 0; 
-  Y_inflow[CO_ID] = 0; 
-  Y_inflow[CO2_ID] = 0; 
    
   //
-  Y_burn[H_ID] = 1.4666e-05; 
-  Y_burn[H2_ID] = 9.9468e-05; 
-  Y_burn[O_ID] = 0.0009379; 
-  Y_burn[OH_ID] = 0.0055107; 
-  Y_burn[H2O_ID] = 0.12534; 
-  Y_burn[O2_ID] = 0.11219; 
-  Y_burn[HO2_ID] = 5.1687e-06; 
-  Y_burn[H2O2_ID] = 4.4871e-07 ;  
-  Y_burn[N2_ID] = 0.7559; 
+  Y_burn[H_ID] = 9.125e-06; 
+  Y_burn[H2_ID] = 7.2983e-05; 
+  Y_burn[O_ID] = 0.00068717; 
+  Y_burn[OH_ID] = 0.0047711; 
+  Y_burn[H2O_ID] = 0.12602; 
+  Y_burn[O2_ID] = 0.11253; 
+  Y_burn[HO2_ID] = 5.6389e-06; 
+  Y_burn[H2O2_ID] = 3.3351e-07;  
+  Y_burn[N2_ID] = 0.7559 ; 
   
   #endif
 
@@ -92,7 +88,7 @@ struct ProbParm {
   }
 
   // compute density and internal energy
-  const Real Q = 8.665; // volumetric flow rate [kg /m2 s] ??
+  const Real Q = 8.665; //  
   
   // inside combustor state/exit
   const Real p_0     = pres_atm2si; //[Pa] inflow pressure (1 atm) 
@@ -217,17 +213,17 @@ prob_initdata(int i, int j, int k, Array4<Real> const &state,
   */
 
   // put burn condistions
-  bool comb_init = false;
+  bool comb_init = true;
   if (comb_init)
   {
-    if (z > 0.07)
-    { 
+    //if (z > 0.05)
+    //{ 
       for (int n=0; n < NUM_SPECIES; n++) {
         y_sp[n] = prob_parm.Y_burn[n];
       }     
       cls.PYT2R(prob_parm.p_0,y_sp, prob_parm.Tburn, rhot);
       cls.RYP2E(rhot, y_sp, prob_parm.p_0, eint);
-    }
+    //}
   }
 
   Real kin = Real(0.5) * rhot * (u[0] * u[0] + u[1] * u[1] + u[2]*u[2]);
@@ -323,12 +319,12 @@ user_tagging(int i, int j, int k, int nt_level, auto &tagfab,
 
       //refine = ( z < 0.07) && (z > 0.035) && (r < 0.03);    // refine injector exit
 
-      refine = (z < 0.15);
+      refine = (z > 0.043) && (z < 0.13) && (r < 0.022) || (z < 0.043) && (r < 0.01);
 
       break;
     case 1:
-      refine= (z > 0.035) && (z < 0.07) && (x < 0.015) && (x > -0.015) && (y < 0.015) && (y > -0.015);
-
+      //refine= (z > 0.035) && (z < 0.07) && (x < 0.019) && (x > -0.019) && (y < 0.019) && (y > -0.019);
+      refine= (z > 0.043) && (z < 0.07) && (r < 0.022) || (z < 0.043) && (z > 0.035) && (r < 0.01);
 
       // refine = (z < prob_parm.zexit); 
 
