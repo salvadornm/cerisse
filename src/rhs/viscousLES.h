@@ -23,8 +23,8 @@ class viscousLES_t {
   ~viscousLES_t() = default;
   
   // vars accessed by functions 
-  //int order_sch=param::order;  
-  int halfsten = param::order / 2;
+  static constexpr int halfsten = param::order / 2;
+
 
 #if NUM_SPECIES > 1
   typedef Array1D<Real, 0, param::order> arrayNumCoef;

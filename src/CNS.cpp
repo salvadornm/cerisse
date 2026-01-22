@@ -266,6 +266,10 @@ void CNS::initData() {
     setupStats();
   }
 
+
+   prob_rhs.init_coeffs(); // CGPT dixit
+
+
 }
 
 void CNS::buildMetrics() {

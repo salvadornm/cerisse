@@ -182,7 +182,13 @@ class CNS : public amrex::AmrLevel {
   static bool use_LES;
 
  public:
-  // /*static inline*/ PROB::ProbRHS prob_rhs;   // removed (we now use a local object in compute_rhs)
+  
+  //
+  //static PROB::ProbRHS prob_rhs;   // removed (we now use a local object in compute_rhs)
+  //inline static PROB::ProbRHS prob_rhs{};
+  PROB::ProbRHS prob_rhs{};
+  //
+
   static PROB::ProbClosures* h_prob_closures;
   static PROB::ProbClosures* d_prob_closures;
   static PROB::ProbParm* h_prob_parm;

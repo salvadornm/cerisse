@@ -24,7 +24,8 @@ class viscous_t {
   ~viscous_t() = default;
 
   // half stencil size 
-  int halfsten = param::order / 2;
+  //int halfsten = param::order / 2;
+  static constexpr int halfsten = param::order / 2;
 
 #if NUM_SPECIES > 1
   typedef Array1D<Real, 0, param::order> arrayNumCoef;
