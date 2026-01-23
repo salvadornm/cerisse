@@ -1,8 +1,8 @@
 # Simulation time
-max_step  =  2500
+max_step  =  4000
 stop_time =  0.5
-cfl = 0.3
-#time_step = 5.0e-7
+#cfl = 0.1
+time_step = 5.0e-7
 
 cns.order_rk  = -2 
 cns.stages_rk = 2
@@ -19,13 +19,12 @@ cns.hi_bc = 1 1 1
 
 
 # output screen
-cns.screen_output = 0 # 0=quiet, 1=verbose
 cns.verbose       = 1 # 0=quiet, 1=verbose
 amr.v             = 1 # 0=quiet,1= verbose
 
 # Refinement and regridding 
 amr.n_cell            = 104 104 160 
-amr.max_level         = 2     # maximum level number allowed
+amr.max_level         = 0     # maximum level number allowed
 amr.ref_ratio         = 2      # refinement ratio per level
 amr.regrid_int        = 100    # how often to regrid per level
 amr.blocking_factor_x = 8      # blocking factor in x per level
@@ -40,17 +39,17 @@ amr.grid_eff          = 0.7    # what constitutes an efficient grid
 # Plot and checkpoint
 amr.checkpoint_files_output = 1
 amr.check_file              = ./checkpoint/chk     # root name of checkpoint file
-amr.check_int               = 5000   # number of timesteps betw.  checkpoints
-#amr.restart = chk47500
+amr.check_int               = 1000   # number of timesteps betw.  checkpoints
+amr.restart =./checkpoint/chk01000
 amr.plot_files_output = 1
 amr.plot_file         = ./plot/plt    # root name of plotfile
-amr.plot_int          = 100          # number of timesteps between plotfiles
+amr.plot_int          = 50            # number of timesteps between plotfiles
 amr.derive_plot_vars  = pressure velocity temperature
 
 eb2.geom_type = "custom"
 
 eb2.eb_weight  = 1.0
-eb2.redistribution_type = "FluxRedist"
+eb2.redistribution_type = "NewRedist"
 
 # DIAGNOSTICS
 amr.data_log = time_probe_react.log

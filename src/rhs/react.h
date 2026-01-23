@@ -54,11 +54,19 @@ class reactor_t {
    * @param cls    The problem closure object (for indicies).
    * @param dt     The time step size. (react() requires it to be non-const)
    */
-  // https://www.codeproject.com/Articles/48575/How-to-Define-a-Template-Class-in-a-h-File-and-Imp
-  void inline src(const Geometry& /*geomdata*/, const amrex::MFIter& mfi,
+
+#if (AMREX_USE_GPIBM || CNS_USE_EB )     
+  void inline src(const Geometry& geomdata, const amrex::MFIter& mfi,
                   const amrex::Array4<const amrex::Real>& prims,
                   const amrex::Array4<amrex::Real>& rhs, const cls_t* cls_d,
-                  amrex::Real dt, amrex::Real /*real_time*/) {
+                  amrex::Real dt, amrex::Real real_time, const Array4<uint8_t>& marker) {
+#else
+  void inline src(const Geometry& geomdata, const amrex::MFIter& mfi,
+                  const amrex::Array4<const amrex::Real>& prims,
+                  const amrex::Array4<amrex::Real>& rhs, const cls_t* cls_d,
+                  amrex::Real dt, amrex::Real real_time) {
+#endif
+
     if (!m_initialized) amrex::Abort("reactor_t not initialised");
 
     // amrex::Print() << "reactor_t::src()" << std::endl;
@@ -142,6 +150,10 @@ class reactor_t {
       }     
       // fill mask      
       mask(i, j, k) = (T(i, j, k) > CNSConstants::min_react_temp) ? 1 : -1;
+      // mask solid boundaries
+#if (AMREX_USE_GPIBM || CNS_USE_EB )        
+      mask(i, j, k) = marker(i, j, k, 0) ? -1 : mask(i, j, k);
+#endif
 
     });
 
@@ -167,13 +179,6 @@ class reactor_t {
         }
         rEi(i,j,k) *= rhoenergy_cgs2si;
       });
-
-
-    /// Compute LES properties
-    // if (LES)
-    // {
-    //   // do stuff compute taus sgs, Efficiency ...
-    // }
 
     //////////////////////// Unpack dat + Update RHS ////////////////////////
     amrex::ParallelFor(bx, [=] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {
@@ -246,8 +251,6 @@ class reactor_t {
     tempf.clear();
 
      
-     // if LES multiply by something
-
 
     // TODO: Record runtime for load balancing
   

@@ -29,7 +29,7 @@ class reactor_sourceLES_t {
     m_reactor = pele::physics::reactions::ReactorBase::create(reactor_type);
     
     if (!m_reactor) {
-      amrex::Abort("reactor_t(): Unknown reactor type " + reactor_type);
+      amrex::Abort("reactor_sourceLES (): Unknown reactor type " + reactor_type);
     }
     m_reactor->init(therm_reactor_type, 1); // create reactor solver
     m_initialized = true;
@@ -51,16 +51,23 @@ class reactor_sourceLES_t {
    * @param cls    The problem closure object (for indicies).
    * @param dt     The time step size. (react() requires it to be non-const)
    */
-  // https://www.codeproject.com/Articles/48575/How-to-Define-a-Template-Class-in-a-h-File-and-Imp
+
+#if (AMREX_USE_GPIBM || CNS_USE_EB )     
+  void inline src(const Geometry& geomdata, const amrex::MFIter& mfi,
+                  const amrex::Array4<const amrex::Real>& prims,
+                  const amrex::Array4<amrex::Real>& rhs, const cls_t* cls_d,
+                  amrex::Real dt, amrex::Real real_time, const Array4<uint8_t>& marker) {
+#else
   void inline src(const Geometry& geomdata, const amrex::MFIter& mfi,
                   const amrex::Array4<const amrex::Real>& prims,
                   const amrex::Array4<amrex::Real>& rhs, const cls_t* cls_d,
                   amrex::Real dt, amrex::Real real_time) {
+#endif
+
+
     if (!m_initialized) amrex::Abort("reactor_t not initialised");
 
-    // amrex::Print() << "reactor_t::src()" << std::endl;
-
-    BL_PROFILE("reactor_t::src()");
+    BL_PROFILE("reactor_sourceLES_t::src()");
 
     // put here because this is a .h file
     using amrex::Array4;
@@ -70,8 +77,8 @@ class reactor_sourceLES_t {
     using amrex::Real;
 
     const Box bx = mfi.tilebox();
-
-    // TODO: do not work in fine covered box
+      
+    // TODO: do not work in fine covered box ??
     // TODO: stochastic fields indexing
 
     ///////////////////// Prepare for react /////////////////////
@@ -95,11 +102,17 @@ class reactor_sourceLES_t {
 
     const Real o_dt = 1.0 / dt;
 
-    // prepare input
-     amrex::ParallelFor(bx, [=] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {
-      const auto& cls = *cls_d;
+    
+    // parameters pased by prob.h (only in LES)
+    constexpr bool do_react       = source_t::do_reactions;  
+    constexpr bool mask_closewall = source_t::mask_cells_boundary;  
 
-      // [rY, rEi, T, rYsrc, rEisrc] convert to CGS!!
+    const auto& cls = *cls_d;
+
+    // prepare input -------------------------------------------------------------------------
+    amrex::ParallelFor(bx, [=] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {
+
+      // [rY, rEi, T, rYsrc, rEisrc] convert to CGS  to enter PelePhysics
 
       Real rho = prims(i, j, k, cls.QRHO);
       for (int ns = 0; ns < NUM_SPECIES; ++ns) {
@@ -139,18 +152,20 @@ class reactor_sourceLES_t {
       // fill mask      
       mask(i, j, k) = (T(i, j, k) > CNSConstants::min_react_temp) ? 1 : -1;
 
-      //mask(i, j, k) = (T(i, j, k) > 3000.0) ? -1 : mask(i,j,k);
-      // if (T(i,j,k) > 3000.0) {
-      //   mask(i, j, k) = -1;
-      // }
+      // mask solid boundaries
+#if (AMREX_USE_GPIBM || CNS_USE_EB )        
+      mask(i, j, k) = marker(i, j, k, 0) ? -1 : mask(i, j, k);
+      //remove cells close to solid from chemistry (input by prob)
+      if (mask_closewall) { if (marker(i, j, k, 1)) mask(i,j,k) = -1; }
+#endif
+
+       
+
      
     });
 
     /////////////////////////// React ///////////////////////////
     Real current_time = 0.0;
-
-    // smm
-    constexpr bool do_react = source_t::do_reactions; // temp
 
     if (do_react) {
     // Not necessary to start a stream here, however pelePhysics function only takes a stream.     
@@ -180,7 +195,7 @@ class reactor_sourceLES_t {
     // }
 
 
-    // ATF options    (by default no ATF)
+    // ATF options    (by default no ATF: o_F=1)
     constexpr amrex::Real Fthick = (source_t::ATF ? source_t::thickfactor : amrex::Real(1.0));
     const amrex::Real o_F = amrex::Real(1.0) / Fthick;
     //

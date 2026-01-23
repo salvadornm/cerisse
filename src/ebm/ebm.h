@@ -183,6 +183,8 @@ public:
   ////////////////////////////////////////////////////////////////////////////
   /**
   * @brief Update boolean markers solid and partially solid
+  *        i,j,k,0):  if cells is covered                         :1 (true) 0 (false)
+  *        i,j,k,1):  if cells is partially covered  (near solid) :1 (true) 0 (false)
   * @param lev current AMR level  
   **/
   void computeMarkers(int lev)
@@ -294,7 +296,7 @@ public:
 
 
             for (int n = 0; n < cls_t::NPRIM; n++) {
-              prim_wall[n] = prims(i,j,k,n);   // interpolate   ???????????   
+              prim_wall[n] = prims(i,j,k,n);   // interpolate   over neighbours ???????????   
               
               // use same tecniques weighted based on distance phi = sum w phi(node)/sum w
               // w is 1/r (only connected)
@@ -505,13 +507,22 @@ public:
 
 #endif
 
-// intrepolation based on distance
+// intrepolation based on distance, nb: number of neighbours
 // temp
 // #if (AMREX_SPACEDIM == 2)
 //         int kk(0);
 // #else
-//         for (int kk = -nb; kk <= nb; kk++) {
+//         for (int kk = k - nb; kk <= k + nb; kk++) {
 // #endif
-//         for (int jj = -nb; jj <= nb; jj++) {
-//         for (int ii = -nb; ii <= nb; ii++) {
+//         for (int jj = j - nb; jj <= j + nb; jj++) {
+//         for (int ii = j - nb; ii <= j + nb; ii++) {
+
+// compute weights
+//          xcell[0]  = x(ii,jj,kk)  ....                 // neighb cell  position                     
+            // r = (bc_centroid(i,j,k,n) - xcell[n]);     // distance
+            // solid phi=0 otherwise phi=1                // remove solid neighbours
+            // weight = phi/(r + eps)                         
+            // sum + = weght
+            // for (int nv = 0; nvar < cls_t::NPRIM; nv++)
+            // primwall(nv) += weight*prims(ii,jj,kk,nv)    
 

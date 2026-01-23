@@ -88,9 +88,9 @@ struct ProbParm {
   }
 
   // compute density and internal energy
-  const Real Q = 8.665; //  
+  const Real Q = 8.665; //  flow m3/s
   
-  // inside combustor state/exit
+  // inflow
   const Real p_0     = pres_atm2si; //[Pa] inflow pressure (1 atm) 
   const Real T_0     = 298;  //[K]  
   Real rho_0, eint_0;
@@ -159,8 +159,8 @@ template <typename cls_t > class user_source_t;
 
 // USED
 //typedef rhs_dt<weno_t<ReconScheme::WenoZ5, ProbClosures>, viscousLES_t<user_source_t<ProbClosures>, ProbClosures>, reactor_sourceLES_t<user_source_t<ProbClosures>,ProbClosures >> ProbRHS;
-//typedef rhs_dt<riemann_t<false, ProbClosures>, viscousLES_t<user_source_t<ProbClosures>, ProbClosures>, reactor_sourceLES_t<user_source_t<ProbClosures>,ProbClosures >> ProbRHS;
 typedef rhs_dt<skew_t<skewparm_t, ProbClosures>, viscousLES_t<user_source_t<ProbClosures>, ProbClosures>, reactor_sourceLES_t<user_source_t<ProbClosures>,ProbClosures >> ProbRHS;
+//typedef rhs_dt<skew_t<skewparm_t, ProbClosures>, viscousLES_t<user_source_t<ProbClosures>, ProbClosures>, no_source_t > ProbRHS;
 
 
 // define type of wall and EBM class
@@ -212,18 +212,24 @@ prob_initdata(int i, int j, int k, Array4<Real> const &state,
   }
   */
 
-  // put burn condistions
+  // put burn conditions inside combustor
   bool comb_init = true;
   if (comb_init)
   {
-    //if (z > 0.05)
-    //{ 
+    if (z > 0.035)
+    { 
       for (int n=0; n < NUM_SPECIES; n++) {
         y_sp[n] = prob_parm.Y_burn[n];
       }     
       cls.PYT2R(prob_parm.p_0,y_sp, prob_parm.Tburn, rhot);
       cls.RYP2E(rhot, y_sp, prob_parm.p_0, eint);
-    //}
+    }
+    else
+    {
+      u[2] = prob_parm.Q/prob_parm.rho_0;
+    }
+
+
   }
 
   Real kin = Real(0.5) * rhot * (u[0] * u[0] + u[1] * u[1] + u[2]*u[2]);
@@ -356,16 +362,14 @@ class user_source_t {
   // ATF options
   bool static constexpr ATF = true; // use adaptive thickening factor
   static constexpr Real thickfactor = 5.0; // thickening factor
-
-  bool static constexpr do_reactions = true;
+  // compute chemistry
+  bool static constexpr do_reactions = true;  // <<<<<<<<<<<<<<<<<<<<<<<<<
+  bool static constexpr mask_cells_boundary = true; // avoid compute reactions in cells partially covered
   //
 
   // viscous options
   static constexpr int order = 2;                  // order numerical scheme   
   static constexpr bool use_LES= true;
-
-
-
 
 
   // to use as a user source term, the function name must be src:
@@ -398,6 +402,11 @@ class user_source_t {
     const Real coef =dt/tau_relax;
  
 
+    // doing in this way avoids passing  whole prob_parm and only pass scalars you use 
+    const Real zexit = prob_parm.zexit;
+    const Real p_0    = prob_parm.p_0;
+
+    // ------------------------------------------------------------------------------------
     amrex::ParallelFor(bxg,
       [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept
       {
@@ -405,12 +414,12 @@ class user_source_t {
       const Real x = prob_lo[0] + (i + Real(0.5)) * dx[0];
       const Real y = prob_lo[1] + (j + Real(0.5)) * dx[1];
       const Real z = prob_lo[2] + (k + Real(0.5)) * dx[2];
-      const Real r = sqrt(x*x + y*y + (z-prob_parm.zexit)*(z-prob_parm.zexit));
+      const Real r = sqrt(x*x + y*y + (z-zexit)*(z-zexit));
       
-      // pressure relax  if P > P0  P drops and to keep T constant rho drops
+      // pressure relax  if P > P0  away from chamber
       Real pres = prims(i,j,k,cls.QPRES);
 
-      const Real dP = (prob_parm.p_0- pres)*coef;
+      const Real dP = (p_0- pres)*coef;
     
       const Real T = prims(i,j,k,cls.QT); // dT =0
       const Real rho  = prims(i, j, k, cls.QRHO);
@@ -429,7 +438,7 @@ class user_source_t {
                     + prims(i,j,k,cls.QW)*prims(i,j,k,cls.QW));
       Real Et  = prims(i,j,k,cls.QEINT) + kin;
     
-      bool buffer = (z > prob_parm.zexit) && (r > 0.06);
+      bool buffer = (z > zexit) && (r > 0.06);
 
       if (buffer){        
         rhs(i,j,k,cls.UMX) += prims(i,j,k,cls.QU)*drhodt;
@@ -448,19 +457,16 @@ class user_source_t {
 
       
       // damps energy if T > 3000 K
-      if (T > 3000.0)
-      {
-        const Real Ts = 3000.0;       
-        Real Etarget = 0.0;
-        Real rhos = 0.0;
-        cls.PYT2R(pres,Y,Ts,rhos);  
-        cls.RYP2E(rhos,Y,pres,Etarget);
-
-        Real tau = 5.0e-6; //5e-3 slow relaxation
-
-        rhs(i,j,k,cls.UET) += (rhos*Etarget - rho*prims(i,j,k,cls.QEINT))/tau;
-
-      }
+      // if (T > 3000.0)
+      // {
+      //   const Real Ts = 3000.0;       
+      //   Real Etarget = 0.0;
+      //   Real rhos = 0.0;
+      //   cls.PYT2R(pres,Y,Ts,rhos);  
+      //   cls.RYP2E(rhos,Y,pres,Etarget);
+      //   Real tau = 5.0e-6; //5e-3 slow relaxation
+      //   rhs(i,j,k,cls.UET) += (rhos*Etarget - rho*prims(i,j,k,cls.QEINT))/tau;
+      // }
 
     });
 

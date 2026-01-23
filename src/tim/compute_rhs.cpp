@@ -143,7 +143,9 @@ void CNS::compute_rhs(MultiFab& statemf, Real dt, FluxRegister* fr_as_crse, Flux
     const auto& flag = (*EBM::eb.ebflags_a[level])[mfi];
     FabType t = flag.getType(ebbox);
 
-    const bool fab_with_eb = (FabType::singlevalued == t);  
+    const bool fab_with_eb     = (FabType::singlevalued == t);  
+    const bool fab_with_fluid  =  !(t == amrex::FabType::covered);
+
     // EB flux     
     if (fab_with_eb) {
       EBM::eb.ebflux(geom,mfi, prims, {AMREX_D_DECL(&fluxt[0], &fluxt[1], &fluxt[2])},state, cls_d,level);
@@ -168,8 +170,15 @@ void CNS::compute_rhs(MultiFab& statemf, Real dt, FluxRegister* fr_as_crse, Flux
 
 #endif 
 
-    // Source terms
+    // Add source terms (only in fluid fabs)
+#if CNS_USE_EB 
+    if (fab_with_fluid ) {    
+        prob_rhs.src(geom,mfi, prims, state, cls_d, dt, cur_time, geoMarkers);
+    }
+#else
     prob_rhs.src(geom,mfi, prims, state, cls_d, dt, cur_time);
+#endif
+
 
     // Set solid point RHS to 0  (state hold RHS at this point)
 #if AMREX_USE_GPIBM || CNS_USE_EB
