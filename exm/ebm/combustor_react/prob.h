@@ -36,7 +36,7 @@ namespace PROB {
 struct LESparm {
   // Smagorinsky constant
   static constexpr Real Cs = 0.1;
-  static constexpr int order = 4; // order of the numerical scheme for LES
+  static constexpr int order = 2; // order of the numerical scheme for LES
   static constexpr Real Scsgs = 0.4 ; //0.4 // turbulent Schmidt number
   static constexpr Real Pr_o_Prsgs = 0.1; //0.1 // turbulent Prandtl number  
   static constexpr bool fixDelta = false; // use fixed filter width
@@ -134,7 +134,7 @@ struct skewparm_t {
 
   static constexpr bool dissipation = true;         // no dissipation
   static constexpr int  order = 4;                  // order numerical scheme   (2 or 4)
-  static constexpr Real C2skew=0.1,C4skew=0.016;    // Skew symmetric default  (0.5)
+  static constexpr Real C2skew=0.1,C4skew=0.016;    // Skew symmetric default  (0.1 0.016)
 };
 
 
@@ -216,18 +216,18 @@ prob_initdata(int i, int j, int k, Array4<Real> const &state,
   bool comb_init = true;
   if (comb_init)
   {
-    if (z > 0.035)
-    { 
+    // if (z > 0.035)
+    // { 
       for (int n=0; n < NUM_SPECIES; n++) {
         y_sp[n] = prob_parm.Y_burn[n];
       }     
       cls.PYT2R(prob_parm.p_0,y_sp, prob_parm.Tburn, rhot);
       cls.RYP2E(rhot, y_sp, prob_parm.p_0, eint);
-    }
-    else
-    {
-      u[2] = prob_parm.Q/prob_parm.rho_0;
-    }
+    // }
+    // else
+    // {
+    //   u[2] = prob_parm.Q/prob_parm.rho_0;
+    // }
 
 
   }
@@ -319,18 +319,12 @@ user_tagging(int i, int j, int k, int nt_level, auto &tagfab,
  switch (level)
   {
     case 0:
-      //refine=  (z < 0.20) && (r < 0.05);    
-      //refine = (z < prob_parm.zexit); 
-      //refine = (z < prob_parm.zexit) && (r < 0.025) ;    // refine combustor    
-
-      //refine = ( z < 0.07) && (z > 0.035) && (r < 0.03);    // refine injector exit
-
-      refine = (z < 0.13);
+      
+      refine = (z < 0.14) && (r < 0.03);    // refine combustor close to walls
 
       break;
     case 1:
-      //refine= (z > 0.035) && (z < 0.07) && (x < 0.019) && (x > -0.019) && (y < 0.019) && (y > -0.019);
-      refine= (z > 0.035) && (z < 0.07);
+      refine= (z > 0.035) && (z < 0.05) && (r < 0.012);
 
 
       // refine = (z < prob_parm.zexit); 
