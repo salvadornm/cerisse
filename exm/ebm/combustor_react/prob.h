@@ -35,7 +35,7 @@ namespace PROB {
 
 struct LESparm {
   // Smagorinsky constant
-  static constexpr Real Cs = 0.1;
+  static constexpr Real Cs = 0.0; // Smag original 0.17 (off)
   static constexpr int order = 2; // order of the numerical scheme for LES
   static constexpr Real Scsgs = 0.4 ; //0.4 // turbulent Schmidt number
   static constexpr Real Pr_o_Prsgs = 0.1; //0.1 // turbulent Prandtl number  
@@ -159,8 +159,11 @@ template <typename cls_t > class user_source_t;
 
 // USED
 //typedef rhs_dt<weno_t<ReconScheme::WenoZ5, ProbClosures>, viscousLES_t<user_source_t<ProbClosures>, ProbClosures>, reactor_sourceLES_t<user_source_t<ProbClosures>,ProbClosures >> ProbRHS;
-typedef rhs_dt<skew_t<skewparm_t, ProbClosures>, viscousLES_t<user_source_t<ProbClosures>, ProbClosures>, reactor_sourceLES_t<user_source_t<ProbClosures>,ProbClosures >> ProbRHS;
-//typedef rhs_dt<skew_t<skewparm_t, ProbClosures>, viscousLES_t<user_source_t<ProbClosures>, ProbClosures>, no_source_t > ProbRHS;
+//typedef rhs_dt<skew_t<skewparm_t, ProbClosures>, viscousLES_t<user_source_t<ProbClosures>, ProbClosures>, reactor_sourceLES_t<user_source_t<ProbClosures>,ProbClosures >> ProbRHS;
+
+//typedef rhs_dt<skew_t<skewparm_t, ProbClosures>, no_diffusive_t, no_source_t > ProbRHS;
+
+typedef rhs_dt<skew_t<skewparm_t, ProbClosures>, viscousLES_t<user_source_t<ProbClosures>, ProbClosures>, no_source_t > ProbRHS;
 
 
 // define type of wall and EBM class
@@ -251,12 +254,23 @@ bcnormal(const Real x[AMREX_SPACEDIM], Real dratio, const Real s_int[ProbClosure
 
   const int face = (idir+1)*sgn; // +/-1 (1D) +/- 2 (2D) +/- 3 (3D)
 
+
+  for (int n=0; n < ProbClosures::NCONS; n++) {
+    s_ext[n] = s_int[n];
+  }
+
+  return;
+
+
   switch(face)
   {
     case  3:  // LEFT/BOTTOM  z
 	    {                  
-      GlobalBC::bc_inlet_fixmassflow(0.0,0.0,1.0,&closures,
-        prob_parm.Q,prob_parm.T_inflow,prob_parm.Y_inflow, s_int, s_ext);  
+      // GlobalBC::bc_inlet_fixmassflow(0.0,0.0,1.0,&closures,
+      //   prob_parm.Q,prob_parm.T_inflow,prob_parm.Y_inflow, s_int, s_ext);  
+
+      GlobalBC::bc_fixP(0.0,0.0,1.0,&closures,prob_parm.p_0, s_int, s_ext);  
+
       break;
       }
     case  2:  // SOUTH        y  
@@ -361,9 +375,9 @@ class user_source_t {
   bool static constexpr mask_cells_boundary = true; // avoid compute reactions in cells partially covered
   //
 
-  // viscous options
+  // viscous LES options
   static constexpr int order = 2;                  // order numerical scheme   
-  static constexpr bool use_LES= true;
+  static constexpr bool use_LES= false;           // use LES model in viscous term
 
 
   // to use as a user source term, the function name must be src:

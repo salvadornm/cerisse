@@ -248,7 +248,7 @@ public:
 #endif
 
     // paramters for interpolation
-    constexpr bool use_weighted_interp = false;
+    constexpr bool use_weighted_interp = true;  ///
     constexpr int nb = 1; // number of neighbours for interpolation 
     const Real *prob_lo = geom.ProbLo();
 
@@ -258,28 +258,20 @@ public:
           // only applied to covered cells (could be done with flags)
 
           if (ebMarkers(i,j,k,1)){
-            Real vfracinv = 1.0/vfrac(i,j,k);
+            Real vfracinv = 1.0/vfrac(i,j,k);   Real inv_hvfrac = dxinv[0]*vfracinv; //only isotropic cells
 
-            // rebuild fluxes
+            // rebuild fluxes in the cut cells
             for (int n = 0; n < cls_t::NCONS; n++) {
-              Real fxp = flx_x(i+1,j,k,n); 
-              Real fxm = flx_x(i,j,k,n);
-              Real fyp = flx_y(i,j+1,k,n); 
-              Real fym = flx_y(i,j,k,n);
-
-              //  overwrite rhs in the cut-cells
-
+              
 #if (AMREX_SPACEDIM==3)            
-              Real fzp = flx_z(i,j,k+1,n); 
-              Real fzm = flx_z(i,j,k,n);
-              rhs(i, j, k, n) = -vfracinv*(
-                dxinv[0] * (apx(i + 1, j, k) * fxp - apx(i, j, k) * fxm) +
-                dxinv[1] * (apy(i, j + 1, k) * fyp - apy(i, j, k) * fym) +
-                dxinv[2] * (apz(i, j, k + 1) * fzp - apz(i, j, k) * fzm) );
+              rhs(i, j, k, n) = -inv_hvfrac*(
+                (apx(i + 1, j, k) * flx_x(i+1,j,k,n)  - apx(i, j, k) * flx_x(i,j,k,n)) +
+                (apy(i, j + 1, k) * flx_y(i,j+1,k,n)  - apy(i, j, k) * flx_y(i,j,k,n)) +
+                (apz(i, j, k + 1) * flx_z(i,j,k+1,n)  - apz(i, j, k) * flx_z(i,j,k,n)) );
 #else
-              rhs(i, j, k, n) = -vfracinv*(
-                dxinv[0] * (apx(i + 1, j, k) * fxp - apx(i, j, k) * fxm) +
-                dxinv[1] * (apy(i, j + 1, k) * fyp - apy(i, j, k) * fym) );            
+              rhs(i, j, k, n) = -inv_hvfrac *(
+                (apx(i + 1, j, k) * flx_x(i+1,j,k,n) - apx(i, j, k) * flx_x(i,j,k,n)) +
+                (apy(i, j + 1, k) * flx_y(i,j+1,k,n) - apy(i, j, k) * flx_y(i,j,k,n)) );            
 #endif      
             }
 
@@ -290,43 +282,54 @@ public:
 
       
             if (use_weighted_interp){
-              Real sumw = 0.0;  
-              //--o loop over neighbours  ii,jj,kk
-#if (AMREX_SPACEDIM == 2)
-              int kk = 0;
-#else
+              Real sumw = 1e-30;                
+              // position of centropid in cell units
+              Real x_bc = i + 0.5 + bc_centroid(i,j,k,0);
+              Real y_bc = j + 0.5 + bc_centroid(i,j,k,1) ;
+#if (AMREX_SPACEDIM == 3)
+              Real z_bc =  k  + 0.5 + bc_centroid(i,j,k,2);
               for (int kk = k - nb; kk <= k + nb; kk++) {
+#else
+              int kk = 0;              
 #endif
                 for (int jj = j - nb; jj <= j + nb; jj++) {
                   for (int ii = i - nb; ii <= i + nb; ii++) {
-                    // distance nighbour cell to boundary centroid (prob_lo can be remove as it is relative)
-                    Real xx = prob_lo[0] + (ii + Real(0.5)) * dx[0]; 
-                    Real yy = prob_lo[1] + (jj + Real(0.5)) * dx[1]; 
-                    Real x_bc = prob_lo[0] + (i + 0.5 + bc_centroid(i,j,k,0)) * dx[0];
-                    Real y_bc = prob_lo[1] + (j + 0.5 + bc_centroid(i,j,k,1)) * dx[1];
-#if (AMREX_SPACEDIM == 2)
-                    Real r = std::sqrt( (xx - x_bc)*(xx - x_bc) + (yy - y_bc)*(yy - y_bc) );
-#else                    
-                    Real zz   = prob_lo[2] + (kk + Real(0.5)) * dx[2]; 
-                    Real z_bc = prob_lo[2] + (k + 0.5 + bc_centroid(i,j,k,2)) * dx[2];
-                    Real r = std::sqrt( (xx - x_bc)*(xx - x_bc) + (yy - y_bc)*(yy - y_bc) + (zz - z_bc)*(zz - z_bc) );  
-#endif                    
-                    
-                    if (ebMarkers(ii,jj,kk,0)) continue; // skip solid cells
+                  // loop over neighbour cells                          
+                    if (!ebMarkers(ii,jj,kk,0)) {
+                      // regular or cut-cell neighbour coordinates in cell units
+                      Real xx = ii + 0.5;
+                      Real yy = jj + 0.5;
+#if (AMREX_SPACEDIM == 3)
+                      Real zz = kk + 0.5;
+#endif
+                      if (ebMarkers(ii,jj,kk,1)) { // cut cell (use position of centroid)
+                        xx += vol_centroid(ii,jj,kk,0);
+                        yy += vol_centroid(ii,jj,kk,1);
+#if (AMREX_SPACEDIM == 3)
+                        zz += vol_centroid(ii,jj,kk,2);
+#endif
+                      }              
+                      // distance from nighbour cell (ii,jj,kk) centroid  to target cell (i,j,k) boundary centroid (in cell units)
+#if (AMREX_SPACEDIM == 3)
+                      Real r = std::sqrt( (xx - x_bc)*(xx - x_bc) + (yy - y_bc)*(yy - y_bc) + (zz - z_bc)*(zz - z_bc) );                        
+#else                                          
+                      Real r = std::sqrt( (xx - x_bc)*(xx - x_bc) + (yy - y_bc)*(yy - y_bc) );
+#endif                                                           
+                      // interpolation weight based on distance 
+                      r = amrex::max(r, 1e-6_rt);
+                      Real w = 1.0_rt/(r*r); sumw += w;
 
-                    // weight based on distance
-                    Real w = 1.0/(r + 1.e-12); 
-                    sumw += w;
-
-                    for (int n = 0; n < cls_t::NPRIM; n++) {
-                      prim_wall[n] += w*prims(ii,jj,kk,n);               
-                    }    
+                      for (int n = 0; n < cls_t::NPRIM; n++) {
+                        prim_wall[n] += w*prims(ii,jj,kk,n);               
+                      } 
+                    }   
                   }
                 }
               }
-              //--o           
+              //--o  
+              sumw = 1.0/sumw; //normalise weights          
               for (int n = 0; n < cls_t::NPRIM; n++) {
-                prim_wall[n] = prim_wall[n]/sumw; //normalise weights              
+                prim_wall[n] = prim_wall[n]*sumw;             
               }
             }
             else {
@@ -334,10 +337,10 @@ public:
                 prim_wall[n] = prims(i,j,k,n);               
               }
             }    
-            // normal to surface (point towards the fluid)
+            // normal to surface (pointing towards the fluid)
             Real norm_wall[AMREX_SPACEDIM]= {0.0};
             for (int n = 0; n < AMREX_SPACEDIM; n++) {
-              norm_wall[n] = -normxyz(i,j,k,n); // -1 to point twds fluid
+              norm_wall[n] = -normxyz(i,j,k,n);  
             }
 
             // calculate wall flux and add it to rhs
@@ -349,90 +352,35 @@ public:
             Real Resy = apy(i,j,k) - apy(i,j+1,k) + areaw*norm_wall[1];
 #if (AMREX_SPACEDIM == 3)                      
             Real Resz = apz(i,j,k) - apz(i,j,k+1) + areaw*norm_wall[2]; 
-            Real delta = -(Resx+Resy+Resz)/(norm_wall[0]+norm_wall[1]+norm_wall[2]);
-#else
-            Real delta = -(Resx+Resy)/(norm_wall[0]+norm_wall[1]);
+            Real delta_mag = std::sqrt((Resx*Resx + Resy*Resy + Resz*Resz) / 3.0);
+            // sign source: oppose residual along normal
+            Real s = -(Resx*norm_wall[0] + Resy*norm_wall[1] + Resz*norm_wall[2]);          
+#else            
+            Real delta_mag = std::sqrt(0.5*(Resx*Resx + Resy*Resy));
+            Real s = -(Resx*norm_wall[0] + Resy*norm_wall[1]);
 #endif
+            Real delta = std::copysign(delta_mag, s);     
             areaw += delta;
-            
-            
+                        
             // calculate viscous walls
             if (param::solve_diffwall)
             {
               // from volume and area centroid compute distance to wall 
               // and project into normal direction
               Real x_dis[AMREX_SPACEDIM]= {0.0};
-              Real dis = 1.e-8; 
+              Real dis = 1e-6_rt; // min value (cell units) 
               for (int n = 0; n < AMREX_SPACEDIM; n++) {
                 x_dis[n] = vol_centroid(i,j,k,n)- bc_centroid(i,j,k,n);
                 dis += x_dis[n]*norm_wall[n];
               }   
               dis = dis*dx[0]; // units
               //         
-              
-      //-> temp snm
-      // amrex::GpuArray<Real, cls_t::NCONS> flux_visc = {0.0};  
-      Real xx = prob_lo[0] + (i + Real(0.5)) * dx[0]; 
-      Real yy = prob_lo[1] + (j + Real(0.5)) * dx[1]; 
-      Real zz = prob_lo[2] + (k + Real(0.5)) * dx[2]; 
-      Real rad = std::sqrt(xx*xx+yy*yy);
-
-      //bool cellprob = (zz > 0.044) && (zz < 0.04556) && (xx > 0.021) && (vfrac(i,j,k) < 0.5);
-      bool cellprob = (zz > 0.01) && (zz < 0.03) && (xx > 0.0) && (xx< 0.005);
-
-
-      if (cellprob){  //cell to debug   
-
-        printf(" CELL i=%d j=%d k=%d \n",i,j,k);
-        printf("  X=%f Y=%f Z=%f  R=%f \n",xx,yy,zz,rad);
-        printf( " marker (0) = %d marker(1) = %d \n",ebMarkers(i,j,k,0),ebMarkers(i,j,k,1));
-        printf(" lev = %d \n",lev);
-
-        printf(" vol_centroid = %f %f \n",vol_centroid(i,j,k,0),vol_centroid(i,j,k,1));
-        printf(" bc_centroid = %f %f \n",bc_centroid(i,j,k,0),bc_centroid(i,j,k,1));
-        printf(" distance = %f nx =%f ny=%f nz=%f\n", dis,norm_wall[0],norm_wall[1],norm_wall[2]);
-
-        printf(" volfrac = %f \n",vfrac(i,j,k));
-        printf(" area frac  ax(i)=%f ax(i+1)=%f \n",apx(i,j,k),apx(i+1,j,k));
-        printf("            ay(j)=%f ay(j+1)=%f \n",apy(i,j,k),apy(i,j+1,k));
-        printf("            az(k)=%f az(k+1)=%f \n",apz(i,j,k),apz(i,j,k+1));
-        printf(" bc area = %f \n",bcarea(i,j,k,0));
-
-        printf(" RESx=%e Resy=%e Resz=%e\n", Resx,Resy,Resz);
-        printf(" ERROR=%e \n", Resx+Resy+Resz);
-        Resx = apx(i,j,k) - apx(i+1,j,k) + areaw*norm_wall[0];
-        Resy = apy(i,j,k) - apy(i,j+1,k) + areaw*norm_wall[1];
-        Resz = apz(i,j,k) - apz(i,j,k+1) + areaw*norm_wall[2];
-        printf(" NEW ERROR=%e \n", Resx+Resy+Resz);
-        
-        
-        printf(" Area = %f new area = %f delta=%e \n", bcarea(i,j,k,0), areaw,delta);
-
-       for (int n = 0; n < cls_t::NPRIM; n++) {
-        printf(" %d q=%f \n",n,prim_wall[n]);         
-       }
-       
-
-      // //  printf(" i-1 i i+1  P \n");
-      // //  for (int n = 0; n < cls_t::NPRIM; n++) {
-      // //   printf(" %d : %f  %f  %f \n",n,prims(i-1,j,k,n),prims(i,j,k,n),prims(i+1,j,k,n));
-      // //  }
-
-       
-       for (int n = 0; n < 5; n++) {
-        printf(" %d fluxw=%f \n",n,flux_wall[n]);  
-       }    
-
-      } // end of cell to debug   
-      //->
-
-      //      wallmodel::wall_flux_diff(geom,i,j,k,dis,norm_wall,prims,prim_wall,flux_wall,cls);
-
+              wallmodel::wall_flux_diff(geom,i,j,k,dis,norm_wall,prims,prim_wall,flux_wall,cls);
       
           } //end if solve_diffwall
 
           for (int n = 0; n < cls_t::NCONS; n++) {
-            rhs(i,j,k,n) += flux_wall[n]*vfracinv*areaw*dxinv[0]; 
+            rhs(i,j,k,n) += flux_wall[n]*areaw*inv_hvfrac; 
           }
 
           }

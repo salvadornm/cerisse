@@ -336,8 +336,8 @@ class skew_t {
 
 #ifdef CNS_USE_EB   
     // in EBM wall flux will be computed afterwards
-    const bool next_to_wall = marker(i,j,k,0) || marker(il,jl,kl,0);
-    if (next_to_wall) return;  
+   // const bool next_to_wall = marker(i,j,k,0) || marker(il,jl,kl,0);
+   // if (next_to_wall) return;  
 #endif
 
 
@@ -399,8 +399,8 @@ class skew_t {
 
 #ifdef CNS_USE_EB   
     // in EBM wall flux will be computed afterwards
-    const bool next_to_wall = marker(i,j,k,0) || marker(il,jl,kl,0);
-    if (next_to_wall) return;  
+    // const bool next_to_wall = marker(i,j,k,0) || marker(il,jl,kl,0);
+    // if (next_to_wall) return;  
 #endif
 
     int i0[3],i1[3],i2[3],i3[3];
