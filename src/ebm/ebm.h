@@ -248,7 +248,7 @@ public:
 #endif
 
     // paramters for interpolation
-    constexpr bool use_weighted_interp = true;  ///
+    constexpr bool use_weighted_interp = false;  ///
     constexpr int nb = 1; // number of neighbours for interpolation 
     const Real *prob_lo = geom.ProbLo();
 

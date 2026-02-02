@@ -255,22 +255,19 @@ bcnormal(const Real x[AMREX_SPACEDIM], Real dratio, const Real s_int[ProbClosure
   const int face = (idir+1)*sgn; // +/-1 (1D) +/- 2 (2D) +/- 3 (3D)
 
 
-  for (int n=0; n < ProbClosures::NCONS; n++) {
-    s_ext[n] = s_int[n];
-  }
-
-  return;
+  // for (int n=0; n < ProbClosures::NCONS; n++) {
+  //   s_ext[n] = s_int[n];
+  // }
+  // return;
 
 
   switch(face)
   {
     case  3:  // LEFT/BOTTOM  z
 	    {                  
-      // GlobalBC::bc_inlet_fixmassflow(0.0,0.0,1.0,&closures,
-      //   prob_parm.Q,prob_parm.T_inflow,prob_parm.Y_inflow, s_int, s_ext);  
-
-      GlobalBC::bc_fixP(0.0,0.0,1.0,&closures,prob_parm.p_0, s_int, s_ext);  
-
+      GlobalBC::bc_inlet_fixmassflow(0.0,0.0,1.0,&closures,
+        prob_parm.Q,prob_parm.T_inflow,prob_parm.Y_inflow, s_int, s_ext);  
+        
       break;
       }
     case  2:  // SOUTH        y  
