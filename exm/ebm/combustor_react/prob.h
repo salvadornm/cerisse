@@ -38,7 +38,7 @@ struct LESparm {
   static constexpr Real Cs = 0.0; // Smag original 0.17 (off)
   static constexpr int order = 2; // order of the numerical scheme for LES
   static constexpr Real Scsgs = 0.4 ; //0.4 // turbulent Schmidt number
-  static constexpr Real Pr_o_Prsgs = 0.1; //0.1 // turbulent Prandtl number  
+  static constexpr Real Pr_o_Prsgs = 1.0; //0.1 // turbulent Prandtl number  
   static constexpr bool fixDelta = false; // use fixed filter width
 };
 
@@ -254,7 +254,7 @@ bcnormal(const Real x[AMREX_SPACEDIM], Real dratio, const Real s_int[ProbClosure
 
   const int face = (idir+1)*sgn; // +/-1 (1D) +/- 2 (2D) +/- 3 (3D)
 
-
+  // snm comment for 0-gradient BCs (to be used for debugging)
   // for (int n=0; n < ProbClosures::NCONS; n++) {
   //   s_ext[n] = s_int[n];
   // }
@@ -331,18 +331,11 @@ user_tagging(int i, int j, int k, int nt_level, auto &tagfab,
   {
     case 0:
       
-      refine = (z < 0.14) && (r < 0.03);    // refine combustor close to walls
+      refine = (z > 0.03) && (z < 0.08) && (r < 0.03);    // refine combustor close to walls
 
       break;
     case 1:
-      refine= (z > 0.035) && (z < 0.05) && (r < 0.012);
-
-
-      // refine = (z < prob_parm.zexit); 
-
-      // refine based on T
-
-
+      refine= (z > 0.004) && (z < 0.06) && (r < 0.015);
       break;
     case 2:
       // refine= (z > 0.035) && (z < 0.07);    

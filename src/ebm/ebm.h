@@ -279,7 +279,6 @@ public:
             amrex::GpuArray<Real, cls_t::NCONS> flux_wall = {0.0};                             
             // primitive array at surface
             amrex::GpuArray<Real, cls_t::NPRIM> prim_wall = {0.0};
-
       
             if (use_weighted_interp){
               Real sumw = 1e-30;                
@@ -317,7 +316,7 @@ public:
 #endif                                                           
                       // interpolation weight based on distance 
                       r = amrex::max(r, 1e-6_rt);
-                      Real w = 1.0_rt/(r*r); sumw += w;
+                      Real w = 1.0_rt/r; sumw += w;
 
                       for (int n = 0; n < cls_t::NPRIM; n++) {
                         prim_wall[n] += w*prims(ii,jj,kk,n);               
@@ -338,30 +337,47 @@ public:
               }
             }    
             // normal to surface (pointing towards the fluid)
-            Real norm_wall[AMREX_SPACEDIM]= {0.0};
+            Real norm_wall[AMREX_SPACEDIM]= {0.0}; 
             for (int n = 0; n < AMREX_SPACEDIM; n++) {
               norm_wall[n] = -normxyz(i,j,k,n);  
             }
 
+            // area/normal correction to ensure divergence free fluxes in cut cells 
+            //====================================================================
+            Real Err_A[AMREX_SPACEDIM]= {0.0};
+            Real areaw = bcarea(i,j,k,0);
+            Err_A[0] = apx(i,j,k) - apx(i+1,j,k) + areaw*norm_wall[0];
+            Err_A[1] = apy(i,j,k) - apy(i,j+1,k) + areaw*norm_wall[1];
+#if (AMREX_SPACEDIM == 3)                      
+            Err_A[2] = apz(i,j,k) - apz(i,j,k+1) + areaw*norm_wall[2]; 
+#endif
+            // error measure (temp)
+            Real sumError = 0.0_rt; Real sumnorm=0.0_rt;
+            for (int n = 0; n < AMREX_SPACEDIM; n++) { sumError += Err_A[n];}
+            for (int n = 0; n < AMREX_SPACEDIM; n++) { sumnorm += norm_wall[n];}
+
+            // correct area projections 
+            Real Areai[AMREX_SPACEDIM]= {0.0}; 
+            for (int n = 0; n < AMREX_SPACEDIM; n++){
+              Areai[n] = areaw*norm_wall[n] - Err_A[n];
+            }  
+            // recalculate normal based on corrected area projections
+            Real areanew = Areai[0]*Areai[0] + Areai[1]*Areai[1] + Areai[2]*Areai[2];
+            areanew = std::sqrt(areanew);
+            Real normnew[AMREX_SPACEDIM]= {0.0};
+            for (int n = 0; n < AMREX_SPACEDIM; n++) {
+              normnew[n] = Areai[n]/areanew;
+            }
+            // update wall normal and area with corrected values
+            areaw = areanew;
+            for (int n = 0; n < AMREX_SPACEDIM; n++) {
+              norm_wall[n] = normnew[n];
+            }
+            //=================================================================
+
             // calculate wall flux and add it to rhs
             wallmodel::wall_flux(geom,i,j,k,norm_wall,prim_wall,flux_wall,cls);      
-
-            // area correction to ensure divergence free fluxes in cut cells
-            Real areaw = bcarea(i,j,k,0);
-            Real Resx = apx(i,j,k) - apx(i+1,j,k) + areaw*norm_wall[0];
-            Real Resy = apy(i,j,k) - apy(i,j+1,k) + areaw*norm_wall[1];
-#if (AMREX_SPACEDIM == 3)                      
-            Real Resz = apz(i,j,k) - apz(i,j,k+1) + areaw*norm_wall[2]; 
-            Real delta_mag = std::sqrt((Resx*Resx + Resy*Resy + Resz*Resz) / 3.0);
-            // sign source: oppose residual along normal
-            Real s = -(Resx*norm_wall[0] + Resy*norm_wall[1] + Resz*norm_wall[2]);          
-#else            
-            Real delta_mag = std::sqrt(0.5*(Resx*Resx + Resy*Resy));
-            Real s = -(Resx*norm_wall[0] + Resy*norm_wall[1]);
-#endif
-            Real delta = std::copysign(delta_mag, s);     
-            areaw += delta;
-                        
+                                  
             // calculate viscous walls
             if (param::solve_diffwall)
             {
@@ -377,15 +393,12 @@ public:
               //         
               wallmodel::wall_flux_diff(geom,i,j,k,dis,norm_wall,prims,prim_wall,flux_wall,cls);
       
-          } //end if solve_diffwall
+            } //end if solve_diffwall
 
-          for (int n = 0; n < cls_t::NCONS; n++) {
-            rhs(i,j,k,n) += flux_wall[n]*areaw*inv_hvfrac; 
-          }
-
-          }
-         
-
+            for (int n = 0; n < cls_t::NCONS; n++) {
+              rhs(i,j,k,n) += flux_wall[n]*areaw*inv_hvfrac; 
+            }                
+          }  //end if partially covered       
         });
 
   }                      
