@@ -238,8 +238,10 @@ public:
     // markers 
     const auto& ebMarkers = (*bmf_a[lev]).array(mfi);
 
-    // just in case 
-    const auto& flag = (*ebflags_a[lev])[mfi];
+    // temp variables and arrays for debugging mostly
+    //const auto& flag_arr = (*ebflags_a[lev]).const_array(mfi);
+    //const auto& flag = (*ebflags_a[lev])[mfi];
+    //const Real *prob_lo = geom.ProbLo();
 
     auto const& flx_x = flxt[0]->array(); 
     auto const& flx_y = flxt[1]->array(); 
@@ -248,17 +250,26 @@ public:
 #endif
 
     // paramters for interpolation
-    constexpr bool use_weighted_interp = false;  ///
-    constexpr int nb = 1; // number of neighbours for interpolation 
-    const Real *prob_lo = geom.ProbLo();
+    constexpr bool use_weighted_interp = false;  //false: unweighted average; true: inverse-distance weighted average
+    constexpr int nb = 1; // number of neighbours for interpolation     
+    constexpr Real vfracmin = 1.e-7; // minimum vfrac to consider a cell "not empty" 
+
 
     amrex::ParallelFor(
         ebbox, [=] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {
 
-          // only applied to covered cells (could be done with flags)
+          // only solve flux in cut cells (not in regular or almost empty cells)
+          bool solve_fluxwall = ebMarkers(i,j,k,1) && (vfrac(i,j,k) > vfracmin); 
 
-          if (ebMarkers(i,j,k,1)){
-            Real vfracinv = 1.0/vfrac(i,j,k);   Real inv_hvfrac = dxinv[0]*vfracinv; //only isotropic cells
+          if (solve_fluxwall){
+            Real inv_hvfrac = dxinv[0]/vfrac(i,j,k); //only isotropic cells
+
+            // if (vfrac(i,j,k) < vfracmin) {
+            //   // if the cell is almost empty, we can treat it as a regular cell 
+            //   // and apply a correction to the fluxes to ensure conservation.               
+            //   inv_hvfrac = dxinv[0];              
+            // }  
+
 
             // rebuild fluxes in the cut cells
             for (int n = 0; n < cls_t::NCONS; n++) {
@@ -395,9 +406,14 @@ public:
       
             } //end if solve_diffwall
 
+            // add wall flux to rhs 
             for (int n = 0; n < cls_t::NCONS; n++) {
               rhs(i,j,k,n) += flux_wall[n]*areaw*inv_hvfrac; 
-            }                
+            }                           
+            // (debug cells here)
+              //// DEBUG    
+            //
+
           }  //end if partially covered       
         });
 

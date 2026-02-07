@@ -1,16 +1,16 @@
   //// DEBUG    
+       // debug      
+//------------------------------------------------
       Real xx = prob_lo[0] + (i + Real(0.5)) * dx[0]; 
       Real yy = prob_lo[1] + (j + Real(0.5)) * dx[1]; 
       Real zz = prob_lo[2] + (k + Real(0.5)) * dx[2]; 
       Real rad = std::sqrt(xx*xx+yy*yy);
 
-      //bool cellprob = (zz > 0.132) && (zz < 0.138) && (xx < 0.02) && (rad <  0.024) && std::abs(yy) < 0.001;
-      // bool cellprob = (zz < 0.006) && (xx > -0.005) && (std::abs(yy) < 0.001);
-      ///bool cellprob = (i == 65 && j == 64 && k == 4);
+      //bool cellprob = (zz > 0.132) && (zz < 0.138) && (xx < -0.070) && (xx >  -0.076) && (j==64);
+      bool cellprob = (i == 3 && j == 64 && k == 107);
       
-      bool cellprob= std::abs(sumnorm)< 1.e-6;
-
-      cellprob = cellprob || std::abs(sumError) > 1.e-6 || max(std::abs(Err_A[0]), max(std::abs(Err_A[1]), std::abs(Err_A[2]))) > 1.e-6;
+      //bool cellprob= std::abs(sumnorm)< 1.e-6;
+      //cellprob = cellprob || std::abs(sumError) > 1.e-6 || max(std::abs(Err_A[0]), max(std::abs(Err_A[1]), std::abs(Err_A[2]))) > 1.e-6;
 
       
       if (cellprob){  //cell to debug   
@@ -21,6 +21,9 @@
         if(std::abs(sumnorm)< 1.e-6) printf(" SUMNORMis very small = %e \n", sumnorm);
         printf("  X=%f Y=%f Z=%f  R=%f \n",xx,yy,zz,rad);
         printf( " marker (0) = %d marker(1) = %d \n",ebMarkers(i,j,k,0),ebMarkers(i,j,k,1));
+        printf(" flag_arr(i,j,k).isCovered() = %d \n",flag_arr(i,j,k).isCovered());
+        printf(" flag_arr(i,j,k).isSingleValued() = %d \n",flag_arr(i,j,k).isSingleValued());  
+
         printf(" lev = %d \n",lev);
 
         printf(" vol_centroid = %f %f \n",vol_centroid(i,j,k,0),vol_centroid(i,j,k,1));
@@ -186,14 +189,14 @@
        for (int n = 0; n < 5; n++) {
         printf(" %d f(i)=%e f(i+1)=%f Sum(fi)=%e  Sum(fi)/dxcell=%e \n",n,flx_x(i,j,k,n),flx_x(i+1,j,k,n),  
             apx(i + 1, j, k) * flx_x(i+1,j,k,n) - apx(i, j, k) * flx_x(i,j,k,n), 
-            (apx(i + 1, j, k) * flx_x(i+1,j,k,n) - apx(i, j, k) * flx_x(i,j,k,n))*dxinv[0]*vfracinv);  
+            (apx(i + 1, j, k) * flx_x(i+1,j,k,n) - apx(i, j, k) * flx_x(i,j,k,n))*inv_hvfrac);  
        }
 
        printf(" FLUX Y j j+1\n");
        for (int n = 0; n < 5; n++) {
         printf(" %d f(j)=%e f(j+1)=%e Sum(fj)=%e  Sum(fj)/dycell=%e \n",n,flx_y(i,j,k,n),flx_y(i,j+1,k,n), 
             apy(i, j, k + 1) * flx_y(i,j+1,k,n) - apy(i, j, k) * flx_y(i,j,k,n), 
-            (apy(i, j, k + 1) * flx_y(i,j+1,k,n) - apy(i, j, k) * flx_y(i,j,k,n))*dxinv[1]*vfracinv);  
+            (apy(i, j, k + 1) * flx_y(i,j+1,k,n) - apy(i, j, k) * flx_y(i,j,k,n))*inv_hvfrac);  
        }
 
       
@@ -201,16 +204,17 @@
        for (int n = 0; n < 5; n++) {
         printf(" %d f(k)=%e f(k+1)=%e Sum(fk)=%e  Sum(fk)/dzcell=%e\n",n,flx_z(i,j,k,n),flx_z(i,j,k+1,n),
             apz(i, j, k + 1) * flx_z(i,j,k+1,n) - apz(i, j, k) * flx_z(i,j,k,n),  
-            (apz(i, j, k + 1) * flx_z(i,j,k+1,n) - apz(i, j, k) * flx_z(i,j,k,n))*dxinv[2]*vfracinv);  
+            (apz(i, j, k + 1) * flx_z(i,j,k+1,n) - apz(i, j, k) * flx_z(i,j,k,n))*inv_hvfrac);  
        }
 
 
        printf(" RHS  *******\n");
        for (int n = 0; n < 5; n++) {
-          printf(" %d drhs +=%e   RHSTOT=%e \n",n,flux_wall[n]*vfracinv*areaw*dxinv[0],rhs(i,j,k,n)); 
+          printf(" %d drhs +=%e   RHSTOT=%e \n",n,flux_wall[n]*inv_hvfrac*areaw,rhs(i,j,k,n)); 
         }
 
 
 
       } // end of cell to debug   
+            
       //->  
