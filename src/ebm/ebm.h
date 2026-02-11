@@ -92,28 +92,32 @@ public:
   // mask
   Vector<iMultiFab> level_mask_a;  // object not pointers
  
-  const amrex::Real isodxerr = 1.e-8;        // relative isotropy error ||dx-dy||/dx
-  const amrex::Real vfracmin = 1.e-6;        // minimum to consider a cell "empty"
-  const amrex::Real vfracmax = 1.0-vfracmin; // maximum to consider a cell "not-full"
-
   // variables for redistribution (originally declared static)
   amrex::Real eb_weight;
   std::string redistribution_type;
 
-  // aux vars for redistribution
+  // EB constants and parameters --------------------------------------------------------
+  static constexpr Real isodxerr = 1.e-8;        // relative isotropy error ||dx-dy||/dx
+  //  for redistribution
   const bool use_wts_in_divnc = false; //true
   const int srd_max_order = 2; // 2
-  const amrex::Real target_volfrac = 0.5; //0.5
-  const amrex::Real fac_for_deltaR = 1.0;
+  const Real target_volfrac = 0.5; //0.5
+  const Real fac_for_deltaR = 1.0;
 
-  
+  //  for interpolation
+  static constexpr bool use_weighted_interp = false;  //false: unweighted average; true: inverse-distance weighted average
+  static constexpr int nb = 1; // number of neighbours for interpolation     
+  static constexpr Real vfracmin = 1.e-9; // minimum vfrac to consider a cell "not empty" 
+  static constexpr Real vfracmax = 1.0 - vfracmin; // maximum vfrac to consider a cell "not full"
+
   ///////////////////////////////////////////////////////////////////////////
   void init(Amr* pointer_amr,const Geometry& geom, const int required_level, 
                                                          const int max_level)
   {
     BL_PROFILE("initializeEB2");
 
-    amrex::Print() << " Initialize EB at maxlevel = " << max_level << std::endl;
+    amrex::Print() << " Initialize EB at level = " << required_level ;
+    amrex::Print() << " out of "<< max_level << std::endl;
 
    static_assert(AMREX_SPACEDIM > 1, "EB only supports 2D and 3D"); 
 
@@ -197,16 +201,168 @@ public:
       // make box including GHOST
       const Box& bxg = mfi.growntilebox(cls_t::NGHOST);
 
-      const auto& ebMarkers = mfab.array(mfi);           
       const auto& flag_arr = (*ebflags_a[lev]).const_array(mfi);
+      const auto vfrac     = (*volmf_a[lev]).const_array(mfi);    
+
+      // markers: comp 0 = solid mask, comp 1 = neighbor-of-solid mask
+      const auto& ebMarkers = mfab.array(mfi);           
+
+
+      const bool correct_cells = false; //treat small cells as solid
+      // -------------------------
+      // Pass 1: define "solid"
+      // -------------------------
+      int ncorr=0;
+      amrex::ParallelFor( bxg, [=,&ncorr] AMREX_GPU_DEVICE (int i, int j, int k) noexcept
+        {
+          // Start from AMReX EB classification
+          int is_solid = flag_arr(i,j,k).isCovered() ? 1 : 0;
+          // If it's a cut cell with very small fluid volume, treat it as solid
+          if (correct_cells)
+          {
+            if (flag_arr(i,j,k).isSingleValued() && (vfrac(i,j,k) < vfracmin)) {
+              is_solid = 1; ++ncorr;
+            }
+          }  
+          ebMarkers(i,j,k,0) = is_solid;
+          // Initialize neighbor flag; will be rebuilt in Pass 2          
+          ebMarkers(i,j,k,1) = flag_arr(i,j,k).isSingleValued(); //old      
+
+        });
+      // ---------------------------------------------------------
+      // Pass 2: rebuild "neighbor-of-solid" using updated marker0
+      // ---------------------------------------------------------
+      
+      if (ncorr > 0)
+      {
+      // We need i±1/j±1/k±1 accesses; avoid OOB by shrinking one layer.
+      amrex::Box bx_inner = bxg;
+      bx_inner.grow(-1);
+
+      if (bx_inner.ok()) // is box ok
+      {
+        amrex::ParallelFor( bx_inner, [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept
+          {
+          // Only fluid cells can be "neighbors of solid"
+          if (ebMarkers(i,j,k,0) != 0) {
+            ebMarkers(i,j,k,1) = 0;
+            return;
+          }
+
+          int nbr_solid = 0;
+          // Face-neighbors (6-neighborhood in 3D, 4-neighborhood in 2D)
+          nbr_solid |= (ebMarkers(i-1,j,k,0) != 0);
+          nbr_solid |= (ebMarkers(i+1,j,k,0) != 0);
+          nbr_solid |= (ebMarkers(i,j-1,k,0) != 0);
+          nbr_solid |= (ebMarkers(i,j+1,k,0) != 0);
+#if (AMREX_SPACEDIM == 3)
+          nbr_solid |= (ebMarkers(i,j,k-1,0) != 0);
+          nbr_solid |= (ebMarkers(i,j,k+1,0) != 0);
+#endif
+          ebMarkers(i,j,k,1) = nbr_solid ? 1 : 0;
+          });
+      } // endif box ok
+      } // endif ncorr
+    }  // end loop mfi
+
+      // Optional: if you rely on marker(.,.,.,1) being valid in  ALL ghost cells
+      // need to mfab.FillBoundary(geom[lev].periodicity()) outside the MFIter
+  }
+  ////////////////////////////////////////////////////////////////////////////
+  /**
+  * @brief check if the geometry is properly defined by printing out some geometric parameters
+  * @param lev current AMR level  
+  **/
+  void check_geometry (int lev)
+  {
+    int empty_cutcells      = 0;
+    int distorted_cutcells  = 0;
+    int corr_cutcells       = 0;
+
+    auto& mfab = *bmf_a[lev];
+
+    amrex::Print() << " Check EB geometry at level " << lev << "\n";
+
+    for (amrex::MFIter mfi(mfab, false); mfi.isValid(); ++mfi)
+    {
+      const Box& ebbox  = mfi.growntilebox(0);  // box without ghost points 
+
+      const auto& flag = (*ebflags_a[lev])[mfi];
+      FabType t = flag.getType(ebbox);
+      const bool fab_with_eb     = (FabType::singlevalued == t);  
+
+      if (!fab_with_eb) { continue;}
+
+      // geometry arrays for this tile
+      const auto apx       = areamcf_a[lev][0]->const_array(mfi);
+      const auto apy       = areamcf_a[lev][1]->const_array(mfi);
+#if (AMREX_SPACEDIM == 3)
+      const auto apz       = areamcf_a[lev][2]->const_array(mfi);
+#endif
+      const auto vfrac     = (*volmf_a[lev]).const_array(mfi);    
+      const auto flag_arr  = (*ebflags_a[lev]).const_array(mfi);           
+      const auto normxyz   = (*normmcf_a[lev]).const_array(mfi);
+      const auto bcarea    = (*bcareamcf_a[lev]).const_array(mfi);
+      // markers
+      const auto& ebMarkers = mfab.array(mfi);      
 
       amrex::ParallelFor(
-        bxg, [=] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {                       
-        ebMarkers(i, j, k, 0) = flag_arr(i,j,k).isCovered();  
-        ebMarkers(i, j, k, 1) = flag_arr(i,j,k).isSingleValued();    
+        ebbox, [=,&empty_cutcells, &distorted_cutcells, &corr_cutcells] AMREX_GPU_DEVICE(int i, int j, int k) noexcept
+      {
+
+        // remove regular cells and covered cells (keep cut cells only)
+        // if ( flag_arr(i,j,k).isCovered() ) return; 
+        
+        //if (!flag_arr(i,j,k).isSingleValued()) return; // not cutcell
+
+        if (ebMarkers(i,j,k,1) == 0) return; // not neighbour of solid
+
+
+        // normal to surface (pointing towards the fluid)
+        amrex::Real norm_wall[AMREX_SPACEDIM] = {0.0_rt};
+        for (int n = 0; n < AMREX_SPACEDIM; ++n) {
+          norm_wall[n] = -normxyz(i,j,k,n);
+        }
+        amrex::Real areaw = bcarea(i,j,k,0);
+        // calculate error divergence 
+        amrex::Real Err_A[AMREX_SPACEDIM] = {0.0_rt};
+        Err_A[0] = apx(i,j,k)   - apx(i+1,j,k)   + areaw*norm_wall[0];
+        Err_A[1] = apy(i,j,k)   - apy(i,j+1,k)   + areaw*norm_wall[1];
+#if (AMREX_SPACEDIM == 3)
+        Err_A[2] = apz(i,j,k)   - apz(i,j,k+1)   + areaw*norm_wall[2];
+#endif
+        amrex::Real sumError = 0.0_rt;
+        for (int n = 0; n < AMREX_SPACEDIM; ++n) {sumError += Err_A[n];} 
+
+        // check if vfrac is in the expected range
+        if (vfrac(i,j,k) < vfracmin)  {
+          ++empty_cutcells;          
+        }                
+
+        if (amrex::Math::abs(sumError) > 1.e-6_rt) {
+          ++distorted_cutcells;
+        }        
+
+        // these cells were corrected because they were empty
+        if (!flag_arr(i,j,k).isSingleValued())
+        {
+          ++corr_cutcells;
+        }
+
+
       });
 
     }
+
+    // sum across MPI ranks
+    amrex::ParallelDescriptor::ReduceIntSum(empty_cutcells);
+    amrex::ParallelDescriptor::ReduceIntSum(distorted_cutcells);
+    amrex::ParallelDescriptor::ReduceIntSum(corr_cutcells);
+    
+    amrex::Print() << " Total number of empty cut-cells:  " << empty_cutcells ;
+    amrex::Print() << " and distorted cut-cells: " << distorted_cutcells << "\n";
+    amrex::Print() << " empty cells corrected:   " << corr_cutcells << "\n";
+    amrex::Print() << " ------------------------------------ \n";
   }
   ////////////////////////////////////////////////////////////////////////////
   /**
@@ -239,9 +395,9 @@ public:
     const auto& ebMarkers = (*bmf_a[lev]).array(mfi);
 
     // temp variables and arrays for debugging mostly
-    //const auto& flag_arr = (*ebflags_a[lev]).const_array(mfi);
+    const auto& flag_arr = (*ebflags_a[lev]).const_array(mfi);
     //const auto& flag = (*ebflags_a[lev])[mfi];
-    //const Real *prob_lo = geom.ProbLo();
+    const Real *prob_lo = geom.ProbLo();
 
     auto const& flx_x = flxt[0]->array(); 
     auto const& flx_y = flxt[1]->array(); 
@@ -249,27 +405,15 @@ public:
     auto const& flx_z = flxt[2]->array(); 
 #endif
 
-    // paramters for interpolation
-    constexpr bool use_weighted_interp = false;  //false: unweighted average; true: inverse-distance weighted average
-    constexpr int nb = 1; // number of neighbours for interpolation     
-    constexpr Real vfracmin = 1.e-7; // minimum vfrac to consider a cell "not empty" 
-
-
     amrex::ParallelFor(
         ebbox, [=] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {
 
           // only solve flux in cut cells (not in regular or almost empty cells)
           bool solve_fluxwall = ebMarkers(i,j,k,1) && (vfrac(i,j,k) > vfracmin); 
+          //bool solve_fluxwall = ebMarkers(i,j,k,1);
 
-          if (solve_fluxwall){
-            Real inv_hvfrac = dxinv[0]/vfrac(i,j,k); //only isotropic cells
-
-            // if (vfrac(i,j,k) < vfracmin) {
-            //   // if the cell is almost empty, we can treat it as a regular cell 
-            //   // and apply a correction to the fluxes to ensure conservation.               
-            //   inv_hvfrac = dxinv[0];              
-            // }  
-
+          if (solve_fluxwall){            
+            Real inv_hvfrac = dxinv[0]/(vfrac(i,j,k)+vfracmin); //only isotropic cells
 
             // rebuild fluxes in the cut cells
             for (int n = 0; n < cls_t::NCONS; n++) {
@@ -389,13 +533,15 @@ public:
             // calculate wall flux and add it to rhs
             wallmodel::wall_flux(geom,i,j,k,norm_wall,prim_wall,flux_wall,cls);      
                                   
+
+
             // calculate viscous walls
             if (param::solve_diffwall)
             {
               // from volume and area centroid compute distance to wall 
               // and project into normal direction
               Real x_dis[AMREX_SPACEDIM]= {0.0};
-              Real dis = 1e-6_rt; // min value (cell units) 
+              Real dis = 1e-6_rt; // min value (cell units)   <<<<
               for (int n = 0; n < AMREX_SPACEDIM; n++) {
                 x_dis[n] = vol_centroid(i,j,k,n)- bc_centroid(i,j,k,n);
                 dis += x_dis[n]*norm_wall[n];
@@ -410,8 +556,7 @@ public:
             for (int n = 0; n < cls_t::NCONS; n++) {
               rhs(i,j,k,n) += flux_wall[n]*areaw*inv_hvfrac; 
             }                           
-            // (debug cells here)
-              //// DEBUG    
+            
             //
 
           }  //end if partially covered       

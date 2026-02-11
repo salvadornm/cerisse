@@ -92,7 +92,13 @@ struct ProbParm {
   
   // inflow
   const Real p_0     = pres_atm2si; //[Pa] inflow pressure (1 atm) 
-  const Real T_0     = 298;  //[K]  
+  const Real T_0     = 298.0;  //[K]  
+  
+  // 
+  const Real T_b  = Tburn;
+  const Real T_u  = T_0;
+  
+
   Real rho_0, eint_0;
 
   const Real vel_0[3]= {0.0,0.0,0.0}; // array of inside velocity [m/s]
@@ -309,38 +315,42 @@ user_tagging(int i, int j, int k, int nt_level, auto &tagfab,
 
   bool refine = false;
   
-  // // refine exit of injector
-  // refine= (z > 0.035) && (z < 0.07);
-  // // refine close to exit  (avoid corner problem)
-  // refine= (z > 0.13) || refine;
 
+  //  U->Q 
+  // Real Q[ProbClosures::NPRIM],U[ProbClosures::NCONS];
+  // for (int n = 0; n < ProbClosures::NCONS; ++n) {
+  //   U[n] = sdatafab(i,j,k,n);
+  // }
+  // auto thermo = ProbClosures::multispecies_pele_gas_t();
+  // thermo.cons2prims_point(U,Q);
+ 
 
-  //const int URHO= ProbClosures::URHO;
-
-  // // compoute | d rho | normalised with rho
-  // Real o_over_rhot = Real(1.0)/sdatafab(i,j,k,URHO);
-
-  // Real drhox = Math::abs(sdatafab(i+1,j,k,URHO) - sdatafab(i-1,j,k,URHO));
-  // Real drhoy = Math::abs(sdatafab(i,j+1,k,URHO) - sdatafab(i,j-1,k,URHO));
-  // Real drhoz = Math::abs(sdatafab(i,j,k+1,URHO) - sdatafab(i,j,k-1,URHO));
-
-  // Real gradrho= Real(0.5)*sqrt(drhox*drhox+drhoy*drhoy)*o_over_rhot;        
+  // use H2O as refinement
+  //const int UREF= ProbClosures::UFS + H2O_ID;  
+  // Real drhox =( sdatafab(i+1,j,k,UREF) - sdatafab(i-1,j,k,UREF) );
+  // Real drhoy =( sdatafab(i,j+1,k,UREF) - sdatafab(i,j-1,k,UREF) );
+  // Real drhoz =( sdatafab(i,j,k+1,UREF) - sdatafab(i,j,k-1,UREF) );
+  // Real gradrho= Real(0.5)*sqrt(drhox*drhox+drhoy*drhoy);
+  // refine = grad_rho > 0.1       
+  
+  // progress variable
+  //Real c =  (Q[ProbClosures::QT]-prob_parm.T_u)/(prob_parm.T_b - prob_parm.T_u);
 
 
  switch (level)
   {
-    case 0:
-      
-      refine = (z > 0.03) && (z < 0.08) && (r < 0.03);    // refine combustor close to walls
-
+    case 0:      
+      refine =(z < 0.08) && (r < 0.1);    
       break;
     case 1:
-      refine= (z > 0.004) && (z < 0.06) && (r < 0.015);
+      refine = (z > 0.03) && (z < 0.08) && (r < 0.015);  
       break;
     case 2:
-      // refine= (z > 0.035) && (z < 0.07);    
+      refine = (z > 0.0042) && (z < 0.06) && (r < 0.01);
       break;  
-      
+    case 3:  
+      //refine =  (c < 0.7) && (c > 0.3);
+      break;      
     default:
 
     break;
@@ -359,7 +369,7 @@ class user_source_t {
 
   // ATF options
   bool static constexpr ATF = true; // use adaptive thickening factor
-  static constexpr Real thickfactor = 5.0; // thickening factor
+  static constexpr Real thickfactor = 1.0; // thickening factor
   // compute chemistry
   bool static constexpr do_reactions = true;  // <<<<<<<<<<<<<<<<<<<<<<<<<
   bool static constexpr mask_cells_boundary = true; // avoid compute reactions in cells partially covered

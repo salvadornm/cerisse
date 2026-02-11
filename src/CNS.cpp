@@ -31,7 +31,7 @@ std::string CNS::eb_redistribution_type = "NoRedist";
 int CNS::nstep_screen_output = 10;
 int CNS::order_rk = 2;
 int CNS::stages_rk = 2;
-int CNS::do_reflux = 1;
+int CNS::do_reflux = 0; // default reflux is off
 int CNS::refine_max_dengrad_lev = -1;
 Real CNS::cfl = 0.0_rt;
 Real CNS::dt_constant = 0.0_rt;
@@ -302,7 +302,13 @@ void CNS::post_init(Real stop_time) {
   if (record_probe) {
     setupTimeProbe();
   }
+
   
+#if CNS_USE_EB
+  EBM::eb.check_geometry(level);
+#endif
+  
+
 }
 // -----------------------------------------------------------------------------
 
@@ -677,6 +683,9 @@ void CNS::post_regrid(int lbase, int new_finest) {
 
   // Calculate markers  
   EBM::eb.computeMarkers(level);
+  
+  EBM::eb.check_geometry(level);
+
 
 #endif
 
@@ -772,6 +781,8 @@ amrex::Print() << " recreate markers " << std::endl;
 
   // Calculate markers  
   EBM::eb.computeMarkers(level);
+
+  EBM::eb.check_geometry(level);
 
 #endif
 

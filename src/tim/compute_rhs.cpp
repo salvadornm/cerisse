@@ -192,21 +192,28 @@ void CNS::compute_rhs(MultiFab& statemf, Real dt, FluxRegister* fr_as_crse, Flux
 
     // TODO: IBM::set_solid_state(mfi,state,cls_d)
 
-
-    // // Flux register
+    
+    // Flux register accumulation (conservation across AMR levels)
     // if (do_reflux) {
-    //   const auto dx = geom.CellSizeArray();
-    //   if (fr_as_fine) {
-    //     fr_as_fine->FineAdd(mfi,
-    //                         {AMREX_D_DECL(&fluxes[0], &fluxes[1], &fluxes[2])},
-    //                         dx.data(), dtsub, RunOn::Device);
-    //   }
-    //   if (fr_as_crse) {
-    //     fr_as_crse->CrseAdd(mfi,
-    //                         {AMREX_D_DECL(&fluxes[0], &fluxes[1], &fluxes[2])},
-    //                         dx.data(), dtsub, RunOn::Device);
+    //   if (fr_as_fine || fr_as_crse) {
+    //     const auto dx = geom.CellSizeArray();
+    //     // Note: fluxt[dir] are face-centered FArrayBox with NCONS components
+    //     // Already filled them with eflux + dflux (+ ebflux if enabled)
+
+    //     if (fr_as_fine) {
+    //       fr_as_fine->FineAdd(
+    //         mfi,{AMREX_D_DECL(&fluxt[0], &fluxt[1], &fluxt[2])}, dx.data(), dt, RunOn::Device);
+    //     }
+
+    //     if (fr_as_crse) {
+    //       fr_as_crse->CrseAdd(
+    //       mfi,{AMREX_D_DECL(&fluxt[0], &fluxt[1], &fluxt[2])}, dx.data(), dt, RunOn::Device);            
+    //     }
     //   }
     // }
-  }
+    //
+
+
+  } // end mfi loop
  
 }
