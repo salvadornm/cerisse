@@ -1,5 +1,5 @@
 # Simulation time
-max_step  =  8000
+max_step  =  25000
 stop_time =  0.5
 cfl = 0.3
 #time_step = 5.0e-7
@@ -39,8 +39,8 @@ amr.grid_eff          = 0.7    # what constitutes an efficient grid
 # Plot and checkpoint
 amr.checkpoint_files_output = 1
 amr.check_file              = ./chk     # root name of checkpoint file
-amr.check_int               = 4000   # number of timesteps betw.  checkpoints
-amr.restart =./chk04000
+amr.check_int               = 5000   # number of timesteps betw.  checkpoints
+amr.restart =./chk20000
 amr.plot_files_output = 1
 amr.plot_file         = ./plot/plt    # root name of plotfile
 amr.plot_int          = 100           # number of timesteps between plotfiles
@@ -58,15 +58,15 @@ cns.time_probe_lev = 0
 cns.time_probe_int = 1
 cns.time_probes = PressurePoint Temperature
 PressurePoint.field_name = pressure
-PressurePoint.box_lo = -0.01 -0.01 0.125
-PressurePoint.box_hi = 0.01 0.01 0.13
+PressurePoint.box_lo = -0.01 -0.01 0.095
+PressurePoint.box_hi = 0.01 0.01 0.1
 Temperature.field_name = temperature
-Temperature.box_lo = -0.01 -0.01 0.125
-Temperature.box_hi = 0.01 0.01 0.13
+Temperature.box_lo = -0.01 -0.01 0.095
+Temperature.box_hi = 0.01 0.01 0.1
 
 # Chemical Options
-#cns.reactor_type = "ReactorCvode"
-cns.reactor_type = "ReactorNull"
+cns.reactor_type = "ReactorCvode"
+#cns.reactor_type = "ReactorNull"
 cvode.solve_type =  "dense_direct"
 ode.clean_init_massfrac = 1
 

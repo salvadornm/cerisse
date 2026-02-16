@@ -165,11 +165,11 @@ template <typename cls_t > class user_source_t;
 
 // USED
 //typedef rhs_dt<weno_t<ReconScheme::WenoZ5, ProbClosures>, viscousLES_t<user_source_t<ProbClosures>, ProbClosures>, reactor_sourceLES_t<user_source_t<ProbClosures>,ProbClosures >> ProbRHS;
-//typedef rhs_dt<skew_t<skewparm_t, ProbClosures>, viscousLES_t<user_source_t<ProbClosures>, ProbClosures>, reactor_sourceLES_t<user_source_t<ProbClosures>,ProbClosures >> ProbRHS;
+typedef rhs_dt<skew_t<skewparm_t, ProbClosures>, viscousLES_t<user_source_t<ProbClosures>, ProbClosures>, reactor_sourceLES_t<user_source_t<ProbClosures>,ProbClosures >> ProbRHS;
 
 //typedef rhs_dt<skew_t<skewparm_t, ProbClosures>, no_diffusive_t, no_source_t > ProbRHS;
 
-typedef rhs_dt<skew_t<skewparm_t, ProbClosures>, viscousLES_t<user_source_t<ProbClosures>, ProbClosures>, no_source_t > ProbRHS;
+//typedef rhs_dt<skew_t<skewparm_t, ProbClosures>, viscousLES_t<user_source_t<ProbClosures>, ProbClosures>, no_source_t > ProbRHS;
 
 
 // define type of wall and EBM class
@@ -317,12 +317,12 @@ user_tagging(int i, int j, int k, int nt_level, auto &tagfab,
   
 
   //  U->Q 
-  // Real Q[ProbClosures::NPRIM],U[ProbClosures::NCONS];
-  // for (int n = 0; n < ProbClosures::NCONS; ++n) {
-  //   U[n] = sdatafab(i,j,k,n);
-  // }
-  // auto thermo = ProbClosures::multispecies_pele_gas_t();
-  // thermo.cons2prims_point(U,Q);
+  Real Q[ProbClosures::NPRIM],U[ProbClosures::NCONS];
+  for (int n = 0; n < ProbClosures::NCONS; ++n) {
+    U[n] = sdatafab(i,j,k,n);
+  }
+  auto thermo = ProbClosures::multispecies_pele_gas_t();
+  thermo.cons2prims_point(U,Q);
  
 
   // use H2O as refinement
@@ -334,19 +334,19 @@ user_tagging(int i, int j, int k, int nt_level, auto &tagfab,
   // refine = grad_rho > 0.1       
   
   // progress variable
-  //Real c =  (Q[ProbClosures::QT]-prob_parm.T_u)/(prob_parm.T_b - prob_parm.T_u);
+  Real c =  (Q[ProbClosures::QT]-prob_parm.T_u)/(prob_parm.T_b - prob_parm.T_u);
 
 
  switch (level)
   {
     case 0:      
-      refine =(z < 0.08) && (r < 0.1);    
+      refine =(z < 0.08) && (r < 0.03);    
       break;
     case 1:
-      refine = (z > 0.03) && (z < 0.08) && (r < 0.015);  
+      refine = (z > 0.01) && (z < 0.08) && (r < 0.018);  
       break;
     case 2:
-      refine = (z > 0.0042) && (z < 0.06) && (r < 0.01);
+      refine = (z > 0.03) && (z < 0.06) && (r < 0.015);
       break;  
     case 3:  
       //refine =  (c < 0.7) && (c > 0.3);
@@ -369,7 +369,7 @@ class user_source_t {
 
   // ATF options
   bool static constexpr ATF = true; // use adaptive thickening factor
-  static constexpr Real thickfactor = 1.0; // thickening factor
+  static constexpr Real thickfactor = 5.0; // thickening factor
   // compute chemistry
   bool static constexpr do_reactions = true;  // <<<<<<<<<<<<<<<<<<<<<<<<<
   bool static constexpr mask_cells_boundary = true; // avoid compute reactions in cells partially covered
@@ -411,7 +411,8 @@ class user_source_t {
  
 
     // doing in this way avoids passing  whole prob_parm and only pass scalars you use 
-    const Real zexit = prob_parm.zexit;
+    //const Real zexit = prob_parm.zexit;
+    const Real zexit = 0.2;
     const Real p_0    = prob_parm.p_0;
 
     // ------------------------------------------------------------------------------------
@@ -446,7 +447,8 @@ class user_source_t {
                     + prims(i,j,k,cls.QW)*prims(i,j,k,cls.QW));
       Real Et  = prims(i,j,k,cls.QEINT) + kin;
     
-      bool buffer = (z > zexit) && (r > 0.06);
+      
+      bool buffer = (z > zexit); //&& (r > 0.06);
 
       if (buffer){        
         rhs(i,j,k,cls.UMX) += prims(i,j,k,cls.QU)*drhodt;
