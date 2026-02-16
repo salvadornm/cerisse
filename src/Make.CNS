@@ -9,6 +9,10 @@ endif
 
 include $(AMREX_HOME)/Tools/GNUMake/Make.defs
 
+
+AMREXVERSION ?= 23
+DEFINES += -DAMREXVERSION
+
 ifeq ($(GTEST),TRUE) 
   include $(AMR_SOLVER)/tst/googletest/Make.main 
 else 
@@ -108,6 +112,7 @@ ifeq ($(USE_PELEPHYSICS),TRUE)
 
 # PelePhysics version 25 or 23 (can be overrided in GNUMakefile )
 PELEPVERSION ?= 23
+DEFINES += -DPELEPVERSION
 
 # version dependent paths
 ifeq ($(PELEPVERSION),25)
@@ -174,6 +179,7 @@ warning_flags +=-Wfatal-errors
 
 # CNS uses a coarse grained OMP approach
 DEFINES += -DAMREX_CRSEGRNDOMP
+
 
 TPL:
 	@echo "==> Building SUNDIALS library"

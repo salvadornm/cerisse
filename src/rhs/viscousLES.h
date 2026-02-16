@@ -101,22 +101,30 @@ class viscousLES_t {
     
      
     BL_PROFILE("PelePhysics::get_transport_coeffs()");
-    Array4<Real> chi; // dummy Soret effect coef (not ready yet)
     
-    // temp snm
-    //pele::physics::transport::TransportParams< pele::physics::PhysicsType::transport_type> trans_parms;
+    // Soret effect (not used yet)
+    const auto& chi_arr = coeffs.array(cls_t::CSORET); 
+        
+#if (PELEPVERSION==23)   
     trans_parms.allocate(); 
-
     auto const* ltransparm = trans_parms.device_trans_parm();
-    
+#else
+    auto const* ltransparm = trans_parms.device_parm();
+#endif    
+
+    // temp snm
+    // AMREX_ALWAYS_ASSERT(ltransparm != nullptr);
+    // AMREX_ALWAYS_ASSERT(mu_arr.dataPtr() != nullptr);
+
+        
     amrex::launch(bxg, [=] AMREX_GPU_DEVICE(Box const& tbx) {
 
             auto trans = pele::physics::PhysicsType::transport();                      
             trans.get_transport_coeffs(tbx, q_y, q_T, q_rho, 
-                rhoD_arr, chi, mu_arr,xi_arr, lam_arr, ltransparm);
+                rhoD_arr, chi_arr, mu_arr,xi_arr, lam_arr, ltransparm);
           });
 
-    // change units
+    // change units cgs-> SI
     amrex::ParallelFor(
         bxg, [=, *this] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {        
         mu_arr(i,j,k) *= visc_cgs2si;

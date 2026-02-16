@@ -35,6 +35,10 @@ AMREX_NO_PROBINIT=TRUE
 AMR_SOLVER = $(abspath ../../../)
 AMREX_HOME = $(abspath ../../../lib/amrex)
 PELE_PHYSICS_HOME = $(abspath ../../../lib/PelePhysics)
+SUNDIALS_HOME = $(abspath ../../../lib/sundials/)
+PELEPVERSION = 25
+AMREXVERSION = 25
+
 
 CEXE_headers += prob.h
 CEXE_sources += eb_geometry.cpp

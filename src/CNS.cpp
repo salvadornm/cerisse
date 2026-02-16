@@ -9,6 +9,17 @@
 #include <fsi/RigidBodyProperties.h>
 #endif
 
+#ifdef USE_PELEPHYSICS
+#include "TransPele.h"
+
+pele::physics::PeleParams<
+  pele::physics::transport::TransParm<
+    pele::physics::PhysicsType::eos_type,
+    pele::physics::PhysicsType::transport_type
+  >> trans_parms;
+#endif
+
+
 using namespace amrex;
 
 bool CNS::verbose = true;
@@ -188,6 +199,16 @@ void CNS::read_params() {
   EBM::eb.eb_weight = eb_weight;
   EBM::eb.redistribution_type = eb_redistribution_type; 
 
+#endif
+
+
+#ifdef USE_PELEPHYSICS
+  // One-time transport parameter initialization (host->device)
+  static bool trans_inited = false;
+  if (!trans_inited) {
+    trans_parms.initialize();
+    trans_inited = true;
+  }
 #endif
 
 

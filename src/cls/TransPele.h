@@ -4,14 +4,23 @@
 #ifdef USE_PELEPHYSICS
 #include <PelePhysics.H>
 
-// v23
-static pele::physics::transport::TransportParams<
-       pele::physics::PhysicsType::transport_type> trans_parms;
 
+#if (PELEPVERSION==23)
+// v23
+static  pele::physics::transport::TransportParams<
+        pele::physics::PhysicsType::transport_type> trans_parms;
+#else
 // v25       
-// static pele::physics::transport::TransParm<
-// pele::physics::PhysicsType::eos_type,
-// pele::physics::PhysicsType::transport_type> trans_parms;
+// static  pele::physics::transport::TransParm<
+//         pele::physics::PhysicsType::eos_type,
+//         pele::physics::PhysicsType::transport_type> trans_parms;
+// Wrap TransParm in PeleParams so it can be initialized and accessed on device
+extern  pele::physics::PeleParams<
+        pele::physics::transport::TransParm<
+        pele::physics::PhysicsType::eos_type,
+        pele::physics::PhysicsType::transport_type > > trans_parms;
+#endif
+
 
 
 #endif

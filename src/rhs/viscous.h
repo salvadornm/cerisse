@@ -100,11 +100,13 @@ class viscous_t {
     BL_PROFILE("PelePhysics::get_transport_coeffs()");
     Array4<Real> chi; // dummy Soret effect coef (not ready yet)
     
-    // temp snm
-    //pele::physics::transport::TransportParams< pele::physics::PhysicsType::transport_type> trans_parms;
+    
+#if (PELEPVERSION==23)   
     trans_parms.allocate(); 
-
     auto const* ltransparm = trans_parms.device_trans_parm();
+#else
+    auto const* ltransparm = trans_parms.device_parm();
+#endif    
     
     amrex::launch(bxg, [=] AMREX_GPU_DEVICE(Box const& tbx) {
 

@@ -128,10 +128,16 @@ class adiabatic_wall_t
       for (int n = 0; n < NUM_SPECIES; ++n) { Y[n] = prims_w[cls_t::QFS + n]; }
       const bool get_xi = true, get_mu = true, get_lam = false;
       const bool get_Ddiag = false, get_chi = false;
-      // pepelephysics 
-      auto trans = pele::physics::PhysicsType::transport();
+      
+      // pelePhysics       
+      auto trans = pele::physics::PhysicsType::transport();   
+#if (PELEPVERSION==23)            
       trans_parms.allocate(); 
       auto const* ltransparm = trans_parms.device_trans_parm();
+#else
+      auto const* ltransparm = trans_parms.device_parm();
+#endif    
+
       trans.transport(get_xi, get_mu, get_lam, get_Ddiag, get_chi, Tw, rho,
                      Y, nullptr, nullptr, mu_w, xi_w, cond_w, ltransparm);
       mu_w = mu_w*visc_cgs2si; // convert to SI units
@@ -234,10 +240,16 @@ class isothermal_wall_t
       for (int n = 0; n < NUM_SPECIES; ++n) { Y[n] = prims_w[cls_t::QFS + n]; }
       const bool get_xi = true, get_mu = true, get_lam = true;
       const bool get_Ddiag = false, get_chi = false;
-      // pepelephysics 
-      auto trans = pele::physics::PhysicsType::transport();
+
+      // pelePhysics    
+      auto trans = pele::physics::PhysicsType::transport();      
+#if (PELEPVERSION==23)         
       trans_parms.allocate(); 
       auto const* ltransparm = trans_parms.device_trans_parm();
+#else
+      auto const* ltransparm = trans_parms.device_parm();
+#endif    
+    
       trans.transport(get_xi, get_mu, get_lam, get_Ddiag, get_chi, Tw, rho,
                      Y, nullptr, nullptr, mu_w, xi_w, cond_w, ltransparm);
       mu_w = mu_w*visc_cgs2si; // convert to SI units
