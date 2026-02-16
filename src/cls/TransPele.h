@@ -9,16 +9,25 @@
 // v23
 static  pele::physics::transport::TransportParams<
         pele::physics::PhysicsType::transport_type> trans_parms;
+
+// check (not validated v23)
+using trans_parm_t =
+ 	pele::physics::transport::TransParm<
+	pele::physics::PhysicsType::eos_type,
+	pele::physics::PhysicsType::transport_type>;	
+
 #else
 // v25       
-// static  pele::physics::transport::TransParm<
-//         pele::physics::PhysicsType::eos_type,
-//         pele::physics::PhysicsType::transport_type> trans_parms;
-// Wrap TransParm in PeleParams so it can be initialized and accessed on device
 extern  pele::physics::PeleParams<
         pele::physics::transport::TransParm<
         pele::physics::PhysicsType::eos_type,
         pele::physics::PhysicsType::transport_type > > trans_parms;
+
+using trans_parm_t =
+	typename pele::physics::transport::TransParm<
+	pele::physics::PhysicsType::eos_type,
+	pele::physics::PhysicsType::transport_type>;
+
 #endif
 
 

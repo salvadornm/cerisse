@@ -114,34 +114,34 @@ class reactor_sourceLES_t {
 
       // [rY, rEi, T, rYsrc, rEisrc] convert to CGS  to enter PelePhysics
 
-      Real rho = prims(i, j, k, cls.QRHO);
+      Real rho = prims(i, j, k, cls_t::QRHO);
       for (int ns = 0; ns < NUM_SPECIES; ++ns) {
-        rY(i, j, k, ns)    =   rho* prims(i, j, k, cls.QFS + ns) * rho_si2cgs;        
+        rY(i, j, k, ns)    =   rho* prims(i, j, k, cls_t::QFS + ns) * rho_si2cgs;        
       }      
-      rEi(i, j, k) = rho * prims(i, j, k, cls.QEINT) * rhoenergy_si2cgs;
-      T(i, j, k) = prims(i, j, k, cls.QT);
+      rEi(i, j, k) = rho * prims(i, j, k, cls_t::QEINT) * rhoenergy_si2cgs;
+      T(i, j, k) = prims(i, j, k, cls_t::QT);
       // Enthalpy (if reactor_type 2)
-      if constexpr (therm_reactor_type==2){
-        rEi(i,j,k)  +=  prims(i, j, k, cls.QPRES)*pres_si2cgs;   // rEi stores rhoHi
+      if (therm_reactor_type==2){
+        rEi(i,j,k)  +=  prims(i, j, k, cls_t::QPRES)*pres_si2cgs;   // rEi stores rhoHi
       }          
       
       // communicate source terms to solver
-      if constexpr(pass_source_term){
+      if (pass_source_term){
         for (int ns = 0; ns < NUM_SPECIES; ++ns) {
-          rYsrc(i, j, k, ns) = rhs(i, j, k, cls.UFS + ns) * rho_si2cgs;
+          rYsrc(i, j, k, ns) = rhs(i, j, k, cls_t::UFS + ns) * rho_si2cgs;
         }        
-        Real mx = rho * prims(i, j, k, cls.QU);
-        Real my = rho * prims(i, j, k, cls.QV);
-        Real mz = rho * prims(i, j, k, cls.QW);
+        Real mx = rho * prims(i, j, k, cls_t::QU);
+        Real my = rho * prims(i, j, k, cls_t::QV);
+        Real mz = rho * prims(i, j, k, cls_t::QW);
         Real rke = Real(0.5) * (mx * mx + my * my + mz * mz) / rho;
         for (int ns = 0; ns < NUM_SPECIES; ++ns) {
-          rho += rhs(i, j, k, cls.UFS + ns) * dt;
+          rho += rhs(i, j, k, cls_t::UFS + ns) * dt;
         }
-        mx += rhs(i, j, k, cls.UMX) * dt;
-        my += rhs(i, j, k, cls.UMY) * dt;
-        mz += rhs(i, j, k, cls.UMZ) * dt;
+        mx += rhs(i, j, k, cls_t::UMX) * dt;
+        my += rhs(i, j, k, cls_t::UMY) * dt;
+        mz += rhs(i, j, k, cls_t::UMZ) * dt;
         Real rke_new = Real(0.5) * (mx * mx + my * my + mz * mz) / rho;
-        rEisrc(i, j, k) = (rhs(i, j, k, cls.UET) - (rke_new - rke) / dt) * rhoenergy_si2cgs;
+        rEisrc(i, j, k) = (rhs(i, j, k, cls_t::UET) - (rke_new - rke) / dt) * rhoenergy_si2cgs;
       }      
       else {
         rEisrc(i, j, k) = 0.0;
@@ -199,6 +199,9 @@ class reactor_sourceLES_t {
     constexpr amrex::Real Fthick = (source_t::ATF ? source_t::thickfactor : amrex::Real(1.0));
     const amrex::Real o_F = amrex::Real(1.0) / Fthick;
     //
+    //
+    // Sensor
+    //
 
     //////////////////////// Unpack dat + Update RHS ////////////////////////
     amrex::ParallelFor(bx, [=] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {
@@ -210,7 +213,7 @@ class reactor_sourceLES_t {
         bool problem_cell = false;      
 
         // check for problematic cell after reaction
-        if constexpr (check_problem_cell) {
+        if (check_problem_cell) {
           for (int ns = 0; ns < NUM_SPECIES; ++ns) {
             problem_cell |=
               (rY(i, j, k, ns) < -1e-5 || rY(i, j, k, ns) > 1.0 + 1e-5 ||
@@ -223,40 +226,40 @@ class reactor_sourceLES_t {
         if (!problem_cell)
         {
           // Update species source terms ----------------------
-          const Real rho = prims(i, j, k, cls.QRHO);
+          const Real rho = prims(i, j, k, cls_t::QRHO);
 
           // Option 1: constant pressure ----------- (h,P constant)
-          if constexpr(reactor_constant_pressure) 
+          if (reactor_constant_pressure) 
           {
             Real Yk[NUM_SPECIES];
             for (int n = 0; n < NUM_SPECIES; ++n) { Yk[n] = rY(i, j, k, n)/rho;}            
             // enthalpy
-            const Real h = prims(i, j, k, cls.QEINT) + prims(i,j,k,cls.QPRES)/rho;
+            const Real h = prims(i, j, k, cls_t::QEINT) + prims(i,j,k,cls_t::QPRES)/rho;
             // recalculate Temperature
-            cls.RHY2T(rho, h, Yk, T(i,j,k));
+	    cls.RHY2T(rho, h, Yk, T(i,j,k));
             // recalculate rho based on new T, Y and P (unchanged during reaction)
             Real rhonew;
-            cls.PYT2R(prims(i,j,k,cls.QPRES),Yk,T(i,j,k),rhonew);
+            cls.PYT2R(prims(i,j,k,cls_t::QPRES),Yk,T(i,j,k),rhonew);
             // calculate density change drho/dt
             const Real drhodt = (rhonew - rho)* o_dt;
             // mass rhs:   rho dY/dt + Y drho/dt
             for (int ns = 0; ns < NUM_SPECIES; ++ns) {
-              rhs(i, j, k, cls.UFS + ns) +=  rho*(Yk[ns]- prims(i, j, k, cls.QFS + ns))* o_dt;
-              rhs(i, j, k, cls.UFS + ns) +=  prims(i, j, k, cls.QFS + ns)* drhodt;                         
+              rhs(i, j, k, cls_t::UFS + ns) +=  rho*(Yk[ns]- prims(i, j, k, cls_t::QFS + ns))* o_dt;
+              rhs(i, j, k, cls_t::UFS + ns) +=  prims(i, j, k, cls_t::QFS + ns)* drhodt;                         
             }
             // energy rhs:  h drho/dt
-            rhs(i, j, k, cls.UET) +=  h*drhodt;
+            rhs(i, j, k, cls_t::UET) +=  h*drhodt;
           }
           else
           // Option 2: constant volume ----------- (rho, e constant)
           {
             for (int ns = 0; ns < NUM_SPECIES; ++ns) {                          
-              Real Wchem = (rY(i, j, k, ns) - rho * prims(i, j, k, cls.QFS + ns)) * o_dt;
-              if constexpr(pass_source_term){
-                rhs(i, j, k, cls.UFS + ns) = Wchem*o_F;
+              Real Wchem = (rY(i, j, k, ns) - rho * prims(i, j, k, cls_t::QFS + ns)) * o_dt;
+              if (pass_source_term){
+                rhs(i, j, k, cls_t::UFS + ns) = Wchem*o_F;
               }
               else {
-                rhs(i, j, k, cls.UFS + ns) += Wchem*o_F;
+                rhs(i, j, k, cls_t::UFS + ns) += Wchem*o_F;
               }
             }
           }

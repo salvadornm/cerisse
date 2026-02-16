@@ -213,7 +213,10 @@ public:
       // Pass 1: define "solid"
       // -------------------------
       int ncorr=0;
-      amrex::ParallelFor( bxg, [=,&ncorr] AMREX_GPU_DEVICE (int i, int j, int k) noexcept
+      amrex::Gpu::DeviceScalar<int> ncorr_d(0);
+      int* p_ncorr = ncorr_d.dataPtr();
+
+      amrex::ParallelFor( bxg, [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept
         {
           // Start from AMReX EB classification
           int is_solid = flag_arr(i,j,k).isCovered() ? 1 : 0;
@@ -221,7 +224,8 @@ public:
           if (correct_cells)
           {
             if (flag_arr(i,j,k).isSingleValued() && (vfrac(i,j,k) < vfracmin)) {
-              is_solid = 1; ++ncorr;
+              is_solid = 1; 
+	      amrex::Gpu::Atomic::Add(p_ncorr, 1);
             }
           }  
           ebMarkers(i,j,k,0) = is_solid;
@@ -229,6 +233,7 @@ public:
           ebMarkers(i,j,k,1) = flag_arr(i,j,k).isSingleValued(); //old      
 
         });
+      ncorr = ncorr_d.dataValue();  // bring device counter back to host
       // ---------------------------------------------------------
       // Pass 2: rebuild "neighbor-of-solid" using updated marker0
       // ---------------------------------------------------------
@@ -275,13 +280,23 @@ public:
   **/
   void check_geometry (int lev)
   {
-    int empty_cutcells      = 0;
-    int distorted_cutcells  = 0;
-    int corr_cutcells       = 0;
 
     auto& mfab = *bmf_a[lev];
 
     amrex::Print() << " Check EB geometry at level " << lev << "\n";
+
+    // init counters
+    int empty_cutcells = 0;
+    int distorted_cutcells = 0;
+    int corr_cutcells = 0;
+
+    amrex::Gpu::DeviceScalar<int> empty_d(0);
+    amrex::Gpu::DeviceScalar<int> distorted_d(0);
+    amrex::Gpu::DeviceScalar<int> corr_d(0);
+
+    int* p_empty     = empty_d.dataPtr();
+    int* p_distorted = distorted_d.dataPtr();
+    int* p_corr      = corr_d.dataPtr();
 
     for (amrex::MFIter mfi(mfab, false); mfi.isValid(); ++mfi)
     {
@@ -307,13 +322,8 @@ public:
       const auto& ebMarkers = mfab.array(mfi);      
 
       amrex::ParallelFor(
-        ebbox, [=,&empty_cutcells, &distorted_cutcells, &corr_cutcells] AMREX_GPU_DEVICE(int i, int j, int k) noexcept
+        ebbox, [=] AMREX_GPU_DEVICE(int i, int j, int k) noexcept
       {
-
-        // remove regular cells and covered cells (keep cut cells only)
-        // if ( flag_arr(i,j,k).isCovered() ) return; 
-        
-        //if (!flag_arr(i,j,k).isSingleValued()) return; // not cutcell
 
         if (ebMarkers(i,j,k,1) == 0) return; // not neighbour of solid
 
@@ -336,23 +346,31 @@ public:
 
         // check if vfrac is in the expected range
         if (vfrac(i,j,k) < vfracmin)  {
-          ++empty_cutcells;          
+           //++empty_cutcells;          
+	  amrex::Gpu::Atomic::Add(p_empty, 1);
         }                
 
         if (amrex::Math::abs(sumError) > 1.e-6_rt) {
-          ++distorted_cutcells;
+           //++distorted_cutcells;
+	  amrex::Gpu::Atomic::Add(p_distorted, 1);
         }        
 
         // these cells were corrected because they were empty
         if (!flag_arr(i,j,k).isSingleValued())
         {
-          ++corr_cutcells;
+          //++corr_cutcells;
+	  amrex::Gpu::Atomic::Add(p_corr, 1);
         }
 
 
       });
 
     }
+
+
+    empty_cutcells     = empty_d.dataValue();
+    distorted_cutcells = distorted_d.dataValue();
+    corr_cutcells      = corr_d.dataValue();
 
     // sum across MPI ranks
     amrex::ParallelDescriptor::ReduceIntSum(empty_cutcells);
@@ -404,6 +422,14 @@ public:
 #if (AMREX_SPACEDIM==3)     
     auto const& flx_z = flxt[2]->array(); 
 #endif
+
+#ifdef USE_PELEPHYSICS    
+    // transport properties
+    auto const* ltransparm = trans_parms.device_parm();
+    AMREX_ALWAYS_ASSERT(ltransparm != nullptr);
+#else
+    auto const* ltransparm = (trans_parm_t const*)nullptr;        
+#endif    
 
     amrex::ParallelFor(
         ebbox, [=] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {
@@ -530,11 +556,10 @@ public:
             }
             //=================================================================
 
+	    wallmodel wm;  // create local instance
             // calculate wall flux and add it to rhs
-            wallmodel::wall_flux(geom,i,j,k,norm_wall,prim_wall,flux_wall,cls);      
+            wm.wall_flux(geom,i,j,k,norm_wall,prim_wall,flux_wall,cls);      
                                   
-
-
             // calculate viscous walls
             if (param::solve_diffwall)
             {
@@ -548,8 +573,7 @@ public:
               }   
               dis = dis*dx[0]; // units
               //         
-              wallmodel::wall_flux_diff(geom,i,j,k,dis,norm_wall,prims,prim_wall,flux_wall,cls);
-      
+              wm.wall_flux_diff(geom,i,j,k,dis,norm_wall,prims,prim_wall,flux_wall,cls,ltransparm);
             } //end if solve_diffwall
 
             // add wall flux to rhs 

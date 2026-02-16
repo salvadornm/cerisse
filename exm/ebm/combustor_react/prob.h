@@ -368,8 +368,8 @@ class user_source_t {
   public:
 
   // ATF options
-  bool static constexpr ATF = true; // use adaptive thickening factor
-  static constexpr Real thickfactor = 5.0; // thickening factor
+  bool static constexpr ATF = false; // use adaptive thickening factor
+  static constexpr Real thickfactor = 2.0; // thickening factor
   // compute chemistry
   bool static constexpr do_reactions = true;  // <<<<<<<<<<<<<<<<<<<<<<<<<
   bool static constexpr mask_cells_boundary = true; // avoid compute reactions in cells partially covered

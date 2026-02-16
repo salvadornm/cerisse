@@ -23,7 +23,7 @@ inline void cerisse_flux_redistribute (
     //
     const Real* dx = geom.CellSize();
 
-    const Box dbox1 = geom.growPeriodicDomain(1);
+    //const Box dbox1 = geom.growPeriodicDomain(1);
     const Box dbox2 = geom.growPeriodicDomain(2);
 
     const Box& grown1_bx = amrex::grow(bx,1);

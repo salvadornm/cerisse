@@ -98,8 +98,9 @@ class viscous_t {
     
      
     BL_PROFILE("PelePhysics::get_transport_coeffs()");
-    Array4<Real> chi; // dummy Soret effect coef (not ready yet)
-    
+    //Array4<Real> chi; // dummy Soret effect coef (not ready yet)
+    // Soret effect (not used yet)
+    const auto& chi_arr = coeffs.array(cls_t::CSORET); 
     
 #if (PELEPVERSION==23)   
     trans_parms.allocate(); 
@@ -112,7 +113,7 @@ class viscous_t {
 
             auto trans = pele::physics::PhysicsType::transport();                      
             trans.get_transport_coeffs(tbx, q_y, q_T, q_rho, 
-                rhoD_arr, chi, mu_arr,xi_arr, lam_arr, ltransparm);
+                rhoD_arr, chi_arr, mu_arr,xi_arr, lam_arr, ltransparm);
           });
 
     // change units

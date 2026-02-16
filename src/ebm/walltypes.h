@@ -77,16 +77,22 @@ class adiabatic_wall_t
 {
   public:
 
-    adiabatic_wall_t() {}
+    AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
+    adiabatic_wall_t() noexcept = default;	  
+  // adiabatic_wall_t() {}
+ 
+    AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
+    ~adiabatic_wall_t() noexcept = default;
 
-    ~adiabatic_wall_t() {}
+    //~adiabatic_wall_t() {}
 
     static constexpr Real r43 = 4.0/3.0;
     static constexpr Real r13 = 1.0/3.0;
 
     // Eulerian flux
-    static void inline wall_flux(const auto &geomdata, int /*i*/, int /*j*/, int /*k*/, const Real norm[AMREX_SPACEDIM], 
-      amrex::GpuArray<amrex::Real, cls_t::NPRIM>& prims, amrex::GpuArray<amrex::Real, cls_t::NCONS>& fluxw,const cls_t* cls) {
+    AMREX_GPU_DEVICE AMREX_FORCE_INLINE
+void wall_flux (const auto &geomdata, int /*i*/, int /*j*/, int /*k*/, const Real norm[AMREX_SPACEDIM], 
+      amrex::GpuArray<amrex::Real, cls_t::NPRIM>& prims, amrex::GpuArray<amrex::Real, cls_t::NCONS>& fluxw,const cls_t* cls) const noexcept {
 
       // printf(" oo Adiabatic wall \n ");
       // only set-non zero values (by default fluxw=0)                       
@@ -99,12 +105,12 @@ class adiabatic_wall_t
                                  
     }  
     // Viscous flux (stress and heat)  
-    static void inline wall_flux_diff(const auto &geomdata, int i, int j, int k, amrex::Real dis,const Real norm[AMREX_SPACEDIM],
+    AMREX_GPU_DEVICE AMREX_FORCE_INLINE
+    void  wall_flux_diff(const auto &geomdata, int i, int j, int k, amrex::Real dis,const Real norm[AMREX_SPACEDIM],
       const Array4<Real>& q, amrex::GpuArray<amrex::Real, cls_t::NPRIM>& prims_w, 
-      amrex::GpuArray<amrex::Real, cls_t::NCONS>& fluxw,const cls_t* cls) {
+      amrex::GpuArray<amrex::Real, cls_t::NCONS>& fluxw,const cls_t* cls, trans_parm_t const* ltransparm ) const noexcept  {
   
       // printf(" oo Adiabatic Viscous wall \n ");
-      // printf(" oo Isothermal Viscous wall \n ");              
       Real u[AMREX_SPACEDIM];
       u[0] = q(i,j,k,cls_t::QU); u[1] = q(i,j,k,cls_t::QV);
 #if AMREX_SPACEDIM==3        
@@ -131,13 +137,6 @@ class adiabatic_wall_t
       
       // pelePhysics       
       auto trans = pele::physics::PhysicsType::transport();   
-#if (PELEPVERSION==23)            
-      trans_parms.allocate(); 
-      auto const* ltransparm = trans_parms.device_trans_parm();
-#else
-      auto const* ltransparm = trans_parms.device_parm();
-#endif    
-
       trans.transport(get_xi, get_mu, get_lam, get_Ddiag, get_chi, Tw, rho,
                      Y, nullptr, nullptr, mu_w, xi_w, cond_w, ltransparm);
       mu_w = mu_w*visc_cgs2si; // convert to SI units
