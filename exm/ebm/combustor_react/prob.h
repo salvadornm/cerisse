@@ -35,7 +35,7 @@ namespace PROB {
 
 struct LESparm {
   // Smagorinsky constant
-  static constexpr Real Cs = 0.0; // Smag original 0.17 (off)
+  static constexpr Real Cs = 0.17; // Smag original 0.17 (off)
   static constexpr int order = 2; // order of the numerical scheme for LES
   static constexpr Real Scsgs = 0.4 ; //0.4 // turbulent Schmidt number
   static constexpr Real Pr_o_Prsgs = 1.0; //0.1 // turbulent Prandtl number  
@@ -59,7 +59,7 @@ struct ProbParm {
   const Real Tburn = 2207.0; //[K] burned gas temperature
 
   ProbParm () {
-  #if USE_PELEPHYSICS
+#if USE_PELEPHYSICS
   Y_inflow[H_ID] = 0; 
   Y_inflow[H2_ID] = 0.014468; 
   Y_inflow[O_ID] = 0; 
@@ -81,7 +81,7 @@ struct ProbParm {
   Y_burn[H2O2_ID] = 3.3351e-07;  
   Y_burn[N2_ID] = 0.7559 ; 
   
-  #endif
+#endif
 
   pp_pc.PYT2R(p_0, Y_inflow, T_0, rho_0);
   pp_pc.RYP2E(rho_0, Y_inflow, p_0, eint_0); 
@@ -194,9 +194,9 @@ prob_initdata(int i, int j, int k, Array4<Real> const &state,
   const Real *prob_hi = geomdata.ProbHi();
   const Real *dx = geomdata.CellSize();
 
-  Real x = prob_lo[0] + (i + Real(0.5)) * dx[0];
-  Real y = prob_lo[1] + (j + Real(0.5)) * dx[1];
-  Real z = prob_lo[2] + (k + Real(0.5)) * dx[2];
+  //Real x = prob_lo[0] + (i + Real(0.5)) * dx[0];
+  //Real y = prob_lo[1] + (j + Real(0.5)) * dx[1];
+  //Real z = prob_lo[2] + (k + Real(0.5)) * dx[2];
 
   // local vars
   Real rhot,eint,u[3],y_sp[NUM_SPECIES];
@@ -334,16 +334,16 @@ user_tagging(int i, int j, int k, int nt_level, auto &tagfab,
   // refine = grad_rho > 0.1       
   
   // progress variable
-  Real c =  (Q[ProbClosures::QT]-prob_parm.T_u)/(prob_parm.T_b - prob_parm.T_u);
+  //Real c =  (Q[ProbClosures::QT]-prob_parm.T_u)/(prob_parm.T_b - prob_parm.T_u);
 
 
  switch (level)
   {
     case 0:      
-      refine =(z < 0.08) && (r < 0.03);    
+      refine = (z < 0.1) && (r < 0.03);    
       break;
     case 1:
-      refine = (z > 0.01) && (z < 0.08) && (r < 0.018);  
+      refine = (z < 0.08) && (r < 0.025);  
       break;
     case 2:
       refine = (z > 0.03) && (z < 0.06) && (r < 0.015);
@@ -368,7 +368,7 @@ class user_source_t {
   public:
 
   // ATF options
-  bool static constexpr ATF = false; // use adaptive thickening factor
+  bool static constexpr ATF = true; // use adaptive thickening factor
   static constexpr Real thickfactor = 2.0; // thickening factor
   // compute chemistry
   bool static constexpr do_reactions = true;  // <<<<<<<<<<<<<<<<<<<<<<<<<
@@ -376,8 +376,8 @@ class user_source_t {
   //
 
   // viscous LES options
-  static constexpr int order = 2;                  // order numerical scheme   
-  static constexpr bool use_LES= false;           // use LES model in viscous term
+  static constexpr int  order = 2;                  // order numerical scheme   
+  static constexpr bool use_LES= true;           // use LES model in viscous term
 
 
   // to use as a user source term, the function name must be src:
@@ -394,89 +394,65 @@ class user_source_t {
                   amrex::Real dt, amrex::Real real_time){
 
     const Box& bxg = mfi.tilebox();
-    // const Box& bxg = mfi.growntilebox(cls_t::NGHOST);
-    const Real *prob_lo = geomdata.ProbLo();
-    const Real *dx = geomdata.CellSize();
+    
+    // use device-friendly arrays instead of pointers
+    //  const Real *prob_lo = geomdata.ProbLo();
+    //  const Real *dx = geomdata.CellSize();
+    auto prob_lo = geomdata.ProbLoArray();
+    auto dx     = geomdata.CellSizeArray();
 
     ProbParm const prob_parm;
-    const auto& cls = *cls_d;
-
-    // for spark
-    //SparkParm const spark;
-    //Real gauss_funt = std::exp( -0.5 * (real_time - spark.t0)*(real_time - spark.t0)/spark.dt2 );
-
 
     const Real tau_relax = 5.e-6;
     const Real coef =dt/tau_relax;
  
-
     // doing in this way avoids passing  whole prob_parm and only pass scalars you use 
     //const Real zexit = prob_parm.zexit;
     const Real zexit = 0.2;
     const Real p_0    = prob_parm.p_0;
+
+    auto const* cls = cls_d;
 
     // ------------------------------------------------------------------------------------
     amrex::ParallelFor(bxg,
       [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept
       {
       
+      // coordinates 
       const Real x = prob_lo[0] + (i + Real(0.5)) * dx[0];
       const Real y = prob_lo[1] + (j + Real(0.5)) * dx[1];
       const Real z = prob_lo[2] + (k + Real(0.5)) * dx[2];
       const Real r = sqrt(x*x + y*y + (z-zexit)*(z-zexit));
-      
-      // pressure relax  if P > P0  away from chamber
-      Real pres = prims(i,j,k,cls.QPRES);
 
-      const Real dP = (p_0- pres)*coef;
-    
-      const Real T = prims(i,j,k,cls.QT); // dT =0
-      const Real rho  = prims(i, j, k, cls.QRHO);
-     
-      Real drho = 0.0; Real Y[NUM_SPECIES] = {1.0};
-      #if USE_PELEPHYSICS
-      for (int sp = 0; sp < NUM_SPECIES; sp ++) {
-        Y[sp] = prims(i, j, k, cls.QFS + sp);
-      }
-      #endif 
+      // get values from primitives
+      const Real pres = prims(i,j,k,cls_t::QPRES);
+      const Real T    = prims(i,j,k,cls_t::QT   ); 
+      const Real rho  = prims(i,j,k,cls_t::QRHO );     
+      Real Y[NUM_SPECIES]; for (int sp = 0; sp < NUM_SPECIES; sp ++) { Y[sp] = prims(i, j, k, cls_t::QFS + sp);}
+      // u v w      
+      const Real u  = prims(i,j,k,cls_t::QU );
+      const Real v  = prims(i,j,k,cls_t::QV );
+      const Real w  = prims(i,j,k,cls_t::QW );
+      // Kinetic and Total energy (per density unit)  [J/rho] 
+      const Real Ekin = 0.5*(u*u + v*v + w*w);
+      const Real Et  = prims(i,j,k,cls_t::QEINT) + Ekin;
 
-      cls.PYT2R(dP,Y,T,drho);  
-      Real drhodt = drho/dt;
-      //Real drhodt = drho;
-      Real kin = 0.5*(prims(i,j,k,cls.QU)*prims(i,j,k,cls.QU) + prims(i,j,k,cls.QV)*prims(i,j,k,cls.QV)
-                    + prims(i,j,k,cls.QW)*prims(i,j,k,cls.QW));
-      Real Et  = prims(i,j,k,cls.QEINT) + kin;
-    
-      
-      bool buffer = (z > zexit); //&& (r > 0.06);
+      // pressure relaxation towards P0   
+      const Real dP = (p_0- pres)*coef; Real drho;
+      cls->PYT2R(dP,Y,T,drho);      // associated density change
+      const Real drhodt = drho/dt;  // rate of change
+   
+      // buffer zone where relaxation applies 
+      const bool buffer = (z > zexit); //&& (r > 0.06);
 
       if (buffer){        
-        rhs(i,j,k,cls.UMX) += prims(i,j,k,cls.QU)*drhodt;
-        rhs(i,j,k,cls.UMY) += prims(i,j,k,cls.QV)*drhodt; 
-        rhs(i,j,k,cls.UMZ) += prims(i,j,k,cls.QW)*drhodt;
-        rhs(i,j,k,cls.UET) += Et*drhodt;
-        for (int sp = 0; sp < NUM_SPECIES; sp++) {
-          rhs(i,j,k, cls.UFS + sp) += prims(i,j,k, cls.QFS + sp) * drhodt;  
-        }                        
-      }
-
-      // spark ignition --------------------
-      // const Real rs2 = (x- spark.x0)*(x- spark.x0) + (y- spark.y0)*(y- spark.y0) + (z- spark.z0)*(z- spark.z0);
-      // Real gauss_funr = std::exp( -0.5 * rs2/spark.ds2 );        
-      // rhs(i,j,k,cls.UET) += spark.energy*gauss_funt*gauss_funr*spark.o_Volt ;
-
-      
-      // damps energy if T > 3000 K
-      // if (T > 3000.0)
-      // {
-      //   const Real Ts = 3000.0;       
-      //   Real Etarget = 0.0;
-      //   Real rhos = 0.0;
-      //   cls.PYT2R(pres,Y,Ts,rhos);  
-      //   cls.RYP2E(rhos,Y,pres,Etarget);
-      //   Real tau = 5.0e-6; //5e-3 slow relaxation
-      //   rhs(i,j,k,cls.UET) += (rhos*Etarget - rho*prims(i,j,k,cls.QEINT))/tau;
-      // }
+ 
+        rhs(i,j,k,cls_t::UMX) += u*drhodt;
+        rhs(i,j,k,cls_t::UMY) += v*drhodt; 
+        rhs(i,j,k,cls_t::UMZ) += w*drhodt;
+        rhs(i,j,k,cls_t::UET) += Et*drhodt;
+        for (int sp = 0; sp < NUM_SPECIES; sp++)  rhs(i,j,k, cls_t::UFS + sp) += Y[sp] * drhodt;  
+      }                        
 
     });
 

@@ -16,7 +16,7 @@ inline void cerisse_flux_redistribute (
     Array4<Real       const> const& vfrac,
     Array4<EBCellFlag const> const& flag,
     const Geometry& geom,
-    int ncomp, Real dt)
+    int ncomp, Real /*dt*/)
 {
     //
     // Assume grid is uniform

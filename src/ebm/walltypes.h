@@ -14,6 +14,10 @@
 #include <TransPele.h>
 #endif
 
+// some constants
+static constexpr Real r43 = 4.0/3.0;
+static constexpr Real r13 = 1.0/3.0;
+
 ////////////////////////////////////////////////////////////////////////////
 // test wall
 template <typename cls_t>
@@ -79,72 +83,60 @@ class adiabatic_wall_t
 
     AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
     adiabatic_wall_t() noexcept = default;	  
-  // adiabatic_wall_t() {}
  
     AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
     ~adiabatic_wall_t() noexcept = default;
 
-    //~adiabatic_wall_t() {}
-
-    static constexpr Real r43 = 4.0/3.0;
-    static constexpr Real r13 = 1.0/3.0;
+    //static constexpr Real r43 = 4.0/3.0;
+    //static constexpr Real r13 = 1.0/3.0;
 
     // Eulerian flux
     AMREX_GPU_DEVICE AMREX_FORCE_INLINE
-void wall_flux (const auto &geomdata, int /*i*/, int /*j*/, int /*k*/, const Real norm[AMREX_SPACEDIM], 
+    void wall_flux (const auto &geomdata, int /*i*/, int /*j*/, int /*k*/, const Real norm[AMREX_SPACEDIM], 
       amrex::GpuArray<amrex::Real, cls_t::NPRIM>& prims, amrex::GpuArray<amrex::Real, cls_t::NCONS>& fluxw,const cls_t* cls) const noexcept {
 
-      // printf(" oo Adiabatic wall \n ");
       // only set-non zero values (by default fluxw=0)                       
       Real P = prims[cls_t::QPRES];
       fluxw[cls_t::UMX] =  P*norm[0];
       fluxw[cls_t::UMY] =  P*norm[1];
 #if AMREX_SPACEDIM==3          
       fluxw[cls_t::UMZ] =  P*norm[2];
-#endif        
-                                 
+#endif                                         
     }  
-    // Viscous flux (stress and heat)  
-    AMREX_GPU_DEVICE AMREX_FORCE_INLINE
+    // Viscous flux: stress and heat (in this case heat is 0 as is within adiabatic class), mass transfer is always 0
+    AMREX_GPU_DEVICE AMREX_FORCE_INLINE	    
     void  wall_flux_diff(const auto &geomdata, int i, int j, int k, amrex::Real dis,const Real norm[AMREX_SPACEDIM],
       const Array4<Real>& q, amrex::GpuArray<amrex::Real, cls_t::NPRIM>& prims_w, 
       amrex::GpuArray<amrex::Real, cls_t::NCONS>& fluxw,const cls_t* cls, trans_parm_t const* ltransparm ) const noexcept  {
-  
-      // printf(" oo Adiabatic Viscous wall \n ");
+   	    
       Real u[AMREX_SPACEDIM];
       u[0] = q(i,j,k,cls_t::QU); u[1] = q(i,j,k,cls_t::QV);
 #if AMREX_SPACEDIM==3        
       u[2] = q(i,j,k,cls_t::QW);
 #endif        
-      // compute velocity derivatives normal direction
-      Real dudn[AMREX_SPACEDIM]= {0.0};
-      const Real dis_inv = 1.0/dis;
-      for (int n = 0; n < AMREX_SPACEDIM; n++) {
-        dudn[n] = u[n]*dis_inv;                
-      }   
+
+      // compute velocity derivatives normal direction (u - uw)/dis
+      Real dudn[AMREX_SPACEDIM] = {0.0};
+      Real dis_inv = 1.0_rt/dis;
+      for (int n=0; n<AMREX_SPACEDIM; ++n) dudn[n] = u[n]*dis_inv;
 
       // compute viscosity at the wall
 #ifdef USE_PELEPHYSICS
       Real mu_w,cond_w,xi_w;
       const Real Tw = prims_w[cls_t::QT];
-      // P,rho,Y
-      //const Real P  = prims_w[cls_t::QPRES];
+      // rho,Y
       const Real rho= prims_w[cls_t::QRHO];
       Real Y[NUM_SPECIES];
       for (int n = 0; n < NUM_SPECIES; ++n) { Y[n] = prims_w[cls_t::QFS + n]; }
-      const bool get_xi = true, get_mu = true, get_lam = false;
-      const bool get_Ddiag = false, get_chi = false;
-      
-      // pelePhysics       
+      // pelePhysics (only get viscosity)         
+      const bool get_xi = false, get_mu = true, get_lam = false, get_Ddiag = false, get_chi = false;
       auto trans = pele::physics::PhysicsType::transport();   
       trans.transport(get_xi, get_mu, get_lam, get_Ddiag, get_chi, Tw, rho,
-                     Y, nullptr, nullptr, mu_w, xi_w, cond_w, ltransparm);
+                      Y, nullptr, nullptr, mu_w, xi_w, cond_w, ltransparm);
       mu_w = mu_w*visc_cgs2si; // convert to SI units
 #else
       Real mu_w  = cls->visc(prims_w[cls_t::QT]);
 #endif
-      // printf(" oo Adiabatic Viscous wall mu_w = %e  \n",mu_w);
-
       
       // coordinate transformation
 #if AMREX_SPACEDIM==2      
@@ -187,12 +179,14 @@ class isothermal_wall_t
 
   public:
 
-    isothermal_wall_t() {}
+    AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
+    isothermal_wall_t() noexcept = default;
 
-    ~isothermal_wall_t() {}
+    AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
+    ~isothermal_wall_t() noexcept = default;
 
-    static constexpr Real r43 = 4.0/3.0;
-    static constexpr Real r13 = 1.0/3.0;
+  //  static constexpr Real r43 = 4.0/3.0;
+  //  static constexpr Real r13 = 1.0/3.0;
 
     // Eulerian flux
     static void inline wall_flux(const auto &geomdata, int i, int j, int k, const Real norm[AMREX_SPACEDIM], 
@@ -204,15 +198,12 @@ class isothermal_wall_t
 #if AMREX_SPACEDIM==3          
       fluxw[cls_t::UMZ] =  P*norm[2];
 #endif        
- 
-      // species fluxes are 0
-
     }
 
     // Viscous flux (stress and heat)  
     static void inline wall_flux_diff(const auto &geomdata, int i, int j, int k, amrex::Real dis,const Real norm[AMREX_SPACEDIM],
       const Array4<Real>& q, amrex::GpuArray<amrex::Real, cls_t::NPRIM>& prims_w, 
-      amrex::GpuArray<amrex::Real, cls_t::NCONS>& fluxw,const cls_t* cls) {
+      amrex::GpuArray<amrex::Real, cls_t::NCONS>& fluxw,const cls_t* cls, trans_parm_t const* ltransparm) {
 
       // printf(" oo Isothermal Viscous wall \n ");              
       Real u[AMREX_SPACEDIM];
@@ -232,28 +223,17 @@ class isothermal_wall_t
       // compute viscosity and conductivity at the wall            
 #ifdef USE_PELEPHYSICS
       Real mu_w,cond_w,xi_w;
-      // P,rho,Y
-      //const Real P  = prims_w[cls_t::QPRES];
+      // rho,Y
       const Real rho= prims_w[cls_t::QRHO];
       Real Y[NUM_SPECIES];
       for (int n = 0; n < NUM_SPECIES; ++n) { Y[n] = prims_w[cls_t::QFS + n]; }
-      const bool get_xi = true, get_mu = true, get_lam = true;
-      const bool get_Ddiag = false, get_chi = false;
-
-      // pelePhysics    
-      auto trans = pele::physics::PhysicsType::transport();      
-#if (PELEPVERSION==23)         
-      trans_parms.allocate(); 
-      auto const* ltransparm = trans_parms.device_trans_parm();
-#else
-      auto const* ltransparm = trans_parms.device_parm();
-#endif    
-    
+      // pelePhysics (only get viscosity)
+      const bool get_xi = false, get_mu = true, get_lam = true, get_Ddiag = false, get_chi = false;
+      auto trans = pele::physics::PhysicsType::transport();
       trans.transport(get_xi, get_mu, get_lam, get_Ddiag, get_chi, Tw, rho,
-                     Y, nullptr, nullptr, mu_w, xi_w, cond_w, ltransparm);
-      mu_w = mu_w*visc_cgs2si; // convert to SI units
+                      Y, nullptr, nullptr, mu_w, xi_w, cond_w, ltransparm);
+      mu_w = mu_w*visc_cgs2si;     // convert to SI units
       cond_w = cond_w*cond_cgs2si; // convert to SI units
-     // xi_w = xi_w*visc_cgs2si; // convert to SI units                     
 #else                     
       const Real mu_w   = cls->visc(Tw);
       const Real cond_w = cls->cond(Tw); 
@@ -285,9 +265,6 @@ class isothermal_wall_t
       exit(1);              
 #endif                
       fluxw[cls_t::UET] -=  cond_w*dTdn;
-
-      // all species fluxes are 0 ! 
-        
     }    
 
 };

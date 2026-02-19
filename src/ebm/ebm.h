@@ -8,7 +8,6 @@
 #include <AMReX_EBFArrayBox.H>
 #include <AMReX_ParmParse.H>
 
-// snm new
 #include <AMReX_EBFluxRegister.H>
 #include <AMReX_Geometry.H>
 
@@ -394,8 +393,10 @@ public:
                       const Array4<Real>& rhs, const cls_t* cls, int lev) {
 
     const Box& ebbox  = mfi.growntilebox(0);  // box without ghost points 
-    const GpuArray<Real, AMREX_SPACEDIM> dxinv = geom.InvCellSizeArray();
-    const Real *dx = geom.CellSize();
+
+    // avoid pointers
+    auto dxinv = geom.InvCellSizeArray();
+    auto dx    = geom.CellSizeArray();
 
     // extract EB arrays given a level and mfi
     Array4<const Real> vfrac = (*volmf_a[lev]).const_array(mfi);              // vfrac
@@ -411,12 +412,7 @@ public:
 
     // markers 
     const auto& ebMarkers = (*bmf_a[lev]).array(mfi);
-
-    // temp variables and arrays for debugging mostly
-    const auto& flag_arr = (*ebflags_a[lev]).const_array(mfi);
-    //const auto& flag = (*ebflags_a[lev])[mfi];
-    const Real *prob_lo = geom.ProbLo();
-
+    // fluxes
     auto const& flx_x = flxt[0]->array(); 
     auto const& flx_y = flxt[1]->array(); 
 #if (AMREX_SPACEDIM==3)     
@@ -436,7 +432,6 @@ public:
 
           // only solve flux in cut cells (not in regular or almost empty cells)
           bool solve_fluxwall = ebMarkers(i,j,k,1) && (vfrac(i,j,k) > vfracmin); 
-          //bool solve_fluxwall = ebMarkers(i,j,k,1);
 
           if (solve_fluxwall){            
             Real inv_hvfrac = dxinv[0]/(vfrac(i,j,k)+vfracmin); //only isotropic cells
@@ -463,7 +458,7 @@ public:
       
             if (use_weighted_interp){
               Real sumw = 1e-30;                
-              // position of centropid in cell units
+              // position of centroid in cell units
               Real x_bc = i + 0.5 + bc_centroid(i,j,k,0);
               Real y_bc = j + 0.5 + bc_centroid(i,j,k,1) ;
 #if (AMREX_SPACEDIM == 3)
@@ -543,7 +538,10 @@ public:
               Areai[n] = areaw*norm_wall[n] - Err_A[n];
             }  
             // recalculate normal based on corrected area projections
-            Real areanew = Areai[0]*Areai[0] + Areai[1]*Areai[1] + Areai[2]*Areai[2];
+	    Real areanew = 0.0_rt;
+	    for (int n = 0; n < AMREX_SPACEDIM; n++) {
+              areanew += Areai[n]*Areai[n];
+            }
             areanew = std::sqrt(areanew);
             Real normnew[AMREX_SPACEDIM]= {0.0};
             for (int n = 0; n < AMREX_SPACEDIM; n++) {
@@ -565,28 +563,30 @@ public:
             {
               // from volume and area centroid compute distance to wall 
               // and project into normal direction
-              Real x_dis[AMREX_SPACEDIM]= {0.0};
-              Real dis = 1e-6_rt; // min value (cell units)   <<<<
-              for (int n = 0; n < AMREX_SPACEDIM; n++) {
-                x_dis[n] = vol_centroid(i,j,k,n)- bc_centroid(i,j,k,n);
-                dis += x_dis[n]*norm_wall[n];
-              }   
-              dis = dis*dx[0]; // units
-              //         
-              wm.wall_flux_diff(geom,i,j,k,dis,norm_wall,prims,prim_wall,flux_wall,cls,ltransparm);
-            } //end if solve_diffwall
+	      Real dis = 1e-6_rt; // min distance (cell units)   
+              for (int n = 0; n < AMREX_SPACEDIM; n++) {                
+                dis += (vol_centroid(i,j,k,n)- bc_centroid(i,j,k,n)) *norm_wall[n];       
+              }    
+	      dis = dis*dx[0];  // units
+	      wm.wall_flux_diff(geom,i,j,k,dis,norm_wall,prims,prim_wall,flux_wall,cls,ltransparm);
+            } 
 
             // add wall flux to rhs 
             for (int n = 0; n < cls_t::NCONS; n++) {
               rhs(i,j,k,n) += flux_wall[n]*areaw*inv_hvfrac; 
             }                           
-            
-            //
 
           }  //end if partially covered       
+
         });
 
-  }                      
+   //amrex::Gpu::streamSynchronize();
+   //AMREX_GPU_ERROR_CHECK();
+
+
+  }
+
+
   ///////////////////////////////////////////////////////////////////////////
   /**
   * @brief Compute fluxes in the EB wall and add it to rhs
@@ -605,56 +605,48 @@ public:
                       const Array4<Real>& rhs, const cls_t* cls, int lev, Real dt,
                       BCRec const* phys_bc) {
 
-    const Box& ebbox  = mfi.growntilebox(0);  // box without ghost points 
-    const GpuArray<Real, AMREX_SPACEDIM> dxinv = geom.InvCellSizeArray();
-    const Real *dx = geom.CellSize();
+    const Box& ebbox  = mfi.growntilebox(0); 
+    const Box& bxg    = mfi.growntilebox(cls_t::NGHOST);
+    auto dx    = geom.CellSizeArray();
 
     // printf(" [ebm::redist] in ebm redist... (SNM temp) \n ");
-
                     
-    // extract EB-related arrays given a level and mfi
-    Array4<const Real> vfrac = (*volmf_a[lev]).const_array(mfi);             // vfrac
-    Array4<const Real> const& apx = areamcf_a[lev][0]->const_array(mfi);     // areas fraction x
-    Array4<const Real> const& apy = areamcf_a[lev][1]->const_array(mfi);     //                y 
+    // extract EB-related arrays/flags  given a level and mfi
+    Array4<const Real> vfrac = (*volmf_a[lev]).const_array(mfi);               // vfrac
+    Array4<const Real> const& apx = areamcf_a[lev][0]->const_array(mfi);       // area  fraction x
+    Array4<const Real> const& apy = areamcf_a[lev][1]->const_array(mfi);       //                y 
 #if (AMREX_SPACEDIM==3)    
-    Array4<const Real> const& apz = areamcf_a[lev][2]->const_array(mfi);     //                z
+    Array4<const Real> const& apz = areamcf_a[lev][2]->const_array(mfi);       //                z
 #endif    
-    Array4<const Real> const& bcarea  = (*bcareamcf_a[lev]).const_array(mfi); // bc area 
-    Array4<const Real> const& bcent   = (*bndrycent_a[lev]).const_array(mfi); // bc centroid
+    Array4<const Real> const& bcarea  = (*bcareamcf_a[lev]).const_array(mfi);  // bc area 
+    Array4<const Real> const& bcent   = (*bndrycent_a[lev]).const_array(mfi);  // bc centroid
+    Array4<const int> const& lev_mask = level_mask_a[lev].const_array(mfi);    // level mask is an object (not a pointer)
+    Array4<const EBCellFlag> const& flag = (*ebflags_a[lev]).const_array(mfi); // flags
 
-    Array4<const int> const& lev_mask = level_mask_a[lev].const_array(mfi);   // level mask is an object (not a pointer)
-
-    // flags
-    //const auto& flag = (*ebflags_a[lev])[mfi];
-
-    Array4<const EBCellFlag> const& flag = (*ebflags_a[lev]).const_array(mfi); ;
-
-    //flags.const_array(mfi)  /<------------------------------------------
-    // Array4<const EBCellFlag> const& fla
-
-    // store weights and ebwight in two arrays to prep for redist
-    const Box& bxg = mfi.growntilebox(cls_t::NGHOST);    
-    // redistribution weights arrays
-    FArrayBox redistwgt_fab(bxg, 1);       
-    FArrayBox srd_update_scale_fab(bxg, 1);  
-    auto const& redistwgt = redistwgt_fab.array();
-    auto const& srd_update_scale = srd_update_scale_fab.array();
-     
-    amrex::ParallelFor(bxg, [=, this]  AMREX_GPU_DEVICE(int i, int j, int k) noexcept {
-      redistwgt(i, j, k) = vfrac(i, j, k);
-      srd_update_scale(i, j, k) = eb_weight; 
+     // create temporary arrays to store the weights
+      FArrayBox redistwgt_fab(bxg, 1);        
+      FArrayBox srd_update_scale_fab(bxg, 1); 
+      int ncomp = cls_t::NCONS;
+      if (redistribution_type == "FluxRedist") ncomp = 1;
+      FArrayBox tmpfab(bxg, ncomp, The_Async_Arena());
+      auto const& redistwgt = redistwgt_fab.array();
+      auto const& srd_update_scale = srd_update_scale_fab.array();
+      Array4<Real> scratch = tmpfab.array();
+  
+    // fill temporary arrays
+    Real ebw = eb_weight;   // copy member to a plain scalar
+    amrex::ParallelFor(bxg, [=]  AMREX_GPU_DEVICE(int i, int j, int k) noexcept {
+      redistwgt(i, j, k)        = vfrac(i, j, k);
+     srd_update_scale(i, j, k)  = ebw; // eb_weight;
     });
 
-
-    
-    // create temporary array and fill first with weights (will be used as weights)
-    FArrayBox tmpfab(bxg, 1, The_Async_Arena()); // cls_t::NCONS
-    Array4<Real> scratch = tmpfab.array();    
+    //redist weights (in case of FluxRedist, otherwise use as scrap inside Reditribution)  // temp snm
     if (redistribution_type == "FluxRedist") {
       amrex::ParallelFor(bxg, [=] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {
         scratch(i, j, k) = redistwgt(i, j, k);
       });
     }
+
     // call MLRedistribution from AMReX
     int level_mask_not_covered = CNSConstants::level_mask_notcovered;
 
@@ -690,9 +682,16 @@ public:
 
     int as_crse = 0;
     int as_fine = 0;  // if 1 it crashes
-    FArrayBox dm_as_fine(Box::TheUnitBox(), cls_t::NCONS, The_Async_Arena());
-    FArrayBox fab_drho_as_crse(Box::TheUnitBox(), cls_t::NCONS, The_Async_Arena());
+    
+     FArrayBox dm_as_fine(Box::TheUnitBox(), cls_t::NCONS, The_Async_Arena()); //snm (new 2 lines  below, now commented)
+    //FArrayBox dm_as_fine(bxg, cls_t::NCONS, The_Async_Arena());
+    //dm_as_fine.setVal<RunOn::Device>(0.0);
+
+    FArrayBox fab_drho_as_crse(Box::TheUnitBox(), cls_t::NCONS, The_Async_Arena()); //snm ( new 2 lines below the lien belwo)
     IArrayBox fab_rrflag_as_crse(Box::TheUnitBox());
+    //FArrayBox fab_drho_as_crse(bxg, cls_t::NCONS, The_Async_Arena());   
+    //IArrayBox fab_rrflag_as_crse(bxg);   
+
     // in cerisse this call is different, depends on
     const IArrayBox* p_rrflag_as_crse = &fab_rrflag_as_crse;
     FArrayBox* p_drho_as_crse = &fab_drho_as_crse;
@@ -703,20 +702,26 @@ public:
     auto const& fcz = flxt[2]->array(); 
 #endif
     
-    // redistribution
+    // redistribution temp snm
     if (redistribution_type == "NewRedist")
     {
       cerisse_flux_redistribute( ebbox,rhs, divc, redistwgt, vfrac,flag,geom,cls_t::NCONS,dt);
-    }
-    else  
-    {
-      amrex::ApplyMLRedistribution(
+   }
+   else  
+   {
+     amrex::ApplyMLRedistribution(
       ebbox, cls_t::NCONS, rhs, divc, cons, scratch, flag, AMREX_D_DECL(apx, apy, apz), vfrac,
       AMREX_D_DECL(fcx, fcy, fcz), bcent, phys_bc, geom, dt, redistribution_type,
       as_crse, p_drho_as_crse->array(), p_rrflag_as_crse->const_array(), as_fine, dm_as_fine.array(), lev_mask,
       level_mask_not_covered, fac_for_deltaR, use_wts_in_divnc, 0, srd_max_order,
       target_volfrac, srd_update_scale);
-    }                                
+   }                                
+
+    // temp snm
+    //amrex::Gpu::streamSynchronize();
+    //AMREX_GPU_ERROR_CHECK();
+
+
   }  
 
   ////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -725,14 +730,4 @@ public:
 
 
 #endif
-
-
-// compute weights
-//          xcell[0]  = x(ii,jj,kk)  ....                 // neighb cell  position                     
-            // r = (bc_centroid(i,j,k,n) - xcell[n]);     // distance
-            // solid phi=0 otherwise phi=1                // remove solid neighbours
-            // weight = phi/(r + eps)                         
-            // sum + = weght
-            // for (int nv = 0; nvar < cls_t::NPRIM; nv++)
-            // primwall(nv) += weight*prims(ii,jj,kk,nv)    
 

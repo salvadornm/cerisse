@@ -111,30 +111,24 @@ class viscousLES_t {
 #else
     auto const* ltransparm = trans_parms.device_parm();
 #endif    
-
-    // temp snm
-    // AMREX_ALWAYS_ASSERT(ltransparm != nullptr);
-    // AMREX_ALWAYS_ASSERT(mu_arr.dataPtr() != nullptr);
-
         
     amrex::launch(bxg, [=] AMREX_GPU_DEVICE(Box const& tbx) {
 
             auto trans = pele::physics::PhysicsType::transport();                      
             trans.get_transport_coeffs(tbx, q_y, q_T, q_rho, 
                 rhoD_arr, chi_arr, mu_arr,xi_arr, lam_arr, ltransparm);
-          });
+      });
 
-    // change units cgs-> SI
+    // change units cgs-> SI 
     amrex::ParallelFor(
         bxg, [=, *this] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {        
         mu_arr(i,j,k) *= visc_cgs2si;
-        lam_arr(i,j,k)*= cond_cgs2si*Fthick;    
+        lam_arr(i,j,k)*= cond_cgs2si;    
         for (int n=0;n<NUM_SPECIES; n++){        
-          rhoD_arr(i,j,k,n) *= rhodiff_cgs2si*Fthick;
+          rhoD_arr(i,j,k,n) *= rhodiff_cgs2si;
         }   
         xi_arr(i,j,k) *= visc_cgs2si;
-        });        
-    //    
+      });            
 #else
     amrex::ParallelFor(
         bxg, [=, *this] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {        
@@ -143,6 +137,29 @@ class viscousLES_t {
         xi_arr(i,j,k)  = 0.0;
         });
 #endif     
+
+    // ATF thickening    (using sensor)
+    if (Fthick > 1) {
+      amrex::ParallelFor(
+        bxg, [=, *this] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {        
+        
+        //Real c =  ( prims(i,j,k,param::QATFSENSOR) - param::ATF_c0 ) * param::ATF_cnorm;
+        //Real sensflame = std::min( std::max(16*c*c*(1.0-c)*(1.0-c),0.0),1.0); 
+        Real sensflame = 1.0;
+        Real F = 1.0 + (Fthick - 1.0)*sensflame;    
+      
+        //mu_arr(i,j,k) *= F;
+        lam_arr(i,j,k)*= F ;    
+#if NUM_SPECIES > 1        
+        for (int n=0;n<NUM_SPECIES; n++){        
+          rhoD_arr(i,j,k,n) *= F;
+        }           
+#endif
+      });      
+    }
+    
+
+
 
     // -------  LES Options  ----------- //
     if constexpr (param::use_LES)
