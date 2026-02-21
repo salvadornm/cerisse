@@ -31,6 +31,9 @@ using trans_parm_t =
 #endif
 
 
+#else
+
+  struct trans_parm_t {}; //dummy type definition for compiling
 
 #endif
 ////////////////////////////////TRANSPORT/////////////////////////////////

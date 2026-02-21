@@ -37,15 +37,19 @@ template<typename marker_t, typename gp_t>
 class IBMultiFab : public FabArray<IBFab<marker_t,gp_t>> {
  public:
   // constructor from BoxArray and DistributionMapping
+
+#if (AMREXVERSION==23)  
   explicit inline IBMultiFab<marker_t,gp_t>(
       const BoxArray& bxs, const DistributionMapping& dm, const int nvar,
       const int ngrow, const MFInfo& info = MFInfo{true, amrex::The_Managed_Arena()},
       const FabFactory<IBFab<marker_t,gp_t>>& factory = DefaultFabFactory<IBFab<marker_t,gp_t>>()) : FabArray<IBFab<marker_t,gp_t>>(bxs, dm, nvar, ngrow, info, factory) {};
+#else
+  explicit inline IBMultiFab<marker_t,gp_t>(
+      const BoxArray& bxs, const DistributionMapping& dm, const int nvar,
+      const int ngrow, const MFInfo& info = MFInfo().SetArena(amrex::The_Managed_Arena()),
+      const FabFactory<IBFab<marker_t,gp_t>>& factory = DefaultFabFactory<IBFab<marker_t,gp_t>>()) : FabArray<IBFab<marker_t,gp_t>>(bxs, dm, nvar, ngrow, info, factory) {};
+#endif
 
-  // original    
-  //IBMultiFab<marker_t,gp_t>(IBMultiFab<marker_t,gp_t>&& rhs) noexcept 
-  //                      : FabArray<IBFab<marker_t,gp_t>>(std::move(rhs)) {};
-  
   IBMultiFab(IBMultiFab&& rhs) noexcept; // NEW correct move constructor                       
 
   ~IBMultiFab() {};

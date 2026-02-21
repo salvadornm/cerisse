@@ -37,11 +37,11 @@ amr.n_error_buf       = 4      # number of buffer cells in error est
 amr.grid_eff          = 0.7    # what constitutes an efficient grid
 
 # Plot and checkpoint
-amr.checkpoint_files_output = 1
+amr.checkpoint_files_output = 0
 amr.check_file              = ./chk     # root name of checkpoint file
 amr.check_int               = 5000   # number of timesteps betw.  checkpoints
-amr.restart =./chk15000
-amr.plot_files_output = 1
+#amr.restart =./chk15000
+amr.plot_files_output = 0
 amr.plot_file         = ./plot/plt    # root name of plotfile
 amr.plot_int          = 100           # number of timesteps between plotfiles
 amr.derive_plot_vars  = pressure velocity temperature
@@ -67,7 +67,7 @@ Temperature.box_hi = 0.01 0.01 0.1
 # Chemical Options
 cns.reactor_type = "ReactorCvode"
 #cns.reactor_type = "ReactorNull"
-cvode.solve_type =  "dense_direct"
+cvode.solve_type =  "GMRES"
 ode.clean_init_massfrac = 1
 
 # STATS

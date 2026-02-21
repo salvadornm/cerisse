@@ -213,10 +213,10 @@ class reactor_t {
             // enthalpy
             const Real h = prims(i, j, k, cls_t::QEINT) + prims(i,j,k,cls_t::QPRES)/rho;
             // recalculate Temperature
-	    cls_t::RHY2T(rho, h, Yk, T(i,j,k));
+	          cls.RHY2T(rho, h, Yk, T(i,j,k));
             // recalculate rho based on new T, Y and P (unchanged during reaction)
             Real rhonew;
-	    cls_t::PYT2R(prims(i,j,k,cls_t::QPRES),Yk,T(i,j,k),rhonew);
+	          cls.PYT2R(prims(i,j,k,cls_t::QPRES),Yk,T(i,j,k),rhonew);
             // calculate density change drho/dt
             const Real drhodt = (rhonew - rho)* o_dt;
             // mass rhs:   rho dY/dt + Y drho/dt

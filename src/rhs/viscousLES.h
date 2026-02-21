@@ -58,7 +58,7 @@ class viscousLES_t {
 
     // grid
    // const Box& bx = mfi.tilebox();        
-    const Box& bxg = mfi.growntilebox(cls->NGHOST);     // to handle high-order 
+    const Box& bxg = mfi.growntilebox(cls_t::NGHOST);     // to handle high-order 
     const Box& bxgnodal = mfi.grownnodaltilebox(-1, 0); // to handle fluxes    
 
     // allocate arrays for transport properties  
@@ -98,7 +98,6 @@ class viscousLES_t {
     auto const& q_y   = qfab.const_array(cls_t::QFS);             // species mass fraction
     auto const& q_T   = qfab.const_array(cls_t::QT);              // temperature 
     auto const& q_rho = qfab.const_array(cls_t::QRHO);            // density (change units below)
-    
      
     BL_PROFILE("PelePhysics::get_transport_coeffs()");
     
@@ -111,24 +110,24 @@ class viscousLES_t {
 #else
     auto const* ltransparm = trans_parms.device_parm();
 #endif    
-        
+    
     amrex::launch(bxg, [=] AMREX_GPU_DEVICE(Box const& tbx) {
+        auto trans = pele::physics::PhysicsType::transport();                      
+        trans.get_transport_coeffs(tbx, q_y, q_T, q_rho, 
+        rhoD_arr, chi_arr, mu_arr,xi_arr, lam_arr, ltransparm);
+        });
 
-            auto trans = pele::physics::PhysicsType::transport();                      
-            trans.get_transport_coeffs(tbx, q_y, q_T, q_rho, 
-                rhoD_arr, chi_arr, mu_arr,xi_arr, lam_arr, ltransparm);
-      });
-
-    // change units cgs-> SI 
+    // change units cgs-> SI (and modduf)
     amrex::ParallelFor(
         bxg, [=, *this] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {        
         mu_arr(i,j,k) *= visc_cgs2si;
-        lam_arr(i,j,k)*= cond_cgs2si;    
+        lam_arr(i,j,k)*= cond_cgs2si*Fthick;    
         for (int n=0;n<NUM_SPECIES; n++){        
-          rhoD_arr(i,j,k,n) *= rhodiff_cgs2si;
+          rhoD_arr(i,j,k,n) *= rhodiff_cgs2si*Fthick;
         }   
         xi_arr(i,j,k) *= visc_cgs2si;
-      });            
+        });        
+    //    
 #else
     amrex::ParallelFor(
         bxg, [=, *this] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {        
@@ -138,54 +137,24 @@ class viscousLES_t {
         });
 #endif     
 
-    // ATF thickening    (using sensor)
-    if (Fthick > 1) {
-      amrex::ParallelFor(
-        bxg, [=, *this] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {        
-        
-        //Real c =  ( prims(i,j,k,param::QATFSENSOR) - param::ATF_c0 ) * param::ATF_cnorm;
-        //Real sensflame = std::min( std::max(16*c*c*(1.0-c)*(1.0-c),0.0),1.0); 
-        Real sensflame = 1.0;
-        Real F = 1.0 + (Fthick - 1.0)*sensflame;    
-      
-        //mu_arr(i,j,k) *= F;
-        lam_arr(i,j,k)*= F ;    
-#if NUM_SPECIES > 1        
-        for (int n=0;n<NUM_SPECIES; n++){        
-          rhoD_arr(i,j,k,n) *= F;
-        }           
-#endif
-      });      
-    }
-    
-
-
-
     // -------  LES Options  ----------- //
-    if constexpr (param::use_LES)
+    if (param::use_LES)
     {
-      Real Delta = cls->calc_delta(dx); // compute filter width
-      //Real mu_sgs,cond_sgs, diff_sgs;
-      // loop over cells (including enough ghost to build stencil)  
+    //AMREX_ALWAYS_ASSERT_WITH_MESSAGE( cls_t::NGHOST >= halfsten, 
+    // 		  "ERROR: NGHOST < halfsten (order/2), LES stencil exceeds  ghost cells."); 
+
       const Box& bxgs = mfi.growntilebox(halfsten);   
-      // BEWARE cannot go over all the ghost cell !! 
-      // for viscous order 2, LES order can be  2,4
-      // for viscous order 4, LES order can be  2
-      // for viscous order 6, LES cannot be used
-      amrex::ParallelFor( bxgs, [=, *this] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {
+      Real Delta = cls->calc_delta(dx); // compute filter width
 
-        // Per-thread mutable outputs:
-        Real mu_sgs  = 0.0;
-        Real cond_sgs = 0.0;
-        Real diff_sgs = 0.0;
+      amrex::ParallelFor( bxgs, [=] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {
 
-        Real Cp_o_Pr = lam_arr(i,j,k)/(mu_arr(i,j,k)+1.e-15); 
-        cls-> compute_sgsterms(i,j,k,prims, dxinv, Delta, Cp_o_Pr,  mu_sgs, cond_sgs, diff_sgs);
+      	Real mu_sgs  = 0.0; Real cond_sgs = 0.0; Real diff_sgs = 0.0;
+      	Real Cp_o_Pr = lam_arr(i,j,k)/(mu_arr(i,j,k)+1.e-15);        
+      	cls-> compute_sgsterms(i,j,k,prims, dxinv, Delta, Cp_o_Pr,  mu_sgs, cond_sgs, diff_sgs);
+
         mu_arr(i,j,k) += mu_sgs;
         lam_arr(i,j,k)+= cond_sgs;   
-        for (int n=0;n<NUM_SPECIES; n++){        
-          rhoD_arr(i,j,k,n) += diff_sgs;
-        }   
+        for (int n=0;n<NUM_SPECIES; n++){rhoD_arr(i,j,k,n) += diff_sgs;}   
       }); 
     }          
 
@@ -431,7 +400,7 @@ class viscousLES_t {
     Real u11,dTdn,u21,u12,u22,u31,u13,u33,muf,xif,lamf;
     
     constexpr int order_default = 2; 
-    int order_local = (close_to_wall ? order_default : param::order);   
+    //int order_local = (close_to_wall ? order_default : param::order);   
 
 #if NUM_SPECIES > 1
     Real rhoD_f[NUM_SPECIES];

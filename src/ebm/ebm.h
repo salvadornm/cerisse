@@ -424,7 +424,7 @@ public:
     auto const* ltransparm = trans_parms.device_parm();
     AMREX_ALWAYS_ASSERT(ltransparm != nullptr);
 #else
-    auto const* ltransparm = (trans_parm_t const*)nullptr;        
+    auto const* ltransparm = (trans_parm_t const*)nullptr;  //null pointer      
 #endif    
 
     amrex::ParallelFor(
@@ -493,14 +493,13 @@ public:
                       // interpolation weight based on distance 
                       r = amrex::max(r, 1e-6_rt);
                       Real w = 1.0_rt/r; sumw += w;
-
-                      for (int n = 0; n < cls_t::NPRIM; n++) {
-                        prim_wall[n] += w*prims(ii,jj,kk,n);               
-                      } 
-                    }   
-                  }
-                }
-              }
+                      for (int n = 0; n < cls_t::NPRIM; n++) { prim_wall[n] += w*prims(ii,jj,kk,n);    } 
+                    }  //  endif not-empty 
+                  } //endfor ii
+                } //endfor jj
+#if (AMREX_SPACEDIM == 3)                
+              } //end for kk
+#endif              
               //--o  
               sumw = 1.0/sumw; //normalise weights          
               for (int n = 0; n < cls_t::NPRIM; n++) {
@@ -554,7 +553,7 @@ public:
             }
             //=================================================================
 
-	    wallmodel wm;  // create local instance
+	          wallmodel wm;  // create local instance
             // calculate wall flux and add it to rhs
             wm.wall_flux(geom,i,j,k,norm_wall,prim_wall,flux_wall,cls);      
                                   
@@ -563,12 +562,12 @@ public:
             {
               // from volume and area centroid compute distance to wall 
               // and project into normal direction
-	      Real dis = 1e-6_rt; // min distance (cell units)   
+	            Real dis = 1e-6_rt; // min distance (cell units)   
               for (int n = 0; n < AMREX_SPACEDIM; n++) {                
                 dis += (vol_centroid(i,j,k,n)- bc_centroid(i,j,k,n)) *norm_wall[n];       
               }    
-	      dis = dis*dx[0];  // units
-	      wm.wall_flux_diff(geom,i,j,k,dis,norm_wall,prims,prim_wall,flux_wall,cls,ltransparm);
+	            dis = dis*dx[0];  // units
+	            wm.wall_flux_diff(geom,i,j,k,dis,norm_wall,prims,prim_wall,flux_wall,cls,ltransparm);
             } 
 
             // add wall flux to rhs 
@@ -580,12 +579,7 @@ public:
 
         });
 
-   //amrex::Gpu::streamSynchronize();
-   //AMREX_GPU_ERROR_CHECK();
-
-
   }
-
 
   ///////////////////////////////////////////////////////////////////////////
   /**
@@ -595,9 +589,6 @@ public:
   * @param flxt  fluxes across faces (convective + viscous)
   * @param rhs  
   **/
-
-  //(geom,mfi,cons,divc, {AMREX_D_DECL(&fluxt[0], &fluxt[1], &fluxt[2])},
-  //state, cls_d,level,dt,h_phys_bc);
 
   void inline redist (const Geometry& geom, const MFIter& mfi,
                       const Array4<Real>& cons, const Array4<Real>& divc, 

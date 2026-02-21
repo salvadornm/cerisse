@@ -260,12 +260,12 @@ class user_source_t {
   void inline src(const Geometry& geomdata, const amrex::MFIter &mfi,
                   const amrex::Array4<const amrex::Real> &prims,
                   const amrex::Array4<amrex::Real> &rhs, const cls_t *cls_d,
-                  amrex::Real dt,amrex::Real /*time*/){
+                  amrex::Real dt,amrex::Real /*time*/,const Array4<uint8_t>& /*ebmarkers*/){
 
-    //const Box bx = mfi.tilebox();
     const Box& bxg = mfi.growntilebox(cls_t::NGHOST);
-    const Real *prob_lo = geomdata.ProbLo();
-    const Real *dx = geomdata.CellSize();
+   // use device-friendly arrays instead of pointers
+    auto prob_lo = geomdata.ProbLoArray();
+    auto dx     = geomdata.CellSizeArray();
 
     ProbParm const prob_parm;
     const auto& cls = *cls_d;

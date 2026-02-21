@@ -10,9 +10,7 @@
 
 #include <EBMultiFab.h>
 
-#ifdef USE_PELEPHYSICS
-#include <TransPele.h>
-#endif
+#include <TransPele.h> 
 
 // some constants
 static constexpr Real r43 = 4.0/3.0;
@@ -185,12 +183,11 @@ class isothermal_wall_t
     AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
     ~isothermal_wall_t() noexcept = default;
 
-  //  static constexpr Real r43 = 4.0/3.0;
-  //  static constexpr Real r13 = 1.0/3.0;
-
     // Eulerian flux
-    static void inline wall_flux(const auto &geomdata, int i, int j, int k, const Real norm[AMREX_SPACEDIM], 
-      amrex::GpuArray<amrex::Real, cls_t::NPRIM>& prims, amrex::GpuArray<amrex::Real, cls_t::NCONS>& fluxw,const cls_t* cls) {      
+    AMREX_GPU_DEVICE AMREX_FORCE_INLINE
+    void wall_flux (const auto &geomdata, int /*i*/, int /*j*/, int /*k*/, const Real norm[AMREX_SPACEDIM], 
+      amrex::GpuArray<amrex::Real, cls_t::NPRIM>& prims, amrex::GpuArray<amrex::Real, cls_t::NCONS>& fluxw,const cls_t* cls) const noexcept {
+
       // only set-non zero values (by default fluxw=0)                       
       Real P = prims[cls_t::QPRES];
       fluxw[cls_t::UMX] =  P*norm[0];
@@ -201,9 +198,10 @@ class isothermal_wall_t
     }
 
     // Viscous flux (stress and heat)  
-    static void inline wall_flux_diff(const auto &geomdata, int i, int j, int k, amrex::Real dis,const Real norm[AMREX_SPACEDIM],
+    AMREX_GPU_DEVICE AMREX_FORCE_INLINE	    
+    void  wall_flux_diff(const auto &geomdata, int i, int j, int k, amrex::Real dis,const Real norm[AMREX_SPACEDIM],
       const Array4<Real>& q, amrex::GpuArray<amrex::Real, cls_t::NPRIM>& prims_w, 
-      amrex::GpuArray<amrex::Real, cls_t::NCONS>& fluxw,const cls_t* cls, trans_parm_t const* ltransparm) {
+      amrex::GpuArray<amrex::Real, cls_t::NCONS>& fluxw,const cls_t* cls, trans_parm_t const* ltransparm ) const noexcept  {
 
       // printf(" oo Isothermal Viscous wall \n ");              
       Real u[AMREX_SPACEDIM];

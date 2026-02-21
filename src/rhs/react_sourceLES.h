@@ -13,6 +13,9 @@ class reactor_sourceLES_t {
   bool m_initialized = false;
   std::unique_ptr<pele::physics::reactions::ReactorBase> m_reactor;
 
+  // factor to multiply reaction (for transients)
+  Real reaction_relax=1.0;
+
   // reactor types (hardcoded) and specific options
   inline static constexpr int therm_reactor_type = 1; // 1: U  2:H
   inline static constexpr bool reactor_constant_pressure = false;
@@ -25,6 +28,8 @@ class reactor_sourceLES_t {
     {
       amrex::ParmParse pp("cns");
       pp.get("reactor_type", reactor_type);
+      pp.get("reaction_relax", reaction_relax);
+
     }
     m_reactor = pele::physics::reactions::ReactorBase::create(reactor_type);
     
@@ -108,6 +113,7 @@ class reactor_sourceLES_t {
     constexpr bool mask_closewall = source_t::mask_cells_boundary;  
 
     const auto& cls = *cls_d;
+
 
     // prepare input -------------------------------------------------------------------------
     amrex::ParallelFor(bx, [=] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {
@@ -195,13 +201,14 @@ class reactor_sourceLES_t {
     // }
 
 
+    // relaxation factor
+    const Real rr = reaction_relax;
+
+
     // ATF options    (by default no ATF: o_F=1)
     constexpr amrex::Real Fthick = (source_t::ATF ? source_t::thickfactor : amrex::Real(1.0));
-    const amrex::Real o_F = amrex::Real(1.0) / Fthick;
-    //
-    //
-    // Sensor
-    //
+    const amrex::Real o_F = rr / Fthick;
+
 
     //////////////////////// Unpack dat + Update RHS ////////////////////////
     amrex::ParallelFor(bx, [=] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {
@@ -236,7 +243,7 @@ class reactor_sourceLES_t {
             // enthalpy
             const Real h = prims(i, j, k, cls_t::QEINT) + prims(i,j,k,cls_t::QPRES)/rho;
             // recalculate Temperature
-	    cls.RHY2T(rho, h, Yk, T(i,j,k));
+	          cls.RHY2T(rho, h, Yk, T(i,j,k));
             // recalculate rho based on new T, Y and P (unchanged during reaction)
             Real rhonew;
             cls.PYT2R(prims(i,j,k,cls_t::QPRES),Yk,T(i,j,k),rhonew);

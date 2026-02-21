@@ -18,7 +18,7 @@ class LES_t {
   const int order  = param::order;
   static constexpr Real Scsgs_inv = 1.0/param::Scsgs;
   // Indexes
-  static constexpr int QUn[3]={idx_t::QU,idx_t::QV,idx_t::QW};
+  //static constexpr int QUn[3]={idx_t::QU,idx_t::QV,idx_t::QW};
   // WALE constant
   static constexpr Real Cw = std::sqrt(10.6) * param::Cs;
     
@@ -27,8 +27,8 @@ class LES_t {
    * \param[in] dx
    * \return Delta
   */
-  AMREX_GPU_DEVICE AMREX_FORCE_INLINE Real calc_delta(
-  const GpuArray<Real, AMREX_SPACEDIM>& dx) const{
+  AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE  
+  Real calc_delta(  const GpuArray<Real, AMREX_SPACEDIM>& dx) const{
 
     if constexpr (param::fixDelta) {
       return(param::Delta);
@@ -117,7 +117,8 @@ class Smagorinsky_t : public LES_t<param, idx_t> {
     // finite difference central order 2/4/6
     for (int m = 0; m < AMREX_SPACEDIM; m++) {
       for (int n = 0; n < AMREX_SPACEDIM; n++) {
-        dUdx[m][n]  = normal_diff_cc<param::order>(iv, n, this->QUn[m], q, dxinv); // dUmdn
+      //  dUdx[m][n]  = normal_diff_cc<param::order>(iv, n, this->QUn[m], q, dxinv); // dUmdn
+	dUdx[m][n] = normal_diff_cc<param::order>(iv, n, idx_t::QU + m, q, dxinv);
      }
     }
     // || Sij ||
@@ -202,7 +203,9 @@ public :
     // finite difference central order 2/4/6
     for (int m = 0; m < AMREX_SPACEDIM; m++) {
       for (int n = 0; n < AMREX_SPACEDIM; n++) {
-        dUdx[m][n]  = normal_diff_cc<param::order>(iv, n, this->QUn[m], q, dxinv); // dUmdn
+        //dUdx[m][n]  = normal_diff_cc<param::order>(iv, n, this->QUn[m], q, dxinv); // dUmdn
+	dUdx[m][n] = normal_diff_cc<param::order>(iv, n, idx_t::QU + m, q, dxinv);
+
      }
     }
     //

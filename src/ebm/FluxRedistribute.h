@@ -29,7 +29,7 @@ inline void cerisse_flux_redistribute (
     const Box& grown1_bx = amrex::grow(bx,1);
     const Box& grown2_bx = amrex::grow(bx,2);
 
-    Real reredistribution_threshold = amrex_eb_get_reredistribution_threshold();
+    //Real reredistribution_threshold = amrex_eb_get_reredistribution_threshold();
 
     //
     // Working arrays
@@ -138,7 +138,7 @@ inline void cerisse_flux_redistribute (
     amrex::ParallelFor(grown1_bx, ncomp,
     [=] AMREX_GPU_DEVICE (int i, int j, int k, int n) noexcept
     {
-      bool valid_dst_cell;
+      //bool valid_dst_cell;
        // check if it is cut cell
       if (flag(i,j,k).isSingleValued())
         {
