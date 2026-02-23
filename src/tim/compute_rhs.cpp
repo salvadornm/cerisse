@@ -190,6 +190,7 @@ void CNS::compute_rhs(MultiFab& statemf, Real dt, FluxRegister* fr_as_crse, Flux
 #endif
  
 
+
     // TODO: IBM::set_solid_state(mfi,state,cls_d)
 
     
@@ -217,3 +218,44 @@ void CNS::compute_rhs(MultiFab& statemf, Real dt, FluxRegister* fr_as_crse, Flux
   } // end mfi loop
  
 }
+
+#if NUM_SPECIES > 1
+void CNS::clip_species_state(MultiFab& statemf) {
+  BL_PROFILE("CNS:clip_speciesstate()");
+
+  const PROB::ProbClosures& cls_h = *CNS::h_prob_closures;
+
+  for (MFIter mfi(statemf, false); mfi.isValid(); ++mfi) {
+    Array4<Real> const& cons = statemf.array(mfi);
+
+    const Box& bx  = mfi.growntilebox(0);
+    const Box& bxg = mfi.growntilebox(cls_h.NGHOST);
+    
+    // clip state
+    amrex::ParallelFor(bx, [=] AMREX_GPU_DEVICE(int i, int j, int k) noexcept
+    {
+      // compute real rho 
+      Real rhoreal = 0.0;
+	    for (int n = 0; n < NUM_SPECIES; ++n) {
+	      rhoreal += max( cons(i, j, k, cls_h.UFS + n) ,0.0);
+	    }
+      // ensure sum Y[k] =-1
+	    Real rhoinv = Real(1.0) / rhoreal;
+	    Real Y[NUM_SPECIES]; Real sumY=0.0;
+	    for (int n = 0; n < NUM_SPECIES; ++n) {
+	      Y[n] = max( cons(i, j, k, cls_h.UFS + n),0.0) * rhoinv; 
+	      sumY += Y[n];
+	    }
+	    for (int n = 0; n < NUM_SPECIES; ++n) {Y[n] /= sumY;}
+	     
+      // readjust	      
+	    for (int n = 0; n < NUM_SPECIES; ++n) {
+	      cons(i, j, k, cls_h.UFS + n) = rhoreal*Y[n]; 
+	    }
+    }); 
+
+  } // end looop mfi  
+
+}
+#endif
+

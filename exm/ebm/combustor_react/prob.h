@@ -140,7 +140,7 @@ struct skewparm_t {
 
   static constexpr bool dissipation = true;         // no dissipation
   static constexpr int  order = 4;                  // order numerical scheme   (2 or 4)
-  static constexpr Real C2skew=0.1,C4skew=0.016;    // Skew symmetric default  (0.1 0.016)
+  static constexpr Real C2skew=0.5,C4skew=0.016;    // Skew symmetric default  (0.1 0.016)
 };
 
 

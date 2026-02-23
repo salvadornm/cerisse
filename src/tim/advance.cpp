@@ -59,7 +59,6 @@ Real CNS::advance(Real time, Real dt, int /*iteration*/, int /*ncycle*/) {
     compute_rhs(Stemp, Real(0.5) * dt, fr_as_crse, fr_as_fine);
     // U^* = U^n + dt*dUdt^n
     MultiFab::LinComb(S2, Real(1.0), S1, 0, dt, Stemp, 0, 0, ncons, 0);
-
     // RK2 stage 2
     // After fillpatch Sborder = U^n+dt*dUdt^n
     state[0].setNewTimeLevel(time + dt);
@@ -70,6 +69,8 @@ Real CNS::advance(Real time, Real dt, int /*iteration*/, int /*ncycle*/) {
     // S_new += 0.5*dt*dSdt
     MultiFab::Saxpy(S2, Real(0.5) * dt, Stemp, 0, 0, ncons, 0);
     // We now have S_new = U^{n+1} = (U^n+0.5*dt*dUdt^n) + 0.5*dt*dUdt^*
+
+
     ////////////////////////////////////////////////////////////////////////////
   } else if (order_rk == 0) {  // returns rhs
     FillPatch(*this, Stemp, nghost, time, State_Type, 0, ncons);
@@ -206,6 +207,10 @@ Real CNS::advance(Real time, Real dt, int /*iteration*/, int /*ncycle*/) {
     }
 
   }
+
+#if ENSURE_MASSFRACSUM_ONE  
+  clip_species_state(S2);
+#endif
 
 #ifdef AMREX_USE_GPIBM
   const PROB::ProbClosures& cls_h = *CNS::h_prob_closures;

@@ -51,6 +51,10 @@ class CNS : public amrex::AmrLevel {
                    amrex::FluxRegister* fr_as_crse,
                    amrex::FluxRegister* fr_as_fine);
 
+#if NUM_SPECIES > 1                   
+  void clip_species_state(amrex::MultiFab& S);                   
+#endif  
+
   // void computeTemp(amrex::MultiFab& State, int ng);
 
   GpuArray<Real,AMREX_SPACEDIM> maxEigen();
