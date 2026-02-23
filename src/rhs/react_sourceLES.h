@@ -28,7 +28,10 @@ class reactor_sourceLES_t {
     {
       amrex::ParmParse pp("cns");
       pp.get("reactor_type", reactor_type);
-      pp.get("reaction_relax", reaction_relax);
+      //pp.get("reaction_relax", reaction_relax);
+       if (!pp.query("reaction_relax", reaction_relax)) {
+        amrex::Print() << " using no relaxation in chem source term  \n ";   
+      }
 
     }
     m_reactor = pele::physics::reactions::ReactorBase::create(reactor_type);
@@ -157,6 +160,7 @@ class reactor_sourceLES_t {
       }     
       // fill mask      
       mask(i, j, k) = (T(i, j, k) > CNSConstants::min_react_temp) ? 1 : -1;
+     // if (T(i,j,k) > 2200.0) mask(i,j,k)  = -1; // temp snm
 
       // mask solid boundaries
 #if (AMREX_USE_GPIBM || CNS_USE_EB )        
@@ -195,9 +199,26 @@ class reactor_sourceLES_t {
     /////////////////////////////////////////////////////////////
 
     /// Compute LES properties
-    // if (LES)
+    // if (PaSR)
     // {
     //   // do stuff compute taus sgs, Efficiency ...
+// Calculate laminar chemical source term
+  // Real omega[NUM_SPECIES];
+  // for (int n = 0; n < NUM_SPECIES; ++n) {
+  //   omega[n] =
+  //     (rY(i, j, k, n) - sold_arr(i, j, k, UFS + n)) / dt - rYsrc(i, j, k, n);
+  // }
+
+  // // Calculate chemical timescale tau_chem = min(rY/|omega|)
+  // Real tau_chem = 1e10;
+  // for (int n = 0; n < NUM_SPECIES; ++n) {
+  //   tau_chem =
+  //     std::min(rY(i, j, k, n) / std::max(std::abs(omega[n]),
+  //                                        std::numeric_limits<Real>::denorm_min()),
+  //              tau_chem);
+  // }
+  // tau_chem = std::max(tau_chem, std::numeric_limits<Real>::epsilon());
+    ////////////////
     // }
 
 
