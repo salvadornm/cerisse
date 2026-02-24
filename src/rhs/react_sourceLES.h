@@ -14,7 +14,9 @@ class reactor_sourceLES_t {
   std::unique_ptr<pele::physics::reactions::ReactorBase> m_reactor;
 
   // factor to multiply reaction (for transients)
-  Real reaction_relax=1.0;
+  amrex::Real reaction_relax=1.0;
+  // max temperature for reaction (to avoid instability in early stages of ATF)
+  amrex::Real max_react_temp = 3500.0; 
 
   // reactor types (hardcoded) and specific options
   inline static constexpr int therm_reactor_type = 1; // 1: U  2:H
@@ -29,9 +31,13 @@ class reactor_sourceLES_t {
       amrex::ParmParse pp("cns");
       pp.get("reactor_type", reactor_type);
       //pp.get("reaction_relax", reaction_relax);
-       if (!pp.query("reaction_relax", reaction_relax)) {
+      if (!pp.query("reaction_relax", reaction_relax)) {
         amrex::Print() << " using no relaxation in chem source term  \n ";   
       }
+      if (!pp.query("max_react_temp", max_react_temp)) {
+        amrex::Print() << " using default max_react_temp = " << max_react_temp << " K \n ";   
+      }
+
 
     }
     m_reactor = pele::physics::reactions::ReactorBase::create(reactor_type);
@@ -85,8 +91,11 @@ class reactor_sourceLES_t {
     using amrex::Real;
 
     const Box bx = mfi.tilebox();
+    // mesh sizes
+    const GpuArray<Real, AMREX_SPACEDIM> dxinv = geomdata.InvCellSizeArray();
+    const GpuArray<Real, AMREX_SPACEDIM> dx = geomdata.CellSizeArray(); 
+
       
-    // TODO: do not work in fine covered box ??
     // TODO: stochastic fields indexing
 
     ///////////////////// Prepare for react /////////////////////
@@ -111,12 +120,40 @@ class reactor_sourceLES_t {
     const Real o_dt = 1.0 / dt;
 
     
-    // parameters pased by prob.h (only in LES)
+    // parameters pased by prob.h 
     constexpr bool do_react       = source_t::do_reactions;  
     constexpr bool mask_closewall = source_t::mask_cells_boundary;  
 
-    const auto& cls = *cls_d;
+    // parameters pased by input
+    const Real maxT = max_react_temp;
+    const Real relax = reaction_relax;
 
+    // models defiend by source_t  (ATF, PaSR, LES) if not defined, default to false
+    constexpr bool useATF = []{
+    if constexpr (requires { source_t::use_ATF; })
+        return source_t::use_ATF;
+    else
+        return false;
+    }();
+
+    constexpr bool usePaSR = []{
+    if constexpr (requires { source_t::use_PaSR; })
+        return source_t::use_PaSR;
+    else
+        return false;
+    }();
+
+    constexpr bool useLES = []{
+    if constexpr (requires { source_t::use_LES; })
+        return source_t::use_LES;
+    else
+        return false;
+    }();
+    //
+
+
+
+    const auto& cls = *cls_d;
 
     // prepare input -------------------------------------------------------------------------
     amrex::ParallelFor(bx, [=] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {
@@ -158,19 +195,17 @@ class reactor_sourceLES_t {
           rYsrc(i, j, k, ns) = 0.0;       
         } 
       }     
-      // fill mask      
+      // --------  MASK -------------
+      // fill mask  with max/min temperature and solid boundaries (if EB or GPIBM)    
       mask(i, j, k) = (T(i, j, k) > CNSConstants::min_react_temp) ? 1 : -1;
-     // if (T(i,j,k) > 2200.0) mask(i,j,k)  = -1; // temp snm
-
-      // mask solid boundaries
+      if (T(i,j,k) > maxT) mask(i,j,k)  = -1;
 #if (AMREX_USE_GPIBM || CNS_USE_EB )        
       mask(i, j, k) = marker(i, j, k, 0) ? -1 : mask(i, j, k);
       //remove cells close to solid from chemistry (input by prob)
       if (mask_closewall) { if (marker(i, j, k, 1)) mask(i,j,k) = -1; }
 #endif
 
-       
-
+      
      
     });
 
@@ -198,38 +233,10 @@ class reactor_sourceLES_t {
       });
     /////////////////////////////////////////////////////////////
 
-    /// Compute LES properties
-    // if (PaSR)
-    // {
-    //   // do stuff compute taus sgs, Efficiency ...
-// Calculate laminar chemical source term
-  // Real omega[NUM_SPECIES];
-  // for (int n = 0; n < NUM_SPECIES; ++n) {
-  //   omega[n] =
-  //     (rY(i, j, k, n) - sold_arr(i, j, k, UFS + n)) / dt - rYsrc(i, j, k, n);
-  // }
+   
 
-  // // Calculate chemical timescale tau_chem = min(rY/|omega|)
-  // Real tau_chem = 1e10;
-  // for (int n = 0; n < NUM_SPECIES; ++n) {
-  //   tau_chem =
-  //     std::min(rY(i, j, k, n) / std::max(std::abs(omega[n]),
-  //                                        std::numeric_limits<Real>::denorm_min()),
-  //              tau_chem);
-  // }
-  // tau_chem = std::max(tau_chem, std::numeric_limits<Real>::epsilon());
-    ////////////////
-    // }
-
-
-    // relaxation factor
-    const Real rr = reaction_relax;
-
-
-    // ATF options    (by default no ATF: o_F=1)
-    constexpr amrex::Real Fthick = (source_t::ATF ? source_t::thickfactor : amrex::Real(1.0));
-    const amrex::Real o_F = rr / Fthick;
-
+    // compute filter width for LES
+    Real Delta = cls.calc_delta(dx);
 
     //////////////////////// Unpack dat + Update RHS ////////////////////////
     amrex::ParallelFor(bx, [=] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {
@@ -256,6 +263,32 @@ class reactor_sourceLES_t {
           // Update species source terms ----------------------
           const Real rho = prims(i, j, k, cls_t::QRHO);
 
+          /******** COMBUSTION MODELS */
+          // multiplying factor for the chemical source term
+          Real rr = relax;
+          // ATF MODEL 
+          if constexpr (useATF) {                      
+            const Real omega = cls.flame_sensor(i,j,k,prims);  // compute sensor for ATF
+            const Real F     = cls.thickening(omega);          // F
+            // ATF models: (1) Classic Ducros (2) Rathore transformation (default)
+            if (source_t::ATF_model == 1 && useLES) {
+              const Real usgs  = cls.usgs_cell(i,j,k,prims, dxinv, Delta); // compute u_sgs for model 1
+              const Real E     = cls.efficiency(usgs,Delta);        
+              rr *= F*E; // modify reaction source term by ATF factor and efficiency
+            }
+            else {                    
+              rr *= F;   // modify reaction source term by ATF factor
+            }
+          }    
+          // PaSR MODEL if (usePaSR && useLES) 
+          if constexpr (usePaSR) {
+            const Real tau_chem = cls.tau_chem(i,j,k,rY,prims,rho,dt);
+            const Real tau_mix  = cls.tau_sgs(i,j,k,prims,dxinv,Delta);
+            const Real Dasgs = tau_mix/tau_chem; // Damkohler number based on sgs mixing time scale
+            const Real E = 1.0/(1.0 + Dasgs);    // PaSR efficiency model 
+            rr *= E; // modify reaction source term by PaSR efficiency
+          }
+         
           // Option 1: constant pressure ----------- (h,P constant)
           if (reactor_constant_pressure) 
           {
@@ -272,8 +305,8 @@ class reactor_sourceLES_t {
             const Real drhodt = (rhonew - rho)* o_dt;
             // mass rhs:   rho dY/dt + Y drho/dt
             for (int ns = 0; ns < NUM_SPECIES; ++ns) {
-              rhs(i, j, k, cls_t::UFS + ns) +=  rho*(Yk[ns]- prims(i, j, k, cls_t::QFS + ns))* o_dt;
-              rhs(i, j, k, cls_t::UFS + ns) +=  prims(i, j, k, cls_t::QFS + ns)* drhodt;                         
+              rhs(i, j, k, cls_t::UFS + ns) +=  rho*(Yk[ns]- prims(i, j, k, cls_t::QFS + ns))* o_dt*rr;
+              rhs(i, j, k, cls_t::UFS + ns) +=  prims(i, j, k, cls_t::QFS + ns)* drhodt*rr;                         
             }
             // energy rhs:  h drho/dt
             rhs(i, j, k, cls_t::UET) +=  h*drhodt;
@@ -284,10 +317,10 @@ class reactor_sourceLES_t {
             for (int ns = 0; ns < NUM_SPECIES; ++ns) {                          
               Real Wchem = (rY(i, j, k, ns) - rho * prims(i, j, k, cls_t::QFS + ns)) * o_dt;
               if (pass_source_term){
-                rhs(i, j, k, cls_t::UFS + ns) = Wchem*o_F;
+                rhs(i, j, k, cls_t::UFS + ns) = Wchem*rr;
               }
               else {
-                rhs(i, j, k, cls_t::UFS + ns) += Wchem*o_F;
+                rhs(i, j, k, cls_t::UFS + ns) += Wchem*rr;
               }
             }
           }

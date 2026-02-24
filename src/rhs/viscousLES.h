@@ -52,14 +52,32 @@ class viscousLES_t {
             const Array4<Real>& /*cons*/, const cls_t* cls) {
 #endif
 
+
+    // LES options 
+    constexpr bool useLES = []{
+    if constexpr (requires { param::use_LES; })
+        return param::use_LES;
+    else
+        return false;
+    }();
+    // ATF options
+    constexpr bool useATF = []{
+    if constexpr (requires { param::use_ATF; })
+        return param::use_ATF;
+    else
+        return false;
+    }();
+  
+
     // mesh sizes
     const GpuArray<Real, AMREX_SPACEDIM> dxinv = geom.InvCellSizeArray();
     const GpuArray<Real, AMREX_SPACEDIM> dx = geom.CellSizeArray(); 
 
     // grid
-   // const Box& bx = mfi.tilebox();        
+    // const Box& bx = mfi.tilebox();        
     const Box& bxg = mfi.growntilebox(cls_t::NGHOST);     // to handle high-order 
-    const Box& bxgnodal = mfi.grownnodaltilebox(-1, 0); // to handle fluxes    
+    const Box& bxgnodal = mfi.grownnodaltilebox(-1, 0);   // to handle fluxes    
+    const Box& bxgs = mfi.growntilebox(halfsten);         // smaller box for LES
 
     // allocate arrays for transport properties  
     FArrayBox coeffs(bxg, cls_t::NCOEF, The_Async_Arena());
@@ -72,12 +90,7 @@ class viscousLES_t {
     const auto& lam_arr  = coeffs.array(CLAM);    // thermal conductivity 
     const auto& xi_arr   = coeffs.array(CXI);     // bulk viscosity
     const auto& rhoD_arr = coeffs.array(CRHOD);   // species diffusivity (times rho)
-
-
-    // ATF options    (by default no ATF)
-    constexpr amrex::Real Fthick = (param::ATF ? param::thickfactor : amrex::Real(1.0));    
-    // 
-
+    
     // pointer to array of transport coefficients    
     const amrex::Array4<const amrex::Real>& coeftrans = coeffs.array();
     
@@ -110,24 +123,24 @@ class viscousLES_t {
 #else
     auto const* ltransparm = trans_parms.device_parm();
 #endif    
-    
+  
+    // compute properties
     amrex::launch(bxg, [=] AMREX_GPU_DEVICE(Box const& tbx) {
         auto trans = pele::physics::PhysicsType::transport();                      
         trans.get_transport_coeffs(tbx, q_y, q_T, q_rho, 
         rhoD_arr, chi_arr, mu_arr,xi_arr, lam_arr, ltransparm);
         });
 
-    // change units cgs-> SI (and modduf)
+    ///  change units cgs-> SI
     amrex::ParallelFor(
-        bxg, [=, *this] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {        
-        mu_arr(i,j,k) *= visc_cgs2si;
-        lam_arr(i,j,k)*= cond_cgs2si*Fthick;    
-        for (int n=0;n<NUM_SPECIES; n++){        
-          rhoD_arr(i,j,k,n) *= rhodiff_cgs2si*Fthick;
-        }   
-        xi_arr(i,j,k) *= visc_cgs2si;
-        });        
-    //    
+        bxg, [=, *this] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {                
+          mu_arr(i,j,k) *= visc_cgs2si;
+          lam_arr(i,j,k)*= cond_cgs2si;    
+          for (int n=0;n<NUM_SPECIES; n++){        
+            rhoD_arr(i,j,k,n) *= rhodiff_cgs2si;
+          }   
+          xi_arr(i,j,k) *= visc_cgs2si;       
+        } );   
 #else
     amrex::ParallelFor(
         bxg, [=, *this] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {        
@@ -137,28 +150,58 @@ class viscousLES_t {
         });
 #endif     
 
+    // -------  ATF Options  ----------- //   
+    if constexpr(useATF) {
+      Real Delta = cls->calc_delta(dx); // compute filter width      
+    // change units cgs-> SI (and apply ATF if needed)    
+      amrex::ParallelFor(
+        bxgs, [=, *this] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {      
+
+        Real mod_diff = 1.0; // by default no modification of transport properties   
+        Real mod_mu   = 1.0;
+          
+        // modify transport properties near flame if ATF is on          
+        const Real omega = cls->flame_sensor(i,j,k,prims); // compute sensor for ATF
+        const Real F     = cls->thickening(omega);    // F          
+        // ATF models: (1) Classic Ducros (2) Rathore transformation
+        if (param::ATF_model == 1) {
+          const Real usgs  = cls->usgs_cell(i,j,k,prims, dxinv, Delta); // compute u_sgs for model 1
+          const Real E     = cls->efficiency(usgs,Delta);        
+          mod_diff = F*E;
+        }
+        else if (param::ATF_model == 2) {                    
+          mod_diff = F; mod_mu   = F;
+        }           
+        //
+        mu_arr(i,j,k) *= mod_mu;
+        lam_arr(i,j,k)*= mod_diff;    
+        for (int n=0;n<NUM_SPECIES; n++){        
+          rhoD_arr(i,j,k,n) *= mod_diff;
+        }           
+      });
+    } // end ATF options                  
     // -------  LES Options  ----------- //
-    if (param::use_LES)
+    if constexpr(useLES)
     {
-    //AMREX_ALWAYS_ASSERT_WITH_MESSAGE( cls_t::NGHOST >= halfsten, 
-    // 		  "ERROR: NGHOST < halfsten (order/2), LES stencil exceeds  ghost cells."); 
-
-      const Box& bxgs = mfi.growntilebox(halfsten);   
       Real Delta = cls->calc_delta(dx); // compute filter width
+      // compute sgs viscosity, conductivity and diffusivity add to molecular values
+      amrex::ParallelFor( bxg, [=] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {        
+        Real mu_sgs  = 0.0; Real cond_sgs = 0.0; Real diff_sgs = 0.0;
+        Real Cp_o_Pr = lam_arr(i,j,k)/(mu_arr(i,j,k)+1.e-15);        
+        cls-> compute_sgsterms(i,j,k,prims, dxinv, Delta, Cp_o_Pr,  mu_sgs, cond_sgs, diff_sgs);
 
-      amrex::ParallelFor( bxgs, [=] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {
-
-      	Real mu_sgs  = 0.0; Real cond_sgs = 0.0; Real diff_sgs = 0.0;
-      	Real Cp_o_Pr = lam_arr(i,j,k)/(mu_arr(i,j,k)+1.e-15);        
-      	cls-> compute_sgsterms(i,j,k,prims, dxinv, Delta, Cp_o_Pr,  mu_sgs, cond_sgs, diff_sgs);
+        // remove sgs effects near flame
+        if constexpr(useATF)
+        {
+          Real sensor = cls->flame_sensor(i,j,k,prims);           // compute sensor for ATF
+          mu_sgs  *= (1.0-sensor); cond_sgs *= (1.0-sensor); diff_sgs *= (1.0-sensor); 
+        }
 
         mu_arr(i,j,k) += mu_sgs;
         lam_arr(i,j,k)+= cond_sgs;   
         for (int n=0;n<NUM_SPECIES; n++){rhoD_arr(i,j,k,n) += diff_sgs;}   
       }); 
-    }          
-
-  
+    } // end LES options
     // loop over directions -----------------------------------------------
     for (int dir = 0; dir < AMREX_SPACEDIM; dir++) {
      // GpuArray<int, 3> vdir = {int(dir == 0), int(dir == 1), int(dir == 2)};

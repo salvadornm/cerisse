@@ -13,6 +13,8 @@
 #include "Closures.h"
 #include "RHS.h"
 
+
+
 #if CNS_USE_EB    
 #include <ebm.h>
 #include <walltypes.h>
@@ -21,6 +23,7 @@
 #include <bc_types.h>
 #include <numbers>
 #include <cmath>
+
 
 // NTU Combustor-type for demonstration purposes
 // created by S Dupre and S Navarro-Martinez (2025)
@@ -43,7 +46,10 @@ struct LESparm {
 };
 
 
-typedef closures_dt<indicies_stat_t, transport_Pele_t , multispecies_pele_gas_t<indicies_t>, Smagorinsky_t<LESparm,indicies_t>>ProbClosures;
+// Closure Index+Thermodynamics + Transport + LES + ATF
+
+typedef closures_dt<indicies_stat_t, transport_Pele_t , multispecies_pele_gas_t<indicies_t>,
+                    Smagorinsky_t<LESparm,indicies_t>, TFM_t<LESparm,indicies_t>>ProbClosures;
 //typedef closures_dt<indicies_t, transport_Pele_t , multispecies_pele_gas_t<indicies_t>> ProbClosures;
 
 // problem parameters 
@@ -340,7 +346,8 @@ user_tagging(int i, int j, int k, int nt_level, auto &tagfab,
  switch (level)
   {
     case 0:      
-      refine = (z < 0.1) && (r < 0.03);    
+      //refine = (z < 0.1) && (r < 0.03);    
+      refine = (z < 0.130);    
       break;
     case 1:
       refine = (z < 0.08) && (r < 0.025);  
@@ -368,17 +375,22 @@ class user_source_t {
   public:
 
   // ATF options
-  bool static constexpr ATF = true; // use adaptive thickening factor
-  static constexpr Real thickfactor = 2.0; // thickening factor
+  bool static constexpr use_ATF = true; // use adaptive thickening factor
+  static constexpr int ATF_model = 1; // 1: Classic Ducros, 2: Rathore transformation
+  //
+
+  //...
+  
+  // viscous LES options
+  static constexpr bool use_LES= true;           // use LES model in viscous term
+  static constexpr int  order = 2;               // order numerical scheme   
+
   // compute chemistry
   bool static constexpr do_reactions = true;  // <<<<<<<<<<<<<<<<<<<<<<<<<
   bool static constexpr mask_cells_boundary = true; // avoid compute reactions in cells partially covered
   //
 
-  // viscous LES options
-  static constexpr int  order = 2;                  // order numerical scheme   
-  static constexpr bool use_LES= true;           // use LES model in viscous term
-
+  
 
   // to use as a user source term, the function name must be src:
   // void inline src(const Geometry& geomdata, const amrex::MFIter &mfi,
@@ -408,7 +420,7 @@ class user_source_t {
  
     // doing in this way avoids passing  whole prob_parm and only pass scalars you use 
     //const Real zexit = prob_parm.zexit;
-    const Real zexit = 0.2;
+    const Real zexit = 0.16;
     const Real p_0    = prob_parm.p_0;
 
     auto const* cls = cls_d;

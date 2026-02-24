@@ -72,10 +72,9 @@ for dir in "${MAKE_DIRS[@]}"; do
 	else 
 		#echo -e "                      ${RED}[FAIL]${NC}"
 		build_result="${RED}[FAIL]${NC}"
-		cat build.log
 		echo "===== compile failed in $dir ====="
-    	tail -n 10 build.log
-    	exit 1
+    		#tail -n 10 build.log
+	    	exit 1
 		echo "===================================="
 	fi
 	# remove compiled files, executables and log files
