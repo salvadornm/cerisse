@@ -6,25 +6,24 @@
 //////////////////////////////// PaSR TEMPLATE /////////////////////////////////
 /**
  * \brief Template for calculating PaSR related subroutines
- *  includes, sensor and wrinkling functions
- *  requires that an LES template exists 
+ *  includes, chemical time scale
  */
 template <typename param, typename idx_t>
 class PaSR_t {
  
   // input parameters
-  amrex::Real F0=1.0;            // Thickening factor   for ATF
+  amrex::Real C0=1.0;            // Mixing Constant  
 
   // derived
-  amrex::Real beta =  1.0;
+  //amrex::Real beta =  1.0;
 
 
   public:
   AMREX_GPU_HOST_DEVICE
   PaSR_t() {
      amrex::ParmParse pp("pasr");
-      if (!pp.query("thickening_factor", F0)) {
-        amrex::Print() << " PaSR: using no thickening factor (default 1) \n ";   
+      if (!pp.query("mixing_constant", C0)) {
+        amrex::Print() << " PaSR: using default mixing constant (1) \n ";   
       }
     
   }

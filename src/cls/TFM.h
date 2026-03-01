@@ -46,15 +46,18 @@ class TFM_t {
       if (!pp.query("Ret", Ret)) {
         amrex::Print() << " ATF: using default Ret = 10 \n ";     
       }
-      // if (!pp.(query"cms", cms)) {
-      //   amrex::Print() << " ATF: default cms  = 0.28 \n ";   
-      // }
       if (!pp.query("laminar_flame_thickness", deltaLO)) {
         amrex::Print() << " ATF: using default laminar flame thickness (0.1 mm) \n ";     
       }
 
       beta = max(2.0*std::log(2.0)/(3.0*cms*(std::sqrt(Ret)-1.0 +1.e-8)),0.0); // > 0
-
+        
+      amrex::Print() << " ** ATF/TFM Parameters used: " << "\n";
+      amrex::Print() << " F0 = " << F0 << " SL0 = " << SLO << "\n ";
+      amrex::Print() << " beta = " << beta << "\n ";
+      amrex::Print() << " Tburn = " << c1 << " Tunburn = " << c0 <<  "\n ";
+      amrex::Print() << " Ret = " << Ret << " deltaLO = " << deltaLO << "\n ";
+      amrex::Print() << " ------------------------------------\n ";      
   }
 
   AMREX_GPU_HOST_DEVICE
@@ -74,6 +77,7 @@ class TFM_t {
     amrex::Real c = q(i, j, k, sensor_id);  c= (c - c0)/(c1-c0);
     // clip c between 0 and 1
     c = amrex::max(amrex::min(c, 1.0),0.0);    
+   // printf(" C= %f omega = %f\n", c, 16.0* c*c*(1.0-c)*(1.0-c)); ///-----SNM
     return( 16.0* c*c*(1.0-c)*(1.0-c));
   }  
   /**
@@ -99,7 +103,9 @@ class TFM_t {
     Real w  = wrinkling(usgs, Delta, deltaLO);    // wrinkling factor laminar flame
     Real w1 = wrinkling(usgs, Delta, F0*deltaLO); // wrinkling factor thickened flame  (will be samaller than w)
 
-    return(w/w1); // 
+    Real eff = std::max(w/w1,1.0); // efficiency should be > 1, can be tuned
+
+    return(std::min(eff,5.0) ); // limit efficiency to 5 to avoid excessive reaction rates in highly wrinkled flames, can be tuned
   }
 
   /**

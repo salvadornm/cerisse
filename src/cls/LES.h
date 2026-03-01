@@ -179,6 +179,10 @@ class LES_t {
     }
 #endif
 
+
+  //  printf("cell (%d,%d,%d) w = (%f, %f, %f), lapw = (%f, %f, %f) \n", i,j,k, w0[0], w0[1], w0[2], lapw[0], lapw[1], lapw[2]); ///-----SNM        
+
+
     // |∇²(∇×u)|
 #if (AMREX_SPACEDIM == 3)
     const Real mag = std::sqrt(lapw[0]*lapw[0] + lapw[1]*lapw[1] + lapw[2]*lapw[2]);
@@ -186,8 +190,11 @@ class LES_t {
     const Real mag = std::abs(lapw[2]); // only z-component exists in 2D
 #endif
 
-    // u'_Δe = 2 * Δ^3 * | ... |
-    return 2.0_rt * (Delta*Delta*Delta) * mag;
+    constexpr Real C2 = 0.1;
+
+    // u' = C2 Δ^3 * | ... |
+
+    return (C2 * (Delta*Delta*Delta) * mag);
   }
 
 

@@ -17,9 +17,15 @@ using namespace amrex;
 void CNS::compute_rhs(MultiFab& statemf, Real dt, FluxRegister* fr_as_crse, FluxRegister* fr_as_fine) {
   BL_PROFILE("CNS::compute_rhs()");
 
+
   // Variables
-  const PROB::ProbClosures* cls_d = CNS::d_prob_closures;
-  const PROB::ProbClosures& cls_h = *CNS::h_prob_closures;
+  const PROB::ProbClosures* cls_d = CNS::d_prob_closures;     // for device access to closures (GPU)
+  const PROB::ProbClosures& cls_h = *CNS::h_prob_closures;    // for host  access to closures  (CPU)
+
+  // local Indexing for convenience  
+  constexpr int NCONS  = PROB::ProbClosures::NCONS;
+  constexpr int NPRIM  = PROB::ProbClosures::NPRIM;
+  constexpr int NGHOST = PROB::ProbClosures::NGHOST;
 
   // time
   const Real cur_time = state[State_Type].curTime();
@@ -32,27 +38,26 @@ void CNS::compute_rhs(MultiFab& statemf, Real dt, FluxRegister* fr_as_crse, Flux
     Array4<Real> const& state = statemf.array(mfi);
 
     const Box& bx  = mfi.growntilebox(0);
-    const Box& bxg = mfi.growntilebox(cls_h.NGHOST);
+    const Box& bxg = mfi.growntilebox(NGHOST);
 #ifdef CNS_USE_EB     
-    const Box& bxflux = mfi.growntilebox(cls_h.NGHOST+1); // add 1 cell 
+    const Box& bxflux = mfi.growntilebox(NGHOST+1); // add 1 cell 
 #else
-    const Box& bxflux = mfi.growntilebox(cls_h.NGHOST); 
+    const Box& bxflux = mfi.growntilebox(NGHOST); 
 #endif    
     
     // primitives and fluxes arrays
-    FArrayBox primf(bxg, cls_h.NPRIM, The_Async_Arena());
+    FArrayBox primf(bxg, NPRIM, The_Async_Arena());
     Array4<Real> const& prims= primf.array();
-
     
 #ifdef CNS_USE_EB     
     // auxiliar arrays for redistribution 
-    FArrayBox divcfab(bxg, cls_h.NCONS, The_Async_Arena());
+    FArrayBox divcfab(bxg, NCONS, The_Async_Arena());
     Array4<Real> const& divc= divcfab.array();    
 
     // store array cons 
-    FArrayBox consfab(bxg, cls_h.NCONS, The_Async_Arena());
+    FArrayBox consfab(bxg, NCONS, The_Async_Arena());
     Array4<Real> const& cons= consfab.array();    
-    amrex::ParallelFor(bxg, cls_h.NCONS,
+    amrex::ParallelFor(bxg, NCONS,
       [=] AMREX_GPU_DEVICE (int i, int j, int k, int n) noexcept
       {
         cons(i,j,k,n) = state(i,j,k,n);
@@ -62,13 +67,13 @@ void CNS::compute_rhs(MultiFab& statemf, Real dt, FluxRegister* fr_as_crse, Flux
     std::array<FArrayBox ,AMREX_SPACEDIM> fluxt;
     for (int dir=0; dir < AMREX_SPACEDIM; ++dir)
     {
-      fluxt[dir].resize(amrex::surroundingNodes(bxflux, dir),cls_h.NCONS, The_Async_Arena() );
+      fluxt[dir].resize(amrex::surroundingNodes(bxflux, dir),NCONS, The_Async_Arena() );
       fluxt[dir].setVal<RunOn::Device>(0.);
     }
      
     // We want to minimise function calls. So, we call prims2cons, flux and
     // source term evaluations once per fab from CPU, to be run on GPU.
-    cls_h.cons2prims(mfi, state, prims);
+    cls_h.cons2prims(mfi, state, prims); // <<<<<<<<
 
     // combine arrays if IBM & EBM are used together 
 #if (AMREX_USE_GPIBM || CNS_USE_EB )   
@@ -124,13 +129,13 @@ void CNS::compute_rhs(MultiFab& statemf, Real dt, FluxRegister* fr_as_crse, Flux
     // compute rhs as flux derivative, i.e.  rhs + = (flx[i] - flx[i+1])/dx
     // WARNING: state is now the RHS array
     // set RHS=0 (everywhere including ghost points)
-    ParallelFor(bxg, cls_h.NCONS,[=] AMREX_GPU_DEVICE (int i, int j, int k, int n) noexcept
+    ParallelFor(bxg, NCONS,[=] AMREX_GPU_DEVICE (int i, int j, int k, int n) noexcept
       {state(i,j,k,n) = 0.0;});
     const GpuArray<Real, AMREX_SPACEDIM> dxinv = geom.InvCellSizeArray();
     for (int dir = 0; dir < AMREX_SPACEDIM; dir++) {
         GpuArray<int, 3> vdir = {int(dir == 0), int(dir == 1), int(dir == 2)};
         auto const& flx = fluxt[dir].array();  
-        ParallelFor(bx, cls_h.NCONS,  // bxg or bx (should be bxg but needs correct flux)
+        ParallelFor(bx, NCONS,  // bxg or bx (should be bxg but needs correct flux)
                   [=] AMREX_GPU_DEVICE(int i, int j, int k, int n) noexcept {
                     state(i, j, k, n) +=
                         dxinv[dir] * (flx(i, j, k, n) - flx(i+vdir[0], j+vdir[1], k+vdir[2], n));
@@ -154,7 +159,7 @@ void CNS::compute_rhs(MultiFab& statemf, Real dt, FluxRegister* fr_as_crse, Flux
     // redistribution 
     // WARNING: state is  the RHS array, prims is the prims 
     // compute divc here
-    amrex::ParallelFor(bxg, cls_h.NCONS,  
+    amrex::ParallelFor(bxg, NCONS,  
     [=] AMREX_GPU_DEVICE (int i, int j, int k, int n) noexcept
     {
       divc(i,j,k,n) = state(i,j,k,n);
@@ -182,13 +187,13 @@ void CNS::compute_rhs(MultiFab& statemf, Real dt, FluxRegister* fr_as_crse, Flux
 
     // Set solid point RHS to 0  (state hold RHS at this point)
 #if AMREX_USE_GPIBM || CNS_USE_EB
-    amrex::ParallelFor(bxg, cls_h.NCONS,
+    amrex::ParallelFor(bxg, NCONS,
     [=] AMREX_GPU_DEVICE (int i, int j, int k, int n) noexcept
     {
       state(i,j,k,n) = state(i,j,k,n)*(1 - int(geoMarkers(i,j,k,0)));
     });
 #endif
- 
+
 
 
     // TODO: IBM::set_solid_state(mfi,state,cls_d)
@@ -219,17 +224,22 @@ void CNS::compute_rhs(MultiFab& statemf, Real dt, FluxRegister* fr_as_crse, Flux
  
 }
 
+// 
+// clip species state to ensure positivity and sum Y=1 (if NUM_SPECIES > 1)
+
 #if NUM_SPECIES > 1
 void CNS::clip_species_state(MultiFab& statemf) {
   BL_PROFILE("CNS:clip_speciesstate()");
 
-  const PROB::ProbClosures& cls_h = *CNS::h_prob_closures;
+  // local Indexing for convenience  
+  constexpr int UFS    = PROB::ProbClosures::UFS;
+  constexpr int NGHOST = PROB::ProbClosures::NGHOST;
 
   for (MFIter mfi(statemf, false); mfi.isValid(); ++mfi) {
     Array4<Real> const& cons = statemf.array(mfi);
 
     const Box& bx  = mfi.growntilebox(0);
-    const Box& bxg = mfi.growntilebox(cls_h.NGHOST);
+    const Box& bxg = mfi.growntilebox(NGHOST);
     
     // clip state
     amrex::ParallelFor(bx, [=] AMREX_GPU_DEVICE(int i, int j, int k) noexcept
@@ -237,20 +247,20 @@ void CNS::clip_species_state(MultiFab& statemf) {
       // compute real rho 
       Real rhoreal = 0.0;
 	    for (int n = 0; n < NUM_SPECIES; ++n) {
-	      rhoreal += max( cons(i, j, k, cls_h.UFS + n) ,0.0);
+	      rhoreal += max( cons(i, j, k, UFS + n) ,0.0);
 	    }
       // ensure sum Y[k] =-1
 	    Real rhoinv = Real(1.0) / rhoreal;
 	    Real Y[NUM_SPECIES]; Real sumY=0.0;
 	    for (int n = 0; n < NUM_SPECIES; ++n) {
-	      Y[n] = max( cons(i, j, k, cls_h.UFS + n),0.0) * rhoinv; 
+	      Y[n] = max( cons(i, j, k, UFS + n),0.0) * rhoinv; 
 	      sumY += Y[n];
 	    }
 	    for (int n = 0; n < NUM_SPECIES; ++n) {Y[n] /= sumY;}
 	     
       // readjust	      
 	    for (int n = 0; n < NUM_SPECIES; ++n) {
-	      cons(i, j, k, cls_h.UFS + n) = rhoreal*Y[n]; 
+	      cons(i, j, k, UFS + n) = rhoreal*Y[n]; 
 	    }
     }); 
 

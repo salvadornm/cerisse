@@ -29,6 +29,17 @@
 // created by S Dupre and S Navarro-Martinez (2025)
 
 
+struct NTNUglobalnumbers {  
+  static constexpr Real pressure = pres_atm2si; // [Pa] inflow pressure (1 atm)  
+  static constexpr Real Temperature_inflow = 298.0; //[K] 
+  // geometry 
+  static constexpr Real zinlet = 0.045;  // inlet combustor
+  static constexpr Real zexit  = 0.135 ; // outlet combustor  
+  static constexpr Real radius = 0.022 ; // Radius combustor    
+};
+
+
+
 using namespace amrex;
 
 namespace PROB {
@@ -61,8 +72,21 @@ struct ProbParm {
   Real Y_inflow[NUM_SPECIES] = {0.0};
   Real Y_burn[NUM_SPECIES] = {0.0};
   ProbClosures pp_pc;
+  NTNUglobalnumbers combustor;
 
   const Real Tburn = 2207.0; //[K] burned gas temperature
+
+
+  // inflow
+  const Real p_0     = combustor.pressure; //[Pa] inflow pressure (1 atm) 
+  const Real T_0     = combustor.Temperature_inflow;  //[K]  
+
+  // compute density and internal energy
+  const Real Q = 8.665; //  flow m3/s
+
+  // aux variables for initialisation
+  Real rho_0, eint_0;
+
 
   ProbParm () {
 #if USE_PELEPHYSICS
@@ -92,26 +116,12 @@ struct ProbParm {
   pp_pc.PYT2R(p_0, Y_inflow, T_0, rho_0);
   pp_pc.RYP2E(rho_0, Y_inflow, p_0, eint_0); 
   }
-
-  // compute density and internal energy
-  const Real Q = 8.665; //  flow m3/s
-  
-  // inflow
-  const Real p_0     = pres_atm2si; //[Pa] inflow pressure (1 atm) 
-  const Real T_0     = 298.0;  //[K]  
   
   // 
   const Real T_b  = Tburn;
   const Real T_u  = T_0;
   
-
-  Real rho_0, eint_0;
-
   const Real vel_0[3]= {0.0,0.0,0.0}; // array of inside velocity [m/s]
-
-  // geometry auxiliary
-  Real zin = 0.01;
-  Real zexit = 0.135 ;//0.135;
 
 };
 
@@ -170,12 +180,8 @@ struct wall_param {
 template <typename cls_t > class user_source_t;
 
 // USED
-//typedef rhs_dt<weno_t<ReconScheme::WenoZ5, ProbClosures>, viscousLES_t<user_source_t<ProbClosures>, ProbClosures>, reactor_sourceLES_t<user_source_t<ProbClosures>,ProbClosures >> ProbRHS;
 typedef rhs_dt<skew_t<skewparm_t, ProbClosures>, viscousLES_t<user_source_t<ProbClosures>, ProbClosures>, reactor_sourceLES_t<user_source_t<ProbClosures>,ProbClosures >> ProbRHS;
-
-//typedef rhs_dt<skew_t<skewparm_t, ProbClosures>, no_diffusive_t, no_source_t > ProbRHS;
-
-//typedef rhs_dt<skew_t<skewparm_t, ProbClosures>, viscousLES_t<user_source_t<ProbClosures>, ProbClosures>, no_source_t > ProbRHS;
+//typedef rhs_dt<weno_t<ReconScheme::Teno5, ProbClosures>, viscousLES_t<user_source_t<ProbClosures>, ProbClosures>, reactor_sourceLES_t<user_source_t<ProbClosures>,ProbClosures >> ProbRHS;
 
 
 // define type of wall and EBM class
@@ -314,6 +320,9 @@ user_tagging(int i, int j, int k, int nt_level, auto &tagfab,
 
   const Real *prob_lo = geomdata.ProbLo();
   const Real *dx = geomdata.CellSize();
+
+  NTNUglobalnumbers const combustor;
+
   Real x = prob_lo[0] + (i + Real(0.5)) * dx[0];
   Real y = prob_lo[1] + (j + Real(0.5)) * dx[1];
   Real z = prob_lo[2] + (k + Real(0.5)) * dx[2];
@@ -346,8 +355,7 @@ user_tagging(int i, int j, int k, int nt_level, auto &tagfab,
  switch (level)
   {
     case 0:      
-      //refine = (z < 0.1) && (r < 0.03);    
-      refine = (z < 0.130);    
+      refine = (z < combustor.zexit) && (r < 1.1*combustor.radius) ;    
       break;
     case 1:
       refine = (z < 0.08) && (r < 0.025);  
@@ -363,8 +371,6 @@ user_tagging(int i, int j, int k, int nt_level, auto &tagfab,
     break;
   }
 
- // refine = true; // temp
-
   tagfab(i,j,k) = refine;
 
 
@@ -376,7 +382,7 @@ class user_source_t {
 
   // ATF options
   bool static constexpr use_ATF = true; // use adaptive thickening factor
-  static constexpr int ATF_model = 1; // 1: Classic Ducros, 2: Rathore transformation
+  static constexpr int ATF_model = 1;   // 1: Classic  Colin/Charlette , 2: Rathore transformation
   //
 
   //...
@@ -412,18 +418,14 @@ class user_source_t {
     //  const Real *dx = geomdata.CellSize();
     auto prob_lo = geomdata.ProbLoArray();
     auto dx     = geomdata.CellSizeArray();
-
-    ProbParm const prob_parm;
+                
+    NTNUglobalnumbers const combustor;
 
     const Real tau_relax = 5.e-6;
     const Real coef =dt/tau_relax;
  
-    // doing in this way avoids passing  whole prob_parm and only pass scalars you use 
-    //const Real zexit = prob_parm.zexit;
-    const Real zexit = 0.16;
-    const Real p_0    = prob_parm.p_0;
-
-    auto const* cls = cls_d;
+    const Real zbuffer  = 0.16;
+    const Real p_0      = combustor.pressure;
 
     // ------------------------------------------------------------------------------------
     amrex::ParallelFor(bxg,
@@ -431,10 +433,10 @@ class user_source_t {
       {
       
       // coordinates 
-      const Real x = prob_lo[0] + (i + Real(0.5)) * dx[0];
-      const Real y = prob_lo[1] + (j + Real(0.5)) * dx[1];
+      // const Real x = prob_lo[0] + (i + Real(0.5)) * dx[0];
+      // const Real y = prob_lo[1] + (j + Real(0.5)) * dx[1];
       const Real z = prob_lo[2] + (k + Real(0.5)) * dx[2];
-      const Real r = sqrt(x*x + y*y + (z-zexit)*(z-zexit));
+      // const Real r = sqrt(x*x + y*y + (z-zexit)*(z-zexit));
 
       // get values from primitives
       const Real pres = prims(i,j,k,cls_t::QPRES);
@@ -446,16 +448,15 @@ class user_source_t {
       const Real v  = prims(i,j,k,cls_t::QV );
       const Real w  = prims(i,j,k,cls_t::QW );
       // Kinetic and Total energy (per density unit)  [J/rho] 
-      const Real Ekin = 0.5*(u*u + v*v + w*w);
-      const Real Et  = prims(i,j,k,cls_t::QEINT) + Ekin;
+      const Real Et  = prims(i,j,k,cls_t::QEINT) + 0.5*(u*u + v*v + w*w);
 
       // pressure relaxation towards P0   
       const Real dP = (p_0- pres)*coef; Real drho;
-      cls->PYT2R(dP,Y,T,drho);      // associated density change
+      cls_d->PYT2R(dP,Y,T,drho);      // associated density change
       const Real drhodt = drho/dt;  // rate of change
    
       // buffer zone where relaxation applies 
-      const bool buffer = (z > zexit); //&& (r > 0.06);
+      const bool buffer = (z > zbuffer); //&& (r > 0.06);
 
       if (buffer){        
  

@@ -95,7 +95,9 @@ class reactor_sourceLES_t {
     const GpuArray<Real, AMREX_SPACEDIM> dxinv = geomdata.InvCellSizeArray();
     const GpuArray<Real, AMREX_SPACEDIM> dx = geomdata.CellSizeArray(); 
 
-      
+     
+     
+
     // TODO: stochastic fields indexing
 
     ///////////////////// Prepare for react /////////////////////
@@ -151,9 +153,8 @@ class reactor_sourceLES_t {
     }();
     //
 
-
-
-    const auto& cls = *cls_d;
+    // use cls_d to compute sensor and filter width for ATF and LES models (if needed)
+    const auto& cls = *cls_d; 
 
     // prepare input -------------------------------------------------------------------------
     amrex::ParallelFor(bx, [=] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {
@@ -187,7 +188,7 @@ class reactor_sourceLES_t {
         my += rhs(i, j, k, cls_t::UMY) * dt;
         mz += rhs(i, j, k, cls_t::UMZ) * dt;
         Real rke_new = Real(0.5) * (mx * mx + my * my + mz * mz) / rho;
-        rEisrc(i, j, k) = (rhs(i, j, k, cls_t::UET) - (rke_new - rke) / dt) * rhoenergy_si2cgs;
+        rEisrc(i, j, k) = (rhs(i, j, k, cls_t::UET) - (rke_new - rke) * o_dt ) * rhoenergy_si2cgs;
       }      
       else {
         rEisrc(i, j, k) = 0.0;
@@ -204,9 +205,7 @@ class reactor_sourceLES_t {
       //remove cells close to solid from chemistry (input by prob)
       if (mask_closewall) { if (marker(i, j, k, 1)) mask(i,j,k) = -1; }
 #endif
-
-      
-     
+           
     });
 
     /////////////////////////// React ///////////////////////////
@@ -234,7 +233,6 @@ class reactor_sourceLES_t {
     /////////////////////////////////////////////////////////////
 
    
-
     // compute filter width for LES
     Real Delta = cls.calc_delta(dx);
 
@@ -270,14 +268,21 @@ class reactor_sourceLES_t {
           if constexpr (useATF) {                      
             const Real omega = cls.flame_sensor(i,j,k,prims);  // compute sensor for ATF
             const Real F     = cls.thickening(omega);          // F
+            
             // ATF models: (1) Classic Ducros (2) Rathore transformation (default)
             if (source_t::ATF_model == 1 && useLES) {
-              const Real usgs  = cls.usgs_cell(i,j,k,prims, dxinv, Delta); // compute u_sgs for model 1
-              const Real E     = cls.efficiency(usgs,Delta);        
-              rr *= F*E; // modify reaction source term by ATF factor and efficiency
+              // compute wrinkling  only inside flame
+              Real E = 1.0; 
+              if (F > 1.001) { // avoid computing u_sgs when F ~ 1 (outside flame)
+                const Real usgs  = cls.usgs_cell(i,j,k,prims, dxinv, Delta); // compute u_sgs for model 1
+                //const Real usgs  = 0.1;
+                E     = cls.efficiency(usgs,Delta);                                        
+              } 
+              rr *= E/F; // modify reaction source term by ATF factor and efficiency             
             }
             else {                    
-              rr *= F;   // modify reaction source term by ATF factor
+              rr *= 1.0/F;   // modify reaction source term by ATF factor
+             //printf(" rr= %f T(i,j,k) = %f\n", rr, T(i,j,k)); ///-----SNM
             }
           }    
           // PaSR MODEL if (usePaSR && useLES) 
@@ -332,17 +337,9 @@ class reactor_sourceLES_t {
     ///
 
 
-
-    //
-
-
     // clear memory
     tempf.clear();
-
      
-     // if LES multiply by something
-
-
     // call user source term (passed as argument)
     //  - assume source_t is a user_source_t is lightweight (no persistent state, just logic),
     source_t{}.rsrc(geomdata,mfi, prims, rhs, cls_d, dt, real_time);

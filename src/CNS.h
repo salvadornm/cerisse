@@ -195,8 +195,8 @@ class CNS : public amrex::AmrLevel {
 
   static PROB::ProbClosures* h_prob_closures;
   static PROB::ProbClosures* d_prob_closures;
-  static PROB::ProbParm* h_prob_parm;
-  static PROB::ProbParm* d_prob_parm;
+  static PROB::ProbParm* h_prob_parm;       // host-resident objects used on CPU and as sources for copies
+  static PROB::ProbParm* d_prob_parm;       // device-resident objects used on GPU (copied from host at initialization)
   static BCRec* h_phys_bc;
   static BCRec* d_phys_bc;
 };
