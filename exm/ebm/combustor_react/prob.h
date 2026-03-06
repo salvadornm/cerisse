@@ -60,7 +60,7 @@ struct LESparm {
 // Closure Index+Thermodynamics + Transport + LES + ATF
 
 typedef closures_dt<indicies_stat_t, transport_Pele_t , multispecies_pele_gas_t<indicies_t>,
-                    Smagorinsky_t<LESparm,indicies_t>, TFM_t<LESparm,indicies_t>>ProbClosures;
+                    WALE_t<LESparm,indicies_t>, TFM_t<LESparm,indicies_t>>ProbClosures;
 //typedef closures_dt<indicies_t, transport_Pele_t , multispecies_pele_gas_t<indicies_t>> ProbClosures;
 
 // problem parameters 

@@ -150,10 +150,18 @@ class viscousLES_t {
         });
 #endif     
 
-    // -------  ATF Options  ----------- //   
-    if constexpr(useATF) {
+    // Sensor array
+      FArrayBox sensor_fab(bxg, 1, The_Async_Arena());
+      auto const& sensor = sensor_fab.array();
+      amrex::ParallelFor(
+        bxg, [=, *this] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {      
+          sensor(i,j,k) = 0.0; // initialize sensor to 0
+      }); 
+    
+    // -------  ATF Options  ----------- //       
+    if constexpr(useATF) {      
       Real Delta = cls_d->calc_delta(dx); // compute filter width      
-    // change units cgs-> SI (and apply ATF if needed)    
+      // calculate sensor and effiency, modify transport properties near flame  
       amrex::ParallelFor(
         bxgs, [=, *this] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {      
 
@@ -161,6 +169,7 @@ class viscousLES_t {
         Real mod_mu   = 1.0;                     
         // modify transport properties near flame if ATF is on          
         const Real omega = cls_d->flame_sensor(i,j,k,prims); // compute sensor for ATF
+        sensor(i,j,k) = omega; // store sensor 
         const Real F     = cls_d->thickening(omega);    // F          
         // ATF models: (1) Classic Ducros (2) Rathore transformation
         if (param::ATF_model == 1) {
@@ -169,12 +178,7 @@ class viscousLES_t {
           if (F > 1.001) { // avoid computing u_sgs when F ~ 1 (outside flame) and next to wall
             const Real usgs  = cls_d->usgs_cell(i,j,k,prims, dxinv, Delta); // compute u_sgs for model 1
             //const Real usgs  = 0.1;
-            E  = cls_d->efficiency(usgs,Delta);               
-            if (std::isnan(usgs))
-            {
-              printf("ATF VISC: cell (%d,%d,%d) omega = %f, F = %f, usgs = %f, E = %f \n", i,j,k, omega, F, usgs, E); ///-----SNM
-              exit(1);
-            }            
+            E  = cls_d->efficiency(usgs,Delta);                          
           }          
           mod_diff = F*E;            
         }
@@ -189,28 +193,22 @@ class viscousLES_t {
         }           
       });
     } // end ATF options                  
-    // -------  LES Options  ----------- //
-    if constexpr(useLES)
-    {
+    // -------  LES : sub-grid models  ----------- //
+    if constexpr(useLES){
       Real Delta = cls_d->calc_delta(dx); // compute filter width
       // compute sgs viscosity, conductivity and diffusivity add to molecular values
       amrex::ParallelFor( bxg, [=] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {        
         Real mu_sgs  = 0.0; Real cond_sgs = 0.0; Real diff_sgs = 0.0;
         Real Cp_o_Pr = lam_arr(i,j,k)/(mu_arr(i,j,k)+1.e-15);        
         cls_d-> compute_sgsterms(i,j,k,prims, dxinv, Delta, Cp_o_Pr,  mu_sgs, cond_sgs, diff_sgs);
-
-        // remove sgs effects near flame
-        if constexpr(useATF)
-        {
-          Real sensor = cls_d->flame_sensor(i,j,k,prims);           // compute sensor for ATF
-          mu_sgs  *= (1.0-sensor); cond_sgs *= (1.0-sensor); diff_sgs *= (1.0-sensor); 
-        }
-
+        const Real omega = sensor(i,j,k);           
+        mu_sgs  *= (1.0-omega); cond_sgs *= (1.0-omega); diff_sgs *= (1.0-omega);         
         mu_arr(i,j,k) += mu_sgs;
         lam_arr(i,j,k)+= cond_sgs;   
         for (int n=0;n<NUM_SPECIES; n++){rhoD_arr(i,j,k,n) += diff_sgs;}   
       }); 
     } // end LES options
+
     // loop over directions -----------------------------------------------
     for (int dir = 0; dir < AMREX_SPACEDIM; dir++) {
      // GpuArray<int, 3> vdir = {int(dir == 0), int(dir == 1), int(dir == 2)};

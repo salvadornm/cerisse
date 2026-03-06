@@ -95,8 +95,7 @@ class reactor_sourceLES_t {
     const GpuArray<Real, AMREX_SPACEDIM> dxinv = geomdata.InvCellSizeArray();
     const GpuArray<Real, AMREX_SPACEDIM> dx = geomdata.CellSizeArray(); 
 
-     
-     
+       
 
     // TODO: stochastic fields indexing
 
@@ -130,7 +129,7 @@ class reactor_sourceLES_t {
     const Real maxT = max_react_temp;
     const Real relax = reaction_relax;
 
-    // models defiend by source_t  (ATF, PaSR, LES) if not defined, default to false
+    // models defined by source_t  (ATF, PaSR, LES) if not defined, default to false
     constexpr bool useATF = []{
     if constexpr (requires { source_t::use_ATF; })
         return source_t::use_ATF;
@@ -231,114 +230,105 @@ class reactor_sourceLES_t {
         rEi(i,j,k) *= rhoenergy_cgs2si;
       });
     /////////////////////////////////////////////////////////////
-
    
-    // compute filter width for LES
-    Real Delta = cls.calc_delta(dx);
+    // pre-multiplying factor array
+    FArrayBox turbcombf(bx, 1, The_Async_Arena());
+    auto const& wfactor = turbcombf.array(0);
+    amrex::ParallelFor(
+      bx, [=] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {      
+          wfactor(i,j,k) = relax; // initialize wfactor to 1 (no modification )
+    });      
+    // LES
+    Real Delta;
+    if constexpr(useLES) {
+      Delta = cls.calc_delta(dx);
+    } else {
+      Delta = dx[0];
+    }
+    /// ATF
+    if constexpr(useATF) {                      
+      amrex::ParallelFor(
+        bx, [=] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {      
+          const auto& cls = *cls_d;
+          const Real omega = cls.flame_sensor(i,j,k,prims);  // compute sensor for ATF
+          const Real F     = cls.thickening(omega); 
+          // ATF models: (1) Classic Ducros (2) Rathore transformation (default)
+          if (source_t::ATF_model == 1) {
+            // compute wrinkling  only inside flame
+            Real E = 1.0; 
+            if (F > 1.001) { // avoid computing u_sgs when F ~ 1 (outside flame)
+              const Real usgs  = cls.usgs_cell(i,j,k,prims, dxinv, Delta); // compute u_sgs for model 1
+              E     = cls.efficiency(usgs,Delta);                                        
+            } 
+            wfactor(i,j,k) *= E/F;    // modify reaction source term by ATF factor and efficiency             
+          }
+          else {                    
+            wfactor(i,j,k) *= 1.0/F;  // modify reaction source term by ATF factor             
+          }
+      }); 
+    }     
+    /// PASR
+    if constexpr(usePaSR) {                      
+      amrex::ParallelFor(
+        bx, [=] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {      
+          const auto& cls = *cls_d;
+          const Real tau_chem = cls.tau_chem(i,j,k,rY,prims,prims(i, j, k, cls_t::QRHO),dt);
+          const Real tau_mix  = cls.tau_sgs(i,j,k,prims,dxinv,Delta);
+          const Real Dasgs = tau_mix/tau_chem; // Damkohler number based on sgs mixing time scale
+          wfactor(i,j,k)  *= 1.0/(1.0 + Dasgs); // modify reaction source term by PaSR efficiency
+        }); 
+    }
 
     //////////////////////// Unpack dat + Update RHS ////////////////////////
     amrex::ParallelFor(bx, [=] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {
       const auto& cls = *cls_d;
 
       // only update rhs if mask != -1 (valid cell for reaction)
-      if (mask(i, j, k) != -1) {
+      if (mask(i, j, k) != -1) {               
         
-        bool problem_cell = false;      
+        const Real rr = wfactor(i,j,k); // reaction rate multiplyier (relaxation, comb models)
 
-        // check for problematic cell after reaction
-        if (check_problem_cell) {
+        const Real rho = prims(i, j, k, cls_t::QRHO);          
+        // Option 1: constant pressure ----------- (h,P constant)
+        if (reactor_constant_pressure) {
+          Real Yk[NUM_SPECIES];
+          for (int n = 0; n < NUM_SPECIES; ++n) { Yk[n] = rY(i, j, k, n)/rho;}            
+          // enthalpy
+          const Real h = prims(i, j, k, cls_t::QEINT) + prims(i,j,k,cls_t::QPRES)/rho;
+          // recalculate Temperature
+	        cls.RHY2T(rho, h, Yk, T(i,j,k));
+          // recalculate rho based on new T, Y and P (unchanged during reaction)
+          Real rhonew;
+          cls.PYT2R(prims(i,j,k,cls_t::QPRES),Yk,T(i,j,k),rhonew);
+          // calculate density change drho/dt
+          const Real drhodt = (rhonew - rho)* o_dt;
+          // mass rhs:   rho dY/dt + Y drho/dt
           for (int ns = 0; ns < NUM_SPECIES; ++ns) {
-            problem_cell |=
-              (rY(i, j, k, ns) < -1e-5 || rY(i, j, k, ns) > 1.0 + 1e-5 ||
-               std::isnan(rY(i, j, k, ns)));
+            rhs(i, j, k, cls_t::UFS + ns) +=  rho*(Yk[ns]- prims(i, j, k, cls_t::QFS + ns))* o_dt*rr;
+            rhs(i, j, k, cls_t::UFS + ns) +=  prims(i, j, k, cls_t::QFS + ns)* drhodt*rr;                         
           }
-          problem_cell =  problem_cell || (T(i, j, k) <= 0.0);        
+          // energy rhs:  h drho/dt
+          rhs(i, j, k, cls_t::UET) +=  h*drhodt;
         }
-
-        // Monitor problem cell, do not add reaction source         
-        if (!problem_cell)
-        {
-          // Update species source terms ----------------------
-          const Real rho = prims(i, j, k, cls_t::QRHO);
-
-          /******** COMBUSTION MODELS */
-          // multiplying factor for the chemical source term
-          Real rr = relax;
-          // ATF MODEL 
-          if constexpr (useATF) {                      
-            const Real omega = cls.flame_sensor(i,j,k,prims);  // compute sensor for ATF
-            const Real F     = cls.thickening(omega);          // F
-            
-            // ATF models: (1) Classic Ducros (2) Rathore transformation (default)
-            if (source_t::ATF_model == 1 && useLES) {
-              // compute wrinkling  only inside flame
-              Real E = 1.0; 
-              if (F > 1.001) { // avoid computing u_sgs when F ~ 1 (outside flame)
-                const Real usgs  = cls.usgs_cell(i,j,k,prims, dxinv, Delta); // compute u_sgs for model 1
-                //const Real usgs  = 0.1;
-                E     = cls.efficiency(usgs,Delta);                                        
-              } 
-              rr *= E/F; // modify reaction source term by ATF factor and efficiency             
+        else {
+        // Option 2: constant volume ----------- (rho, e constant)          
+          for (int ns = 0; ns < NUM_SPECIES; ++ns) {                          
+            Real Wchem = (rY(i, j, k, ns) - rho * prims(i, j, k, cls_t::QFS + ns)) * o_dt;
+            if (pass_source_term){
+              rhs(i, j, k, cls_t::UFS + ns) = Wchem*rr;
             }
-            else {                    
-              rr *= 1.0/F;   // modify reaction source term by ATF factor
-             //printf(" rr= %f T(i,j,k) = %f\n", rr, T(i,j,k)); ///-----SNM
-            }
-          }    
-          // PaSR MODEL if (usePaSR && useLES) 
-          if constexpr (usePaSR) {
-            const Real tau_chem = cls.tau_chem(i,j,k,rY,prims,rho,dt);
-            const Real tau_mix  = cls.tau_sgs(i,j,k,prims,dxinv,Delta);
-            const Real Dasgs = tau_mix/tau_chem; // Damkohler number based on sgs mixing time scale
-            const Real E = 1.0/(1.0 + Dasgs);    // PaSR efficiency model 
-            rr *= E; // modify reaction source term by PaSR efficiency
-          }
-         
-          // Option 1: constant pressure ----------- (h,P constant)
-          if (reactor_constant_pressure) 
-          {
-            Real Yk[NUM_SPECIES];
-            for (int n = 0; n < NUM_SPECIES; ++n) { Yk[n] = rY(i, j, k, n)/rho;}            
-            // enthalpy
-            const Real h = prims(i, j, k, cls_t::QEINT) + prims(i,j,k,cls_t::QPRES)/rho;
-            // recalculate Temperature
-	          cls.RHY2T(rho, h, Yk, T(i,j,k));
-            // recalculate rho based on new T, Y and P (unchanged during reaction)
-            Real rhonew;
-            cls.PYT2R(prims(i,j,k,cls_t::QPRES),Yk,T(i,j,k),rhonew);
-            // calculate density change drho/dt
-            const Real drhodt = (rhonew - rho)* o_dt;
-            // mass rhs:   rho dY/dt + Y drho/dt
-            for (int ns = 0; ns < NUM_SPECIES; ++ns) {
-              rhs(i, j, k, cls_t::UFS + ns) +=  rho*(Yk[ns]- prims(i, j, k, cls_t::QFS + ns))* o_dt*rr;
-              rhs(i, j, k, cls_t::UFS + ns) +=  prims(i, j, k, cls_t::QFS + ns)* drhodt*rr;                         
-            }
-            // energy rhs:  h drho/dt
-            rhs(i, j, k, cls_t::UET) +=  h*drhodt;
-          }
-          else
-          // Option 2: constant volume ----------- (rho, e constant)
-          {
-            for (int ns = 0; ns < NUM_SPECIES; ++ns) {                          
-              Real Wchem = (rY(i, j, k, ns) - rho * prims(i, j, k, cls_t::QFS + ns)) * o_dt;
-              if (pass_source_term){
-                rhs(i, j, k, cls_t::UFS + ns) = Wchem*rr;
-              }
-              else {
-                rhs(i, j, k, cls_t::UFS + ns) += Wchem*rr;
-              }
+            else {
+              rhs(i, j, k, cls_t::UFS + ns) += Wchem*rr;
             }
           }
-      
-
-        }
-      }
-    });
+        }    
+      } //end mask      
+    });    
     ///
-
 
     // clear memory
     tempf.clear();
+    turbcombf.clear();
      
     // call user source term (passed as argument)
     //  - assume source_t is a user_source_t is lightweight (no persistent state, just logic),

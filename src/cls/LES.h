@@ -19,10 +19,9 @@ class LES_t {
   static constexpr Real Pr_o_Prsgs = param::Pr_o_Prsgs;
   const int order  = param::order;
   static constexpr Real Scsgs_inv = 1.0/param::Scsgs;
-  // Indexes
-  //static constexpr int QUn[3]={idx_t::QU,idx_t::QV,idx_t::QW};
   // WALE constant
-  static constexpr Real Cw = std::sqrt(10.6) * param::Cs;
+  //static constexpr std::sqrt(10.6)=> 3.255764119219941 
+  static constexpr Real Cw = 3.255764119219941 * param::Cs;
     
   /**
    * \brief calculates filter width
@@ -179,10 +178,6 @@ class LES_t {
     }
 #endif
 
-
-  //  printf("cell (%d,%d,%d) w = (%f, %f, %f), lapw = (%f, %f, %f) \n", i,j,k, w0[0], w0[1], w0[2], lapw[0], lapw[1], lapw[2]); ///-----SNM        
-
-
     // |∇²(∇×u)|
 #if (AMREX_SPACEDIM == 3)
     const Real mag = std::sqrt(lapw[0]*lapw[0] + lapw[1]*lapw[1] + lapw[2]*lapw[2]);
@@ -287,20 +282,22 @@ class Smagorinsky_t : public LES_t<param, idx_t> {
   {
     Real mu_T;
     visc_sgs(i,j,k,q,dxinv,delta,mu_T);
-    Real tau_T = q(i, j, k, this->QRHO)*delta*delta/(mu_T + smalleps);
+    Real tau_T = q(i, j, k, idx_t::QRHO)*delta*delta/(mu_T + smalleps);
     return tau_T;
   }  
 
 };
-//////////////////////////////// SMAG TEMPLATE /////////////////////////////////
+//////////////////////////////// WALE TEMPLATE /////////////////////////////////
 template <typename param, typename idx_t>
 class WALE_t : public LES_t<param, idx_t> {
+
+  using LES_t<param,idx_t>::Cw;
 
 public :
 
   AMREX_GPU_DEVICE AMREX_FORCE_INLINE void visc_sgs(
   const int i, const int j, const int k, const Array4<const Real>& q,
-  const GpuArray<Real, AMREX_SPACEDIM>& dxinv, const Real delta, Real& mu_T)
+  const GpuArray<Real, AMREX_SPACEDIM>& dxinv, const Real delta, Real& mu_T) const
   {
     // Calculate derivatives at cell centers, second order central difference
     const amrex::IntVect iv{AMREX_D_DECL(i, j, k)};
@@ -336,7 +333,7 @@ public :
       }
     }
 
-    mu_T = q(i, j, k, this->QRHO) * param::Cw * param::Cw * delta * delta * std::pow(DijDij, 1.5) /
+    mu_T = q(i, j, k, idx_t::QRHO) * Cw * Cw * delta * delta * std::pow(DijDij, 1.5) /
          (std::pow(SijSij, 2.5) + std::pow(DijDij, 1.25) +
           std::numeric_limits<Real>::denorm_min());
   }
@@ -346,7 +343,7 @@ public :
   {
     Real mu_T;
     visc_sgs(i,j,k,q,dxinv,delta,mu_T);
-    cond_T = mu_T*this->Prsgs_o_Pr*Cp_o_Pr;
+    cond_T = mu_T*this->Pr_o_Prsgs*Cp_o_Pr;
   }  
   /**
    * \brief calculates sub-grid diffusivity
