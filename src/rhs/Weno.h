@@ -293,10 +293,11 @@ class weno_t {
         IntVect ivd(IntVect::TheDimensionVector(dir));
 
         int gl = ng, gr = ng;  // ghost point position on left and right
-#if (AMREX_USE_GPIBM || CNS_USE_EB )
-        
+
+        // modify stencils near IBM:  ibMarkers(iv,0) true means solid, false means fluid
+#if AMREX_USE_GPIBM         
         for (int mm = 0; mm < ng; ++mm) {
-          if (ibMarkers(iv + mm * ivd, 0)) gr = amrex::min(gr, mm);
+          if (ibMarkers(iv + mm * ivd, 0))       gr = amrex::min(gr, mm);
           if (ibMarkers(iv - (mm + 1) * ivd, 0)) gl = amrex::min(gl, mm);
         }
         if (gl == 0 && gr == 0) {
@@ -306,6 +307,18 @@ class weno_t {
           AMREX_ASSERT_WITH_MESSAGE(false, "Cell is fluid but both neighbors are solid: no valid stencil");
         }
 #endif
+        // modify stencils near EBM  ibMarkers(iv,0) true means solid, false means fluid
+#if CNS_USE_EB
+        // TODO
+        if (ibMarkers(iv +  2*ivd, 0 )) gr = 1;
+        if (ibMarkers(iv +  ivd, 0)   ) gr = 0;
+        if (ibMarkers(iv -  2*ivd, 0) ) gl = 0;
+                
+        if (gl == 0 && gr == 0) {
+          return;  // skip solid cells
+        }
+#endif
+        
 
         const Real alpha = cls->max_char_speed(iv, dir, ng, prims_in);
         const auto roe_avg = cls->roe_avg_state(iv, dir, prims_in);
@@ -350,6 +363,7 @@ class weno_t {
     }  // end of for each direction
   }
 
+///// OBSOLETE //////// // ........
 #if (AMREX_USE_GPIBM || CNS_USE_EB )
   AMREX_GPU_DEVICE AMREX_FORCE_INLINE bool fill_solid_prims(
       amrex::IntVect iv, amrex::IntVect ivd, int cdir,
@@ -369,64 +383,9 @@ class weno_t {
     if (gl == 0 && gr == 0) return false;  // skip solid cells
 
 
-     //printf("  gl gr = %d %d \n ",gl,gr);
-
-    // // Option1: use first order recon up to ng cells away from GP
-    // int glr = std::min(gl, gr);
-    // if (glr < ng) {
-    //   glr = 0;
-    // }
-    // for (int m = 0; m < ng; ++m) {
-    //   if (m <= glr) {
-    //     for (int n = 0; n < cls_t::NPRIM; ++n) {
-    //       prims(iv + m * ivd, n) = prims_in(iv + m * ivd, n);
-    //       prims(iv - (m + 1) * ivd, n) = prims_in(iv - (m + 1) * ivd, n);
-    //     }
-    //   } else {
-    //     for (int n = 0; n < cls_t::NPRIM; ++n) {
-    //       prims(iv + m * ivd, n) = prims_in(iv + glr * ivd, n);
-    //       prims(iv - (m + 1) * ivd, n) = prims_in(iv - (glr + 1) * ivd, n);
-    //     }
-    //   }
-    // }
-
-    // 2. fill the other solid points with the ghost point values
-    // if (gl == 0 || gr == 0) {
-    //   gl = 0;
-    //   gr = 0; // use 1st order if next to GP
-    // }
-    // for (int m = 0; m < ng; ++m) {
-    //   if (m <= gr) {
-    //     for (int n = 0; n < cls_t::NPRIM; ++n) {
-    //       prims(iv + m * ivd, n) = prims_in(iv + m * ivd, n);
-    //     }
-    //   } else {
-    //     for (int n = 0; n < cls_t::NPRIM; ++n) {
-    //       prims(iv + m * ivd, n) = prims_in(iv + gr * ivd, n);
-    //     }
-    //   }
-    // }
-    // for (int m = 0; m < ng; ++m) {
-    //   if (m <= gl) {
-    //     for (int n = 0; n < cls_t::NPRIM; ++n) {
-    //       prims(iv - (m + 1) * ivd, n) = prims_in(iv - (m + 1) * ivd, n);
-    //     }
-    //   } else {
-    //     for (int n = 0; n < cls_t::NPRIM; ++n) {
-    //       prims(iv - (m + 1) * ivd, n) = prims_in(iv - (gl + 1) * ivd, n);
-    //     }
-    //   }
-    // }
-
+  
     // 3. fill using 1st order BC (adiabatic no-slip)
     for (int m = 0; m < 2 * ng; ++m) {
-
-      //  printf("  line 390 m = %d ng=%d \n ",m,ng);
-      //  printf("iv = %d %d %d \n ",iv);
-      //  printf("ivd = %d %d %d \n ",ivd);
-      //  printf("iv - (m -ng)*ivd = %d %d %d \n ",iv - (m -ng)*ivd);
-
-      // prims  <--- prims_in   at iv (i + h,j,k)    why looping?  
       for (int n = 0; n < cls_t::NPRIM; ++n) {        
         prims(iv + (m - ng) * ivd, n) = prims_in(iv + (m - ng) * ivd, n);
       }
@@ -454,7 +413,7 @@ class weno_t {
     }
 
     return true;
-  }
+  } // ........
 #endif
 };
 

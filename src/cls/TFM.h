@@ -31,10 +31,12 @@ class TFM_t {
 
   // derived
   amrex::Real beta =  1.0;
+  amrex::Real dc1 = 1.0/(c1-c0); // for sensor calculation
+  amrex::Real dc0 = c0/(c1-c0);  // for sensor calculation
+  
 
 
   public:
-  AMREX_GPU_HOST_DEVICE
   TFM_t() {
      amrex::ParmParse pp("atf");
       if (!pp.query("thickening_factor", F0)) {
@@ -43,24 +45,35 @@ class TFM_t {
       if (!pp.query("laminar_flame_speed", SLO)) {
         amrex::Print() << " ATF: using default laminar flame speed (2 m/s) \n ";     
       }
-      if (!pp.query("Ret", Ret)) {
+      if (!pp.query("Ret", Ret)) {    
         amrex::Print() << " ATF: using default Ret = 10 \n ";     
-      }
+      }   
       if (!pp.query("laminar_flame_thickness", deltaLO)) {
-        amrex::Print() << " ATF: using default laminar flame thickness (0.1 mm) \n ";     
+        amrex::Print() << " ATF: using default laminar flame thickness (0.1 mm) \n ";       
       }
-
+      if (!pp.query("Cburn", c1)) {
+        amrex::Print() << " ATF: using default Cburn = 2200 \n ";             
+      }
+      if (!pp.query("Cunburn", c0)) {
+        amrex::Print() << " ATF: using default Cunburn = 298 \n ";             
+      }
+      if (!pp.query("Cindex", sensor_id)) {
+        amrex::Print() << " ATF: using default Cindex = TEMPERATURE \n ";             
+      }
+  
       beta = max(2.0*std::log(2.0)/(3.0*cms*(std::sqrt(Ret)-1.0 +1.e-8)),0.0); // > 0
+
+      dc0 = c0/(c1-c0); dc1= 1.0/(c1-c0); // for sensor calculation
         
       amrex::Print() << " ** ATF/TFM Parameters used: " << "\n";
       amrex::Print() << " F0 = " << F0 << " SL0 = " << SLO << "\n ";
       amrex::Print() << " beta = " << beta << "\n ";
       amrex::Print() << " Tburn = " << c1 << " Tunburn = " << c0 <<  "\n ";
       amrex::Print() << " Ret = " << Ret << " deltaLO = " << deltaLO << "\n ";
+      amrex::Print() << " sensor index = " << sensor_id << "\n ";
       amrex::Print() << " ------------------------------------\n ";      
   }
 
-  AMREX_GPU_HOST_DEVICE
   ~TFM_t() {}
 
   /**
@@ -74,7 +87,7 @@ class TFM_t {
   AMREX_GPU_DEVICE AMREX_FORCE_INLINE Real flame_sensor(
   const int i, const int j, const int k, const Array4<const Real>& q) const
   {
-    amrex::Real c = q(i, j, k, sensor_id);  c= (c - c0)/(c1-c0);
+    amrex::Real c = q(i, j, k, sensor_id);  c = c*dc1 -dc0; // normalize sensor
     // clip c between 0 and 1
     c = amrex::max(amrex::min(c, 1.0),0.0);    
    // printf(" C= %f omega = %f\n", c, 16.0* c*c*(1.0-c)*(1.0-c)); ///-----SNM

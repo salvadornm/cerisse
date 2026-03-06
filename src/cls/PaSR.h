@@ -19,7 +19,6 @@ class PaSR_t {
 
 
   public:
-  AMREX_GPU_HOST_DEVICE
   PaSR_t() {
      amrex::ParmParse pp("pasr");
       if (!pp.query("mixing_constant", C0)) {
@@ -28,7 +27,6 @@ class PaSR_t {
     
   }
 
-  AMREX_GPU_HOST_DEVICE
   ~PaSR_t() {}
 
   /**
