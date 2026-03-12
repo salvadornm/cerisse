@@ -85,7 +85,7 @@ class skew_t {
       coefP(2) =  Real(7.0/12.0);
       coefP(3) = -Real(1.0/12.0);   
 
-      // damping coefficients
+      // damping coefficients     Ui+2 - 3 Ui+1 + 3 Ui - Ui-1
       coefdamp(0) = -Real(1.0);
       coefdamp(1) = +Real(3.0);
       coefdamp(2) = -Real(3.0);
@@ -98,30 +98,58 @@ class skew_t {
       coefshock(3) = -Real(1.0/6.0);
 
       break; 
-    case 6:                   
-      coefskew(0,0) = Real(1.0/120.0);
-      coefskew(0,3) = Real(1.0/120.0);
+    case 6:       
+      //   F(i+1/2) = beta(k,p) U(i+p) V(i+k)
 
-      coefskew(1,1) = -Real(8.0/120.0);
-      coefskew(1,3) = -Real(9.0/120.0);    
-      coefskew(1,4) = Real(1.0/120.0);    
+      // coefskew(-2+ k, -2+p) = beta(k,p) 
+
+      // beta(k= -2 ,p)   U(i+p)V(i-2)              
+      coefskew(0,0) = Real(1.0/120.0);  //  p = -2
+      coefskew(0,1) = Real(0.0);        //  -1
+      coefskew(0,2) = Real(0.0);        //  0
+      coefskew(0,3) = Real(1.0/120.0);  //  1
+      coefskew(0,4) = Real(0.0);        //  2 
+      coefskew(0,5) = Real(0.0);        //  3 
       
-      coefskew(2,2) = Real(37.0/120.0);
-      coefskew(2,3) = Real(45.0/120.0);
-      coefskew(2,4) = -Real(9.0/120.0);    
-      coefskew(2,5) = Real(1.0/120.0);    
+      // beta(k= -1 ,p)  U(i+p)V(i-1)
+      coefskew(1,0) =  Real(0.0);         // p = -2
+      coefskew(1,1) = -Real(8.0/120.0);   // -1
+      coefskew(1,2) =  Real(0.0);         // 0
+      coefskew(1,3) = -Real(9.0/120.0);   // 1 
+      coefskew(1,4) =  Real(1.0/120.0);   // 2 
+      coefskew(1,5) =  Real(0.0);         // 3
 
-      coefskew(3,0) = Real(1.0/120.0);
-      coefskew(3,1) = -Real(9.0/120.0);    
-      coefskew(3,2) = Real(45.0/120.0);    
-      coefskew(3,3) = Real(37.0/120.0);    
-      
-      coefskew(4,1) = Real(1.0/120.0);
-      coefskew(4,2) = -Real(9.0/120.0);    
-      coefskew(4,4) = Real(8.0/120.0);    
+      // beta(k= 0 ,p)  U(i+p)V(i) 
+      coefskew(2,0) =  Real(0.0);         // -2
+      coefskew(2,1) =  Real(0.0);         // -1
+      coefskew(2,2) =  Real(37.0/120.0);  // 0
+      coefskew(2,3) =  Real(45.0/120.0);  // 1
+      coefskew(2,4) = -Real(9.0/120.0);   // 2 
+      coefskew(2,5) =  Real(1.0/120.0);   // 3
 
-      coefskew(5,2) = Real(1.0/120.0);
-      coefskew(5,5) = Real(7.0/120.0);
+      // beta(k= 1 ,p) U(i+p)V(i+1)
+      coefskew(3,0) =  Real(1.0/120.0);   // -2
+      coefskew(3,1) = -Real(9.0/120.0);   // -1 
+      coefskew(3,2) =  Real(45.0/120.0);  // 0  
+      coefskew(3,3) =  Real(37.0/120.0);  // 1  
+      coefskew(3,4) =  Real(0.0);         // 2
+      coefskew(3,5) =  Real(0.0);         // 3
+
+      // beta(k= 2 ,p) U(i+p)V(i+2)
+      coefskew(4,0) =  Real(0.0);         // -2
+      coefskew(4,1) =  Real(1.0/120.0);   // -1
+      coefskew(4,2) = -Real(9.0/120.0);   // 0 
+      coefskew(4,3) =  Real(0.0);         // 1
+      coefskew(4,4) = -Real(8.0/120.0);   // 2
+      coefskew(4,5) =  Real(0.0);         // 3
+
+      // beta(k= 3 ,p) U(i+p)V(i+3)
+      coefskew(5,0) = Real(0.0);          // -2
+      coefskew(5,1) = Real(0.0);          // -1
+      coefskew(5,2) = Real(1.0/120.0);    // 0
+      coefskew(5,3) = Real(0.0);          // 1      
+      coefskew(5,4) = Real(0.0);          // 2
+      coefskew(5,5) = Real(1.0/120.0);    // 3
 
       // no FV correction
         
@@ -133,14 +161,14 @@ class skew_t {
       coefP(4) = -Real(8.0/60.0);
       coefP(5) = Real(1.0/60.0);
 
-      // damping coefficients
-      coefdamp(0) = +Real(1.0/12.0);
-      coefdamp(1) = -Real(17.0/12.0);
-      coefdamp(2) = +Real(46.0/12.0);
-      coefdamp(3) = -Real(46.0/12.0);
-      coefdamp(4) = +Real(17.0/12.0);
-      coefdamp(5) = -Real(1.0/12.0);
-
+      // damping coefficients  -(Ui+3 -5 U i+2 + 10 Ui+1 -10 Ui  + 5 Ui+1 - Ui-2)
+      coefdamp(0) = Real(1.0);
+      coefdamp(1) = -Real(5.0);
+      coefdamp(2) = +Real(10.0);
+      coefdamp(3) = -Real(10.0);
+      coefdamp(4) = +Real(5.0);
+      coefdamp(5) = -Real(1.0);
+      
       // shock coefficients
       coefshock(0) =  Real(0.0);      
       coefshock(1) = -Real(1.0/6.0);
@@ -550,7 +578,7 @@ class skew_t {
 
   int halfsten = order / 2;
 
-// sensor variables (denisty and pressure by default)
+// sensor variables (density and pressure by default)
 // #if NUM_SPECIES > 1    
 //     static constexpr int NVARSEN = 2 + NUM_SPECIES;
 // #else

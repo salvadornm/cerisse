@@ -23,4 +23,4 @@ for grid in "${MESH[@]}"; do
 done
 
 # plot order (optional)
-#python checkorder.py
+python checkorder.py
