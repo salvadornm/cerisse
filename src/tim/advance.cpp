@@ -37,19 +37,18 @@ Real CNS::advance(Real time, Real dt, int /*iteration*/, int /*ncycle*/) {
   // MultiFab dSdt(grids,dmap,ncons,0,MFInfo(),Factory());
   MultiFab Stemp(grids,dmap,ncons,nghost,MFInfo(),Factory());
 
-  FluxRegister* fr_as_crse = nullptr;
+  FluxReg* fr_as_crse = nullptr;
   if (do_reflux && level < parent->finestLevel()) {
-    CNS& fine_level = getLevel(level + 1);
-    fr_as_crse = fine_level.flux_reg.get();
+    fr_as_crse = &getLevel(level + 1).flux_reg;
   }
 
-  FluxRegister* fr_as_fine = nullptr;
+  FluxReg* fr_as_fine = nullptr;
   if (do_reflux && level > 0) {
-    fr_as_fine = flux_reg.get();
+    fr_as_fine = &flux_reg;
   }
 
   if (fr_as_crse) {
-    fr_as_crse->setVal(Real(0.0));
+    fr_as_crse->reset();
   }
 
   if (order_rk == -2) {

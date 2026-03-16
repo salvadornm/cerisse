@@ -14,7 +14,7 @@ using namespace amrex;
 // computation and data transfer, is not useful then. Therefore, we can have all
 // grid point computations, per fab, in a single MFIter loop (single stream).
 
-void CNS::compute_rhs(MultiFab& statemf, Real dt, FluxRegister* fr_as_crse, FluxRegister* fr_as_fine) {
+void CNS::compute_rhs(MultiFab& statemf, Real dt, FluxReg* fr_as_crse, FluxReg* fr_as_fine) {
   BL_PROFILE("CNS::compute_rhs()");
 
 
@@ -166,10 +166,15 @@ void CNS::compute_rhs(MultiFab& statemf, Real dt, FluxRegister* fr_as_crse, Flux
     });  
     
     // do redistribution only in box with EB
-    if (eb_redistribution && fab_with_eb){      
-
-      EBM::eb.redist(geom,mfi,cons,divc, {AMREX_D_DECL(&fluxt[0], &fluxt[1], &fluxt[2])},
-                    state, cls_d,level,dt,h_phys_bc);
+    FArrayBox dm_as_fine(Box::TheUnitBox(), NCONS, The_Async_Arena());
+    if (fr_as_fine) {
+        dm_as_fine.resize(amrex::grow(bx, 1), NCONS);
+        dm_as_fine.setVal<RunOn::Device>(0.0);
+    }
+    if (eb_redistribution && fab_with_eb){
+      EBM::eb.redist(geom, mfi, cons, divc, {AMREX_D_DECL(&fluxt[0], &fluxt[1], &fluxt[2])},
+                     fr_as_crse, fr_as_fine, dm_as_fine.array(), 
+                     state, cls_d, level, dt, h_phys_bc);
     }                    
       
 
@@ -200,24 +205,38 @@ void CNS::compute_rhs(MultiFab& statemf, Real dt, FluxRegister* fr_as_crse, Flux
 
     
     // Flux register accumulation (conservation across AMR levels)
-    // if (do_reflux) {
-    //   if (fr_as_fine || fr_as_crse) {
-    //     const auto dx = geom.CellSizeArray();
-    //     // Note: fluxt[dir] are face-centered FArrayBox with NCONS components
-    //     // Already filled them with eflux + dflux (+ ebflux if enabled)
-
-    //     if (fr_as_fine) {
-    //       fr_as_fine->FineAdd(
-    //         mfi,{AMREX_D_DECL(&fluxt[0], &fluxt[1], &fluxt[2])}, dx.data(), dt, RunOn::Device);
-    //     }
-
-    //     if (fr_as_crse) {
-    //       fr_as_crse->CrseAdd(
-    //       mfi,{AMREX_D_DECL(&fluxt[0], &fluxt[1], &fluxt[2])}, dx.data(), dt, RunOn::Device);            
-    //     }
-    //   }
-    // }
-    //
+    if (do_reflux && (fr_as_crse || fr_as_fine)) {
+        const Real* dx = geom.CellSize();
+        const int ncomp = PROB::ProbClosures::NCONS;
+#ifdef CNS_USE_EB
+        if (t == FabType::singlevalued) {
+            const FArrayBox& volfrac = (*EBM::eb.volmf_a[level])[mfi];
+            AMREX_D_TERM(const FArrayBox& areafracx = (*(EBM::eb.areamcf_a[level][0]))[mfi];,
+                         const FArrayBox& areafracy = (*(EBM::eb.areamcf_a[level][1]))[mfi];,
+                         const FArrayBox& areafracz = (*(EBM::eb.areamcf_a[level][2]))[mfi];)
+            if (fr_as_crse) {
+                fr_as_crse->CrseAdd(mfi, {AMREX_D_DECL(&fluxt[0], &fluxt[1], &fluxt[2])}, dx, dt,
+                                    volfrac, {AMREX_D_DECL(&areafracx, &areafracy, &areafracz)},
+                                    0, 0, ncomp, RunOn::Device);
+            }
+            if (fr_as_fine) {
+                fr_as_fine->FineAdd(mfi, {AMREX_D_DECL(&fluxt[0], &fluxt[1], &fluxt[2])}, dx, dt,
+                                    volfrac, {AMREX_D_DECL(&areafracx, &areafracy, &areafracz)}, dm_as_fine,
+                                    0, 0, ncomp, RunOn::Device);
+            }
+        } else 
+#endif
+        {
+            if (fr_as_crse) {
+                fr_as_crse->CrseAdd(mfi, {AMREX_D_DECL(&fluxt[0], &fluxt[1], &fluxt[2])}, dx, dt, 
+                                    0, 0, ncomp, RunOn::Device);
+            }
+            if (fr_as_fine) {
+                fr_as_fine->FineAdd(mfi, {AMREX_D_DECL(&fluxt[0], &fluxt[1], &fluxt[2])}, dx, dt, 
+                                    0, 0, ncomp, RunOn::Device);
+            }
+        }
+    }
 
 
   } // end mfi loop
