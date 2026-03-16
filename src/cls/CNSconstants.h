@@ -19,7 +19,7 @@ constexpr int level_mask_notcovered = 2;  // ghost cells not covered
 constexpr int level_mask_physbnd = 3;     // outside domain
 
 constexpr amrex::Real min_react_temp  = 350.0;   // minimum reaction temperature
-constexpr amrex::Real min_euler_temp  = 10.0;    // minimum temperature for Euler solvers
+constexpr amrex::Real min_euler_temp  = 50.0;    // minimum temperature for Euler solvers  TODO: make it a user parameter?
 constexpr amrex::Real min_euler_press = 1.0e-8;  // minimum pressure for Euler solvers
 
 constexpr amrex::Real one_half  = 1.0/2.0;   // 1/2

@@ -1,0 +1,82 @@
+# Simulation time
+max_step  = 40000
+stop_time = 0.1
+cfl = 0.3
+#time_step = 5.0e-7
+#amr.restart = chk28000
+
+#DEBUGGING
+#amrex.abort_on_unused_inputs = 1
+#amrex.fpe_trap_invalid = 1
+#amrex.fpe_trap_zero = 1
+#amrex.fpe_trap_overflow = 1
+#fab.init_snan = 1
+
+cns.order_rk  = -2 
+cns.stages_rk = 2
+cns.do_reflux = 1
+
+# Geometry 
+geometry.is_periodic = 0 0 0
+geometry.coord_sys   = 0  
+geometry.prob_lo     = -0.358   -0.0127  -0.01905
+geometry.prob_hi     =  0.2135   0.0254   0.01905
+amr.n_cell           =  960      64       64
+#amr.n_cell           =  480      32       32
+
+# BC
+cns.lo_bc = 1 1 5
+cns.hi_bc = 2 5 5
+
+# output screen
+cns.verbose = 1
+amr.v       = 1
+
+# Refinement and regridding 
+amr.max_level       = 1      # maximum level number allowed
+amr.ref_ratio       = 2      # refinement ratio per level
+amr.regrid_int      = 20     # how often to regrid per level
+amr.blocking_factor = 8
+amr.max_grid_size   = 64
+amr.n_error_buf     = 4      # number of buffer cells in error est
+amr.grid_eff        = 0.7    # what constitutes an efficient grid
+
+# Plot and checkpoint
+amr.checkpoint_files_output = 0
+amr.check_file = chk   # root name of checkpoint file
+amr.check_int  = 2000  # number of timesteps betw.  checkpoints
+amr.plot_files_output = 0
+amr.plot_file = plt    # root name of plotfile
+amr.plot_int  = 500    # number of timesteps between plotfiles
+amr.derive_plot_vars = pressure velocity temperature
+
+eb2.geom_type = "custom"
+eb2.eb_weight  = 1.0
+eb2.redistribution_type = "FluxRedist"   #FluxRedist
+
+# DIAGNOSTICS
+#amr.data_log = time_probe_react.log
+#cns.record_probe = 1 
+#cns.time_probe_lev = 0 
+#cns.time_probe_int = 1
+#cns.time_probes = PressurePoint Temperature
+#PressurePoint.field_name = pressure
+#PressurePoint.box_lo = -0.01 -0.01 0.095
+#PressurePoint.box_hi = 0.01 0.01 0.1
+#Temperature.field_name = temperature
+#Temperature.box_lo = -0.01 -0.01 0.095
+#Temperature.box_hi = 0.01 0.01 0.1
+
+# Chemical Options
+cns.reactor_type = "ReactorNull"
+cvode.solve_type =  "GMRES"
+ode.clean_init_massfrac = 1
+cns.reaction_relax = 1.0
+cns.max_react_temp = 2205.0
+
+# ATF model
+#atf.thickening_factor = 5
+#atf.laminar_flame_speed = 1.2
+
+# STATS
+cns.record_stats = 0
