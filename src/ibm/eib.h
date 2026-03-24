@@ -1227,11 +1227,18 @@ public:
       Array4<Real> const& cons = stateprops.array(mfi);
 
       // Create a local temporary FAB for primitive variables
-      FArrayBox primf(bxg, cls_t::NPRIM, The_Async_Arena());
-      Array4<Real> const& prims = primf.array();
-
+      //FArrayBox primf(bxg, cls_t::NPRIM, The_Async_Arena());
+      //Array4<Real> const& prims = primf.array();
       // Convert conservative to primitive variables (local copy)
-      cls->cons2prims(mfi, cons, prims); 
+      //cls->cons2prims(mfi, cons, prims); 
+
+
+     //new 
+     FArrayBox primf(bxg, cls_t::NPRIM);   // not The_Async_Arena()
+     Array4<Real> const& prims = primf.array();
+	
+     cls->cons2prims(mfi, cons, prims);
+     amrex::Gpu::streamSynchronize();
 
       // ----------------------------------------------------------------------
       // Iterate over all surface faces belonging to this FAB using CSR structure
@@ -1262,13 +1269,13 @@ public:
                              << "  Found: " << surfphys_soa.elemfound[global_idx] << "\n";
               amrex::Abort("Error in computeSURFs: face ownership mismatch");
           }
-          
+
           // 2. Retrieve Geometry & Interpolation Data
           // -----------------------------------------
           const LocalFrame& localframe = LocalFrame_a[global_idx];
           const SurfElem& surfelem     = SurfElem_a[global_idx];
 
-          #if (AMREX_SPACEDIM == 2)
+#if (AMREX_SPACEDIM == 2)
           Array1D<Real, 0, AMREX_SPACEDIM - 1>  nvec = {   localframe.normal[0],   localframe.normal[1] };
           Array1D<Real, 0, AMREX_SPACEDIM - 1> t1vec = { localframe.tangent1[0], localframe.tangent1[1] };
           Array1D<Real, 0, AMREX_SPACEDIM - 1> t2vec = { 0.0, 0.0 }; 
@@ -1280,6 +1287,7 @@ public:
           auto const ip_ijk    = surfimp_soa.imp_ip_ijk[local_idx];
           auto const ipweights = surfimp_soa.imp_ipweights[local_idx];
           auto const disIM     = surfimp_soa.disIM[local_idx];
+
 
           // 3. Initialize Primitive Variables Array along Normal
           // --------------------------------------------------
@@ -1336,6 +1344,7 @@ public:
           Real tau2_val = 0.0;
 #endif
 
+
           // 8. Store Results in SoA
           // -----------------------
           // Note: We store the original pressure/temperature (scalars, invariant)
@@ -1347,7 +1356,10 @@ public:
 
       } // end loop over faces in this FAB
 
+
     } // end MFIter loop
+
+ 
   }
 
   /**
@@ -2174,9 +2186,15 @@ private:
       // For each image point
       for (int iim = 0; iim < eorder_t; ++iim) {
           // For each interpolation point (corner) of its stencil
+	  //
+	  //
+
+
           for (int iip = 0; iip < N_InterP; ++iip) {
 
               const Real w = imp_ipweights(iim, iip);
+
+
               // If weight is zero (e.g. solid point or invalid marker), skip to avoid potential invalid memory access
               if (w == 0.0) continue;
 
@@ -2188,6 +2206,8 @@ private:
               // In 2D, k-index is always 0 in Array4
               const int kk = 0;
           #endif
+
+
 
               // Accumulate contributions for all primitive variables at row (iim+2)
               for (int n = 0; n < cls_t::NPRIM; ++n) {

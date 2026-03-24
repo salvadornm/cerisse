@@ -64,7 +64,7 @@ ifeq ($(USE_GPIBM),TRUE)
   INCLUDE_LOCATIONS  += $(MPFR_HOME)/include
   LIBRARY_LOCATIONS  += $(MPFR_HOME)/lib
 
-#  LIBRARIES += -lgmp
+  LIBRARIES += -lgmp
 
   include $(AMR_SOLVER)/src/ibm/Make.package
   INCLUDE_LOCATIONS += $(AMR_SOLVER)/src/ibm/

@@ -11,6 +11,11 @@
 
 #include "diff_ops.H"
 
+// param
+//      :: order     spatial order of central derivatives
+//      :: useLES    use LES by modifying viscosity 
+//      :: useATF    use ATF fot turbulent combustion  modelling
+
 template <typename param, typename cls_t>
 class viscousLES_t {
 

@@ -28,7 +28,7 @@ static constexpr Real Rgas     = gas_constant/Mw;  // gas constant
 static constexpr Real Cv       = Rgas/(gam - 1.0);
 static constexpr Real Cp       = gam*Cv;
 
-static constexpr bool srp_on   = false;
+static constexpr bool srp_on   = true;
 static constexpr int ibm_eorder=1;
   
 //////////////////////////// Physical modelling ////////////////////////////////
@@ -102,12 +102,12 @@ struct ibmparm_t {
   public:
 
   static constexpr int  interp_order = 1;
-  static constexpr int  extrap_order = 1;
+  static constexpr int  extrap_order = ibm_eorder;
   static constexpr Real alpha= 0.6;      
 
   // surface parameters
   static constexpr int  interp_order_surf = 1;
-  static constexpr int  extrap_order_surf = 1;
+  static constexpr int  extrap_order_surf = ibm_eorder;
   static constexpr Real alpha_surf= 0.6;
 
 };
@@ -116,10 +116,12 @@ struct ibmparm_t {
 using ProbClosures = closures_dt< indicies_t, transport_suth_t, calorifically_perfect_gas_t<indicies_t> >;
 
 
-// NUMERICAL SCHEME + EQNS TO SOLVE   (Riemann                  
-typedef rhs_dt<riemann_t<false, ProbClosures>, no_diffusive_t, no_source_t > ProbRHS;
+// NUMERICAL SCHEME + EQNS TO SOLVE   (Options: Riemann/Skew)
+//typedef rhs_dt<riemann_t<false, ProbClosures>, no_diffusive_t, no_source_t > ProbRHS;
 
-//using ProbRHS = rhs_dt< riemann_t<false, ProbClosures>, viscous_t<methodparm_t, ProbClosures>, reactor_t<ProbClosures> >;
+using ProbRHS = rhs_dt< riemann_t<false, ProbClosures>, viscous_t<methodparm_t, ProbClosures>, no_source_t >;
+//using ProbRHS = rhs_dt< skew_t<skewparm_t, ProbClosures>, viscous_t<methodparm_t, ProbClosures>, no_source_t>;
+
 
 // declaration of user-specific ibm (see bottom of the file for definition)
 template < typename param, typename cls_t > class ibm_user_t; 
