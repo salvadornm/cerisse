@@ -12,6 +12,8 @@
 
 #include <eib_cgal.h>
 
+#include <TransPele.h> 
+
 // Helper for integer power
 AMREX_GPU_HOST_DEVICE constexpr int ipow(int base, int exp) {
     return (exp == 0) ? 1 : base * ipow(base, exp - 1);
@@ -247,6 +249,7 @@ struct surfPhys_t {
   Gpu::ManagedVector<Real> tau2;        // reconstructed local surface shear stress 2
   Gpu::ManagedVector<Real> temperature; // reconstructed temperature
   Gpu::ManagedVector<Real> dTdn;        // reconstructed grad(T)·n
+  // Gpu::ManagedVector<Real> heat;     // reconstructed local heat flux
   
   // Helper function to resize all vectors
   // Note: resize() initializes new elements to 0 / default constructor.
@@ -265,6 +268,7 @@ struct surfPhys_t {
     tau2.resize(n);
     temperature.resize(n);
     dTdn.resize(n);
+    // heat.resize(n);
     ip_quality.resize(n);
 
     // Initialize new elements with specific defaults if n > old_n
@@ -297,6 +301,8 @@ struct surfPhys_t {
         tau2.clear();     
         temperature.clear(); 
         dTdn.clear();     
+        //heat.clear();
+
         ip_quality.clear();     
   }
 
@@ -314,6 +320,7 @@ struct surfPhys_t {
         tau2.shrink_to_fit();
         temperature.shrink_to_fit();
         dTdn.shrink_to_fit();
+        //heat.shrink_to_fit();
         ip_quality.shrink_to_fit();
     }
   }
@@ -1327,19 +1334,45 @@ public:
           // Calculate one-sided normal gradients using surface (1) and first image point (2)
           // Note: disIM stores the distance from the surface (IB point) to each image point.
           // disIM[local_idx](0) is the distance to the first image point (index 2 in primsNormal)
+
+          const Real Tw = primsNormal(1, cls_t::QT);
+          const Real inv_disIM = 1.0/disIM(0);
           
           // Temperature gradient (scalar, unaffected by rotation)
-          Real dTdn = (primsNormal(2, cls_t::QT) - primsNormal(1, cls_t::QT)) / disIM(0);
+          Real dTdn = (primsNormal(2, cls_t::QT) - Tw) * inv_disIM;
 
-          // Compute Viscosity at the wall
-          Real mu_w = cls->visc(primsNormal(1, cls_t::QT));
+#ifdef USE_PELEPHYSICS
+        Real mu_w,cond_w,xi_w;
+        // rho,Y
+        const Real rho= primsNormal(1,cls_t::QRHO);
+        Real Y[NUM_SPECIES];
+        for (int n = 0; n < NUM_SPECIES; ++n) { Y[n] = primsNormal(1,cls_t::QFS + n); }
+        // pelePhysics 
+        const bool get_xi = false, get_mu = true, get_lam = true, get_Ddiag = false, get_chi = false;
+        auto trans = pele::physics::PhysicsType::transport();
+        // trans.transport(get_xi, get_mu, get_lam, get_Ddiag, get_chi, Tw, rho,
+        //               Y, nullptr, nullptr, mu_w, xi_w, cond_w, ltransparm);
+
+        // need to pass ltransparm somehow and fix GPU  
+        amrex::Abort("Error in computeSURFs: PelePhysics surface calc not ready yet");
+
+        mu_w = mu_w*visc_cgs2si;     // convert to SI units
+        //cond_w = cond_w*cond_cgs2si; // convert to SI units
+#else          
+
+        // Compute Viscosity at the wall
+        const Real mu_w = cls->visc(Tw);    
+          // const Real cond_w = cls->cond(Tw); 
+#endif          
+          // Real heat =  cond_w* dTdn     heat > 0 : heat directed to the surface  (Tout > Twall  heat > 0)
+
 
           // Shear Stress: Direct difference of tangential velocities in local frame
           // tau = mu * (du_tau / dn)
-          Real tau1_val = mu_w * (primsNormal(2, cls_t::QV) - primsNormal(1, cls_t::QV)) / disIM(0);
+          Real tau1_val = mu_w * (primsNormal(2, cls_t::QV) - primsNormal(1, cls_t::QV)) * inv_disIM;
           
 #if (AMREX_SPACEDIM == 3)
-          Real tau2_val = mu_w * (primsNormal(2, cls_t::QW) - primsNormal(1, cls_t::QW)) / disIM(0);
+          Real tau2_val = mu_w * (primsNormal(2, cls_t::QW) - primsNormal(1, cls_t::QW)) * inv_disIM;
 #else
           Real tau2_val = 0.0;
 #endif
@@ -1349,8 +1382,9 @@ public:
           // -----------------------
           // Note: We store the original pressure/temperature (scalars, invariant)
           surfphys_soa.pressure[local_idx]    = primsNormal(1, cls_t::QPRES); 
-          surfphys_soa.temperature[local_idx] = primsNormal(1, cls_t::QT);          
+          surfphys_soa.temperature[local_idx] = Tw ;          
           surfphys_soa.dTdn[local_idx]        = dTdn;
+          // surfphys_soa.heat[local_idx]        = heat;          
           surfphys_soa.tau1[local_idx]        = tau1_val;
           surfphys_soa.tau2[local_idx]        = tau2_val;                      
 
@@ -1396,6 +1430,7 @@ public:
         int rank;      // Owning rank
         int ipq;       // Interpolation quality (number of fluid points)
         Real p, T, dTdn, tau1, tau2; // Physical quantities
+        //Real heat;
       };
       // Ensure the struct is safe for raw memory copy (MPI)
       static_assert(std::is_trivially_copyable<SurfOut>::value, "SurfOut must be trivially copyable for MPI");
@@ -1419,6 +1454,7 @@ public:
           s.p    = surfphys_soa.pressure[i];
           s.T    = surfphys_soa.temperature[i];
           s.dTdn = surfphys_soa.dTdn[i];
+          // s.heat = surfphys_soa.heat[i];
           s.tau1 = surfphys_soa.tau1[i];
           s.tau2 = surfphys_soa.tau2[i];
           send.push_back(s);
@@ -1504,6 +1540,7 @@ public:
               surfphys_soa.pressure[i]    = s.p;
               surfphys_soa.temperature[i] = s.T;
               surfphys_soa.dTdn[i]        = s.dTdn;
+              //surfphys_soa.heat[i]        = s.heat;
               surfphys_soa.tau1[i]        = s.tau1;
               surfphys_soa.tau2[i]        = s.tau2;
           }
@@ -1710,6 +1747,7 @@ public:
           write_scalar_field("Tau1",        surfphys_soa.tau1);
           write_scalar_field("Tau2",        surfphys_soa.tau2);
           write_scalar_field("dTdn",        surfphys_soa.dTdn);
+          //write_scalar_field("Heat",        surfphys_soa.heat);
           
           // Write metadata fields
           write_int_field("Rank",  surfphys_soa.rank);

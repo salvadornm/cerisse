@@ -614,10 +614,16 @@ void CNS::postCoarseTimeStep(Real time) {
           
           FillPatch(level_obj, Sdata, nghost, cur_time, State_Type, 0, ncons);
           const PROB::ProbClosures* cls_d = CNS::d_prob_closures;
-          IBM::ib.computeSURFs(Sdata, cls_d, lev);
+          const PROB::ProbClosures* cls_h = CNS::h_prob_closures;
+          IBM::ib.computeSURFs(Sdata, cls_h, lev);  // host
+          //IBM::ib.computeSURFs(Sdata, cls_d, lev);
       }
   }
 
+  
+
+#ifdef CNS_USE_FSI
+  
   // Calculate and print FSI loads and properties
   if (ParallelDescriptor::IOProcessor()) {
       amrex::Print() << "\n=== FSI Loads (Step " << parent->levelSteps(0) << ", Time " << time << ") ===\n";
@@ -626,7 +632,6 @@ void CNS::postCoarseTimeStep(Real time) {
   auto& ib = IBM::ib;
   int ngeom = ib.ngeom;
 
-#ifdef CNS_USE_FSI
   for (int i = 0; i < ngeom; ++i) {
       // 1. Rigid Body Properties
       Real rho_solid = 1.0; // Placeholder density
@@ -1102,7 +1107,7 @@ void CNS::rebuildIBM() {
   IBM::ib.build_mf(grids, dmap, level);
   IBM::ib.computeMarkers(level);
   IBM::ib.initialiseGPs(level);
-  if (plot_surf && level == parent->finestLevel()) {
+  if (level == parent->finestLevel()) {
      for (int lev = parent->finestLevel(); lev >= 0; --lev) {
         IBM::ib.computeSurfIndexs(lev);
      }
@@ -1111,7 +1116,7 @@ void CNS::rebuildIBM() {
 
 void CNS::writeSurfFile() {
       
-  // claculate and  write surface data  
+  // calculate and  write surface data  
   int istep = parent->levelSteps(0);
 
   if (plot_surf && (istep % surf_int == 0))  {
@@ -1131,8 +1136,10 @@ void CNS::writeSurfFile() {
     FillPatch(*this, Sdata, nghost, time, State_Type, 0, ncons);
 
     const PROB::ProbClosures* cls_d = CNS::d_prob_closures;
+    const PROB::ProbClosures* cls_h = CNS::h_prob_closures; 
 
-    IBM::ib.computeSURFs(Sdata,cls_d,this->level); // computed at each level. From low to high.
+    //IBM::ib.computeSURFs(Sdata,cls_d,this->level); // computed at each level. From low to high.
+    IBM::ib.computeSURFs(Sdata,cls_h,this->level);  
 
     // Only gather and write on the finest level to ensure all levels are processed
     if (this->level == parent->finestLevel()){
