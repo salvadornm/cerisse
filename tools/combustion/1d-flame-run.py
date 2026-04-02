@@ -60,7 +60,7 @@ in2   = gas.species_index('N2')
 gas.set_equivalence_ratio(phi, fuel, oxidizer)
 
 ## 1d simulation or thermodynamic equilibrium only?
-solve_1d = False
+solve_1d = True
 
 if not solve_1d: 
     # ==========================================
@@ -113,38 +113,37 @@ else:
     f.max_time_step_count = 3000
     f.max_grid_points = 1000
 
-    if solve_1d == True:    
-        #Calculation
-        f.solve(loglevel, refine_grid)
-            
-        #################
-        #Second flame:
-            
-        #Energy equation enabled
-        f.energy_enabled = True
-            
-        #Refinement criteria when energy equation is enabled
-        f.set_refine_criteria(ratio = 5.0, slope = 0.5, curve = 0.5)
-            
-        #Calculation 
-        f.solve(loglevel, refine_grid)
-            
-        #################
-        #Third flame and so on ...:
-        f.set_refine_criteria(ratio = 3.0, slope = 0.1, curve = 0.1)    
-        f.solve(loglevel, refine_grid)
-            
-        ##################
-        ##Fourth flame and so on ...:
-        f.set_refine_criteria(ratio = 2.0, slope = 0.05, curve = 0.05, prune = 0.01)    
-        f.solve(loglevel, refine_grid)
-            
-        ##################
-        ##Fifth flame and so on ...
-        f.set_refine_criteria(ratio = 2.0, slope = 0.02, curve = 0.02, prune = 0.01)    
-        f.solve(loglevel, refine_grid)
-            
-        print('mixture averaged flamespeed = ',f.velocity[0])
+    #Calculation
+    f.solve(loglevel, refine_grid)
+        
+    #################
+    #Second flame:
+        
+    #Energy equation enabled
+    f.energy_enabled = True
+        
+    #Refinement criteria when energy equation is enabled
+    f.set_refine_criteria(ratio = 5.0, slope = 0.5, curve = 0.5)
+        
+    #Calculation 
+    f.solve(loglevel, refine_grid)
+        
+    #################
+    #Third flame and so on ...:
+    f.set_refine_criteria(ratio = 3.0, slope = 0.1, curve = 0.1)    
+    f.solve(loglevel, refine_grid)
+        
+    ##################
+    ##Fourth flame and so on ...:
+    f.set_refine_criteria(ratio = 2.0, slope = 0.05, curve = 0.05, prune = 0.01)    
+    f.solve(loglevel, refine_grid)
+        
+    ##################
+    ##Fifth flame and so on ...
+    f.set_refine_criteria(ratio = 2.0, slope = 0.02, curve = 0.02, prune = 0.01)    
+    f.solve(loglevel, refine_grid)
+        
+    print('mixture averaged flamespeed = ',f.velocity[0])
 
 
 
