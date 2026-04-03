@@ -4,7 +4,7 @@ COMP      = gcc
 CXXSTD    = c++20
 PRECISION = DOUBLE
 
-TINY_PROFILE = FALSE
+TINY_PROFILE = TRUE
 
 # cerisse options
 CLIP_MINTEMP = FALSE

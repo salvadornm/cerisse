@@ -55,6 +55,7 @@
 
     // CGAL header providing mesh–mesh intersection predicates
     #include <CGAL/Polygon_mesh_processing/intersection.h>
+    #include <CGAL/Polygon_mesh_processing/bbox.h>
     #include <boost/property_map/property_map.hpp>
 
     namespace PMP = CGAL::Polygon_mesh_processing;
@@ -127,11 +128,15 @@ using FT     = Kernel::FT;
         bool is_simple() const             { return poly_.is_simple(); }
         bool is_clockwise_oriented() const { return poly_.is_clockwise_oriented(); }
         void reverse_orientation()         { poly_.reverse_orientation(); finalize(); }
+        Real area() const                  { return poly_.area(); }
 
         // Inside/outside test
         CGAL::Bounded_side bounded_side(const Point& p) const {
             return poly_.bounded_side(p);
         }
+
+        // Bounding box access
+        CGAL::Bbox_2 bbox() const { return poly_.bbox(); }
     };
 
     using Polygon   = Polygon2D;
@@ -148,7 +153,27 @@ using FT     = Kernel::FT;
 
     // Face descriptor for 2D (SegmentIterator)
     using elm_descriptor = SegmentIterator;
-    using PrimitiveID = Tree::Primitive_id;
+    using PrimitiveID    = Tree::Primitive_id;
+    
+    // Bounding box type in 2D
+    using Bbox           = CGAL::Bbox_2;
+
+//============================================================================
+// COMPATIBILITY LAYER — Unified BoundedSide enum matching BVH interface
+//============================================================================
+enum class BoundedSide : int {
+    Inside     =  1,   // CGAL::ON_BOUNDED_SIDE
+    OnBoundary =  0,   // CGAL::ON_BOUNDARY
+    Outside    = -1    // CGAL::ON_UNBOUNDED_SIDE
+};
+
+AMREX_FORCE_INLINE
+BoundedSide cgal_to_bounded_side(CGAL::Bounded_side bs)
+{
+    if (bs == CGAL::ON_BOUNDED_SIDE)  return BoundedSide::Inside;
+    if (bs == CGAL::ON_BOUNDARY)      return BoundedSide::OnBoundary;
+    return BoundedSide::Outside;
+}
 
     //----------------------------------------------------------------------------
     // Inside/Outside Tester for 2D Polygons
@@ -196,10 +221,10 @@ using FT     = Kernel::FT;
 
         /// Test if a point is inside, outside, or on the boundary
         /// \param p Query point
-        /// \return CGAL::ON_BOUNDED_SIDE, CGAL::ON_BOUNDARY, or CGAL::ON_UNBOUNDED_SIDE
-        CGAL::Bounded_side operator()(const Point& p) const {
+        /// \return BoundedSide::Inside, BoundedSide::OnBoundary, or BoundedSide::Outside
+        BoundedSide operator()(const Point& p) const {
             AMREX_ASSERT_WITH_MESSAGE(poly_ != nullptr, "inside_t: Cannot query uninitialized tester");
-            return poly_->bounded_side(p);
+            return cgal_to_bounded_side(poly_->bounded_side(p));
         }
     };
 
@@ -227,14 +252,105 @@ using FT     = Kernel::FT;
     // Typedefs for face indexing and inside/outside classification
     using elm_descriptor  = boost::graph_traits<Polyhedron>::face_descriptor;
     using PrimitiveID     = Tree::Primitive_id;
-    using inside_t        = CGAL::Side_of_triangle_mesh<Polyhedron, Kernel>;
+    using inside_cgal_t   = CGAL::Side_of_triangle_mesh<Polyhedron, Kernel>;
+    
+    // Bounding box type in 3D
+    using Bbox            = CGAL::Bbox_3;
+
+//============================================================================
+// COMPATIBILITY LAYER — Unified BoundedSide enum matching BVH interface
+//============================================================================
+enum class BoundedSide : int {
+    Inside     =  1,   // CGAL::ON_BOUNDED_SIDE
+    OnBoundary =  0,   // CGAL::ON_BOUNDARY
+    Outside    = -1    // CGAL::ON_UNBOUNDED_SIDE
+};
+
+AMREX_FORCE_INLINE
+BoundedSide cgal_to_bounded_side(CGAL::Bounded_side bs)
+{
+    if (bs == CGAL::ON_BOUNDED_SIDE)  return BoundedSide::Inside;
+    if (bs == CGAL::ON_BOUNDARY)      return BoundedSide::OnBoundary;
+    return BoundedSide::Outside;
+}
+
+    //------------------------------------------------------------------------
+    // Inside/Outside Tester wrapper for 3D meshes — returns BoundedSide
+    //------------------------------------------------------------------------
+    class inside_t {
+    private:
+        inside_cgal_t impl_;
+    public:
+        inside_t() = delete;
+        explicit inside_t(const Polyhedron& mesh)
+            : impl_(mesh) {}
+
+        BoundedSide operator()(const Point& p) const {
+            return cgal_to_bounded_side(impl_(p));
+        }
+    };
 
 #endif // AMREX_SPACEDIM
-
 
 //============================================================================
 // FUNCTION IMPLEMENTATIONS
 //============================================================================
+
+//---------------------------------------------------------------------------
+// Helper: Check if Point is inside BBox
+//---------------------------------------------------------------------------
+AMREX_FORCE_INLINE bool bbox_contains(const Bbox& bb, const Point& p)
+{
+#if (AMREX_SPACEDIM == 2)
+    return p.x() >= bb.xmin() && p.x() <= bb.xmax() &&
+           p.y() >= bb.ymin() && p.y() <= bb.ymax();
+#else 
+    return p.x() >= bb.xmin() && p.x() <= bb.xmax() &&
+           p.y() >= bb.ymin() && p.y() <= bb.ymax() &&
+           p.z() >= bb.zmin() && p.z() <= bb.zmax();
+#endif
+}
+
+//---------------------------------------------------------------------------
+// Compatibility: make_grid_point — construct a CGAL Point from grid indices
+//---------------------------------------------------------------------------
+template <typename ArrayLike>
+AMREX_FORCE_INLINE
+Point make_grid_point(const ArrayLike& prob_lo, const ArrayLike& dx,
+                      int i, int j, int k)
+{
+    Real x = prob_lo[0] + (Real(0.5) + Real(i)) * dx[0];
+    Real y = prob_lo[1] + (Real(0.5) + Real(j)) * dx[1];
+#if (AMREX_SPACEDIM == 3)
+    Real z = prob_lo[2] + (Real(0.5) + Real(k)) * dx[2];
+    return Point(x, y, z);
+#else
+    amrex::ignore_unused(k);
+    return Point(x, y);
+#endif
+}
+
+//---------------------------------------------------------------------------
+// Compatibility: point_distance_sq — squared distance between two CGAL Points
+//---------------------------------------------------------------------------
+AMREX_FORCE_INLINE
+Real point_distance_sq(const Point& a, const Point& b)
+{
+    Real d2 = (a.x() - b.x()) * (a.x() - b.x())
+            + (a.y() - b.y()) * (a.y() - b.y());
+#if (AMREX_SPACEDIM == 3)
+    d2 += (a.z() - b.z()) * (a.z() - b.z());
+#endif
+    return d2;
+}
+
+//---------------------------------------------------------------------------
+// Compatibility: ClosestPointResult — matches BVH interface
+//---------------------------------------------------------------------------
+struct ClosestPointResult {
+    Point point;
+    int   prim_id;
+};
 
 #if (AMREX_SPACEDIM == 2)
 
@@ -285,6 +401,7 @@ inline bool read_polygon_2d(const std::string& filename, Polygon2D& poly, Real d
     
     std::string line;
     int line_number = 0;
+    std::vector<Point> raw_points;
     
     while (std::getline(in, line)) {
         ++line_number;
@@ -328,16 +445,84 @@ inline bool read_polygon_2d(const std::string& filename, Polygon2D& poly, Real d
             return false;
         }
         
-        poly.push_back(Point(x, y));
+        raw_points.push_back(Point(x, y));
     }
     
+    if (raw_points.empty()) {
+        amrex::Print() << "read_polygon_2d: No valid vertices found in " << filename << "\n";
+        return false;
+    }
+    
+    // Compute Geometry Scale & Tolerances
+    Real min_x = raw_points[0].x(), max_x = min_x;
+    Real min_y = raw_points[0].y(), max_y = min_y;
+    for (const auto& p : raw_points) {
+        min_x = std::min(min_x, p.x()); max_x = std::max(max_x, p.x());
+        min_y = std::min(min_y, p.y()); max_y = std::max(max_y, p.y());
+    }
+    Real bbox_diag = std::sqrt(std::pow(max_x - min_x, 2) + std::pow(max_y - min_y, 2));
+    
+    // Use user-provided dx as reference if available, otherwise bounding box
+    Real scale_ref = (dx > 0) ? dx : (bbox_diag > 1e-12 ? bbox_diag : 1.0);
+    
+    // Determine tolerances
+    // - deduplication: very tight (micro-gaps)
+    // - area: check for collapse
+    Real eps_dedup = 1e-6 * scale_ref;
+    Real area_eps  = 1e-12 * scale_ref * scale_ref;
+
+    // Vertex Deduplication & Cleanup
+    std::vector<Point> clean_points;
+    clean_points.reserve(raw_points.size());
+    clean_points.push_back(raw_points[0]);
+
+    int n_dups = 0;
+    for (size_t i = 1; i < raw_points.size(); ++i) {
+        Real dx_pt = clean_points.back().x() - raw_points[i].x();
+        Real dy_pt = clean_points.back().y() - raw_points[i].y();
+        Real d2 = dx_pt*dx_pt + dy_pt*dy_pt;
+        if (d2 > eps_dedup * eps_dedup) {
+            clean_points.push_back(raw_points[i]);
+        } else {
+            n_dups++;
+        }
+    }
+    
+    // Remove "closing" vertex if it duplicates the start vertex
+    if (clean_points.size() > 1) {
+        Real dx_end = clean_points.back().x() - clean_points.front().x();
+        Real dy_end = clean_points.back().y() - clean_points.front().y();
+        Real d2 = dx_end*dx_end + dy_end*dy_end;
+        if (d2 <= eps_dedup * eps_dedup) {
+            clean_points.pop_back();
+            n_dups++;
+        }
+    }
+
+    if (n_dups > 0) {
+        amrex::Print() << "Info: Removed " << n_dups << " duplicate/close vertices (tol=" 
+                       << eps_dedup << ") in " << filename << "\n";
+    }
+
+    // Build Polygon
+    for (const auto& p : clean_points) {
+        poly.push_back(p);
+    }
+
     // Validate vertex count
     if (poly.size() < 3) {
-        amrex::Print() << "read_polygon_2d: Polygon must have at least 3 vertices (found "
+        amrex::Print() << "read_polygon_2d: Polygon must have at least 3 unique vertices (found "
                        << poly.size() << ") in: " << filename << "\n";
         return false;
     }
     
+    // Validate degenerate area (collinear points etc.)
+    if (std::abs(poly.area()) <= area_eps) {
+        amrex::Print() << "read_polygon_2d: Polygon has near-zero area (" << poly.area() 
+                       << " <= " << area_eps << ") in: " << filename << "\n";
+        return false;
+    }
+
     // Validate simplicity (no self-intersections)
     if (!poly.is_simple()) {
         amrex::Print() << "read_polygon_2d: Polygon has self-intersections in: " 
@@ -424,6 +609,20 @@ inline bool read_polygon_2d(const std::string& filename, Polygon2D& poly, Real d
 
 #if (AMREX_SPACEDIM == 3)
 
+/// \brief Check 3D mesh validity (closedness, etc.)
+inline bool check_3d_mesh_validity(const Polyhedron& geom, const std::string& name)
+{
+    // 1. Check if mesh is closed (watertight)
+    if (!geom.is_closed()) {
+        amrex::Print() << "ERROR: Mesh " << name << " is not closed (watertight).\n"
+                       << "       IBM requires a closed surface for inside/outside test.\n";
+        return false;
+    }
+    // NOTE: Self-intersection check (PMP::does_self_intersect) omitted for performance.
+    //       Enable if mesh quality issues are suspected.
+    return true;
+}
+
 /// \brief Compute plane equation for a facet
 inline void compute_plane_equations(Polyhedron::Facet& f)
 {
@@ -435,7 +634,7 @@ inline void compute_plane_equations(Polyhedron::Facet& f)
     );
 }
 
-#endif
+#endif // AMREX_SPACEDIM == 3
 
 //============================================================================
 // Local Coordinate Frame Structure
@@ -511,6 +710,27 @@ struct SurfElem {
     }
 };
 
+//============================================================================
+// ROBUST ID MAPPING TYPES
+//============================================================================
+/// \brief Map type for associating geometric primitives with integer indices.
+using PrimitiveIndexMap = std::map<PrimitiveID, int>;
+
+//---------------------------------------------------------------------------
+// Compatibility: closest_point_query via CGAL tree — returns ClosestPointResult
+//   with local prim_id (subtract offset so caller can add geom_offsets[geomIdx])
+//---------------------------------------------------------------------------
+inline ClosestPointResult cgal_closest_point_query(
+    const Tree& tree, const PrimitiveIndexMap& idxmap,
+    const Point& query, int offset)
+{
+    auto ppid = tree.closest_point_and_primitive(query);
+    ClosestPointResult res;
+    res.point   = ppid.first;
+    res.prim_id = idxmap.at(ppid.second) - offset;
+    return res;
+}
+
 // -----------------------------------------------------------------------------
 // build_geometry_cache
 // -----------------------------------------------------------------------------
@@ -533,7 +753,7 @@ inline void build_geometry_cache(
     const GeomType& geom,
     amrex::Gpu::ManagedVector<SurfElem>& surfelem,
     amrex::Gpu::ManagedVector<LocalFrame>& localframe,
-    std::map<PrimitiveID, int>& idxmap,
+    PrimitiveIndexMap& idxmap,
     int offset = 0,
     int geomIdx = -1)
 {
@@ -637,13 +857,36 @@ inline void build_geometry_cache(
 #endif
 }
 
+// -----------------------------------------------------------------------------
+// convert_inout
+// -----------------------------------------------------------------------------
+/// \brief Flip stored local frames so that normals point inward.
+///
+/// If switch the interior_is_solid, geometry interior is treated as fluid,
+/// typically flip the normals.
+///
+/// Tangent handling:
+/// - We also flip tangent1. In 3D this preserves a right-handed orthonormal
+///   frame because t_2 = n*t_1 stays
+///   invariant when both n and t_1 are negated.
+/// - tangent2 (3D) is left unchanged.
+inline void convert_inout(amrex::Gpu::ManagedVector<LocalFrame>& localframe_a)
+{
+    for (auto& lf : localframe_a) {
+        for (int d = 0; d < AMREX_SPACEDIM; ++d) {
+            lf.normal[d]   = -lf.normal[d];
+            lf.tangent1[d] = -lf.tangent1[d];
+        }
+    }
+}
+
 //============================================================================
 // GEOMETRY CONSISTENCY CHECKING
 //============================================================================
 
-/// \brief Check that IBM geometries do not intersect, touch, or contain each other.
+/// \brief Check that IBM geometries do not intersect or touch each other.
 ///
-/// This function validates that multiple IBM geometries are properly separated:
+/// This function validates that multiple IBM geometries are properly separated.
 ///
 /// Level 1: Surface intersection/touching check
 ///   - In 2D: Checks if polygon edges intersect or touch
@@ -652,6 +895,7 @@ inline void build_geometry_cache(
 /// Level 2: Volumetric containment check
 ///   - Tests if one geometry is completely inside another
 ///   - Uses representative vertices from each geometry
+///   - Containment is reported as a WARNING (not fatal)
 ///
 /// \param ngeom Number of geometries to check
 /// \param geom_a Array of geometry objects (Polygon_2 or Polyhedron_3)
@@ -673,6 +917,12 @@ inline void check_ibm_geometry_consistency(
             
             // Skip empty polygons
             if (geom_a[i].size() < 3 || geom_a[j].size() < 3) {
+                continue;
+            }
+
+            // Quick BBox rejection (Optimization)
+            // If bounding boxes do not overlap, polygons cannot intersect, touch, or contain each other.
+            if (!CGAL::do_overlap(geom_a[i].bbox(), geom_a[j].bbox())) {
                 continue;
             }
 
@@ -703,44 +953,58 @@ inline void check_ibm_geometry_consistency(
                     "IBM geometries must not intersect or touch each other.");
             }
 
-            // 2) Check for containment (one polygon inside another)
-            //    Use representative vertices from each polygon
-            
-            // Representative vertex from polygon i
-            auto vi = geom_a[i].vertices_begin();
-            const Point& pi = *vi;
+            // 2) Check for containment (Level 2)
+            //    Robust check using multiple sample points (K=8)
+            constexpr int K_samples = 8;
 
-            // Representative vertex from polygon j
-            auto vj = geom_a[j].vertices_begin();
-            const Point& pj = *vj;
+            auto check_containment_2d = [&](int idx_inner, int idx_outer) {
+                const auto& poly_in = geom_a[idx_inner];
+                // Use non-const ref just in case the functor is not const-correct in all versions
+                inside_t& tester = *inout_fa[idx_outer]; 
+                
+                std::size_t n_pts = poly_in.size();
+                if (n_pts < 3) return;
+                
+                std::size_t step = std::max(std::size_t(1), n_pts / K_samples);
+                
+                int inside_count = 0;
+                int checked_count = 0;
 
-            inside_t& inside_i = *inout_fa[i];
-            inside_t& inside_j = *inout_fa[j];
+                // stride sampling over vertices using iterators for robustness
+                auto vbegin = poly_in.vertices_begin();
+                auto vend   = poly_in.vertices_end();
 
-            CGAL::Bounded_side side_i_in_j = inside_j(pi);
-            CGAL::Bounded_side side_j_in_i = inside_i(pj);
+                for (std::size_t k = 0; k < n_pts && checked_count < K_samples; k += step) {
+                    auto vit = vbegin;
+                    std::advance(vit, static_cast<long>(k)); 
+                    
+                    const Point& p = *vit;
+                    BoundedSide res = tester(p);
+                    checked_count++;
 
-            // Check if polygon i is strictly inside polygon j
-            if (side_i_in_j == CGAL::ON_BOUNDED_SIDE) {
-                amrex::Print() << "ERROR: IBM geometry containment detected:\n"
-                              << "  geom " << i << " : " << files_a[i]
-                              << " is strictly inside\n"
-                              << "  geom " << j << " : " << files_a[j] << "\n";
-                amrex::Abort(
-                    "IBM geometries must not contain one another "
-                    "(no full inclusion).");
-            }
+                    if (res == BoundedSide::OnBoundary) {
+                        amrex::Print() << "ERROR: IBM geometry touching detected (vertex on boundary):\n"
+                                       << "  geom " << idx_inner << " : " << files_a[idx_inner] << "\n"
+                                       << "  touches geom " << idx_outer << " : " << files_a[idx_outer] << "\n";
+                        amrex::Abort("IBM geometries must not intersect or touch each other.");
+                    }
+                    if (res == BoundedSide::Inside) {
+                        inside_count++;
+                    }
+                }
 
-            // Check if polygon j is strictly inside polygon i
-            if (side_j_in_i == CGAL::ON_BOUNDED_SIDE) {
-                amrex::Print() << "ERROR: IBM geometry containment detected:\n"
-                              << "  geom " << j << " : " << files_a[j]
-                              << " is strictly inside\n"
-                              << "  geom " << i << " : " << files_a[i] << "\n";
-                amrex::Abort(
-                    "IBM geometries must not contain one another "
-                    "(no full inclusion).");
-            }
+                // If ALL sampled points are inside, we declare containment.
+                if (checked_count > 0 && inside_count == checked_count) {
+                    amrex::Print() << "WARNING: IBM geometry containment detected (Robust check):\n"
+                                   << "  geom " << idx_inner << " : " << files_a[idx_inner]
+                                   << " is strictly inside\n"
+                                   << "  geom " << idx_outer << " : " << files_a[idx_outer] << "\n";
+                    amrex::Print() << "Continuing, but results may be undefined depending on the IBM setup.\n";
+                }
+            };
+
+            check_containment_2d(i, j); // Check i inside j
+            check_containment_2d(j, i); // Check j inside i
 
 #else  // AMREX_SPACEDIM == 3
             //----------------------------------------------------------------
@@ -760,50 +1024,59 @@ inline void check_ibm_geometry_consistency(
                     "IBM geometries must not intersect or touch each other.");
             }
 
-            // 2) Containment check (pure inclusion without surface intersection)
-            //    At this point surfaces do not intersect. Test whether a
-            //    representative vertex of one closed mesh lies strictly inside
-            //    the volume of the other.
+            // 2) Containment check (Level 2)
+            if (geom_a[i].empty() || geom_a[j].empty()) continue;
+
+            constexpr int K_samples = 8;
             
-            if (geom_a[i].empty() || geom_a[j].empty()) {
-                continue;
-            }
+            auto check_containment_3d = [&](int idx_inner, int idx_outer) {
+                const auto& mesh_in = geom_a[idx_inner];
+                inside_t& tester = *inout_fa[idx_outer];
+                
+                // Polyhedron_3 supports size_of_vertices()
+                std::size_t n_pts = mesh_in.size_of_vertices();
+                if (n_pts == 0) return;
 
-            // Representative vertex from geometry i
-            auto vi = geom_a[i].vertices_begin();
-            const Point& pi = vi->point();
+                std::size_t step = std::max(std::size_t(1), n_pts / K_samples);
+                
+                int inside_count = 0;
+                int checked_count = 0;
+                
+                auto vit = mesh_in.vertices_begin();
+                auto vend = mesh_in.vertices_end();
+                
+                while (vit != vend && checked_count < K_samples) {
+                    const Point& p = vit->point();
+                    BoundedSide res = tester(p);
+                    checked_count++;
 
-            // Representative vertex from geometry j
-            auto vj = geom_a[j].vertices_begin();
-            const Point& pj = vj->point();
+                    if (res == BoundedSide::OnBoundary) {
+                        amrex::Print() << "ERROR: IBM geometry touching detected (vertex on boundary):\n"
+                                       << "  geom " << idx_inner << " : " << files_a[idx_inner] << "\n"
+                                       << "  touches geom " << idx_outer << " : " << files_a[idx_outer] << "\n";
+                        amrex::Abort("IBM geometries must not intersect or touch each other.");
+                    }
+                    if (res == BoundedSide::Inside) {
+                        inside_count++;
+                    }
+                    
+                    // advance by 'step', explicit separate loop for safety
+                    for (std::size_t s = 0; s < step && vit != vend; ++s) {
+                        ++vit;
+                    }
+                }
 
-            inside_t& inside_i = *inout_fa[i];
-            inside_t& inside_j = *inout_fa[j];
-
-            CGAL::Bounded_side side_i_in_j = inside_j(pi);
-            CGAL::Bounded_side side_j_in_i = inside_i(pj);
-
-            // Check if mesh i is strictly inside mesh j
-            if (side_i_in_j == CGAL::ON_BOUNDED_SIDE) {
-                amrex::Print() << "ERROR: IBM geometry containment detected:\n"
-                              << "  geom " << i << " : " << files_a[i]
-                              << " is strictly inside\n"
-                              << "  geom " << j << " : " << files_a[j] << "\n";
-                amrex::Abort(
-                    "IBM geometries must not contain one another "
-                    "(no full inclusion).");
-            }
-
-            // Check if mesh j is strictly inside mesh i
-            if (side_j_in_i == CGAL::ON_BOUNDED_SIDE) {
-                amrex::Print() << "ERROR: IBM geometry containment detected:\n"
-                              << "  geom " << j << " : " << files_a[j]
-                              << " is strictly inside\n"
-                              << "  geom " << i << " : " << files_a[i] << "\n";
-                amrex::Abort(
-                    "IBM geometries must not contain one another "
-                    "(no full inclusion).");
-            }
+                if (checked_count > 0 && inside_count == checked_count) {
+                     amrex::Print() << "WARNING: IBM geometry containment detected (Robust check):\n"
+                                   << "  geom " << idx_inner << " : " << files_a[idx_inner]
+                                   << " is strictly inside\n"
+                                   << "  geom " << idx_outer << " : " << files_a[idx_outer] << "\n";
+                    amrex::Print() << "Continuing, but results may be undefined depending on the IBM setup.\n";
+                }
+            };
+            
+            check_containment_3d(i, j);
+            check_containment_3d(j, i);
 #endif  // AMREX_SPACEDIM
         }
     }
@@ -877,10 +1150,10 @@ AMREX_FORCE_INLINE
 void IB_WarnOnBoundary(int ii,
                        int level,
                        int i, int j, int k,
-                       const CGAL::Bounded_side& result,
+                       const BoundedSide& result,
                        const Point& gridpoint)
 {
-    if (result == CGAL::ON_BOUNDARY) {
+    if (result == BoundedSide::OnBoundary) {
         amrex::Print()
             << "Warning: Grid point on IB surface\n"
             << "  geom ii = " << ii << "\n"

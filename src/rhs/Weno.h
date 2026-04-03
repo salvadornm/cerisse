@@ -288,7 +288,7 @@ class weno_t {
 
       auto const& flx = flxt[dir]->array(); // snm
 
-      ParallelFor(flxbx, [=,this] AMREX_GPU_DEVICE(int i, int j, int k) noexcept { // it was [=]
+      ParallelFor(flxbx, [=] AMREX_GPU_DEVICE(int i, int j, int k) noexcept { // [=] only: do not capture 'this' in GPU lambda
         IntVect iv(AMREX_D_DECL(i, j, k));
         IntVect ivd(IntVect::TheDimensionVector(dir));
 

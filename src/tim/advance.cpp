@@ -48,6 +48,32 @@ Real CNS::advance(Real time, Real dt, int /*iteration*/, int /*ncycle*/) {
     fr_as_fine = flux_reg.get();
   }
 
+#ifdef AMREX_USE_GPIBM
+  // Moving geometry: update vertex positions, rebuild BVH and markers/GPs
+  if (CNS::ib_move) {
+    // Save old markers to detect solid→fluid transitions
+    auto& mfab_pre = *IBM::ib.bmf_a[level];
+    FabArray<BaseFab<uint8_t>> old_markers(
+        mfab_pre.boxArray(), mfab_pre.DistributionMap(),
+        1, mfab_pre.nGrow(), MFInfo().SetArena(The_Managed_Arena()));
+    for (MFIter mfi(mfab_pre, false); mfi.isValid(); ++mfi) {
+      const Box& bx = mfi.fabbox();
+      auto const& dst = old_markers.array(mfi);
+      auto const& src = mfab_pre.const_array(mfi);
+      ParallelFor(bx, [=] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {
+        dst(i,j,k,0) = src(i,j,k,0);
+      });
+    }
+
+    PROB::update_geometry(time + dt, IBM::ib.geom_a, IBM::ib.ngeom);
+    IBM::ib.rebuildGeometryData();
+    rebuildIBM();
+
+    // Fix cells freshly exposed by geometry movement (solid → fluid)
+    IBM::ib.fixExposedCells(old_markers, S1, level);
+  }
+#endif
+
   if (fr_as_crse) {
     fr_as_crse->setVal(Real(0.0));
   }
@@ -208,40 +234,49 @@ Real CNS::advance(Real time, Real dt, int /*iteration*/, int /*ncycle*/) {
   }
 
 #ifdef AMREX_USE_GPIBM
-  const PROB::ProbClosures& cls_h = *CNS::h_prob_closures;
-  const PROB::ProbClosures* cls_d = CNS::d_prob_closures;
-  auto& ib_mf = *IBM::ib.bmf_a[level];
-  FillPatch(*this, Stemp, cls_h.NGHOST, time + dt, State_Type, 0, ncons);
+  // End-of-advance IBM fixup: convert GP cells back from (possibly stale)
+  // conservative values to correct primitive values, then write back as
+  // conservatives.  This is necessary because:
+  //   - computeNewDt/maxEigen scans ALL cells for CFL; stale GP cons → NaN.
+  //   - printTotal integrates ALL cells.
+  //   - FillPatch for sub-cycling / fine-level data uses S2 directly.
+  {
+    const PROB::ProbClosures& cls_h = *CNS::h_prob_closures;
+    const PROB::ProbClosures* cls_d = CNS::d_prob_closures;
+    auto& ib_mf = *IBM::ib.bmf_a[level];
 
-  for (MFIter mfi(S2, false); mfi.isValid(); ++mfi) {
-    const Box& bx = mfi.tilebox();
-    const Box& bxg = mfi.growntilebox(cls_h.NGHOST);
-    FArrayBox primf(bxg, cls_h.NPRIM, The_Async_Arena());
-    Array4<Real> const& state_temp = Stemp.array(mfi);
-    Array4<Real> const& state = S2.array(mfi);
-    const auto& ibMarkers = ib_mf.array(mfi);
-    Array4<Real> const& prims = primf.array();
+    FillPatch(*this, Stemp, nghost, time + dt, State_Type, 0, ncons);
 
-    cls_h.cons2prims(mfi, state_temp, prims);
+    // cons2prims over the full domain
+    MultiFab prims_mf(Stemp.boxArray(), Stemp.DistributionMap(),
+                      cls_h.NPRIM, cls_h.NGHOST,
+                      MFInfo().SetArena(The_Async_Arena()));
+    for (MFIter mfi(Stemp, false); mfi.isValid(); ++mfi) {
+      cls_h.cons2prims(mfi, Stemp.array(mfi), prims_mf.array(mfi));
+    }
 
-    IBM::ib.computeGPs(mfi, state_temp, prims, cls_d, level);
-     
-    // do prims->cns in the GP   
-    ParallelFor(bx, [=] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {
-      if (ibMarkers(i, j, k, 1)) {
+    // Correct GP primitive values
+    IBM::ib.computeAllGPs(prims_mf, cls_d, level);
 
-        IntVect iv(AMREX_D_DECL(i, j, k)); 
-        //Real cons[cls_h.NCONS];        
-        Real cons[PROB::ProbClosures::NCONS];
-        cls_h.prims2cons(iv,prims,cons);        
-        for (int n = 0; n < cls_h.NCONS; n++) {
-          state(i, j, k, n) = cons[n];
+    // Write corrected primitives back as conservatives for GP cells only
+    for (MFIter mfi(S2, false); mfi.isValid(); ++mfi) {
+      const Box& bx = mfi.tilebox();
+      Array4<Real> const& state = S2.array(mfi);
+      Array4<Real> const& prims = prims_mf.array(mfi);
+      const auto& ibMarkers = ib_mf.array(mfi);
+
+      ParallelFor(bx, [=] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {
+        if (ibMarkers(i, j, k, 1)) {
+          IntVect iv(AMREX_D_DECL(i, j, k));
+          Real cons[PROB::ProbClosures::NCONS];
+          cls_h.prims2cons(iv, prims, cons);
+          for (int n = 0; n < PROB::ProbClosures::NCONS; n++) {
+            state(i, j, k, n) = cons[n];
+          }
         }
-
-      }
-    });
+      });
+    }
   }
-
 #endif
 
   // else if (order_rk == 4) {

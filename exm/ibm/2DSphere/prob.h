@@ -92,7 +92,10 @@ struct ibmparm_t {
   
   static constexpr int  interp_order_surf = 1;
   static constexpr int  extrap_order_surf = 1;
-  static constexpr Real alpha_surf = 0.6; 
+  static constexpr Real alpha_surf = 0.6;
+
+  static constexpr int  ghost_layers = 1;
+  static constexpr bool interior_is_solid = true;
 };
 
 
@@ -117,6 +120,10 @@ typedef rhs_dt<riemann_t<false, ProbClosures>, no_diffusive_t, no_source_t > Pro
 typedef ibm_adiabatic_slip_wall_t<ibmparm_t,ProbClosures> TypeWall;
 typedef eib_t<TypeWall,ibmparm_t,ProbClosures> ProbIB;
 
+// Static geometry: no update needed
+inline void update_geometry(Real /*time*/,
+                            Vector<GeomType>& /*geom_a*/,
+                            int /*ngeom*/) {}
 
 void inline inputs() {
   

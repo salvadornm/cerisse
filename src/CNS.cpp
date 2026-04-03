@@ -1,5 +1,6 @@
 #include <AMReX_MultiFabUtil.H>
 #include <AMReX_ParmParse.H>
+#include <AMReX_Reduce.H>
 #include <CNS.h>
 #include <CNS_K.h>
 #include <prob.h>
@@ -72,6 +73,8 @@ CNS::CNS(Amr &papa, int lev, const Geometry &level_geom, const BoxArray &bl,
 #endif
 
   buildMetrics();
+
+  rz_sanity_check(Geom());
 
   // prob_rhs.init();
 };
@@ -480,47 +483,89 @@ void CNS::computeNewDt(int finest_level, int sub_cycle, Vector<int> &n_cycle,
  [[nodiscard]] GpuArray<Real,AMREX_SPACEDIM> CNS::maxEigen() {
   BL_PROFILE("CNS::maxEigen()");
 
-  //const auto dx = geom.CellSizeArray();
   PROB::ProbClosures const *d_cls = d_prob_closures;
 
   // Get multifabs
   MultiFab& consmf = get_new_data(State_Type);
-#if AMREX_USE_GPIBM
-  auto& ib_mf = *IBM::ib.bmf_a[level];
-#endif
 
-  // CPU arrays
-  typedef GpuArray<Real,AMREX_SPACEDIM> Array_t;
-  Array_t h_max_eigenvals;
-  for (int idir = 0; idir < AMREX_SPACEDIM; idir++) {
-    h_max_eigenvals[idir] = - std::numeric_limits<Real>::min();
-  }
+  GpuArray<Real,AMREX_SPACEDIM> h_max_eigenvals;
 
-  // CPU-GPU transfer array
-  AsyncArray<Array_t> aa_max_eigenvals(&h_max_eigenvals, 1);  
-  Array_t* d_max_eigenvals = aa_max_eigenvals.data(); // Get associated device pointer
+  // Use ReduceOps for proper GPU-parallel reduction (replaces the original
+  // AsyncArray approach which had a data race on the device max-reduction).
+#if (AMREX_SPACEDIM == 1)
+  ReduceOps<ReduceOpMax> reduce_op;
+  ReduceData<Real> reduce_data(reduce_op);
+  using ReduceTuple = typename decltype(reduce_data)::Type;
 
-  // Compute max eigenvalues
-  // Can be made more efficient by computing all the eigenvalues in all directions at once. Rather than per direction.
   for (MFIter mfi(consmf, false); mfi.isValid(); ++mfi) {
     const Box &bx = mfi.tilebox();
-    const Array4<Real>& cons= consmf.array(mfi);
-    ParallelFor(
-        bx, [=] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {
-          for (int idir = 0; idir < AMREX_SPACEDIM; idir++) {
+    const Array4<Real>& cons = consmf.array(mfi);
+    reduce_op.eval(bx, reduce_data, [=] AMREX_GPU_DEVICE(int i, int j, int k) -> ReduceTuple {
+      GpuArray<int, 3> vdir0 = {1, 0, 0};
+      auto temp0 = d_cls->cons2eigenvals(i, j, k, cons, vdir0);
+      Real maxe0 = Real(0.0);
+      for (int iw = 0; iw < PROB::ProbClosures::NWAVES; iw++)
+        maxe0 = amrex::max(maxe0, std::abs(temp0[iw]));
+      return {maxe0};
+    });
+  }
+  auto hv = reduce_data.value(reduce_op);
+  h_max_eigenvals[0] = amrex::get<0>(hv);
 
-            GpuArray<int, 3> vdir = {int(idir == 0), int(idir == 1), int(idir == 2)};
+#elif (AMREX_SPACEDIM == 2)
+  ReduceOps<ReduceOpMax, ReduceOpMax> reduce_op;
+  ReduceData<Real, Real> reduce_data(reduce_op);
+  using ReduceTuple = typename decltype(reduce_data)::Type;
 
-            GpuArray<Real,PROB::ProbClosures::NWAVES> temp = d_cls->cons2eigenvals(i, j, k, cons, vdir);
+  for (MFIter mfi(consmf, false); mfi.isValid(); ++mfi) {
+    const Box &bx = mfi.tilebox();
+    const Array4<Real>& cons = consmf.array(mfi);
+    reduce_op.eval(bx, reduce_data, [=] AMREX_GPU_DEVICE(int i, int j, int k) -> ReduceTuple {
+      GpuArray<int, 3> vdir0 = {1, 0, 0};
+      GpuArray<int, 3> vdir1 = {0, 1, 0};
+      auto temp0 = d_cls->cons2eigenvals(i, j, k, cons, vdir0);
+      auto temp1 = d_cls->cons2eigenvals(i, j, k, cons, vdir1);
+      Real maxe0 = Real(0.0), maxe1 = Real(0.0);
+      for (int iw = 0; iw < PROB::ProbClosures::NWAVES; iw++) {
+        maxe0 = amrex::max(maxe0, std::abs(temp0[iw]));
+        maxe1 = amrex::max(maxe1, std::abs(temp1[iw]));
+      }
+      return {maxe0, maxe1};
+    });
+  }
+  auto hv = reduce_data.value(reduce_op);
+  h_max_eigenvals[0] = amrex::get<0>(hv);
+  h_max_eigenvals[1] = amrex::get<1>(hv);
 
-            for (int iwave = 0; iwave < PROB::ProbClosures::NWAVES; iwave++) {
-              (*d_max_eigenvals)[idir] = max((*d_max_eigenvals)[idir],
-                                            std::abs((temp[iwave])));
-            }
-          }
-        });
-  };
-  aa_max_eigenvals.copyToHost(&h_max_eigenvals, 1); // Copy the value back to host
+#else // 3D
+  ReduceOps<ReduceOpMax, ReduceOpMax, ReduceOpMax> reduce_op;
+  ReduceData<Real, Real, Real> reduce_data(reduce_op);
+  using ReduceTuple = typename decltype(reduce_data)::Type;
+
+  for (MFIter mfi(consmf, false); mfi.isValid(); ++mfi) {
+    const Box &bx = mfi.tilebox();
+    const Array4<Real>& cons = consmf.array(mfi);
+    reduce_op.eval(bx, reduce_data, [=] AMREX_GPU_DEVICE(int i, int j, int k) -> ReduceTuple {
+      GpuArray<int, 3> vdir0 = {1, 0, 0};
+      GpuArray<int, 3> vdir1 = {0, 1, 0};
+      GpuArray<int, 3> vdir2 = {0, 0, 1};
+      auto temp0 = d_cls->cons2eigenvals(i, j, k, cons, vdir0);
+      auto temp1 = d_cls->cons2eigenvals(i, j, k, cons, vdir1);
+      auto temp2 = d_cls->cons2eigenvals(i, j, k, cons, vdir2);
+      Real maxe0 = Real(0.0), maxe1 = Real(0.0), maxe2 = Real(0.0);
+      for (int iw = 0; iw < PROB::ProbClosures::NWAVES; iw++) {
+        maxe0 = amrex::max(maxe0, std::abs(temp0[iw]));
+        maxe1 = amrex::max(maxe1, std::abs(temp1[iw]));
+        maxe2 = amrex::max(maxe2, std::abs(temp2[iw]));
+      }
+      return {maxe0, maxe1, maxe2};
+    });
+  }
+  auto hv = reduce_data.value(reduce_op);
+  h_max_eigenvals[0] = amrex::get<0>(hv);
+  h_max_eigenvals[1] = amrex::get<1>(hv);
+  h_max_eigenvals[2] = amrex::get<2>(hv);
+#endif
 
   // Communicate across processors
   for (int idir = 0; idir < AMREX_SPACEDIM; idir++) {
@@ -575,15 +620,15 @@ void CNS::postCoarseTimeStep(Real time) {
           // This computes SURFs and writes to file
           level_obj.writeSurfFile();
       } else {
-          // ComputeSURFs only (needed for FSI loads)
-          MultiFab& Sdata = level_obj.get_new_data(State_Type); 
-          int ncons = CNS::d_prob_closures->NCONS;
-          int nghost= CNS::d_prob_closures->NGHOST;
-          Real cur_time = level_obj.state[State_Type].curTime();
-          
-          FillPatch(level_obj, Sdata, nghost, cur_time, State_Type, 0, ncons);
-          const PROB::ProbClosures* cls_d = CNS::d_prob_closures;
-          IBM::ib.computeSURFs(Sdata, cls_d, lev);
+          // computeSURFs currently disabled; skip the expensive FillPatch.
+          // When computeSURFs is re-enabled, uncomment the FillPatch below.
+          // MultiFab& Sdata = level_obj.get_new_data(State_Type); 
+          // int ncons = CNS::d_prob_closures->NCONS;
+          // int nghost= CNS::d_prob_closures->NGHOST;
+          // Real cur_time = level_obj.state[State_Type].curTime();
+          // FillPatch(level_obj, Sdata, nghost, cur_time, State_Type, 0, ncons);
+          // const PROB::ProbClosures* cls_d = CNS::d_prob_closures;
+          // IBM::ib.computeSURFs(Sdata, cls_d, lev);
       }
   }
 
@@ -597,9 +642,8 @@ void CNS::postCoarseTimeStep(Real time) {
 
 #ifdef CNS_USE_FSI
   for (int i = 0; i < ngeom; ++i) {
-      // 1. Rigid Body Properties
-      Real rho_solid = 1.0; // Placeholder density
-      auto props = FSI::RigidBodyProperties::computeProperties(ib.geom_a[i], rho_solid);
+      // 1. Rigid Body Properties (from inputs or auto-computed from geometry)
+      auto props = FSI::RigidBodyProperties::readOrCompute(ib.geom_a[i], i);
 
       // 2. Aerodynamic Loads
       auto loads = FSI::Kinematics::computeLoads(i, props.xcenter);
@@ -805,10 +849,24 @@ void CNS::printTotal() const {
   // Get conservatives multifab
   const MultiFab& consmf = get_new_data(State_Type);
 
-  // Compute peicewise constant sum of conserved variables
-  std::array<Real, PROB::ProbClosures::NCONS> tot;
+  // Volume-weighted integral of conserved variables (works for Cartesian and RZ)
+  MultiFab volume(consmf.boxArray(), consmf.DistributionMap(), 1, 0);
+  geom.GetVolume(volume, consmf.boxArray(), consmf.DistributionMap(), 0);
+
+  std::array<Real, PROB::ProbClosures::NCONS> tot{};
   for (int comp = 0; comp < PROB::ProbClosures::NCONS; ++comp) {
-    tot[comp] = consmf.sum(comp, true) * geom.ProbSize();
+    ReduceOps<ReduceOpSum> reduce_op;
+    ReduceData<Real> reduce_data(reduce_op);
+
+    auto const& a = consmf.const_arrays();
+    auto const& v = volume.const_arrays();
+    reduce_op.eval(consmf, IntVect(0), reduce_data,
+                   [=] AMREX_GPU_DEVICE(int box_no, int i, int j, int k) noexcept -> Real {
+                     return a[box_no](i, j, k, comp) * v[box_no](i, j, k);
+                   });
+    Gpu::streamSynchronize();
+    auto const& hv = reduce_data.value(reduce_op);
+    tot[comp] = amrex::get<0>(hv);
   }
 
   // Communicate across processors
@@ -1068,7 +1126,7 @@ void CNS::rebuildIBM() {
   IBM::ib.initialiseGPs(level);
   if (plot_surf && level == parent->finestLevel()) {
      for (int lev = parent->finestLevel(); lev >= 0; --lev) {
-        IBM::ib.computeSurfIndexs(lev);
+        IBM::ib.computeSurfIndices(lev);
      }
   }
 }
@@ -1094,9 +1152,17 @@ void CNS::writeSurfFile() {
     
     FillPatch(*this, Sdata, nghost, time, State_Type, 0, ncons);
 
+    // Convert conservative to primitive variables for surface interpolation
+    int nprim = PROB::ProbClosures::NPRIM;
+    MultiFab prims_mf(Sdata.boxArray(), Sdata.DistributionMap(),
+                      nprim, nghost, MFInfo().SetArena(The_Async_Arena()));
+    for (MFIter mfi(Sdata, false); mfi.isValid(); ++mfi) {
+      CNS::h_prob_closures->cons2prims(mfi, Sdata.array(mfi), prims_mf.array(mfi));
+    }
+
     const PROB::ProbClosures* cls_d = CNS::d_prob_closures;
 
-    IBM::ib.computeSURFs(Sdata,cls_d,this->level); // computed at each level. From low to high.
+    IBM::ib.computeSURFs(prims_mf,cls_d,this->level); // computed at each level. From low to high.
 
     // Only gather and write on the finest level to ensure all levels are processed
     if (this->level == parent->finestLevel()){

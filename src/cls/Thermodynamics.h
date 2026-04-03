@@ -85,9 +85,11 @@ class calorifically_perfect_gas_t {
     const Real ux, const Real uy, const Real uz,
     Real* Q ) const {
 
-    P = std::max(min_euler_press,P);  
+    // avoid std::max — it ODR-uses the constexpr by-ref, which is
+    // undefined in CUDA device code.  Plain if-clamp is safe.
+    if (P < min_euler_press) P = min_euler_press;
 #if CLIP_TEMPERATURE_MIN        
-    T = std::max(min_euler_temp,T);
+    if (T < min_euler_temp) T = min_euler_temp;
 #endif    
     Q[idx_t::QRHO] = P/(T*Rspec);
     Q[idx_t::QT] = T;
@@ -549,9 +551,9 @@ class multispecies_pele_gas_t {
 
     //local vars  
     
-    P = std::max(min_euler_press,P);  
+    if (P < min_euler_press) P = min_euler_press;
 #if CLIP_TEMPERATURE_MIN        
-    T = std::max(min_euler_temp,T);
+    if (T < min_euler_temp) T = min_euler_temp;
 #endif    
           
     // compute rho,ei,gamma,cs from eos   SI->cgs
