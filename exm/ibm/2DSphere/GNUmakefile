@@ -4,7 +4,7 @@ COMP      = gcc
 CXXSTD    = c++20
 PRECISION = DOUBLE
 
-TINY_PROFILE = FALSE
+TINY_PROFILE = TRUE
 
 # cerisse options
 CLIP_MINTEMP = FALSE
@@ -21,8 +21,8 @@ AMREX_NO_PROBINIT=TRUE
 CUDA_ARCH=8.0
 
 # Paths
-AMR_SOLVER = $(abspath ../)
-AMREX_HOME = $(abspath ../lib/amrex)
+AMR_SOLVER = $(abspath ../../../)
+AMREX_HOME = $(AMR_SOLVER)/lib/amrex
 
 #  possible Boost and CGAL locations (searching homebrew first)
 BOOST_PREFIX=/opt/homebrew/opt/boost

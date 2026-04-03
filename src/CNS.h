@@ -3,6 +3,7 @@
 
 #include <AMReX_AmrLevel.H>
 #include <AMReX_FluxRegister.H>
+#include <AMReX_Math.H>
 #include <prob.h>
 #include <CNSconstants.h>
 
@@ -108,6 +109,26 @@ class CNS : public amrex::AmrLevel {
   enum StateDataType { State_Type = 0, Stats_Type, Cost_Type };
 
   void buildMetrics();
+
+  static AMREX_FORCE_INLINE void rz_sanity_check(amrex::Geometry const& geom)
+  {
+    // RZ axis sanity check: for RZ the axis must be at r=0 and r-direction
+    // cannot be periodic.
+    if (geom.IsRZ()) {
+#if (AMREX_SPACEDIM != 2)
+      amrex::Abort("RZ requires AMREX_SPACEDIM=2 (axisymmetric r-z)");
+#endif
+      if (geom.isPeriodic(0)) {
+        amrex::Abort(
+            "RZ requires geometry.is_periodic[0]=0 (non-periodic r-direction)");
+      }
+
+      const amrex::Real rlo = geom.ProbLo(0);
+      if (amrex::Math::abs(rlo) > amrex::Real(1.e-14)) {
+        amrex::Abort("RZ requires geometry.prob_lo[0]=0 (axis at r=0)");
+      }
+    }
+  }
 
   void avgDown();
 
