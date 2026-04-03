@@ -1,6 +1,8 @@
 #ifndef RIGIDBODYPROPERTIES_H_
 #define RIGIDBODYPROPERTIES_H_
 
+#include <cmath>
+#include <vector>
 #include <AMReX.H>
 #include <AMReX_RealVect.H>
 #include <AMReX_ParmParse.H>
@@ -35,54 +37,70 @@ struct RigidBodyProps {
 class RigidBodyProperties {
 public:
 
-    // ----------------------------------------------------------------
-    // Read properties from input file (fsi.* namespace).
-    // If fsi.mass is provided, all values come from inputs (skip geometry
-    // computation).  Otherwise compute from geometry assuming uniform
-    // density fsi.rho_solid (required).
+    // Return rigid-body inertial properties for geometry geom_id.
     //
-    // Input keys (per-geometry, indexed by geom_id):
-    //   fsi.rho_solid       = <Real>          (uniform density, required for auto)
-    //   fsi.mass            = <Real>          (manual override — triggers skip)
-    //   fsi.xcenter         = <Real Real ...> (manual CM)
-    //   fsi.Izz             = <Real>          (2D: polar moment about CM)
-    //   fsi.inertia_diag    = <Real Real Real> (3D: Ixx Iyy Izz about CM)
-    //   fsi.inertia_offdiag = <Real Real Real> (3D: Ixy Ixz Iyz about CM)
-    // ----------------------------------------------------------------
-    static RigidBodyProps readOrCompute(const GeomType& geom, int geom_id = 0) {
+    // The result is computed once (on the first call) and cached; subsequent
+    // calls return the cached value without re-reading inputs or re-integrating
+    // the geometry mesh.  This is correct because mass, inertia, and the
+    // reference centre of mass are constant properties of a rigid body.
+    //
+    // Two initialisation modes (selected via the fsi.* input namespace):
+    //   Manual : fsi.mass > 0 is provided; remaining properties are read from
+    //            the input file; the geometry mesh is not consulted.
+    //   Auto   : fsi.mass absent; fsi.rho_solid (uniform density) required;
+    //            mass, centre of mass, and inertia tensor are computed by
+    //            numerical volume integration over the discretised geometry.
+    //
+    // Input keys:
+    //   fsi.rho_solid       = <Real>            (auto: uniform solid density)
+    //   fsi.mass            = <Real>            (manual: total mass)
+    //   fsi.xcenter         = <Real ...>        (manual: centre of mass)
+    //   fsi.Izz             = <Real>            (2D manual: polar moment about CM)
+    //   fsi.inertia_diag    = <Real Real Real>  (3D manual: Ixx Iyy Izz about CM)
+    //   fsi.inertia_offdiag = <Real Real Real>  (3D manual: Ixy Ixz Iyz about CM)
+    static RigidBodyProps readOrCompute(const GeomType& geom, int geom_id = 0)
+    {
+        // Cache: indexed by geom_id; valid flag guards first-call initialisation.
+        static std::vector<RigidBodyProps> cache;
+        static std::vector<bool>          valid;
+
+        // Grow cache on first encounter of a new geom_id
+        if (geom_id >= static_cast<int>(cache.size())) {
+            cache.resize(geom_id + 1);
+            valid.resize(geom_id + 1, false);
+        }
+        if (valid[geom_id]) return cache[geom_id];
 
         amrex::ParmParse pp("fsi");
 
-        // --- Check for manual override ---
         Real manual_mass = -1.0;
         pp.query("mass", manual_mass);
 
         if (manual_mass > 0.0) {
-            return readManual(pp, manual_mass);
+            cache[geom_id] = readManual(pp, manual_mass);
+        } else {
+            Real rho = 0.0;
+            if (!pp.query("rho_solid", rho) || rho <= 0.0) {
+                amrex::Abort("FSI: fsi.rho_solid is required when fsi.mass is not provided");
+            }
+            cache[geom_id] = computeFromGeometry(geom, rho);
+            amrex::Print() << "[FSI] Geometry " << geom_id
+                           << ": computed from mesh (rho_solid=" << rho << ")\n"
+                           << "  volume=" << cache[geom_id].volume
+                           << "  mass="   << cache[geom_id].mass << "\n"
+                           << "  xcenter=(" << AMREX_D_TERM(cache[geom_id].xcenter[0],
+                                               << "," << cache[geom_id].xcenter[1],
+                                               << "," << cache[geom_id].xcenter[2]) << ")\n"
+                           << "  Izz=" << cache[geom_id].inertia[2][2] << "\n";
         }
 
-        // --- Auto-compute from geometry ---
-        Real rho = 0.0;
-        if (!pp.query("rho_solid", rho) || rho <= 0.0) {
-            amrex::Abort("FSI: fsi.rho_solid is required when fsi.mass is not provided");
-        }
-
-        RigidBodyProps props = computeFromGeometry(geom, rho);
-
-        amrex::Print() << "[FSI] Geometry " << geom_id
-                       << ": computed from mesh (rho_solid=" << rho << ")\n"
-                       << "  volume=" << props.volume
-                       << "  mass=" << props.mass << "\n"
-                       << "  xcenter=(" << AMREX_D_TERM(props.xcenter[0],
-                                          << "," << props.xcenter[1],
-                                          << "," << props.xcenter[2]) << ")\n"
-                       << "  Izz=" << props.inertia[2][2] << "\n";
-        return props;
+        valid[geom_id] = true;
+        return cache[geom_id];
     }
 
 private:
 
-    // Read all properties from input file (manual mode)
+    // Populate RigidBodyProps from input-file values (manual mode).
     static RigidBodyProps readManual(amrex::ParmParse& pp, Real mass) {
         RigidBodyProps props;
         props.mass = mass;
@@ -130,28 +148,28 @@ private:
 
 public:
 
-    // Compute properties from geometry assuming uniform density rho.
-    // Public so callers can still use it directly if needed.
+    // Compute mass, centre of mass, and inertia tensor from the discretised
+    // geometry assuming uniform solid density rho.  Exposed publicly so that
+    // callers can bypass the input-file path when needed.
     static RigidBodyProps computeFromGeometry(const GeomType& geom, Real rho) {
         RigidBodyProps props;
         props.rho_solid = rho;
 
 #if (AMREX_SPACEDIM == 2)
         // -------------------------------------------------------------------
-        // 2D Implementation (Polygon)
+        // 2D: signed-area shoelace formula for a closed polygon.
+        // Centroid and second moment of area about the origin are accumulated
+        // edge-by-edge; the parallel axis theorem shifts the result to the CM.
+        // GeomType = Polygon2D: vertex access via geom.vertex(i)[0/1].
         // -------------------------------------------------------------------
-        // GeomType is Polygon2D (bvh_types.h): vertices as GpuArray<Real,2>
-        // Access via geom.vertex(i)[0], geom.vertex(i)[1]
-        
         int n = static_cast<int>(geom.size());
         if (n < 3) return props;
 
         Real area = 0.0;
         Real cx = 0.0;
         Real cy = 0.0;
-        Real Izz = 0.0;
+        Real Izz = 0.0;  // second moment of area about the origin
 
-        // Iterate over edges (shoelace formula)
         for (int i = 0; i < n; ++i) {
             const auto& p1 = geom.vertex(i);
             const auto& p2 = geom.vertex((i + 1) % n);
@@ -167,40 +185,35 @@ public:
             cx += (x1 + x2) * cross;
             cy += (y1 + y2) * cross;
 
-            // Contribution to polar moment of inertia about origin
-            // I_origin = integral (x^2 + y^2) dA
-            // Formula: (x1*y2 - x2*y1) * (x1^2 + x1*x2 + x2^2 + y1^2 + y1*y2 + y2^2) / 12
+            // Polar second moment about the origin:
+            // integral(x^2+y^2)dA = sum_edges cross*(x1^2+x1*x2+x2^2+y1^2+y1*y2+y2^2)/12
             Izz += cross * (x1*x1 + x1*x2 + x2*x2 + y1*y1 + y1*y2 + y2*y2);
         }
 
         area *= 0.5;
-        props.volume = std::abs(area); // Area in 2D
-        props.mass = props.volume * rho;
+        props.volume = std::abs(area);  // area in 2D
+        props.mass   = props.volume * rho;
 
-        if (std::abs(area) > 1e-12) {
+        if (std::abs(area) > 1.0e-12) {
             cx /= (6.0 * area);
             cy /= (6.0 * area);
         }
         props.xcenter[0] = cx;
         props.xcenter[1] = cy;
 
-        // Izz about origin (geometric second moment, needs rho to get inertia)
-        Izz /= 12.0;
-        Izz = std::abs(Izz);
-
-        // Parallel axis theorem: I_cm = I_origin - mass * d^2
-        Real d2 = cx*cx + cy*cy;
-        Real Izz_cm = (Izz * rho) - props.mass * d2;
-
-        // In 2D, only Izz is relevant for rotation in plane
-        props.inertia[2][2] = Izz_cm;
+        // Shift second moment to CM via the parallel axis theorem:
+        //   I_cm = rho * I_geo_origin - mass * |x_cm|^2
+        Izz = std::abs(Izz) / 12.0;
+        props.inertia[2][2] = rho * Izz - props.mass * (cx*cx + cy*cy);
 
 #elif (AMREX_SPACEDIM == 3)
         // -------------------------------------------------------------------
-        // 3D Implementation (TriMesh)
+        // 3D: signed-volume decomposition into tetrahedra with the origin as apex.
+        // Volume, centroid, and the symmetric covariance matrix C_ij are
+        // accumulated face-by-face; the full inertia tensor about the origin is
+        // assembled from C, then shifted to the CM via the parallel axis theorem.
+        // GeomType = TriMesh: faces[fi][0..2] are vertex indices into vertices[].
         // -------------------------------------------------------------------
-        // GeomType is TriMesh (bvh_types.h): vertices[] and faces[] arrays
-        // Each face has 3 vertex indices. Form tetrahedra with origin.
 
         int nf = geom.num_faces();
         if (nf < 1) return props;
@@ -235,11 +248,9 @@ public:
             RealVect tet_xcenter = (p1 + p2 + p3) * 0.25; // Origin is (0,0,0)
             total_xcenter += tet_xcenter * vol;
 
-            // Inertia integrals (Covariance terms)
-            // C_xx = integral(x^2 dV)
-            // Formula for tetrahedron at origin:
-            // integral(x^2) = V/10 * (x1^2 + x2^2 + x3^2 + x1x2 + x2x3 + x3x1)
-            // integral(xy)  = V/20 * (2x1y1 + x1y2 + x1y3 + x2y1 + 2x2y2 + x2y3 + x3y1 + x3y2 + 2x3y3)
+            // Covariance integrals for the tetrahedron (Dobrovolskis 1996):
+            //   C_ii += V/10  * (pi^2 + pi*pj + pj^2)  [diagonal, i==j]
+            //   C_ij += V/20  * (2pi_a*pj_a + cross terms) [off-diagonal]
             
             for(int i=0; i<3; ++i) {
                 for(int j=i; j<3; ++j) {
@@ -270,31 +281,23 @@ public:
         }
         props.xcenter = total_xcenter;
 
-        // Compute Inertia Tensor about Origin
-        // I_xx = integral(y^2 + z^2) = C_yy + C_zz
-        // I_xy = -integral(xy) = -C_xy
+        // Inertia tensor about the origin: I_ij = rho*(delta_ij*tr(C) - C_ij)
         Real I_origin[3][3];
         I_origin[0][0] = rho * (C[1][1] + C[2][2]);
         I_origin[1][1] = rho * (C[0][0] + C[2][2]);
         I_origin[2][2] = rho * (C[0][0] + C[1][1]);
-        
         I_origin[0][1] = I_origin[1][0] = -rho * C[0][1];
         I_origin[0][2] = I_origin[2][0] = -rho * C[0][2];
         I_origin[1][2] = I_origin[2][1] = -rho * C[1][2];
 
-        // Parallel Axis Theorem to move to CM
-        // I_cm = I_origin - M * (d^2 I - d tensor d)
-        // I_cm_xx = I_origin_xx - M * (dy^2 + dz^2)
-        // I_cm_xy = I_origin_xy - M * (-dx * dy) = I_origin_xy + M * dx * dy
-        
-        Real cx = props.xcenter[0];
-        Real cy = props.xcenter[1];
-        Real cz = props.xcenter[2];
+        // Parallel axis theorem: I_cm = I_origin - M*(|d|^2 δ - d⊗d)
+        const Real cx = props.xcenter[0];
+        const Real cy = props.xcenter[1];
+        const Real cz = props.xcenter[2];
 
         props.inertia[0][0] = I_origin[0][0] - props.mass * (cy*cy + cz*cz);
         props.inertia[1][1] = I_origin[1][1] - props.mass * (cx*cx + cz*cz);
         props.inertia[2][2] = I_origin[2][2] - props.mass * (cx*cx + cy*cy);
-
         props.inertia[0][1] = props.inertia[1][0] = I_origin[0][1] + props.mass * cx * cy;
         props.inertia[0][2] = props.inertia[2][0] = I_origin[0][2] + props.mass * cx * cz;
         props.inertia[1][2] = props.inertia[2][1] = I_origin[1][2] + props.mass * cy * cz;

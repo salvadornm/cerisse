@@ -78,7 +78,10 @@ void search_optimal_image_point(
     Array1D<Real, 0, AMREX_SPACEDIM - 1> candi_xyz;
     Array1D< int, 0, AMREX_SPACEDIM - 1> candi_ijk;
     constexpr int N_ATTEMPTS = (GP_OR_SURF ? N_ATTEMPTS_GP : N_ATTEMPTS_SURF);
-    // Local constexpr arrays so addresses are valid in device code
+    // Image-point placement distance multipliers (multiples of di = alpha * cell_diagonal).
+    // The first attempt places the image point at 1.0*di; if the stencil there is
+    // insufficient (too many solid neighbours), we fall back to 1.5*di, 2.0*di, etc.
+    // Local constexpr arrays are required for device-side address validity.
     constexpr Real IMP_FACTOR_GP_local[]   = {1.0, 1.5, 2.0};
     constexpr Real IMP_FACTOR_SURF_local[] = {1.0, 1.5, 2.0, 2.5, 3.0};
     const Real* IMP_FACTOR = (GP_OR_SURF ? IMP_FACTOR_GP_local : IMP_FACTOR_SURF_local);
@@ -348,28 +351,25 @@ static void extrapolate(
     for (int n = 0; n <= cls_t::QLS; ++n) {
         
         if (eff_order >= 2) {
+            // Quadratic Lagrange interpolation using surface value (slot 1)
+            // and two image-point values (slots 2 and 3).
+            // Note: this branch is only reachable when eorder_t >= 2.
             if constexpr (eorder_t >= 2) {
                 Real u0 = prims(1, n);
                 Real u1 = prims(2, n);
                 Real u2 = prims(3, n);
-                
+
                 Real x1 = disIM(0);
                 Real x2 = disIM(1);
                 AMREX_ASSERT(x1 > 0 && x2 > 0);
-                
+
                 Real x = -disGP;
-                
+
                 Real L0 = (x - x1) * (x - x2) / (x1 * x2);
                 Real L1 = x * (x - x2) / (x1 * (x1 - x2));
                 Real L2 = x * (x - x1) / (x2 * (x2 - x1));
-                
+
                 prims(0, n) = u0 * L0 + u1 * L1 + u2 * L2;
-            } else {
-                Real val_surf = prims(1, n);
-                Real val_im1  = prims(2, n);
-                Real d_im1    = disIM(0);
-                Real slope = (val_im1 - val_surf) / d_im1;
-                prims(0, n) = val_surf - slope * disGP;
             }
         }
         else if (eff_order == 1) {

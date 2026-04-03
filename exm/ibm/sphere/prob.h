@@ -101,23 +101,14 @@ struct ibmparm_t {
 typedef closures_dt<indicies_t, transport_const_t<methodparm_t>,
                     calorifically_perfect_gas_t<indicies_t>> ProbClosures;
 
-// NUMERICAL SCHEME + EQNS TO SOLVE   (Euler/NS/Source)                 
+// Numerical scheme: HLLC Riemann solver, inviscid, no source
+typedef rhs_dt<riemann_t<false, ProbClosures>, no_diffusive_t, no_source_t> ProbRHS;
 
-//typedef rhs_dt<rusanov_t<ProbClosures>, no_diffusive_t, no_source_t > ProbRHS;
-typedef rhs_dt<riemann_t<false, ProbClosures>, no_diffusive_t, no_source_t > ProbRHS;
-//typedef rhs_dt<skew_t<skewparm_t,ProbClosures>, no_diffusive_t, no_source_t > ProbRHS;
-// typedef rhs_dt<skew_t<skewparm_t,ProbClosures>, viscous_t<methodparm_t, ProbClosures>, no_source_t > ProbRHS;
+// IBM wall model: adiabatic slip wall
+typedef ibm_adiabatic_slip_wall_t<ibmparm_t, ProbClosures> TypeWall;
+typedef eib_t<TypeWall, ibmparm_t, ProbClosures> ProbIB;
 
-
-// IBM templates
-//using d_image = std::ratio<5, 5>;
-//typedef eib_t<1,1,d_image,ProbClosures> ProbIB;
-
-
-typedef ibm_adiabatic_slip_wall_t<ibmparm_t,ProbClosures> TypeWall;
-typedef eib_t<TypeWall,ibmparm_t,ProbClosures> ProbIB;
-
-// Static geometry: no update needed
+// Static geometry: no kinematic update required
 inline void update_geometry(Real /*time*/,
                             Vector<GeomType>& /*geom_a*/,
                             int /*ngeom*/) {}
@@ -135,14 +126,10 @@ void prob_initdata (int i, int j, int k, amrex::Array4<amrex::Real> const& state
       amrex::GeometryData const& geomdata, ProbClosures const& cls, ProbParm const& pparm) {
   
   const Real* prob_lo = geomdata.ProbLo();
-  // const Real* prob_hi = geomdata.ProbHi(); //
   const Real* dx      = geomdata.CellSize();
 
-  Real x = prob_lo[0] + (i+0.5_rt)*dx[0];
-  // Real y = prob_lo[1] + (j+0.5_rt)*dx[1];
-  // Real z = prob_lo[2] + (k+0.5_rt)*dx[2];
-  // local vars
-  Real rhot,eint,u[3]={0.0};
+  const Real x = prob_lo[0] + (i + 0.5_rt) * dx[0];
+  Real rhot, eint, u[3] = {0.0};
   
   // initial state
   if (x < pparm.xshock) { // left of shock

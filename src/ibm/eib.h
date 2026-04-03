@@ -99,6 +99,50 @@ public:
   }
 
   /**
+   * \brief Explicitly release all GPU-managed memory before amrex::Finalize().
+   *
+   * Must be called while AMReX arenas are still alive. The global inline
+   * IBM::ib outlives amrex::Finalize(), so its implicit destructor would
+   * free arena memory after the arena is destroyed (static destruction
+   * order problem).  Calling cleanup() first leaves the destructor with
+   * nothing to free.
+   */
+  void cleanup() noexcept
+  {
+    // Delete raw-pointer members first (their internals use arena memory)
+    for (auto*& p : bmf_a)    { if (p) { delete p; p = nullptr; } }
+    for (auto*& f : inout_fa) { if (f) { delete f; f = nullptr; } }
+
+    // Swap-with-empty idiom: guarantees capacity→0 and arena memory freed NOW,
+    // so the post-Finalize destructor finds nothing to deallocate.
+    { decltype(bmf_a)        tmp; tmp.swap(bmf_a);        }
+    { decltype(inout_fa)     tmp; tmp.swap(inout_fa);     }
+    { decltype(LocalFrame_a) tmp; tmp.swap(LocalFrame_a); }
+    { decltype(SurfElem_a)   tmp; tmp.swap(SurfElem_a);   }
+    { decltype(geom_offsets) tmp; tmp.swap(geom_offsets);  }
+
+    // Compound types: destroying elements calls their ManagedVector destructors
+    { decltype(geom_a) tmp; tmp.swap(geom_a); }
+#ifdef AMREX_USE_CGAL
+    { decltype(tree_a)   tmp; tmp.swap(tree_a);   }
+    { decltype(idxmap_a) tmp; tmp.swap(idxmap_a); }
+#else
+    { decltype(bvh_a) tmp; tmp.swap(bvh_a); }
+#endif
+    { decltype(bbox_a)     tmp; tmp.swap(bbox_a);     }
+    { decltype(geom_names) tmp; tmp.swap(geom_names); }
+    { decltype(gpstore_a)  tmp; tmp.swap(gpstore_a);  }
+
+    // These structs have their own clear() with shrink_to_fit()
+    surfimp_soa.clear();
+    surfphys_soa.clear();
+
+    { decltype(faces_per_level) tmp; tmp.swap(faces_per_level); }
+
+    amr_p = nullptr;
+  }
+
+  /**
    * \brief Initializes the Immersed Boundary (IB) method structures and geometry.
    *
    * This function sets up the AMR pointer, resizes internal data structures based on the maximum AMR level,

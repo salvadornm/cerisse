@@ -269,13 +269,13 @@ struct surfImp_t {
   }
 
   void clear() {
-      elemIdx.clear();
-      imp_xyz.clear();
-      imp_ijk.clear();
-      disIM.clear();
-      imp_ninterp.clear();
-      imp_ip_ijk.clear();
-      imp_ipweights.clear();
+      elemIdx.clear();       elemIdx.shrink_to_fit();
+      imp_xyz.clear();       imp_xyz.shrink_to_fit();
+      imp_ijk.clear();       imp_ijk.shrink_to_fit();
+      disIM.clear();         disIM.shrink_to_fit();
+      imp_ninterp.clear();   imp_ninterp.shrink_to_fit();
+      imp_ip_ijk.clear();    imp_ip_ijk.shrink_to_fit();
+      imp_ipweights.clear(); imp_ipweights.shrink_to_fit();
   }
 
   void shrink() {
@@ -343,7 +343,7 @@ struct surfPhys_t {
         for (int i = old_n; i < n; ++i) {
             ifab[i] = -1;
             lev[i]  = -1;
-            rank[i] = -99;
+            rank[i] = -1;
             elemfound[i] = 0; // false
             ip_quality[i] = -1;
         }
@@ -353,19 +353,19 @@ struct surfPhys_t {
   // Clear and free memory
   void clear() {
       filled_elems = 0;
-      
-      elemIdx.clear();
-      ifab.clear();    
-      lev.clear();     
-      rank.clear();   
-      elemfound.clear();
-      
-      pressure.clear(); 
-      tau1.clear();     
-      tau2.clear();     
-      temperature.clear(); 
-      dTdn.clear();     
-      ip_quality.clear();     
+
+      elemIdx.clear();     elemIdx.shrink_to_fit();
+      ifab.clear();        ifab.shrink_to_fit();
+      lev.clear();         lev.shrink_to_fit();
+      rank.clear();        rank.shrink_to_fit();
+      elemfound.clear();   elemfound.shrink_to_fit();
+
+      pressure.clear();    pressure.shrink_to_fit();
+      tau1.clear();        tau1.shrink_to_fit();
+      tau2.clear();        tau2.shrink_to_fit();
+      temperature.clear(); temperature.shrink_to_fit();
+      dTdn.clear();        dTdn.shrink_to_fit();
+      ip_quality.clear();  ip_quality.shrink_to_fit();
   }
 
   // Explicitly release memory

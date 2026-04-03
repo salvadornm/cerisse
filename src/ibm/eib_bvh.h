@@ -316,6 +316,10 @@ using inside_t = InsideTester;
 inline bool read_stl_ascii  (const std::string& filename, TriMesh& mesh);
 inline bool read_stl_binary (const std::string& filename, TriMesh& mesh);
 
+/// Vertex deduplication tolerance: coordinates are rounded to 1/STL_INV_TOL
+/// (i.e. 1e-7 length units) before hashing to merge coincident STL vertices.
+static constexpr Real STL_INV_TOL = Real(1e7);
+
 /// Vertex key for spatial deduplication
 struct VertexKey {
     int64_t x, y, z;
@@ -373,14 +377,13 @@ inline bool read_stl (const std::string& filename, TriMesh& mesh) {
 inline bool read_stl_ascii (const std::string& filename, TriMesh& mesh) {
     std::ifstream ifs(filename);
     if (!ifs.good()) return false;
-    const Real inv_tol = Real(1e7);
     std::vector<Point> verts;
     std::vector<GpuArray<int,3>> fcs;
     std::unordered_map<VertexKey, int, VertexKeyHasher> vertex_map;
     auto get_or_add = [&](Real x, Real y, Real z) -> int {
-        VertexKey key{static_cast<int64_t>(std::round(x * inv_tol)),
-                      static_cast<int64_t>(std::round(y * inv_tol)),
-                      static_cast<int64_t>(std::round(z * inv_tol))};
+        VertexKey key{static_cast<int64_t>(std::round(x * STL_INV_TOL)),
+                      static_cast<int64_t>(std::round(y * STL_INV_TOL)),
+                      static_cast<int64_t>(std::round(z * STL_INV_TOL))};
         auto it = vertex_map.find(key);
         if (it != vertex_map.end()) return it->second;
         int idx = static_cast<int>(verts.size());
@@ -419,7 +422,6 @@ inline bool read_stl_binary (const std::string& filename, TriMesh& mesh) {
         amrex::Print() << "read_stl_binary: Invalid triangle count in " << filename << "\n";
         return false;
     }
-    const Real inv_tol = Real(1e7);
     std::vector<Point> verts;
     std::vector<GpuArray<int,3>> fcs;
     std::unordered_map<VertexKey, int, VertexKeyHasher> vertex_map;
@@ -428,9 +430,9 @@ inline bool read_stl_binary (const std::string& filename, TriMesh& mesh) {
     fcs.reserve(num_triangles);
     auto get_or_add = [&](float x, float y, float z) -> int {
         Real rx = static_cast<Real>(x), ry = static_cast<Real>(y), rz = static_cast<Real>(z);
-        VertexKey key{static_cast<int64_t>(std::round(rx * inv_tol)),
-                      static_cast<int64_t>(std::round(ry * inv_tol)),
-                      static_cast<int64_t>(std::round(rz * inv_tol))};
+        VertexKey key{static_cast<int64_t>(std::round(rx * STL_INV_TOL)),
+                      static_cast<int64_t>(std::round(ry * STL_INV_TOL)),
+                      static_cast<int64_t>(std::round(rz * STL_INV_TOL))};
         auto it = vertex_map.find(key);
         if (it != vertex_map.end()) return it->second;
         int idx = static_cast<int>(verts.size());
@@ -604,10 +606,8 @@ inline bool read_polygon_2d (const std::string& filename, Polygon2D& poly, Real 
         amrex::Print() << "Info: Removed " << n_dups << " duplicate vertices (tol="
                        << eps_dedup << ") in " << filename << "\n";
     }
-    // Use std::vector for all building; bulk-assign to Polygon2D at the end
-    // to avoid per-element push_back on Gpu::ManagedVector (very slow with CUDA)
+    // Bulk-assign to Polygon2D (uses Gpu::ManagedVector — avoid per-element push_back with CUDA)
     std::vector<Point> staging(clean.begin(), clean.end());
-    // Bulk-assign to Polygon2D (which uses Gpu::ManagedVector — avoid per-element push_back)
     poly.assign(staging);
     if (poly.size() < 3) {
         amrex::Print() << "read_polygon_2d: Need at least 3 vertices (found "

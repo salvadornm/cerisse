@@ -10,22 +10,6 @@ using namespace amrex;
 Real CNS::advance(Real time, Real dt, int /*iteration*/, int /*ncycle*/) {
   BL_PROFILE("CNS::advance()");
 
-  // Print() << " oo CNS::advance " << std::endl;
-  // Print() << "time = " << time << std::endl;
-  // Print() << "dt = " << dt << std::endl;
-  // Print() << "stages_rk = " << stages_rk << std::endl;
-  // Print() << "order_rk = " << order_rk << std::endl;
-  // Print() << " num_state_data_types= " << num_state_data_types << std::endl;
-  
-  // state[0].printTimeInterval(std::cout);
-
-  // for (int i = 0; i < num_state_data_types; ++i) {
-  //   state[i].allocOldData();
-  //   state[i].swapTimeLevels(dt);
-  // }
-
-
-
   state[0].allocOldData();
   state[0].swapTimeLevels(dt);
   
@@ -34,7 +18,6 @@ Real CNS::advance(Real time, Real dt, int /*iteration*/, int /*ncycle*/) {
 
   int ncons = d_prob_closures->NCONS;
   int nghost= d_prob_closures->NGHOST;
-  // MultiFab dSdt(grids,dmap,ncons,0,MFInfo(),Factory());
   MultiFab Stemp(grids,dmap,ncons,nghost,MFInfo(),Factory());
 
   FluxRegister* fr_as_crse = nullptr;
@@ -49,9 +32,11 @@ Real CNS::advance(Real time, Real dt, int /*iteration*/, int /*ncycle*/) {
   }
 
 #ifdef AMREX_USE_GPIBM
-  // Moving geometry: update vertex positions, rebuild BVH and markers/GPs
+  // Moving-geometry update: advance vertex positions to t^{n+1}, rebuild BVH
+  // and GP markers, then restore conservative data in newly exposed (solid→fluid)
+  // cells to avoid downstream NaN propagation.
   if (CNS::ib_move) {
-    // Save old markers to detect solid→fluid transitions
+    // Snapshot pre-move markers to detect solid→fluid transitions
     auto& mfab_pre = *IBM::ib.bmf_a[level];
     FabArray<BaseFab<uint8_t>> old_markers(
         mfab_pre.boxArray(), mfab_pre.DistributionMap(),
@@ -69,7 +54,7 @@ Real CNS::advance(Real time, Real dt, int /*iteration*/, int /*ncycle*/) {
     IBM::ib.rebuildGeometryData();
     rebuildIBM();
 
-    // Fix cells freshly exposed by geometry movement (solid → fluid)
+    // Initialise state in cells newly exposed by the moving boundary
     IBM::ib.fixExposedCells(old_markers, S1, level);
   }
 #endif
@@ -107,21 +92,14 @@ Real CNS::advance(Real time, Real dt, int /*iteration*/, int /*ncycle*/) {
     compute_rhs(Stemp, dt, fr_as_crse, fr_as_fine);
     MultiFab::LinComb(S2, Real(1.0), S1, 0, dt, Stemp, 0, 0, ncons, 0);
   } else if (order_rk == 2) {
-    // Low storage SSPRKm2 with m stages (C = m-1, Ceff=1-1/m). Where C is the
-    // SSPRK coefficient, it also represents the max CFL over the whole
-    // integration step (including m stages). From pg 84 Strong Stability
-    // Preserving Runge–kutta And Multistep Time Discretizations
+    // Low-storage SSP-RK(m,2): m stages, C=m-1, C_eff=1-1/m.
+    // Ref: Gottlieb et al., "Strong Stability Preserving Runge-Kutta and
+    // Multistep Time Discretizations", §4.2.
     int m = stages_rk;
-    // Copy to S2 from S1
     MultiFab::Copy(S2, S1, 0, 0, ncons, 0);
     state[0].setOldTimeLevel(time);
     state[0].setNewTimeLevel(time);
-    // first to m-1 stages
-    // Print() << "-------- before RK stages -------" << std::endl;
-    // Print() << "time = " << time << std::endl;
-    // Print() << "dt = " << dt << std::endl;
-    // state[0].printTimeInterval(std::cout);
-    // Print() << "---------------------------------" << std::endl;
+    // First m-1 forward-Euler increments
     for (int i = 1; i <= m - 1; i++) {
       FillPatch(*this, Stemp, nghost, time + dt * Real(i - 1) / (m - 1),
                 State_Type, 0, ncons);
@@ -139,23 +117,14 @@ Real CNS::advance(Real time, Real dt, int /*iteration*/, int /*ncycle*/) {
     MultiFab::LinComb(S2, Real(1.0) / m, S1, 0, Real(1.0) / m, S2, 0, 0, ncons,
                       0);
 
-    state[State_Type].setNewTimeLevel(
-        time + dt);  // important to do this for correct fillpatch
-                     // interpolations for the proceeding stages
-
-    // Print() << "--------- after RK stages --------" << std::endl;
-    // Print() << "time = " << time << std::endl;
-    // Print() << "dt = " << dt << std::endl;
-    // state[0].printTimeInterval(std::cout);
-    // Print() << "----------------------------------" << std::endl;
+    state[State_Type].setNewTimeLevel(time + dt);
   }
 
   // default
   else if (order_rk == 3) {
     if (stages_rk == 3) {
+      // SSP-RK(3,3): http://ketch.github.io/numipedia/methods/SSPRK33.html
       state[0].setOldTimeLevel(time);
-      // http://ketch.github.io/numipedia/methods/SSPRK33.html
-      // state[0].setOldTimeLevel (time);
       FillPatch(*this, Stemp, nghost, time, State_Type, 0,
                 ncons);  // filled at t_n to evalulate f(t_n,y_n).
       compute_rhs(Stemp, dt, fr_as_crse, fr_as_fine);
@@ -185,9 +154,8 @@ Real CNS::advance(Real time, Real dt, int /*iteration*/, int /*ncycle*/) {
     }
 
     else if (stages_rk == 4) {
-      // http://ketch.github.io/numipedia/methods/SSPRK43.html and From pg 85
-      // Strong Stability Preserving Runge–kutta And Multistep Time
-      // Discretizations
+      // SSP-RK(4,3): http://ketch.github.io/numipedia/methods/SSPRK43.html
+      // Ref: Gottlieb et al., §4.2, p. 85.
 
       state[0].setOldTimeLevel(time);
       FillPatch(*this, Stemp, nghost, time, State_Type, 0, ncons);
@@ -223,23 +191,19 @@ Real CNS::advance(Real time, Real dt, int /*iteration*/, int /*ncycle*/) {
     }
 
     else {
-      // Low storage SSPRKm3 with m=n^2, n>=3 stages (C=2, Ceff=0.5). From pg 85
-      // Strong Stability Preserving Runge–kutta And Multistep Time
-      // Discretizations
-      // TODO Generally SSPRK(n^2,3) where n>2 - Ceff=1-1/n
-      Print() << "SSPRK(m^2)3 not implemented yet" << std::endl;
-      exit(0);
+      // General SSP-RK(n^2, 3), n>2: C=2, C_eff=1-1/n (not yet implemented).
+      // Ref: Gottlieb et al., §4.2, p. 85.
+      amrex::Abort("SSPRK(n^2,3) with n>2 is not yet implemented");
     }
 
   }
 
 #ifdef AMREX_USE_GPIBM
-  // End-of-advance IBM fixup: convert GP cells back from (possibly stale)
-  // conservative values to correct primitive values, then write back as
-  // conservatives.  This is necessary because:
-  //   - computeNewDt/maxEigen scans ALL cells for CFL; stale GP cons → NaN.
-  //   - printTotal integrates ALL cells.
-  //   - FillPatch for sub-cycling / fine-level data uses S2 directly.
+  // End-of-step GP correction: recompute ghost-point primitive states and
+  // overwrite the corresponding conservative entries in S2.  Required because
+  // the RK accumulation writes stale values into GP cells, and subsequent
+  // operations (CFL estimation, total-energy diagnostics, FillPatch for AMR
+  // sub-cycling) scan all cells without distinguishing fluid from ghost points.
   {
     const PROB::ProbClosures& cls_h = *CNS::h_prob_closures;
     const PROB::ProbClosures* cls_d = CNS::d_prob_closures;
@@ -279,10 +243,5 @@ Real CNS::advance(Real time, Real dt, int /*iteration*/, int /*ncycle*/) {
   }
 #endif
 
-  // else if (order_rk == 4) {
-  //   Print() << "SSPRK4 not implemented yet" << std::endl;
-  //   exit(0);
-  //   // TODO: SSPRK(10,4) C=6, Ceff=0.6
-  // }
   return dt;
 }

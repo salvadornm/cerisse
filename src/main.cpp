@@ -107,6 +107,10 @@ int main(int argc, char* argv[])
 
   BL_PROFILE_VAR_STOP(pmain);
 
+#ifdef AMREX_USE_GPIBM
+  IBM::ib.cleanup();  // release arena memory before Finalize destroys arenas
+#endif
+
   amrex::Finalize();
 
   return 0;

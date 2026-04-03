@@ -29,12 +29,12 @@ void CNS::compute_rhs(MultiFab& statemf, Real dt, FluxRegister* fr_as_crse, Flux
 
   // time
   const Real cur_time = state[State_Type].curTime();
-  
-  //PROB::ProbRHS prob_rhs;  //  local RHS object, lives only in this function
-  //prob_rhs.init_coeffs();  // initialize diffusion coefficients if needed
 
 #ifdef AMREX_USE_GPIBM
-  // Pre-compute level-wide prims and apply IB ghost-cell values in a single kernel
+  // Convert conserved variables to primitives level-wide, then apply IBM
+  // ghost-point corrections in a single pass before the MFIter loop.
+  // This avoids redundant per-fab conversions and ensures all ghost-point
+  // data are consistent when each fab's flux kernel executes.
   MultiFab prims_mf(statemf.boxArray(), statemf.DistributionMap(),
                     cls_h.NPRIM, cls_h.NGHOST,
                     MFInfo().SetArena(The_Async_Arena()));
@@ -143,10 +143,12 @@ void CNS::compute_rhs(MultiFab& statemf, Real dt, FluxRegister* fr_as_crse, Flux
     ParallelFor(bxg, cls_h.NCONS, [=] AMREX_GPU_DEVICE (int i, int j, int k, int n) noexcept
       {state(i,j,k,n) = 0.0;});
 
-    // Geometry-aware finite-volume divergence computed on-the-fly in the same
-    // kernel (no temporary volume/area arrays).
-    // - Cartesian: uses constant areas/volume derived from dx.
-    // - RZ (2D): uses cylindrical metrics in (r,z) with r = prob_lo[0] + i*dr.
+    // Geometry-aware finite-volume flux divergence.  Metrics are evaluated
+    // per-cell inside the kernel, avoiding temporary volume/area arrays.
+    //   Cartesian : standard uniform-cell form, dU/dt += (F_lo - F_hi)/dx.
+    //   RZ (2D)   : cylindrical (r,z) with r_i = prob_lo[0] + (i+1/2)*dr;
+    //               the r-flux term uses the metric-consistent form
+    //               -(1/r) d(rF_r)/dr ≈ 2(r_lo F_lo - r_hi F_hi)/(r_hi^2 - r_lo^2).
     const auto dx = geom.CellSizeArray();
     const auto prob_lo = geom.ProbLoArray();
 
@@ -160,9 +162,9 @@ void CNS::compute_rhs(MultiFab& statemf, Real dt, FluxRegister* fr_as_crse, Flux
 
     const bool is_rz = geom.IsRZ();
 
-    // Performance note: computing geometric metrics per conserved component
-    // (4D ParallelFor) is wasteful when NCONS is large (e.g. many species).
-    // Use a 3D kernel and loop over n to reuse V/A metrics.
+    // Performance note: a 3D kernel with an inner loop over components reuses
+    // per-cell metrics across all NCONS equations, avoiding redundant metric
+    // evaluations that would arise from a 4D (i,j,k,n) ParallelFor.
     const int ncons = cls_h.NCONS;
 
     if (is_rz) {
@@ -188,10 +190,9 @@ void CNS::compute_rhs(MultiFab& statemf, Real dt, FluxRegister* fr_as_crse, Flux
                     // r2diff = r_hi^2 - r_lo^2 = (r_hi + r_lo)*(r_hi - r_lo)
                     //        = (r_hi + r_lo) * dr
                     const Real r2diff = (r_hi + r_lo) * dr;
-                    // With r0=0 and i>=0, r2diff is strictly positive. Keep a tiny
-                    // positive floor to avoid division-by-zero if future setups
-                    // violate this assumption. Use a Real-typed floor to work for
-                    // both float and double builds.
+                    // For well-posed RZ problems prob_lo[0]=0 and i>=0, so
+                    // r2diff is strictly positive; the floor guards against
+                    // pathological setups and is inactive in normal use.
                     const Real tiny = amrex::max(std::numeric_limits<Real>::min(), Real(1.0e-14) * dr * dr);
                     const Real inv_r2diff = Real(1.0) / amrex::max(r2diff, tiny);
                     const Real tiny_r = Real(1.0e-14) * dr;
@@ -251,13 +252,11 @@ void CNS::compute_rhs(MultiFab& statemf, Real dt, FluxRegister* fr_as_crse, Flux
 #endif
     }
 
-    // RZ-only geometric viscous source terms (e.g. hoop stress) that are not captured by the
-    // metric FV divergence of the r/z face fluxes.
+    // RZ viscous geometric source (hoop-stress and related terms) not captured
+    // by the metric FV divergence of the face fluxes.
+    // The IBM/EB variant is pending; viscous RZ-IBM cases should not use this path.
     if (is_rz) {
-    #if (AMREX_USE_GPIBM || CNS_USE_EB)
-        // TODO: implement rz_geometric_source_ibm
-        // prob_rhs.rz_geometric_source_ibm(geom, mfi, prims, state, cls_d, geoMarkers);
-    #else
+    #if !(AMREX_USE_GPIBM || CNS_USE_EB)
         prob_rhs.rz_geometric_source(geom, mfi, prims, state, cls_d);
     #endif
     }
@@ -291,10 +290,10 @@ void CNS::compute_rhs(MultiFab& statemf, Real dt, FluxRegister* fr_as_crse, Flux
     }                    
 #endif 
 
-    // Source terms
+    // Source terms (body forces, chemistry, etc.)
     prob_rhs.src(geom,mfi, prims, state, cls_d, dt, cur_time);
 
-    // Set solid point RHS to 0  (state hold RHS at this point)
+    // Zero the RHS inside solid cells (state holds RHS at this point)
 #if (AMREX_USE_GPIBM || CNS_USE_EB)
         amrex::ParallelFor(bxg,
         [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept
@@ -309,25 +308,6 @@ void CNS::compute_rhs(MultiFab& statemf, Real dt, FluxRegister* fr_as_crse, Flux
             }
         });
 #endif
- 
-
-    // TODO: IBM::set_solid_state(mfi,state,cls_d)
-
-
-    // // Flux register
-    // if (do_reflux) {
-    //   const auto dx = geom.CellSizeArray();
-    //   if (fr_as_fine) {
-    //     fr_as_fine->FineAdd(mfi,
-    //                         {AMREX_D_DECL(&fluxes[0], &fluxes[1], &fluxes[2])},
-    //                         dx.data(), dtsub, RunOn::Device);
-    //   }
-    //   if (fr_as_crse) {
-    //     fr_as_crse->CrseAdd(mfi,
-    //                         {AMREX_D_DECL(&fluxes[0], &fluxes[1], &fluxes[2])},
-    //                         dx.data(), dtsub, RunOn::Device);
-    //   }
-    // }
   }
  
 }

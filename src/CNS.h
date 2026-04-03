@@ -101,11 +101,6 @@ class CNS : public amrex::AmrLevel {
   // init
   CNS& getLevel(int lev) { return dynamic_cast<CNS&>(parent->getLevel(lev)); }
 
-  // enum StateVariable {
-  //     Density = 0, Xmom, Ymom, Zmom, Etot
-  // };
-
-
   enum StateDataType { State_Type = 0, Stats_Type, Cost_Type };
 
   void buildMetrics();
@@ -203,7 +198,7 @@ class CNS : public amrex::AmrLevel {
   static bool use_LES;
 
  public:
-  /*static inline*/ PROB::ProbRHS prob_rhs;   // removed (we now use a local object in compute_rhs)
+  PROB::ProbRHS prob_rhs;   // per-level RHS object (Euler + diffusive + source functors)
   static PROB::ProbClosures* h_prob_closures;
   static PROB::ProbClosures* d_prob_closures;
   static PROB::ProbParm* h_prob_parm;

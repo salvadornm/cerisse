@@ -53,9 +53,7 @@ BCRec *CNS::d_phys_bc = nullptr;
 // needed for CNSBld - derived from LevelBld (abstract class, pure virtual
 // functions must be implemented)
 
-CNS::CNS() {
-  // prob_rhs.init();
-}
+CNS::CNS() {}
 
 CNS::CNS(Amr &papa, int lev, const Geometry &level_geom, const BoxArray &bl,
          const DistributionMapping &dm, Real time)
@@ -75,8 +73,6 @@ CNS::CNS(Amr &papa, int lev, const Geometry &level_geom, const BoxArray &bl,
   buildMetrics();
 
   rz_sanity_check(Geom());
-
-  // prob_rhs.init();
 };
 
 CNS::~CNS() {}
@@ -159,8 +155,8 @@ void CNS::read_params() {
 
   }
 
-#if AMREX_USE_GPIBM
-  // specific keywords for IB boundaries
+#ifdef AMREX_USE_GPIBM
+  // IBM-specific input keywords (ib.* namespace)
   ParmParse ppib("ib");
   if (!ppib.query("move", ib_move)) {
     amrex::Abort("ib.move not specified (0=false, 1=true)");
@@ -168,13 +164,10 @@ void CNS::read_params() {
   if (!ppib.query("plot_surf", plot_surf)) {
     amrex::Abort("ib.plot_surf not specified (0=false, 1=true)");
   }
-
-  // surface plot options
   if (plot_surf) {
     ppib.query("surf_int", surf_int);
     ppib.query("surf_file", surf_filename);
   }
-
 #endif
   
 #if CNS_USE_EB 
@@ -609,74 +602,42 @@ void CNS::postCoarseTimeStep(Real time) {
 
   // amrex::Print() << " oo CNS::postCoarseTimeStep " << std::endl;
 
-#if AMREX_USE_GPIBM
-  // Loop over all levels to compute surface data (for plotting and/or FSI loads)
-  for (int lev = 0; lev <= parent->finestLevel(); ++lev) {
-      CNS& level_obj = dynamic_cast<CNS&>(parent->getLevel(lev));
-      
-      int istep = parent->levelSteps(0);
-      
-      if (plot_surf && (istep % surf_int == 0)) {
-          // This computes SURFs and writes to file
-          level_obj.writeSurfFile();
-      } else {
-          // computeSURFs currently disabled; skip the expensive FillPatch.
-          // When computeSURFs is re-enabled, uncomment the FillPatch below.
-          // MultiFab& Sdata = level_obj.get_new_data(State_Type); 
-          // int ncons = CNS::d_prob_closures->NCONS;
-          // int nghost= CNS::d_prob_closures->NGHOST;
-          // Real cur_time = level_obj.state[State_Type].curTime();
-          // FillPatch(level_obj, Sdata, nghost, cur_time, State_Type, 0, ncons);
-          // const PROB::ProbClosures* cls_d = CNS::d_prob_closures;
-          // IBM::ib.computeSURFs(Sdata, cls_d, lev);
+#ifdef AMREX_USE_GPIBM
+  // Surface output at user-specified step interval
+  const int istep = parent->levelSteps(0);
+  if (plot_surf && (istep % surf_int == 0)) {
+      for (int lev = 0; lev <= parent->finestLevel(); ++lev) {
+          dynamic_cast<CNS&>(parent->getLevel(lev)).writeSurfFile();
       }
   }
-
-  // Calculate and print FSI loads and properties
-  if (ParallelDescriptor::IOProcessor()) {
-      amrex::Print() << "\n=== FSI Loads (Step " << parent->levelSteps(0) << ", Time " << time << ") ===\n";
-  }
-
-  auto& ib = IBM::ib;
-  int ngeom = ib.ngeom;
 
 #ifdef CNS_USE_FSI
-  for (int i = 0; i < ngeom; ++i) {
-      // 1. Rigid Body Properties (from inputs or auto-computed from geometry)
-      auto props = FSI::RigidBodyProperties::readOrCompute(ib.geom_a[i], i);
-
-      // 2. Aerodynamic Loads
-      auto loads = FSI::Kinematics::computeLoads(i, props.xcenter);
-
-      // 3. Output
-      if (ParallelDescriptor::IOProcessor()) {
-          amrex::Print() << "Geometry " << i << ":\n";
-          amrex::Print() << "  Mass: " << props.mass << "\n";
-          amrex::Print() << "  Center of Mass: " << props.xcenter << "\n";
-          amrex::Print() << "  Inertia Tensor:\n";
-          for(int r=0; r<3; ++r) {
-              amrex::Print() << "    [ " << props.inertia[r][0] << ", " << props.inertia[r][1] << ", " << props.inertia[r][2] << " ]\n";
-          }
-          amrex::Print() << "  Fluid Force: " << loads.force << "\n";
-          amrex::Print() << "  Fluid Moment (about CM): " << loads.moment << "\n";
-          amrex::Print() << "----------------------------------------\n";
-      }
+  // Report aerodynamic loads on each IBM geometry
+  {
+    auto& ib = IBM::ib;
+    if (ParallelDescriptor::IOProcessor()) {
+        amrex::Print() << "\n=== FSI Loads (Step " << istep
+                       << ", Time " << time << ") ===\n";
+    }
+    for (int i = 0; i < ib.ngeom; ++i) {
+        auto props = FSI::RigidBodyProperties::readOrCompute(ib.geom_a[i], i);
+        auto loads = FSI::Kinematics::computeLoads(i, props.xcenter);
+        if (ParallelDescriptor::IOProcessor()) {
+            amrex::Print() << "Geometry " << i << ":\n"
+                           << "  Mass: " << props.mass << "\n"
+                           << "  Center of Mass: " << props.xcenter << "\n"
+                           << "  Fluid Force: " << loads.force << "\n"
+                           << "  Fluid Moment (about CM): " << loads.moment << "\n"
+                           << "----------------------------------------\n";
+        }
+    }
   }
-#endif
-
-#endif
-
-   // make sure species sum to 1??
-
-
+#endif  // CNS_USE_FSI
+#endif  // AMREX_USE_GPIBM
 
   if (verbose && ((this->nStep() % nstep_screen_output) == 0)) {
     printTotal();
   }
-
-  // print surface
-
-
 }
 // -----------------------------------------------------------------------------
 
