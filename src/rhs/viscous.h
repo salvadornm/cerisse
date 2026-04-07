@@ -178,14 +178,14 @@ class viscous_t {
       auto const& flx = flxt[dir]->array(); 
 
       // Yosihizawa model  tau_kk
-      if constexpr(useLES)
-      {
-        Real Delta = cls->calc_delta(dx); // compute filter width
-        amrex::ParallelFor(bxgnodal,
-                  [=,*this] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {                     
-                    flx(i,j,k,cls_t::UMX+dir) += cls->compute_xisgs(i,j,k,dir,prims, dxinv, Delta);
-                  });        
-      }
+      // if constexpr(useLES)
+      // {
+      //   Real Delta = cls->calc_delta(dx); // compute filter width
+      //   amrex::ParallelFor(bxgnodal,
+      //             [=,*this] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {                     
+      //               flx(i,j,k,cls_t::UMX+dir) += cls->compute_xisgs(i,j,k,dir,prims, dxinv, Delta);
+      //             });        
+      // }
 
       // compute diffusion fluxes
 #if (AMREX_USE_GPIBM || CNS_USE_EB )   

@@ -41,10 +41,21 @@ class reactor_source_t {
    * @param dt     The time step size. (react() requires it to be non-const)
    */
   // https://www.codeproject.com/Articles/48575/How-to-Define-a-Template-Class-in-a-h-File-and-Imp
+    
+#if (AMREX_USE_GPIBM || CNS_USE_EB )     
+  void inline src(const Geometry& geomdata, const amrex::MFIter& mfi,
+                  const amrex::Array4<const amrex::Real>& prims,
+                  const amrex::Array4<amrex::Real>& rhs, const cls_t* cls_d,
+                  amrex::Real dt, amrex::Real real_time, const Array4<uint8_t>& marker) {
+#else
   void inline src(const Geometry& geomdata, const amrex::MFIter& mfi,
                   const amrex::Array4<const amrex::Real>& prims,
                   const amrex::Array4<amrex::Real>& rhs, const cls_t* cls_d,
                   amrex::Real dt, amrex::Real real_time) {
+#endif
+
+
+
     if (!m_initialized) amrex::Abort("reactor_t not initialised");
 
     // amrex::Print() << "reactor_t::src()" << std::endl;
