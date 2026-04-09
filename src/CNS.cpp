@@ -64,6 +64,7 @@ CNS::CNS(Amr &papa, int lev, const Geometry &level_geom, const BoxArray &bl,
 
 #ifdef AMREX_USE_GPIBM
   IBM::ib.build_mf(grids, dmap, level);
+  IBM::ib.computeMarkers(level);
 #endif
 
 #ifdef CNS_USE_EB

@@ -8,9 +8,9 @@
 #include <AMReX_ParmParse.H>
 #include <AMReX_Print.H>
 
-// GeomType is Polygon2D (2D) or TriMesh (3D), defined in bvh_types.h
-// Already included transitively via eib.h -> eib_data.h -> eib_bvh.h -> bvh.h -> bvh_types.h
-#include <bvh_types.h>
+// GeomType is Polygon2D (2D) or TriMesh (3D), defined in ibm_bvh_defs.h
+// Already included transitively via ibm_solver.h -> ibm_containers.h -> ibm_backend_bvh.h -> ibm_bvh.h -> ibm_bvh_defs.h
+#include <ibm_bvh_defs.h>
 
 using namespace amrex;
 

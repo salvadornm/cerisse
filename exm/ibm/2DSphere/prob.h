@@ -7,10 +7,10 @@
 #include <AMReX_AmrLevel.H>
 #include <Closures.h>
 #include <RHS.h>
-#include <eib.h>
+#include <ibm_solver.h>
 #include <ratio>
 #include <Constants.h>
-#include <ib_walltypes.h>
+#include <ibm_wallmodel.h>
 
 
 using namespace amrex;
@@ -109,7 +109,7 @@ typedef rhs_dt<riemann_t<false, ProbClosures>, no_diffusive_t, no_source_t> Prob
 
 // IBM wall model: adiabatic slip wall
 typedef ibm_adiabatic_slip_wall_t<ibmparm_t, ProbClosures> TypeWall;
-typedef eib_t<TypeWall, ibmparm_t, ProbClosures> ProbIB;
+typedef ibm_solver_t<TypeWall, ibmparm_t, ProbClosures> ProbIB;
 
 // Static geometry: no kinematic update required
 inline void update_geometry(Real /*time*/,

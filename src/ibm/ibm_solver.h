@@ -1,22 +1,22 @@
-#ifndef eib_H_
-#define eib_H_
+#ifndef IBM_SOLVER_H_
+#define IBM_SOLVER_H_
 
 #include <AMReX_Scan.H>
 #include <AMReX_Reduce.H>
 
-#include "eib_data.h"
+#include "ibm_containers.h"
 
 #include <iomanip>  // std::setprecision, std::fixed
 
 //===================================================================================
 ///-------------------------------- main class --------------------------------------
 ///
-/// \brief eib_t is explicit geometry (triangulation based) immersed boundary method
+/// \brief ibm_solver_t is explicit geometry (triangulation based) immersed boundary method
 /// class. It holds an array of IBMultiFab, one for each AMR level; and it also holds
 /// the geometry
 ///
 template <typename wallmodel, typename param, typename cls_t>
-class eib_t
+class ibm_solver_t
 {
 public:
   // constant factor for image point
@@ -85,7 +85,7 @@ public:
   /** 
    * \brief Destructor to release allocated memory
    */
-  ~eib_t() noexcept
+  ~ibm_solver_t() noexcept
   {
     // Release per-level IBMultiFab pointers if any remain
     for (auto*& p : bmf_a) {
@@ -199,7 +199,7 @@ public:
   {
     // Prevent memory leak if MF already exists
     if (lev < 0 || lev >= static_cast<int>(bmf_a.size())) {
-        amrex::Abort("eib_t::build_mf: lev is out of bounds");
+        amrex::Abort("ibm_solver_t::build_mf: lev is out of bounds");
     }
 
     // Prevent memory leak if MF already exists
@@ -316,7 +316,7 @@ public:
       // GPU path: ParallelFor for solid + ghost markers
       // ================================================================
       AMREX_ALWAYS_ASSERT_WITH_MESSAGE(ngeom <= MAX_NGEOM,
-          "ngeom exceeds MAX_NGEOM; increase MAX_NGEOM in eib.h");
+          "ngeom exceeds MAX_NGEOM; increase MAX_NGEOM in ibm_containers.h");
 
       // Pre-extract GPU-friendly views (trivially-copyable POD structs)
       GpuArray<InsideTesterView, MAX_NGEOM> inout_views;
@@ -467,7 +467,7 @@ public:
    * 5. Projects "Image Points" (IMs) into the fluid domain along the surface normal.
    * 6. Computes trilinear interpolation weights and indices for these Image Points.
    *
-   * All computed data is stored in the `gpData` structure for use in boundary condition reconstruction.
+   * All computed data is stored in the level-wide `GPStore` (CSR layout) for use in boundary condition reconstruction.
    *
    * \param lev The current AMR level index.
    */
@@ -484,7 +484,7 @@ public:
 
     // Pre-build GPU-capturable BVHQueryViews for each geometry
     AMREX_ALWAYS_ASSERT_WITH_MESSAGE(ngeom <= MAX_NGEOM,
-        "ngeom exceeds MAX_NGEOM; increase MAX_NGEOM in eib.h");
+        "ngeom exceeds MAX_NGEOM; increase MAX_NGEOM in ibm_containers.h");
     GpuArray<BVHQueryView, MAX_NGEOM> bqv;
     GpuArray<int, MAX_NGEOM + 1> geom_off;
     for (int ii = 0; ii < ngeom; ii++) {
@@ -743,8 +743,8 @@ public:
 
 #endif // AMREX_USE_GPU
 
-    // Optional: shrink GPStore if over-allocated
-    gpstore.shrink();
+    // NOTE: gpstore.shrink() disabled — shrink_to_fit() on PODVector
+    // corrupts data on some platforms (observed with AMReX ManagedVector on CPU).
 
     // Print GP reconstruction quality diagnostics
     // reportGPDiagnostics(lev);
@@ -966,6 +966,7 @@ public:
     // No snapshot needed: GPs write only to ghost cells (ibMarkers==1)
     // while image-point interpolation reads only from fluid cells (ibMarkers==0).
     auto& mfab = *bmf_a[lev];
+
     Gpu::DeviceVector<Array4<Real>> d_prims(nfabs_local);
     {
       Vector<Array4<Real>> h_prims(nfabs_local);
@@ -982,6 +983,7 @@ public:
     // Single kernel launch over all ghost points on this level
     auto* copy = this;
     const int total_ngps = gpview.total_ngps;
+    const int num_lframes = static_cast<int>(LocalFrame_a.size());
 
     ParallelFor(total_ngps, [=] AMREX_GPU_DEVICE (int ii) noexcept
     {
@@ -1024,7 +1026,7 @@ public:
       }
 
       // 5) Apply wall model at IB surface
-      eib_detail::dispatch_compute_surfIB<eorder_tparm, wallmodel>(
+      ibm_detail::dispatch_compute_surfIB<eorder_tparm, wallmodel>(
           gpview.ib_xyz[ii], nvec, t1vec, t2vec, primsNormal, type_solid_bc, cls);
 
       // 6) Extrapolate from surface/image points back to ghost point
@@ -1225,9 +1227,10 @@ public:
     *
     * \param lev AMR level
     */
-  void computeSurfIndices(int lev) 
+  void computeSurfIndices(int lev)
   {
-    // local rank of this process
+    BL_PROFILE("IBM::computeSurfIndices");
+
     int myrank = amrex::ParallelDescriptor::MyProc();
     amrex::Print()  << "Compute Surface Index at LEVEL " << lev  << std::endl;
 
@@ -1243,31 +1246,39 @@ public:
     const auto& domain = amr_p->Geom(lev).Domain();
 
     // ========================================================================
-    // Phase 0: Initialize surfimp_soa structure
+    // Phase 0: Initialize surfimp_soa / surfphys_soa
     // ========================================================================
-    // Ensure surfimp_soa is sized correctly and reset (replicated storage)
-    // The surface data structure is build from finest to coarsest level, so reset only at the finest level.
     if (lev == amr_p->finestLevel()) {
       if ((surfimp_soa.elemIdx.size() != ntotalfaces) || (surfphys_soa.elemIdx.size() != ntotalfaces)) {
         surfimp_soa.resize(ntotalfaces);
         surfphys_soa.resize(ntotalfaces);
-      } 
-
-      // If size is already correct, reset metadata at level finestLevel
+      }
       surfphys_soa.reset();
     }
-    
+
     // ========================================================================
-    // Phase 1: Build spatial lookup structures
+    // Phase 1: Build per-FAB lookup structures
     // ========================================================================
-    
-    // fab arrays and boxes for fast access
     Vector<Array4<uint8_t const>> fab_markers(nfab_local);
     Vector<Box> fab_bxg(nfab_local);
-    
-    // Map from global box index to local fab index
-    // Initialize with -1 (not local)
     Vector<int> global_to_local_fab(nfab_global, -1);
+
+    for (MFIter mfi(mfab, false); mfi.isValid(); ++mfi) {
+        int lidx = mfi.LocalIndex();
+        int gidx = mfi.index();
+        fab_markers[lidx] = mfab.const_array(mfi);
+        fab_bxg[lidx] = mfi.growntilebox(cls_t::NGHOST);
+        global_to_local_fab[gidx] = lidx;
+    }
+
+    // ========================================================================
+    // Phase 2: Fast locate — assign each face to a FAB (lightweight)
+    //
+    // This pass only does centroid→cell→FAB lookup and writes metadata.
+    // The heavy image-point computation is deferred to Phase 3.
+    // ========================================================================
+    // Per-face FAB assignment: >=0 means locally owned, -1 means not local
+    std::vector<int> face_local_fab(ntotalfaces, -1);
 
     int faces_found = 0;
     int faces_out_domain = 0;
@@ -1275,196 +1286,169 @@ public:
     int faces_out_rank   = 0;
     int faces_in_finer   = 0;
 
-    for (MFIter mfi(mfab, false); mfi.isValid(); ++mfi) {
+    // Precompute inverse dx for faster centroid→cell conversion
+    amrex::GpuArray<Real, AMREX_SPACEDIM> inv_dx;
+    for (int d = 0; d < AMREX_SPACEDIM; ++d) {
+        inv_dx[d] = Real(1.0) / dx_a[lev][d];
+    }
 
-        int lidx = mfi.LocalIndex();
-        int gidx = mfi.index(); // Global index of the box
-        
-        fab_markers[lidx] = mfab.const_array(mfi);
-        fab_bxg[lidx] = mfi.growntilebox(cls_t::NGHOST);
+    {
+      std::vector<std::pair<int, Box>> isects;
 
-        global_to_local_fab[gidx] = lidx;
+      for (int f_idx = 0; f_idx < ntotalfaces; ++f_idx) {
+
+        // Skip faces already assigned to a finer level
+        if (surfphys_soa.elemfound[f_idx] && surfphys_soa.lev[f_idx] > lev) {
+            faces_in_finer++;
+            continue;
+        }
+
+        // Convert centroid to cell index
+        const SurfElem& surfelem = SurfElem_a[f_idx];
+        IntVect iv;
+        for (int d = 0; d < AMREX_SPACEDIM; ++d) {
+            iv[d] = static_cast<int>(std::floor(
+                    (surfelem.centroid[d] - prob_lo[d]) * inv_dx[d]));
+        }
+
+        if (!domain.contains(iv)) { faces_out_domain++; continue; }
+
+        ba_global.intersections(Box(iv, iv), isects, true, IntVect::TheZeroVector());
+        if (isects.empty()) { faces_out_level++; continue; }
+
+        int gidx       = isects[0].first;
+        int owner_rank = dm[gidx];
+        int local_fab  = global_to_local_fab[gidx];
+
+        surfphys_soa.ifab[f_idx] = local_fab;
+        surfphys_soa.rank[f_idx] = owner_rank;
+        surfphys_soa.lev[f_idx]  = lev;
+
+        if (owner_rank != myrank) {
+            surfphys_soa.elemfound[f_idx] = -1;
+            faces_out_rank++;
+            continue;
+        }
+
+        surfphys_soa.elemfound[f_idx] = 1;
+        face_local_fab[f_idx] = local_fab;
+        faces_found++;
+      }
+    } // isects freed here
+
+    // ========================================================================
+    // Phase 3: Group locally-owned faces by FAB for cache locality
+    //
+    // Faces in the same FAB access the same ibMarkers array.  Processing
+    // them together keeps marker data in cache and avoids thrashing when
+    // calling search_optimal_image_point / computeIPweights.
+    // ========================================================================
+    std::vector<std::vector<int>> fab_faces(nfab_local);
+    for (int f_idx = 0; f_idx < ntotalfaces; ++f_idx) {
+        if (face_local_fab[f_idx] >= 0) {
+            fab_faces[face_local_fab[f_idx]].push_back(f_idx);
+        }
     }
 
     // ========================================================================
-    // Phase 2: Process all surface elements
+    // Phase 4: Compute image points and interpolation weights per FAB
+    //
+    // Each face writes exclusively to its own f_idx slot in surfimp_soa /
+    // surfphys_soa — no cross-face data dependencies.  The inner helpers
+    // (search_optimal_image_point, computeIPweights) are stateless and
+    // thread-safe, so the outer FAB loop is safe to parallelize with OpenMP.
     // ========================================================================
-
-    // Cache for box intersections to avoid repeated allocations
-    std::vector<std::pair<int, Box>> isects;
-
-    // Loop over all surface elements (faces/edges)
-    for (int f_idx = 0; f_idx < ntotalfaces; ++f_idx) {
-
-      // Prevent overwriting data by a coarser level if it was already processed (whatever by MyProc process or others)
-      if (surfphys_soa.elemfound[f_idx] && surfphys_soa.lev[f_idx] > lev) {
-          faces_in_finer++;
-          continue; 
-      }
-
-      // Get geometry data from pre-computed arrays
-      const LocalFrame& localframe = LocalFrame_a[f_idx];
-      const SurfElem& surfelem = SurfElem_a[f_idx];
-
-      Array1D<Real, 0, AMREX_SPACEDIM - 1> surf_xyz;
-      Array1D< int, 0, AMREX_SPACEDIM - 1> surf_ijk;
-      
-      // Compute face/edge centroid coordinates and indices
-      for (int d = 0; d < AMREX_SPACEDIM; ++d) {
-        surf_xyz(d) = surfelem.centroid[d];
-        surf_ijk(d) = static_cast<int>(std::floor(
-                      (surf_xyz(d) - prob_lo[d]) / dx_a[lev][d]));
-      }
-
-#if (AMREX_SPACEDIM == 2)
-      IntVect iv(surf_ijk(0), surf_ijk(1));
-#elif (AMREX_SPACEDIM == 3)
-      IntVect iv(surf_ijk(0), surf_ijk(1), surf_ijk(2));
+#ifdef AMREX_USE_OMP
+#pragma omp parallel for schedule(dynamic, 1)
 #endif
+    for (int lfab = 0; lfab < nfab_local; ++lfab) {
+      const auto& flist = fab_faces[lfab];
+      if (flist.empty()) continue;
 
-      // 1. Check if point is in global domain
-      if (!domain.contains(iv)) {
-        faces_out_domain++;
-        continue;
-      }
+      // Pin the marker array and box for this FAB — all faces in flist
+      // will read from this same data, maximizing cache reuse.
+      auto const ibMarkers = fab_markers[lfab];
+      auto const bxg       = fab_bxg[lfab];
 
-      // 2. Find global box index using BoxArray::intersections
-      // This uses the internal hash map for O(1) lookup
-      ba_global.intersections(Box(iv, iv), isects, true, IntVect::TheZeroVector());
-      if (isects.empty()) {
-          faces_out_level++; // face/edge not found in this level
-          continue;
-      }
-      int gidx       = isects[0].first;
-      int owner_rank = dm[gidx];
-      int local_fab  = global_to_local_fab[gidx];
+      for (int f_idx : flist) {
+        surfimp_soa.elemIdx[f_idx]  = f_idx;
+        surfphys_soa.elemIdx[f_idx] = f_idx;
 
-      // Store ownership metadata: Global Box Index, Level, and Owner Rank
-      surfphys_soa.ifab[f_idx] = local_fab;
-      surfphys_soa.rank[f_idx] = owner_rank;
-      surfphys_soa.lev[f_idx] = lev;
+        const LocalFrame& localframe = LocalFrame_a[f_idx];
+        const SurfElem&   surfelem   = SurfElem_a[f_idx];
 
-      // 3. Check if this box is local to this process
-      if (owner_rank != myrank) {
-          // This surface element is not owned by this process but elsewhere this level 
-          // continue to next element
-          surfphys_soa.elemfound[f_idx] = -1; 
-          faces_out_rank++;
-          continue;
-      }
-
-      surfphys_soa.elemfound[f_idx] = 1; // true
-      faces_found++;
-
-      // Store basic metadata if element is found locally
-      // Currently, elemIdx[f_idx] is identical to f_idx because surface elements are replicated on all ranks.
-      // However, in a future distributed implementation where each rank only stores a subset of faces,
-      // f_idx (local loop index) will differ from the global elemIdx.
-      // We explicitly store elemIdx to maintain the mapping to the global geometry.
-      surfimp_soa.elemIdx[f_idx] = f_idx;
-      surfphys_soa.elemIdx[f_idx] = f_idx;
-
-#if (AMREX_SPACEDIM == 2)
-      Point surf_centroid{surf_xyz(0), surf_xyz(1)};
-#else
-      Point surf_centroid{surf_xyz(0), surf_xyz(1), surf_xyz(2)};
-#endif
-
-      // local fab information
-      auto const ibMarkers = fab_markers[local_fab];
-      auto const bxg = fab_bxg[local_fab];
-
-      // Temporary storage for this face's image point data
-      Array2D<Real, 0, eorder_tparm_surf - 1, 0, IDIM> imp_xyz;
-      Array2D< int, 0, eorder_tparm_surf - 1, 0, IDIM> imp_ijk;
-      Array1D<Real, 0, eorder_tparm_surf - 1> disIM;
-      Array1D< int, 0, eorder_tparm_surf - 1> imp_ninterp;
-
-      // loop over image points for this face
-      for (int jj = 0; jj < eorder_tparm_surf; jj++) {
-
-        // Starting point for this image point:
-        //   - for jj = 0: use the face/edge centroid
-        //   - for jj > 0: start from the previous image point position
-        Point cp_start;
-        if (jj == 0) {
-          cp_start = surf_centroid;
-        } else {
+        // Build centroid Point
 #ifdef AMREX_USE_CGAL
 #if (AMREX_SPACEDIM == 2)
-          cp_start = Point(imp_xyz(jj - 1, 0), imp_xyz(jj - 1, 1));
+        Point surf_centroid(surfelem.centroid[0], surfelem.centroid[1]);
 #else
-          cp_start = Point(imp_xyz(jj - 1, 0), imp_xyz(jj - 1, 1), imp_xyz(jj - 1, 2));
+        Point surf_centroid(surfelem.centroid[0], surfelem.centroid[1], surfelem.centroid[2]);
 #endif
 #else
-          for (int d = 0; d < AMREX_SPACEDIM; ++d) cp_start[d] = imp_xyz(jj - 1, d);
+        Point surf_centroid;
+        for (int d = 0; d < AMREX_SPACEDIM; ++d) surf_centroid[d] = surfelem.centroid[d];
 #endif
-        }
-      
-        if (jj == 0) {
-          // =======================================================
-          // First image point: try multiple distances (based on N_ATTEMPTS and IMP_FACTOR) and take the best one
-          //   - candidate 1: IMP_FACTOR[0] * di_a[lev]
-          //   - candidate 2: IMP_FACTOR[1] * di_a[lev] (only if candidate 1 is not ideal)
-          //   - candidate x: ......
-          // select the first candidate that yields enough fluid points,
-          // or the candidate with the maximum number of fluid points.
-          // if no candidates has fluid points more than INTERP_THRESHOLD_SURF, abort
-          // =======================================================
-          search_optimal_image_point<eorder_tparm_surf, iorder_tparm_surf>(
-                                        cp_start, localframe, 
-                                        lev, prob_lo, dx_a[lev], di_a_surf[lev],
-                                        bxg, ibMarkers, 
-                                        surfimp_soa, f_idx,
-                                        imp_xyz, imp_ijk, disIM, imp_ninterp);
-        } 
-        else {
-          // =======================================================
-          // Subsequent image points:
-          //   - move one more di_a[lev] along the normal from the previous image point
-          //   - no optimization, no multiple attempts, never abort even if not enough interp points found
-          //   - only check that the image point stays inside the grown box
-          //   - mark as invalid if it leaves the box, set number of interp points to -1.
-          // =======================================================
-          search_image_point<eorder_tparm_surf, iorder_tparm_surf>(
-                                    jj, cp_start, localframe, 
-                                    lev, prob_lo, dx_a[lev], di_a_surf[lev],
-                                    bxg, ibMarkers, 
-                                    surfimp_soa, f_idx,
-                                    imp_xyz, imp_ijk, disIM, imp_ninterp);
-        } // end if 
-      } // end loop on image points
 
-      // Push computed image point data
-      surfimp_soa.imp_xyz[f_idx] = imp_xyz;
-      surfimp_soa.imp_ijk[f_idx] = imp_ijk;
-      surfimp_soa.disIM[f_idx] = disIM;
-      surfimp_soa.imp_ninterp[f_idx] = imp_ninterp;
-      
-      // interpolation quality based on first image point
-      surfphys_soa.ip_quality[f_idx] = imp_ninterp(0); 
+        // Temporary storage for this face's image point data
+        Array2D<Real, 0, eorder_tparm_surf - 1, 0, IDIM> imp_xyz;
+        Array2D< int, 0, eorder_tparm_surf - 1, 0, IDIM> imp_ijk;
+        Array1D<Real, 0, eorder_tparm_surf - 1> disIM;
+        Array1D< int, 0, eorder_tparm_surf - 1> imp_ninterp;
 
-      // Compute and push interpolation weights
-      // We need to allocate space for weights first
-      Array3D< int, 0, eorder_tparm_surf - 1, 0, N_InterP_surf - 1, 0, IDIM> imp_ip_ijk;
-      Array2D<Real, 0, eorder_tparm_surf - 1, 0, N_InterP_surf - 1> imp_ipweights;
+        for (int jj = 0; jj < eorder_tparm_surf; jj++) {
+          Point cp_start;
+          if (jj == 0) {
+            cp_start = surf_centroid;
+          } else {
+#ifdef AMREX_USE_CGAL
+#if (AMREX_SPACEDIM == 2)
+            cp_start = Point(imp_xyz(jj - 1, 0), imp_xyz(jj - 1, 1));
+#else
+            cp_start = Point(imp_xyz(jj - 1, 0), imp_xyz(jj - 1, 1), imp_xyz(jj - 1, 2));
+#endif
+#else
+            for (int d = 0; d < AMREX_SPACEDIM; ++d) cp_start[d] = imp_xyz(jj - 1, d);
+#endif
+          }
 
-      computeIPweights<eorder_tparm_surf, iorder_tparm_surf, SURFIMP>(
-          imp_ipweights, 
-          imp_ip_ijk, 
-          imp_xyz, 
-          imp_ijk, 
-          imp_ninterp,
-          prob_lo, dx_a[lev], ibMarkers);
-          
-      surfimp_soa.imp_ip_ijk[f_idx] = imp_ip_ijk;
-      surfimp_soa.imp_ipweights[f_idx] = imp_ipweights;
+          if (jj == 0) {
+            search_optimal_image_point<eorder_tparm_surf, iorder_tparm_surf>(
+                                          cp_start, localframe,
+                                          lev, prob_lo, dx_a[lev], di_a_surf[lev],
+                                          bxg, ibMarkers,
+                                          surfimp_soa, f_idx,
+                                          imp_xyz, imp_ijk, disIM, imp_ninterp);
+          }
+          else {
+            search_image_point<eorder_tparm_surf, iorder_tparm_surf>(
+                                      jj, cp_start, localframe,
+                                      lev, prob_lo, dx_a[lev], di_a_surf[lev],
+                                      bxg, ibMarkers,
+                                      surfimp_soa, f_idx,
+                                      imp_xyz, imp_ijk, disIM, imp_ninterp);
+          }
+        } // end loop on image points
 
-    } // end loop over faces
+        surfimp_soa.imp_xyz[f_idx]     = imp_xyz;
+        surfimp_soa.imp_ijk[f_idx]     = imp_ijk;
+        surfimp_soa.disIM[f_idx]       = disIM;
+        surfimp_soa.imp_ninterp[f_idx] = imp_ninterp;
+        surfphys_soa.ip_quality[f_idx] = imp_ninterp(0);
 
-    // Surface construct from finest level to coarsest level right now, 
-    // so build csr when level == 0,
-    // If reverse order is preferred, build csr when level == amr_p->finestLevel().
+        Array3D< int, 0, eorder_tparm_surf - 1, 0, N_InterP_surf - 1, 0, IDIM> imp_ip_ijk;
+        Array2D<Real, 0, eorder_tparm_surf - 1, 0, N_InterP_surf - 1> imp_ipweights;
+
+        computeIPweights<eorder_tparm_surf, iorder_tparm_surf, SURFIMP>(
+            imp_ipweights, imp_ip_ijk,
+            imp_xyz, imp_ijk, imp_ninterp,
+            prob_lo, dx_a[lev], ibMarkers);
+
+        surfimp_soa.imp_ip_ijk[f_idx]    = imp_ip_ijk;
+        surfimp_soa.imp_ipweights[f_idx] = imp_ipweights;
+      } // end loop over faces in this FAB
+    } // end loop over FABs
+
+    // Build CSR at the coarsest level (surface is built from finest to coarsest)
     if (lev == 0) buildCSR();
 
   }
@@ -1577,7 +1561,7 @@ public:
 
       // 5) Apply wall model at IB surface (fills primsNormal slot 1)
       int type_solid_bc = 0;
-      eib_detail::dispatch_compute_surfIB<eorder_tparm_surf, wallmodel>(
+      ibm_detail::dispatch_compute_surfIB<eorder_tparm_surf, wallmodel>(
           xyz, nvec, t1vec, t2vec, primsNormal, type_solid_bc, cls);
 
       // 6) Extract surface quantities
@@ -1617,13 +1601,11 @@ public:
 private:
 
   // Interpolation, extrapolation, coordinate-transform helpers
-  // (definitions physically in eib_interp.h for readability)
-  #include "eib_interp.h"
+  #include "ibm_solver_interp.h"
 
   // Geometry I/O, VTK output, MPI gather, CSR builder
-  // (definitions physically in eib_io.h for readability)
-  #include "eib_io.h"
+  #include "ibm_solver_io.h"
 
-}; // end class eib_t
+}; // end class ibm_solver_t
 
-#endif // eib_H_
+#endif // IBM_SOLVER_H_

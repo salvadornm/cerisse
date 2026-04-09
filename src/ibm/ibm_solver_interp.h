@@ -1,11 +1,11 @@
-#ifndef EIB_INTERP_H_
-#define EIB_INTERP_H_
+#ifndef IBM_SOLVER_INTERP_H_
+#define IBM_SOLVER_INTERP_H_
 // ============================================================================
-// eib_interp.h — Interpolation, extrapolation, and coordinate-transform helpers
+// ibm_solver_interp.h — Interpolation, extrapolation, and coordinate-transform helpers
 //
 // This file contains in-class definitions for private member
-// functions of eib_t.  It is included inside the class body of eib_t in eib.h and must NOT
-// be included independently.
+// functions of ibm_solver_t.  It is included inside the class body in ibm_solver.h
+// and must NOT be included independently.
 //
 // Contents:
 //   1. valid_mirror              — Count fluid cells in an interpolation stencil
@@ -515,4 +515,4 @@ bool check_interpolation_stencil(
     }
     return is_valid;
 }
-#endif // EIB_INTERP_H_
+#endif // IBM_SOLVER_INTERP_H_

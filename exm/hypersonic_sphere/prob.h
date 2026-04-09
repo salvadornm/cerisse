@@ -7,7 +7,7 @@
 #include <AMReX_AmrLevel.H>
 #include <Closures.h>
 #include <RHS.h>
-#include <eib.h>
+#include <ibm_solver.h>
 #include <ratio>
 
 namespace PROB {
@@ -35,7 +35,7 @@ typedef rhs_dt<weno_t<ReconScheme::WenoZ5, ProbClosures>, no_diffusive_t, no_sou
     ProbRHS;
 
 typedef std::ratio<5,5> d_image;
-typedef eib_t<1,1,d_image,ProbClosures> ProbIB;
+typedef ibm_solver_t<1,1,d_image,ProbClosures> ProbIB;
 
 void inline inputs() {
   ParmParse pp;

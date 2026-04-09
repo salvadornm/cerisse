@@ -1,8 +1,8 @@
-#ifndef BVH_H_
-#define BVH_H_
+#ifndef IBM_BVH_H_
+#define IBM_BVH_H_
 
 // ============================================================================
-// bvh.h — BVH algorithmic code
+// ibm_bvh.h — BVH algorithmic code
 //
 // Implements all algorithmic (functional) BVH logic:
 //   1. Morton encoding  : namespace morton (morton_code, expand_bits_*)
@@ -11,7 +11,7 @@
 //                         closest_point_query() (CPU/GPU stack traversal)
 // ============================================================================
 
-#include "bvh_types.h"
+#include "ibm_bvh_defs.h"
 
 #include <numeric>
 #include <vector>
@@ -521,4 +521,4 @@ private:
     }
 };
 
-#endif // BVH_H_
+#endif // IBM_BVH_H_

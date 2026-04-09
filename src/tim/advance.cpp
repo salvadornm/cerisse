@@ -3,7 +3,7 @@
 #include <prob.h>
 
 #ifdef AMREX_USE_GPIBM
-#include <eib.h>
+#include <ibm_solver.h>
 #endif
 using namespace amrex;
 

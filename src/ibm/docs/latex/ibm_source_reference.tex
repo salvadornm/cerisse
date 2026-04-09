@@ -1,0 +1,77 @@
+\documentclass[11pt,a4paper]{article}
+
+\usepackage[margin=2.5cm]{geometry}
+\usepackage{booktabs}
+\usepackage{longtable}
+\usepackage{array}
+\usepackage{hyperref}
+\usepackage{enumitem}
+
+\newcolumntype{L}[1]{>{\raggedright\arraybackslash}p{#1}}
+
+\title{\textbf{Source Reference for the Immersed Boundary Module (\texttt{src/ibm/})}}
+\author{CERISSE Project}
+\date{\today}
+
+\begin{document}
+\maketitle
+
+\section{Overview}
+
+The IBM module is organized as a layered custom BVH stack integrated with AMReX.
+The active geometry backend is the custom implementation in \texttt{bvh\_defs.h},
+\texttt{bvh.h}, and \texttt{eib\_bvh.h}. Legacy CGAL material remains as reference
+code in \texttt{eib\_cgal.h}, but the production IBM path is the BVH path.
+
+\section{File Layout}
+
+\renewcommand{\arraystretch}{1.2}
+\begin{longtable}{@{}L{3.5cm}L{10.2cm}@{}}
+\toprule
+\textbf{File} & \textbf{Role} \\
+\midrule
+\endfirsthead
+\toprule
+\textbf{File} & \textbf{Role} \\
+\midrule
+\endhead
+\texttt{bvh\_defs.h} & Core data definitions: \texttt{Point}, \texttt{Vec}, \texttt{BoundedSide}, \texttt{AABB}, \texttt{ClosestPointResult}, \texttt{BVHNode}, \texttt{TriMesh}/\texttt{Polygon2D}, \texttt{LocalFrame}, \texttt{SurfElem}. \\
+\texttt{bvh.h} & BVH algorithms: Morton encoding, primitive closest-point utilities, BVH build, BVH closest-point queries on CPU/GPU. \\
+\texttt{eib\_bvh.h} & IBM/BVH bridge: \texttt{InsideTester} + \texttt{InsideTesterView}, geometry readers (STL/OFF/polygon), cache builders, geometry consistency checks. \\
+\texttt{eib\_data.h} & IBM solver data containers and constants: \texttt{gpData\_t}, \texttt{surfImp\_t}, \texttt{surfPhys\_t}, \texttt{FaceCSR}, interpolation thresholds and factors. \\
+\texttt{eib.h} & Main solver class template \texttt{eib\_t<wallmodel,param,cls\_t>} and runtime kernels: markers, ghost-point setup, GP reconstruction, surface reconstruction/output. \\
+\texttt{eib\_io.h} & Geometry-loading stage called by \texttt{eib\_t::init}: reads \texttt{ib.filename}, builds BVH, initializes in/out testers, builds flattened surface caches. \\
+\texttt{eib\_interp.h} & Interpolation/image-point search helpers used by GP and SURF reconstruction. \\
+\texttt{IBMultiFab.h} & IBM-specific FAB/MultiFab containers combining marker fields and per-FAB ghost-point SoA payload. \\
+\texttt{ib\_walltypes.h} & Wall model templates used by \texttt{compute\_surfIB} dispatch. \\
+\texttt{eib\_geometry\_bvh.h} & Compatibility forwarding header to \texttt{eib\_bvh.h}. \\
+\texttt{eib\_bvh\_geom.h} & Compatibility forwarding header to \texttt{eib\_bvh.h}. \\
+\texttt{bvh\_spatial\_index.h} & Compatibility forwarding header to \texttt{bvh.h}. \\
+\bottomrule
+\end{longtable}
+
+\section{Primary Runtime Path}
+
+\begin{enumerate}[nosep]
+  \item \texttt{main.cpp}: calls \texttt{IBM::ib.init(\&amr)}.
+  \item \texttt{eib\_t::init}: computes level metrics (\texttt{dx\_a}, \texttt{diag\_a}, \texttt{di\_a}) and calls \texttt{read\_geom()}.
+  \item \texttt{read\_geom} (in \texttt{eib\_io.h}):
+  \begin{itemize}[nosep]
+    \item reads files from \texttt{ib.filename},
+    \item builds \texttt{geom\_a[i]} and \texttt{bvh\_a[i]},
+    \item constructs \texttt{inside\_t} for each geometry,
+    \item builds flattened \texttt{SurfElem\_a}/\texttt{LocalFrame\_a} and \texttt{geom\_offsets}.
+  \end{itemize}
+  \item \texttt{computeMarkers}: classifies solid/ghost cells (GPU path available with AMReX ParallelFor).
+  \item \texttt{initialiseGPs}: builds per-ghost-point geometric/interpolation metadata.
+\end{enumerate}
+
+\section{Notes on 2-D and 3-D}
+
+\begin{itemize}[nosep]
+  \item In 3-D, \texttt{InsideTesterView} uses BVH-guided ray/closest-point logic on triangle faces.
+  \item In 2-D, \texttt{InsideTesterView} now supports BVH-accelerated polygon edge culling for inside/outside and boundary checks.
+  \item Both dimensions share the same dataflow in \texttt{eib\_t}, with geometry-specific logic selected by \texttt{AMREX\_SPACEDIM}.
+\end{itemize}
+
+\end{document}

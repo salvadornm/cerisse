@@ -1,12 +1,12 @@
-#ifndef EIB_IO_H_
-#define EIB_IO_H_
+#ifndef IBM_SOLVER_IO_H_
+#define IBM_SOLVER_IO_H_
 
 // ============================================================================
-// eib_io.h — Geometry I/O, VTK output, MPI gather, and CSR builder
+// ibm_solver_io.h — Geometry I/O, VTK output, MPI gather, and CSR builder
 //
-// This file contains in-class definitions for member functions of eib_t.
-// It is #include'd INSIDE the class body in eib.h and must NOT be included
-// independently.
+// This file contains in-class definitions for member functions of ibm_solver_t.
+// It is #include'd INSIDE the class body in ibm_solver.h and must NOT be
+// included independently.
 //
 // Contents:
 //   1. gatherSurfData   — MPI Gatherv of surface physical data to rank 0
@@ -628,4 +628,4 @@ void read_geom()
     }
 }
 
-#endif // EIB_IO_H_
+#endif // IBM_SOLVER_IO_H_

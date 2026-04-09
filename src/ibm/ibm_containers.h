@@ -1,11 +1,12 @@
-#ifndef EIB_DATA_H_
-#define EIB_DATA_H_
+#ifndef IBM_CONTAINERS_H_
+#define IBM_CONTAINERS_H_
 
 // ============================================================================
-// eib_data.h — Data structures, constants, and helper types for the EIB solver
+// ibm_containers.h — Container types, constants, and helper types for the IBM solver
 //
 // Contains:
-//   1. eib_detail namespace : SFINAE helpers for wall-model dispatch
+//   0. IBFab / IBMultiFab  : IBM-specific AMR containers
+//   1. ibm_detail namespace: SFINAE helpers for wall-model dispatch
 //   2. ipow()              : Constexpr integer power
 //   3. Constants           : Dimension indices, thresholds, image-point factors
 //   4. gpData_t            : SoA storage for ghost-point data
@@ -16,25 +17,106 @@
 //   9. CheckMode           : Interpolation stencil check policy
 // ============================================================================
 
+#include <algorithm>
 #include <limits>
 #include <type_traits>
 #include <utility>
 
-#include <IBMultiFab.h>
+#include <AMReX_FabArray.H>
+#include <AMReX_MultiFab.H>
 #include <AMReX_GpuContainers.H>
 #include <AMReX_IntVect.H>
 
 #ifdef AMREX_USE_CGAL
-#include "eib_cgal.h"
+#include "ibm_backend_cgal.h"
 #else
-#include "eib_bvh.h"
+#include "ibm_backend_bvh.h"
 #endif
+
+// ============================================================================
+// 0. IBFab / IBMultiFab — IBM-specific AMR containers
+// ============================================================================
+
+/// \brief IBFab holds marker data and ghost point data
+/// \tparam marker_t Type of the marker data (typically uint8_t)
+/// \tparam gp_t     Type of the ghost point data (gpData_t)
+template<typename marker_t, typename gp_t>
+class IBFab : public amrex::BaseFab<marker_t> {
+public:
+  gp_t gpData;
+
+  // Primary ctor: allocates marker array, gpData starts empty.
+  explicit IBFab(const amrex::Box& b, int ncomp,
+                 bool alloc = true, bool shared = false, amrex::Arena* ar = nullptr)
+      : amrex::BaseFab<marker_t>(b, ncomp, alloc, shared, ar) {}
+
+  // MakeType ctor (alias/deep-copy): gpData is NOT carried — aliases are marker-only.
+  explicit IBFab(const IBFab<marker_t, gp_t>& rhs, amrex::MakeType make_type, int scomp, int ncomp)
+      : amrex::BaseFab<marker_t>(rhs, make_type, scomp, ncomp) {}
+
+  ~IBFab() = default;
+
+  // Prevent expensive implicit deep-copy of gpData (contains Gpu::ManagedVector arrays)
+  IBFab(const IBFab&) = delete;
+  IBFab& operator=(const IBFab&) = delete;
+
+  IBFab(IBFab&&) noexcept = default;
+  IBFab& operator=(IBFab&&) noexcept = default;
+};
+
+/// \brief IBMultiFab holds an array of IBFab on a level
+/// \tparam marker_t Type of the marker data
+/// \tparam gp_t     Type of the ghost point data
+template<typename marker_t, typename gp_t>
+class IBMultiFab : public amrex::FabArray<IBFab<marker_t, gp_t>> {
+public:
+  using Fab  = IBFab<marker_t, gp_t>;
+  using Base = amrex::FabArray<Fab>;
+
+  /// \brief Default MFInfo that routes allocation to managed (CPU+GPU) memory.
+  static amrex::MFInfo DataMFInfo() {
+      amrex::MFInfo info;
+      info.SetArena(amrex::The_Managed_Arena());
+      return info;
+  }
+
+  explicit IBMultiFab(
+      const amrex::BoxArray& bxs, const amrex::DistributionMapping& dm, int nvar, int ngrow,
+      const amrex::MFInfo& info = DataMFInfo(),
+      const amrex::FabFactory<Fab>& factory = amrex::DefaultFabFactory<Fab>())
+      : Base(bxs, dm, nvar, ngrow, info, factory) {}
+
+  ~IBMultiFab() = default;
+
+  IBMultiFab(IBMultiFab&&) noexcept = default;
+  IBMultiFab& operator=(IBMultiFab&&) noexcept = default;
+
+  IBMultiFab(const IBMultiFab&) = delete;
+  IBMultiFab& operator=(const IBMultiFab&) = delete;
+
+  /// \brief Copy marker components from this IBMultiFab into a Real MultiFab (e.g. for plotfile).
+  void copytoRealMF(amrex::MultiFab& mf, int ibcomp, int mfcomp) {
+    const int ncomp_copy = std::min(this->nComp() - ibcomp, mf.nComp() - mfcomp);
+    if (ncomp_copy <= 0) return;
+
+    for (amrex::MFIter mfi(*this, amrex::TilingIfNotGPU()); mfi.isValid(); ++mfi) {
+      const amrex::Box& bx = mfi.tilebox();
+      auto const& src = this->get(mfi).array();
+      auto const& dst = mf.array(mfi);
+
+      amrex::ParallelFor(bx, ncomp_copy,
+        [=] AMREX_GPU_DEVICE(int i, int j, int k, int n) noexcept {
+          dst(i, j, k, mfcomp + n) = static_cast<amrex::Real>(src(i, j, k, ibcomp + n));
+        });
+    }
+  }
+};
 
 // ============================================================================
 // 1. SFINAE helpers for wall-model dispatch
 // ============================================================================
 
-namespace eib_detail {
+namespace ibm_detail {
 template <class...>
 using void_t = void;
 
@@ -80,7 +162,7 @@ void dispatch_compute_surfIB(
     }
 }
 
-} // namespace eib_detail
+} // namespace ibm_detail
 
 // ============================================================================
 // 2. Constexpr integer power
@@ -127,113 +209,19 @@ static constexpr int N_ATTEMPTS_GP   = 3;
 static constexpr int N_ATTEMPTS_SURF = 5;   
 
 // ============================================================================
-// 4. gpData_t — Ghost-point data (SoA)
+// 4. gpData_t — Per-FAB ghost-point count (legacy wrapper)
+//
+// Ghost-point geometry and interpolation data are stored in the level-wide
+// GPStore (CSR layout).  gpData_t only retains the per-FAB GP count used
+// during computeMarkers / initialiseGPs bookkeeping.
 // ============================================================================
 
 template <int eorder_tparm, int iorder_tparm>
 struct gpData_t {
-  // CPU only attributes
   gpData_t() : ngps(0) {}
-  int ngps;    
+  int ngps;
 
-  // ideal number of interpolation points for each image point
-  static constexpr int  N_InterP = ipow(iorder_tparm + 1, AMREX_SPACEDIM);
-
-  // GPU/CPU attributes
-  // Ghost point data
-  Gpu::ManagedVector<Array1D< int, 0, IDIM>> gp_ijk;                        // Ghost point indices
-  Gpu::ManagedVector<Array1D<Real, 0, IDIM>> ib_xyz;                        // IB point coordinates
-  Gpu::ManagedVector<Real> disGP;                                           // Distance from IB point to ghost point
-    
-  // Surface identification
-  Gpu::ManagedVector<int> geomIdx;                                          // Geometry index
-  Gpu::ManagedVector<int> elemIdx;                                          // face/edge element index
-
-  // Image point data arrays
-  Gpu::ManagedVector<Array2D<Real, 0, eorder_tparm - 1, 0, IDIM>> imp_xyz;  // Image point coordinates
-  Gpu::ManagedVector<Array2D< int, 0, eorder_tparm - 1, 0, IDIM>> imp_ijk;  // Image point indices
-  Gpu::ManagedVector<Array1D<Real, 0, eorder_tparm - 1>> disIM;             // Distance from IB point to image points
-      
-  // Interpolation data for image points
-  Gpu::ManagedVector<Array1D< int, 0, eorder_tparm - 1>> imp_ninterp;       // Actual number of interpolation points used for each image point
-  Gpu::ManagedVector<Array3D< int, 0, eorder_tparm - 1, 0, N_InterP - 1, 0, IDIM>> imp_ip_ijk;
-  Gpu::ManagedVector<Array2D<Real, 0, eorder_tparm - 1, 0, N_InterP - 1>> imp_ipweights;
-
-  // Helper function to resize all vectors
-  void resize(int n) {
-      ngps = n;
-      
-      gp_ijk.resize(n);
-      ib_xyz.resize(n);
-      disGP.resize(n);
-      
-      geomIdx.resize(n);
-      elemIdx.resize(n);
-
-      imp_xyz.resize(n);
-      imp_ijk.resize(n);
-      disIM.resize(n);
-      
-      imp_ninterp.resize(n);
-      imp_ip_ijk.resize(n);
-      imp_ipweights.resize(n);
-  }
-
-  // Helper function to reserve memory for all vectors
-  void reserve(int n) {
-      gp_ijk.reserve(n);
-      ib_xyz.reserve(n);
-      disGP.reserve(n);
-      
-      geomIdx.reserve(n);
-      elemIdx.reserve(n);
-
-      imp_xyz.reserve(n);
-      imp_ijk.reserve(n);
-      disIM.reserve(n);
-      
-      imp_ninterp.reserve(n);
-      imp_ip_ijk.reserve(n);
-      imp_ipweights.reserve(n);
-  }
-
-  // Clear and free memory
-  void clear() {
-      ngps = 0;
-
-      gp_ijk.clear();      
-      ib_xyz.clear();      
-      disGP.clear();       
-
-      geomIdx.clear();     
-      elemIdx.clear();
-
-      imp_xyz.clear();     
-      imp_ijk.clear();     
-      disIM.clear();       
-
-      imp_ninterp.clear(); 
-      imp_ip_ijk.clear();  
-      imp_ipweights.clear(); 
-  }
-
-  // Explicitly release memory
-  void shrink() {
-      gp_ijk.shrink_to_fit();
-      ib_xyz.shrink_to_fit();
-      disGP.shrink_to_fit();
-      
-      geomIdx.shrink_to_fit();
-      elemIdx.shrink_to_fit();
-
-      imp_xyz.shrink_to_fit();
-      imp_ijk.shrink_to_fit();
-      disIM.shrink_to_fit();
-      
-      imp_ninterp.shrink_to_fit();
-      imp_ip_ijk.shrink_to_fit();
-      imp_ipweights.shrink_to_fit();
-  }
+  void clear() { ngps = 0; }
 };
 
 // ============================================================================
@@ -635,4 +623,4 @@ enum class CheckMode {
     Abort        // Abort execution immediately on failure
 };
 
-#endif // EIB_DATA_H_
+#endif // IBM_CONTAINERS_H_

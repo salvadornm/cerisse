@@ -9,7 +9,7 @@
 #endif
 
 #ifdef AMREX_USE_GPIBM
-#include <eib.h>
+#include <ibm_solver.h>
 #endif
 
 

@@ -7,10 +7,10 @@
 #include <AMReX_AmrLevel.H>
 #include <Closures.h>
 #include <RHS.h>
-#include <eib.h>
+#include <ibm_solver.h>
 #include <ratio>
 #include <Constants.h>
-#include <ib_walltypes.h>
+#include <ibm_wallmodel.h>
 
 
 using namespace amrex;
@@ -96,7 +96,7 @@ typedef rhs_dt<skew_t<skewparm_t,ProbClosures>, viscous_t<methodparm_t, ProbClos
 // IBM templates
 
 typedef ibm_adiabatic_noslip_wall_t<ibmparm_t,ProbClosures> TypeWall;
-typedef eib_t<TypeWall,ibmparm_t,ProbClosures> ProbIB;
+typedef ibm_solver_t<TypeWall,ibmparm_t,ProbClosures> ProbIB;
 
 
 void inline inputs() {

@@ -1,8 +1,8 @@
-#ifndef BVH_TYPES_H_
-#define BVH_TYPES_H_
+#ifndef IBM_BVH_DEFS_H_
+#define IBM_BVH_DEFS_H_
 
 // ============================================================================
-// bvh_types.h — BVH and geometry data structure definitions
+// ibm_bvh_defs.h — BVH and geometry data structure definitions
 //
 // Contains all pure data types used by the BVH acceleration module:
 //   1. Primitive types    : Point, Vec, BoundedSide, AABB, ClosestPointResult
@@ -492,4 +492,4 @@ struct SurfElem {
     }
 };
 
-#endif // BVH_TYPES_H_
+#endif // IBM_BVH_DEFS_H_

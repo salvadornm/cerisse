@@ -10,10 +10,10 @@
 #include <Closures.h>
 #include <RHS.h>
 
-#include <eib.h>
+#include <ibm_solver.h>
 #include <Constants.h>
 #include <NozzleFunctions.h>
-#include <ib_walltypes.h>
+#include <ibm_wallmodel.h>
 #include <numbers>
 
 using namespace amrex;
@@ -122,7 +122,7 @@ template < typename param, typename cls_t > class ibm_user_t;
 
 // IBM templates
 typedef ibm_user_t<ProbParm,ProbClosures> TypeWall;
-typedef eib_t<TypeWall,ibmparm_t,ProbClosures> ProbIB;
+typedef ibm_solver_t<TypeWall,ibmparm_t,ProbClosures> ProbIB;
 
 
 void inline inputs() {

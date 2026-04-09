@@ -1,10 +1,10 @@
-#ifndef EIB_BVH_H_
-#define EIB_BVH_H_
+#ifndef IBM_BACKEND_BVH_H_
+#define IBM_BACKEND_BVH_H_
 
 // ============================================================================
-// eib_bvh.h — EIB-BVH interaction layer
+// ibm_backend_bvh.h — BVH backend implementation
 //
-// Implements the interface between the EIB solver and BVH geometry:
+// Implements the interface between the IBM solver and BVH geometry:
 //   1. InsideTesterView / InsideTester : GPU-compatible inside/outside tests
 //   2. Geometry I/O                   : read_stl, read_off, read_polygon_2d
 //   3. Geometry processing            : build_geometry_cache, convert_inout,
@@ -12,7 +12,7 @@
 //   4. Utility functions              : make_vec, bbox_contains, IB_WarnOnBoundary
 // ============================================================================
 
-#include "bvh.h"
+#include "ibm_bvh.h"
 
 #include <AMReX_Print.H>
 
@@ -904,4 +904,4 @@ void IB_WarnOnBoundary (int ii, int level, int i, int j, int k,
     }
 }
 
-#endif // EIB_BVH_H_
+#endif // IBM_BACKEND_BVH_H_

@@ -104,7 +104,7 @@ ib.filename = sphere_fine_20k.stl
 A IBM header needs to be included i nthe file.
 
 ```cpp
-#include <eib.h>
+#include <ibm_solver.h>
 ```
 
 Together with the required template of IBM

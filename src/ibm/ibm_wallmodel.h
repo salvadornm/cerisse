@@ -1,7 +1,7 @@
-#ifndef ib_walltypes_H_
-#define ib_walltypes_H_
+#ifndef IBM_WALLMODEL_H_
+#define IBM_WALLMODEL_H_
 
-#include <IBMultiFab.h>
+#include <ibm_containers.h>
 #include <AMReX_GpuContainers.H>
 #include <AMReX_IntVect.H>
 #include <AMReX_StateDescriptor.H>
