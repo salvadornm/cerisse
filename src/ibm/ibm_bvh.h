@@ -18,6 +18,12 @@
 #include <algorithm>
 #include <cstdint>
 
+#if defined(AMREX_USE_CUDA)
+#include <thrust/sort.h>
+#include <thrust/device_ptr.h>
+#include <thrust/execution_policy.h>
+#endif
+
 // ============================================================================
 // 1. MORTON ENCODING
 // ============================================================================
@@ -170,17 +176,59 @@ Real point_aabb_distance_sq (const Point& p, const AABB& box) {
 }
 
 // ============================================================================
-// 3. BVHQueryView — GPU-capturable POD for BVH closest-point queries
+// 3. LBVH — GPU-parallel BVH construction (Karras 2012)
 // ============================================================================
 
-/// \brief Trivially-copyable view into BVH + geometry data for GPU kernels.
-struct BVHQueryView {
-    const BVHNode* node_arr = nullptr;
-    int root = -1;
+namespace lbvh {
+
+/// Count leading zeros (portable host/device)
+AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
+int clz32 (uint32_t x) {
+    if (x == 0) return 32;
+#if defined(__CUDA_ARCH__)
+    return __clz(x);
+#elif defined(__GNUC__) || defined(__clang__)
+    return __builtin_clz(x);
+#else
+    int n = 0;
+    if (x <= 0x0000FFFFu) { n += 16; x <<= 16; }
+    if (x <= 0x00FFFFFFu) { n +=  8; x <<=  8; }
+    if (x <= 0x0FFFFFFFu) { n +=  4; x <<=  4; }
+    if (x <= 0x3FFFFFFFu) { n +=  2; x <<=  2; }
+    if (x <= 0x7FFFFFFFu) { n +=  1; }
+    return n;
+#endif
+}
+
+/// Longest common prefix length between sorted Morton codes i and j.
+/// Returns -1 for out-of-range indices.  Extends with index comparison
+/// when codes are identical (Karras 2012, §4).
+AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
+int delta (const uint32_t* codes, int n, int i, int j) {
+    if (j < 0 || j >= n) return -1;
+    uint32_t xi = codes[i], xj = codes[j];
+    if (xi != xj) return clz32(xi ^ xj);
+    return 32 + clz32(static_cast<uint32_t>(i ^ j));
+}
+
+} // namespace lbvh
+
+// ============================================================================
+// 4. BVH4QueryView — GPU-capturable POD for 4-wide closest-point queries
+// ============================================================================
+
+/// \brief Trivially-copyable view into BVH4 + geometry data for GPU kernels.
+///
+/// Traverses the collapsed 4-wide tree.  Each internal node test evaluates
+/// up to 4 child AABBs, sorts by distance, processes leaves inline, and
+/// pushes internal children far-to-near (LIFO → near popped first).
+struct BVH4QueryView {
+    const BVH4Node* node4_arr = nullptr;
+    int root4 = -1;
 
 #if (AMREX_SPACEDIM == 3)
-    const Point*               verts     = nullptr;
-    const GpuArray<int, 3>*    faces_arr = nullptr;
+    const Point*            verts     = nullptr;
+    const GpuArray<int, 3>* faces_arr = nullptr;
 #elif (AMREX_SPACEDIM == 2)
     const Point* verts   = nullptr;
     int          n_verts = 0;
@@ -191,13 +239,93 @@ struct BVHQueryView {
     {
         ClosestPointResult best;
         best.distance = std::numeric_limits<Real>::max();
+        if (root4 < 0 || node4_arr == nullptr || verts == nullptr) return best;
+
+        // BVH4 halves tree depth → smaller stack suffices
+        constexpr int MAX_STACK = 64;
+        int stack[MAX_STACK];
+        int top = 0;
+        stack[top++] = root4;
+        Real best_dist2 = std::numeric_limits<Real>::max();
+
+        while (top > 0) {
+            int idx = stack[--top];
+            const BVH4Node& nd = node4_arr[idx];
+
+            // Compute distance to each child AABB
+            Real dist[4];
+            for (int c = 0; c < nd.n_children; ++c)
+                dist[c] = point_aabb_distance_sq(query, nd.child_box[c]);
+
+            // Insertion-sort children by distance (ascending, max 4 elements)
+            int order[4] = {0, 1, 2, 3};
+            for (int c = 1; c < nd.n_children; ++c) {
+                int key = order[c];
+                Real key_d = dist[key];
+                int j = c - 1;
+                while (j >= 0 && dist[order[j]] > key_d) {
+                    order[j + 1] = order[j];
+                    --j;
+                }
+                order[j + 1] = key;
+            }
+
+            // Pass 1: process leaf children near-to-far (tightens bound early)
+            for (int c = 0; c < nd.n_children; ++c) {
+                int ci = order[c];
+                if (dist[ci] >= best_dist2) break;
+                if (!nd.child_is_leaf(ci)) continue;
+                int pid = nd.child_prim(ci);
 #if (AMREX_SPACEDIM == 3)
-        if (root < 0 || verts == nullptr || faces_arr == nullptr || node_arr == nullptr)
-            return best;
+                const auto& f = faces_arr[pid];
+                Point cp = closest_point_on_triangle(
+                    query, verts[f[0]], verts[f[1]], verts[f[2]]);
 #else
-        if (root < 0 || verts == nullptr || node_arr == nullptr || n_verts < 2)
-            return best;
+                Point cp = closest_point_on_segment(
+                    query, verts[pid], verts[(pid + 1) % n_verts]);
 #endif
+                Real d2 = point_distance_sq(query, cp);
+                if (d2 < best_dist2) {
+                    best_dist2    = d2;
+                    best.point    = cp;
+                    best.prim_id  = pid;
+                    best.distance = std::sqrt(d2);
+                }
+            }
+
+            // Pass 2: push internal children far-to-near (LIFO → near popped first)
+            for (int c = nd.n_children - 1; c >= 0; --c) {
+                int ci = order[c];
+                if (dist[ci] >= best_dist2) continue;
+                if (nd.child_is_leaf(ci)) continue;
+                if (top < MAX_STACK) stack[top++] = nd.child_idx[ci];
+            }
+        }
+        return best;
+    }
+};
+
+/// Legacy binary BVH query view — kept for InsideTester ray-casting
+/// which still traverses the binary tree.
+struct BVHQueryView {
+    const BVHNode* node_arr = nullptr;
+    int root = -1;
+
+#if (AMREX_SPACEDIM == 3)
+    const Point*            verts     = nullptr;
+    const GpuArray<int, 3>* faces_arr = nullptr;
+#elif (AMREX_SPACEDIM == 2)
+    const Point* verts   = nullptr;
+    int          n_verts = 0;
+#endif
+
+    AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
+    ClosestPointResult closest_point_query (const Point& query) const
+    {
+        ClosestPointResult best;
+        best.distance = std::numeric_limits<Real>::max();
+        if (root < 0 || node_arr == nullptr || verts == nullptr) return best;
+
         constexpr int MAX_STACK = 128;
         int stack[MAX_STACK];
         int top = 0;
@@ -217,9 +345,8 @@ struct BVHQueryView {
                     verts[f[0]], verts[f[1]], verts[f[2]]);
 #else
                 int eid = nd.prim_id;
-                Point a = verts[eid];
-                Point b = verts[(eid + 1) % n_verts];
-                Point cp = closest_point_on_segment(query, a, b);
+                Point cp = closest_point_on_segment(query,
+                    verts[eid], verts[(eid + 1) % n_verts]);
 #endif
                 Real d2 = point_distance_sq(query, cp);
                 if (d2 < best_dist2) {
@@ -229,7 +356,6 @@ struct BVHQueryView {
                     best.distance = std::sqrt(d2);
                 }
             } else {
-                // Inline near-first push for both children
                 int left  = nd.left;
                 int right = nd.right;
                 if (left >= 0 && right >= 0) {
@@ -242,15 +368,6 @@ struct BVHQueryView {
                         if (d_left  < best_dist2 && top < MAX_STACK) stack[top++] = left;
                         if (d_right < best_dist2 && top < MAX_STACK) stack[top++] = right;
                     }
-                } else {
-                    auto push_if = [&](int child) {
-                        if (child >= 0 && top < MAX_STACK) {
-                            Real d = point_aabb_distance_sq(query, node_arr[child].box);
-                            if (d < best_dist2) stack[top++] = child;
-                        }
-                    };
-                    push_if(left);
-                    push_if(right);
                 }
             }
         }
@@ -259,26 +376,32 @@ struct BVHQueryView {
 };
 
 // ============================================================================
-// 4. BVH CLASS
+// 5. BVH CLASS — build (CPU recursive + GPU LBVH) + BVH4 collapse
 // ============================================================================
 
-/// \brief Binary BVH tree for closest-point queries.
+/// \brief Binary BVH tree with optional 4-wide collapsed form.
 ///
-/// Built on CPU with Morton code sorting. Traversed on CPU or GPU.
+/// Build: CPU recursive (Morton-sorted median split) or GPU LBVH (Karras 2012).
+/// Query: through BVH4QueryView (collapsed 4-wide) for closest-point,
+///        or BVHQueryView (binary) for InsideTester ray-casting.
 struct BVH {
-    Gpu::ManagedVector<BVHNode> nodes;
-    int root = -1;       ///< Index of root node in nodes[]
-    int num_prims = 0;   ///< Number of leaf primitives
+    Gpu::ManagedVector<BVHNode>  nodes;       ///< Binary tree nodes
+    Gpu::ManagedVector<BVH4Node> nodes4;      ///< Collapsed 4-wide nodes
+    int root      = -1;   ///< Root index in nodes[]
+    int root4     = -1;   ///< Root index in nodes4[]
+    int num_prims = 0;    ///< Number of leaf primitives
 
     bool empty () const { return nodes.empty(); }
 
-    // ----- Build methods (CPU) ------------------------------------------
+    // ----- Build entry points -------------------------------------------
 
-    /// Build from a flat array of primitive bounding boxes.
+    /// Build from primitive bounding boxes.
+    /// Uses GPU LBVH when available, else CPU recursive.
+    /// Always collapses to BVH4 after binary build.
     void build (const std::vector<AABB>& prim_boxes) {
         int n = static_cast<int>(prim_boxes.size());
         num_prims = n;
-        if (n == 0) { root = -1; return; }
+        if (n == 0) { root = -1; root4 = -1; return; }
         if (n == 1) {
             nodes.resize(1);
             nodes[0].box     = prim_boxes[0];
@@ -286,24 +409,16 @@ struct BVH {
             nodes[0].right   = -1;
             nodes[0].prim_id = 0;
             root = 0;
+            collapse_to_bvh4();
             return;
         }
-        AABB scene;
-        for (auto& b : prim_boxes) scene.merge(b);
 
-        std::vector<uint32_t> codes(n);
-        std::vector<int> indices(n);
-        std::iota(indices.begin(), indices.end(), 0);
-        for (int i = 0; i < n; ++i) {
-            codes[i] = morton::morton_code(prim_boxes[i].centroid(), scene);
-        }
-        std::sort(indices.begin(), indices.end(),
-                  [&](int a, int b) { return codes[a] < codes[b]; });
-
-        nodes.resize(2 * n - 1);
-        int next_node = 0;
-        root = build_recursive(indices.data(), 0, n, prim_boxes, next_node);
-        nodes.resize(next_node);
+#ifdef AMREX_USE_GPU
+        build_lbvh(prim_boxes);
+#else
+        build_cpu(prim_boxes);
+#endif
+        collapse_to_bvh4();
     }
 
 #if (AMREX_SPACEDIM == 3)
@@ -322,124 +437,32 @@ struct BVH {
     }
 #endif
 
-    // ----- Query methods (CPU/GPU) --------------------------------------
+    // ----- BVH4QueryView factory (primary query path) -------------------
 
 #if (AMREX_SPACEDIM == 3)
-    /// Find closest point on a TriMesh using BVH stack traversal.
-    AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
-    ClosestPointResult closest_point_query (
-        const Point& query,
-        const Point* verts,
-        const GpuArray<int,3>* faces_arr,
-        const BVHNode* node_arr) const
-    {
-        ClosestPointResult best;
-        best.distance = std::numeric_limits<Real>::max();
-        if (root < 0 || verts == nullptr || faces_arr == nullptr || node_arr == nullptr) {
-            return best;
-        }
-        constexpr int MAX_STACK = 128;
-        int stack[MAX_STACK];
-        int top = 0;
-        stack[top++] = root;
-        Real best_dist2 = std::numeric_limits<Real>::max();
-
-        while (top > 0) {
-            int idx = stack[--top];
-            const BVHNode& nd = node_arr[idx];
-            Real box_dist2 = point_aabb_distance_sq(query, nd.box);
-            if (box_dist2 >= best_dist2) continue;
-            if (nd.is_leaf()) {
-                int fid = nd.prim_id;
-                const auto& f = faces_arr[fid];
-                Point cp = closest_point_on_triangle(query,
-                    verts[f[0]], verts[f[1]], verts[f[2]]);
-                Real d2 = point_distance_sq(query, cp);
-                if (d2 < best_dist2) {
-                    best_dist2    = d2;
-                    best.point    = cp;
-                    best.prim_id  = fid;
-                    best.distance = std::sqrt(d2);
-                }
-            } else {
-                push_children_near_first<MAX_STACK>(query, node_arr, nd.left, nd.right,
-                                                    best_dist2, stack, top);
-            }
-        }
-        return best;
-    }
-#endif
-
-#if (AMREX_SPACEDIM == 2)
-    /// Find closest point on polygon edges using BVH stack traversal.
-    AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
-    ClosestPointResult closest_point_query (
-        const Point& query,
-        const Point* verts,
-        int n_verts,
-        const BVHNode* node_arr) const
-    {
-        ClosestPointResult best;
-        best.distance = std::numeric_limits<Real>::max();
-        if (root < 0 || verts == nullptr || node_arr == nullptr || n_verts < 2) {
-            return best;
-        }
-        constexpr int MAX_STACK = 128;
-        int stack[MAX_STACK];
-        int top = 0;
-        stack[top++] = root;
-        Real best_dist2 = std::numeric_limits<Real>::max();
-
-        while (top > 0) {
-            int idx = stack[--top];
-            const BVHNode& nd = node_arr[idx];
-            Real box_dist2 = point_aabb_distance_sq(query, nd.box);
-            if (box_dist2 >= best_dist2) continue;
-            if (nd.is_leaf()) {
-                int eid = nd.prim_id;
-                Point a = verts[eid];
-                Point b = verts[(eid + 1) % n_verts];
-                Point cp = closest_point_on_segment(query, a, b);
-                Real d2 = point_distance_sq(query, cp);
-                if (d2 < best_dist2) {
-                    best_dist2    = d2;
-                    best.point    = cp;
-                    best.prim_id  = eid;
-                    best.distance = std::sqrt(d2);
-                }
-            } else {
-                push_children_near_first<MAX_STACK>(query, node_arr, nd.left, nd.right,
-                                                    best_dist2, stack, top);
-            }
-        }
-        return best;
-    }
-#endif
-
-    // ---- Convenience overloads that accept geometry objects directly ----
-
-#if (AMREX_SPACEDIM == 3)
-    AMREX_FORCE_INLINE
-    ClosestPointResult closest_point_query (const Point& query, const TriMesh& mesh) const {
-        return closest_point_query(query,
-            mesh.vertices.data(),
-            mesh.faces.data(),
-            nodes.data());
+    BVH4QueryView query_view (const TriMesh& mesh) const {
+        BVH4QueryView v;
+        v.node4_arr = nodes4.data();
+        v.root4     = root4;
+        v.verts     = mesh.vertices.data();
+        v.faces_arr = mesh.faces.data();
+        return v;
     }
 #elif (AMREX_SPACEDIM == 2)
-    AMREX_FORCE_INLINE
-    ClosestPointResult closest_point_query (const Point& query, const Polygon2D& poly) const {
-        return closest_point_query(query,
-            poly.verts.data(),
-            static_cast<int>(poly.verts.size()),
-            nodes.data());
+    BVH4QueryView query_view (const Polygon2D& poly) const {
+        BVH4QueryView v;
+        v.node4_arr = nodes4.data();
+        v.root4     = root4;
+        v.verts     = poly.verts.data();
+        v.n_verts   = static_cast<int>(poly.verts.size());
+        return v;
     }
 #endif
 
-    // ---- BVHQueryView factory methods -----------------------------------
+    // ----- Legacy binary BVHQueryView (for InsideTester) -----------------
 
 #if (AMREX_SPACEDIM == 3)
-    BVHQueryView query_view (const TriMesh& mesh) const {
+    BVHQueryView binary_query_view (const TriMesh& mesh) const {
         BVHQueryView v;
         v.node_arr  = nodes.data();
         v.root      = root;
@@ -448,7 +471,7 @@ struct BVH {
         return v;
     }
 #elif (AMREX_SPACEDIM == 2)
-    BVHQueryView query_view (const Polygon2D& poly) const {
+    BVHQueryView binary_query_view (const Polygon2D& poly) const {
         BVHQueryView v;
         v.node_arr = nodes.data();
         v.root     = root;
@@ -458,47 +481,41 @@ struct BVH {
     }
 #endif
 
-private:
-    template <int MAX_STACK>
-    AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
-    static void push_if_candidate (int child,
-                                   const Point& query,
-                                   const BVHNode* node_arr,
-                                   Real best_dist2,
-                                   int* stack,
-                                   int& top) {
-        if (child < 0) return;
-        if (top >= MAX_STACK) return;
-        const Real d = point_aabb_distance_sq(query, node_arr[child].box);
-        if (d < best_dist2) stack[top++] = child;
+    // ----- Convenience CPU query (uses BVH4 internally) -----------------
+
+#if (AMREX_SPACEDIM == 3)
+    AMREX_FORCE_INLINE
+    ClosestPointResult closest_point_query (const Point& query, const TriMesh& mesh) const {
+        auto v = query_view(mesh);
+        return v.closest_point_query(query);
     }
+#elif (AMREX_SPACEDIM == 2)
+    AMREX_FORCE_INLINE
+    ClosestPointResult closest_point_query (const Point& query, const Polygon2D& poly) const {
+        auto v = query_view(poly);
+        return v.closest_point_query(query);
+    }
+#endif
 
-    template <int MAX_STACK>
-    AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
-    static void push_children_near_first (const Point& query,
-                                          const BVHNode* node_arr,
-                                          int left,
-                                          int right,
-                                          Real best_dist2,
-                                          int* stack,
-                                          int& top) {
-        if (left < 0 || right < 0) {
-            push_if_candidate<MAX_STACK>(left, query, node_arr, best_dist2, stack, top);
-            push_if_candidate<MAX_STACK>(right, query, node_arr, best_dist2, stack, top);
-            return;
-        }
+    // ----- CPU recursive build (Morton-sorted median split) -------------
 
-        const Real d_left  = point_aabb_distance_sq(query, node_arr[left].box);
-        const Real d_right = point_aabb_distance_sq(query, node_arr[right].box);
+    void build_cpu (const std::vector<AABB>& prim_boxes) {
+        int n = static_cast<int>(prim_boxes.size());
+        AABB scene;
+        for (auto& b : prim_boxes) scene.merge(b);
 
-        // LIFO stack: push farther child first so the nearer child is popped first.
-        if (d_left < d_right) {
-            if (d_right < best_dist2 && top < MAX_STACK) stack[top++] = right;
-            if (d_left  < best_dist2 && top < MAX_STACK) stack[top++] = left;
-        } else {
-            if (d_left  < best_dist2 && top < MAX_STACK) stack[top++] = left;
-            if (d_right < best_dist2 && top < MAX_STACK) stack[top++] = right;
-        }
+        std::vector<uint32_t> codes(n);
+        std::vector<int> indices(n);
+        std::iota(indices.begin(), indices.end(), 0);
+        for (int i = 0; i < n; ++i)
+            codes[i] = morton::morton_code(prim_boxes[i].centroid(), scene);
+        std::sort(indices.begin(), indices.end(),
+                  [&](int a, int b) { return codes[a] < codes[b]; });
+
+        nodes.resize(2 * n - 1);
+        int next_node = 0;
+        root = build_recursive(indices.data(), 0, n, prim_boxes, next_node);
+        nodes.resize(next_node);
     }
 
     int build_recursive (const int* sorted, int lo, int hi,
@@ -518,6 +535,212 @@ private:
         nodes[idx].box = nodes[nodes[idx].left].box;
         nodes[idx].box.merge(nodes[nodes[idx].right].box);
         return idx;
+    }
+
+    // ----- GPU LBVH build (Karras 2012) ---------------------------------
+    //
+    // Layout: internal nodes at [0, n-2], leaf nodes at [n-1, 2n-2].
+    // Total 2n-1 BVHNode entries (same as CPU build).
+    // Root is always internal node 0.
+
+    void build_lbvh (const std::vector<AABB>& prim_boxes) {
+        using namespace amrex;
+        const int n = static_cast<int>(prim_boxes.size());
+
+        // --- 1. Scene bounding box ---
+        AABB scene;
+        for (auto& b : prim_boxes) scene.merge(b);
+
+        // --- 2. Upload primitive boxes to device, compute Morton codes ---
+        // Use DeviceVector for GPU-only temporaries (no managed memory page faults).
+        Gpu::DeviceVector<AABB>     d_boxes(n);
+        Gpu::DeviceVector<uint32_t> d_codes(n);
+        Gpu::DeviceVector<int>      d_indices(n);
+
+        Gpu::htod_memcpy(d_boxes.data(), prim_boxes.data(), n * sizeof(AABB));
+
+        auto* box_ptr = d_boxes.data();
+        auto* cod_ptr = d_codes.data();
+        auto* idx_ptr = d_indices.data();
+        const AABB scene_box = scene;
+
+        ParallelFor(n, [=] AMREX_GPU_DEVICE (int i) noexcept {
+            cod_ptr[i] = morton::morton_code(box_ptr[i].centroid(), scene_box);
+            idx_ptr[i] = i;
+        });
+        Gpu::streamSynchronize();
+
+        // --- 3. Sort by Morton code ---
+#if defined(AMREX_USE_CUDA)
+        {
+            thrust::device_ptr<uint32_t> t_codes(d_codes.data());
+            thrust::device_ptr<int>      t_indices(d_indices.data());
+            thrust::sort_by_key(thrust::device, t_codes, t_codes + n, t_indices);
+            Gpu::streamSynchronize();
+        }
+#else
+        {
+            std::vector<uint32_t> h_codes(n);
+            std::vector<int>      h_idx(n);
+            Gpu::dtoh_memcpy(h_codes.data(), d_codes.data(), n * sizeof(uint32_t));
+            Gpu::dtoh_memcpy(h_idx.data(),   d_indices.data(), n * sizeof(int));
+            std::vector<int> order(n);
+            std::iota(order.begin(), order.end(), 0);
+            std::sort(order.begin(), order.end(),
+                      [&](int a, int b) { return h_codes[a] < h_codes[b]; });
+            std::vector<uint32_t> sorted_codes(n);
+            std::vector<int>      sorted_idx(n);
+            for (int i = 0; i < n; ++i) {
+                sorted_codes[i] = h_codes[order[i]];
+                sorted_idx[i]   = h_idx[order[i]];
+            }
+            Gpu::htod_memcpy(d_codes.data(),   sorted_codes.data(), n * sizeof(uint32_t));
+            Gpu::htod_memcpy(d_indices.data(), sorted_idx.data(),   n * sizeof(int));
+        }
+#endif
+
+        // --- 4. Allocate tree nodes (managed — needed on host for BVH4 collapse) ---
+        const int n_total = 2 * n - 1;
+        nodes.resize(n_total);
+
+        // Auxiliary arrays: device-only (freed automatically after build)
+        Gpu::DeviceVector<int> d_parent(n_total, -1);
+        Gpu::DeviceVector<int> d_counter(n - 1, 0);
+
+        auto* nd_ptr     = nodes.data();
+        auto* parent_ptr = d_parent.data();
+        const auto* code_ptr = d_codes.data();
+        const auto* sidx_ptr = d_indices.data();
+
+        // --- 5. Initialize leaf nodes [n-1 .. 2n-2] ---
+        ParallelFor(n, [=] AMREX_GPU_DEVICE (int i) noexcept {
+            const int leaf = (n - 1) + i;
+            nd_ptr[leaf].box     = box_ptr[sidx_ptr[i]];
+            nd_ptr[leaf].left    = -1;
+            nd_ptr[leaf].right   = -1;
+            nd_ptr[leaf].prim_id = sidx_ptr[i];
+        });
+
+        // --- 6. Karras internal node construction ---
+        ParallelFor(n - 1, [=] AMREX_GPU_DEVICE (int i) noexcept {
+            int d_fwd = lbvh::delta(code_ptr, n, i, i + 1);
+            int d_bwd = lbvh::delta(code_ptr, n, i, i - 1);
+            int d = (d_fwd > d_bwd) ? 1 : -1;
+
+            int delta_min = lbvh::delta(code_ptr, n, i, i - d);
+            int l_max = 2;
+            while (lbvh::delta(code_ptr, n, i, i + l_max * d) > delta_min)
+                l_max *= 2;
+
+            int l = 0;
+            for (int t = l_max / 2; t >= 1; t /= 2) {
+                if (lbvh::delta(code_ptr, n, i, i + (l + t) * d) > delta_min)
+                    l += t;
+            }
+            int j = i + l * d;
+
+            int delta_node = lbvh::delta(code_ptr, n, i, j);
+            int s = 0;
+            int range_len = (i < j ? j : i) - (i < j ? i : j);
+            for (int t = (range_len + 1) / 2; t >= 1; t = (t == 1) ? 0 : (t + 1) / 2) {
+                if (lbvh::delta(code_ptr, n, i, i + (s + t) * d) > delta_node)
+                    s += t;
+                if (t == 1) break;
+            }
+            int gamma = i + s * d + amrex::min(d, 0);
+
+            int left_child  = (amrex::min(i, j) == gamma)     ? (n - 1) + gamma       : gamma;
+            int right_child = (amrex::max(i, j) == gamma + 1) ? (n - 1) + (gamma + 1) : gamma + 1;
+
+            nd_ptr[i].left    = left_child;
+            nd_ptr[i].right   = right_child;
+            nd_ptr[i].prim_id = -1;
+            parent_ptr[left_child]  = i;
+            parent_ptr[right_child] = i;
+        });
+        Gpu::streamSynchronize();
+
+        // --- 7. Bottom-up AABB propagation ---
+        auto* cnt_ptr = d_counter.data();
+        ParallelFor(n, [=] AMREX_GPU_DEVICE (int i) noexcept {
+            int current = parent_ptr[(n - 1) + i];
+            while (current >= 0) {
+                int old = Gpu::Atomic::Add(&cnt_ptr[current], 1);
+                if (old == 0) return;
+                nd_ptr[current].box = AABB();
+                nd_ptr[current].box.merge(nd_ptr[nd_ptr[current].left].box);
+                nd_ptr[current].box.merge(nd_ptr[nd_ptr[current].right].box);
+                current = parent_ptr[current];
+            }
+        });
+        Gpu::streamSynchronize();
+
+        root = 0;
+    }
+
+    // ----- BVH4 collapse (CPU, runs once after build) -------------------
+    //
+    // Converts the binary tree into a 4-wide tree by merging pairs of
+    // levels.  Each BVH4 node gathers up to 4 children (the grandchildren
+    // of a binary node).  This halves tree depth and reduces stack usage.
+
+    void collapse_to_bvh4 () {
+        if (nodes.empty()) { root4 = -1; return; }
+
+        // Copy binary nodes to host vector — avoids managed-memory page
+        // faults during the recursive traversal on CPU.
+        std::vector<BVHNode> h_nodes(nodes.begin(), nodes.end());
+
+        std::vector<BVH4Node> tmp;
+        tmp.reserve(num_prims);
+        root4 = collapse_node(root, tmp, h_nodes);
+
+        nodes4.resize(tmp.size());
+        std::copy(tmp.begin(), tmp.end(), nodes4.begin());
+    }
+
+    /// Recursively collapse a binary subtree into BVH4 nodes.
+    /// Returns a BVH4 node index, or (LEAF_FLAG | prim_id) for a leaf.
+    int collapse_node (int bi, std::vector<BVH4Node>& out,
+                       const std::vector<BVHNode>& h_nodes) {
+        const auto& nd = h_nodes[bi];
+        if (nd.is_leaf())
+            return BVH4Node::LEAF_FLAG | nd.prim_id;
+
+        // Gather up to 4 children by expanding internal children one level
+        struct Child { int bin_idx; AABB box; };
+        std::vector<Child> children;
+        children.reserve(4);
+
+        auto expand = [&](int child_bi) {
+            const auto& c = h_nodes[child_bi];
+            if (c.is_leaf() || static_cast<int>(children.size()) >= 3) {
+                children.push_back({child_bi, c.box});
+            } else {
+                children.push_back({c.left,  h_nodes[c.left].box});
+                children.push_back({c.right, h_nodes[c.right].box});
+            }
+        };
+
+        expand(nd.left);
+        expand(nd.right);
+
+        // Allocate a BVH4 node
+        int bvh4_idx = static_cast<int>(out.size());
+        out.push_back(BVH4Node{});
+        BVH4Node& n4 = out.back();
+        n4.n_children = static_cast<int>(children.size());
+
+        for (int c = 0; c < n4.n_children; ++c) {
+            n4.child_box[c] = children[c].box;
+            n4.child_idx[c] = collapse_node(children[c].bin_idx, out, h_nodes);
+        }
+        // Zero-fill unused slots
+        for (int c = n4.n_children; c < 4; ++c) {
+            n4.child_box[c] = AABB();
+            n4.child_idx[c] = -1;
+        }
+        return bvh4_idx;
     }
 };
 

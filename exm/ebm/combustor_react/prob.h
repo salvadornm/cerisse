@@ -13,6 +13,8 @@
 #include "Closures.h"
 #include "RHS.h"
 
+
+
 #if CNS_USE_EB    
 #include <ebm.h>
 #include <walltypes.h>
@@ -22,8 +24,20 @@
 #include <numbers>
 #include <cmath>
 
+
 // NTU Combustor-type for demonstration purposes
 // created by S Dupre and S Navarro-Martinez (2025)
+
+
+struct NTNUglobalnumbers {  
+  static constexpr Real pressure = pres_atm2si; // [Pa] inflow pressure (1 atm)  
+  static constexpr Real Temperature_inflow = 298.0; //[K] 
+  // geometry 
+  static constexpr Real zinlet = 0.045;  // inlet combustor
+  static constexpr Real zexit  = 0.135 ; // outlet combustor  
+  static constexpr Real radius = 0.022 ; // Radius combustor    
+};
+
 
 
 using namespace amrex;
@@ -35,15 +49,18 @@ namespace PROB {
 
 struct LESparm {
   // Smagorinsky constant
-  static constexpr Real Cs = 0.1;
+  static constexpr Real Cs = 0.17; // Smag original 0.17 (off)
   static constexpr int order = 2; // order of the numerical scheme for LES
-  static constexpr Real Scsgs = 0.4; // turbulent Schmidt number
-  static constexpr Real Pr_o_Prsgs = 0.1; // turbulent Prandtl number  
+  static constexpr Real Scsgs = 0.4 ; //0.4 // turbulent Schmidt number
+  static constexpr Real Pr_o_Prsgs = 1.0; //0.1 // turbulent Prandtl number  
   static constexpr bool fixDelta = false; // use fixed filter width
 };
 
 
-typedef closures_dt<indicies_t, transport_Pele_t , multispecies_pele_gas_t<indicies_t>, Smagorinsky_t<LESparm,indicies_t>>ProbClosures;
+// Closure Index+Thermodynamics + Transport + LES + ATF
+
+typedef closures_dt<indicies_stat_t, transport_Pele_t , multispecies_pele_gas_t<indicies_t>,
+                    WALE_t<LESparm,indicies_t>, TFM_t<LESparm,indicies_t>>ProbClosures;
 //typedef closures_dt<indicies_t, transport_Pele_t , multispecies_pele_gas_t<indicies_t>> ProbClosures;
 
 // problem parameters 
@@ -55,11 +72,24 @@ struct ProbParm {
   Real Y_inflow[NUM_SPECIES] = {0.0};
   Real Y_burn[NUM_SPECIES] = {0.0};
   ProbClosures pp_pc;
+  NTNUglobalnumbers combustor;
 
-  const Real Tburn = 2197.0; //[K] burned gas temperature
+  const Real Tburn = 2207.0; //[K] burned gas temperature
+
+
+  // inflow
+  const Real p_0     = combustor.pressure; //[Pa] inflow pressure (1 atm) 
+  const Real T_0     = combustor.Temperature_inflow;  //[K]  
+
+  // compute density and internal energy
+  const Real Q = 8.665; //  flow m3/s
+
+  // aux variables for initialisation
+  Real rho_0, eint_0;
+
 
   ProbParm () {
-  #if USE_PELEPHYSICS
+#if USE_PELEPHYSICS
   Y_inflow[H_ID] = 0; 
   Y_inflow[H2_ID] = 0.014468; 
   Y_inflow[O_ID] = 0; 
@@ -69,41 +99,29 @@ struct ProbParm {
   Y_inflow[HO2_ID] = 0; 
   Y_inflow[H2O2_ID] = 0;  
   Y_inflow[N2_ID] = 0.7559; 
-  Y_inflow[AR_ID] = 0; 
-  Y_inflow[HE_ID] = 0; 
-  Y_inflow[CO_ID] = 0; 
-  Y_inflow[CO2_ID] = 0; 
    
   //
-  Y_burn[H_ID] = 1.4666e-05; 
-  Y_burn[H2_ID] = 9.9468e-05; 
-  Y_burn[O_ID] = 0.0009379; 
-  Y_burn[OH_ID] = 0.0055107; 
-  Y_burn[H2O_ID] = 0.12534; 
-  Y_burn[O2_ID] = 0.11219; 
-  Y_burn[HO2_ID] = 5.1687e-06; 
-  Y_burn[H2O2_ID] = 4.4871e-07 ;  
-  Y_burn[N2_ID] = 0.7559; 
+  Y_burn[H_ID] = 9.125e-06; 
+  Y_burn[H2_ID] = 7.2983e-05; 
+  Y_burn[O_ID] = 0.00068717; 
+  Y_burn[OH_ID] = 0.0047711; 
+  Y_burn[H2O_ID] = 0.12602; 
+  Y_burn[O2_ID] = 0.11253; 
+  Y_burn[HO2_ID] = 5.6389e-06; 
+  Y_burn[H2O2_ID] = 3.3351e-07;  
+  Y_burn[N2_ID] = 0.7559 ; 
   
-  #endif
+#endif
 
   pp_pc.PYT2R(p_0, Y_inflow, T_0, rho_0);
   pp_pc.RYP2E(rho_0, Y_inflow, p_0, eint_0); 
   }
-
-  // compute density and internal energy
-  const Real Q = 8.665; // volumetric flow rate [kg /m2 s] ??
   
-  // inside combustor state/exit
-  const Real p_0     = pres_atm2si; //[Pa] inflow pressure (1 atm) 
-  const Real T_0     = 298;  //[K]  
-  Real rho_0, eint_0;
-
+  // 
+  const Real T_b  = Tburn;
+  const Real T_u  = T_0;
+  
   const Real vel_0[3]= {0.0,0.0,0.0}; // array of inside velocity [m/s]
-
-  // geometry auxiliary
-  Real zin = 0.01;
-  Real zexit = 0.135 ;//0.135;
 
 };
 
@@ -138,7 +156,7 @@ struct skewparm_t {
 
   static constexpr bool dissipation = true;         // no dissipation
   static constexpr int  order = 4;                  // order numerical scheme   (2 or 4)
-  static constexpr Real C2skew=0.1,C4skew=0.016;    // Skew symmetric default  (0.5)
+  static constexpr Real C2skew=0.5,C4skew=0.016;    // Skew symmetric default  (0.1 0.016)
 };
 
 
@@ -162,9 +180,8 @@ struct wall_param {
 template <typename cls_t > class user_source_t;
 
 // USED
-//typedef rhs_dt<weno_t<ReconScheme::WenoZ5, ProbClosures>, viscousLES_t<user_source_t<ProbClosures>, ProbClosures>, reactor_sourceLES_t<user_source_t<ProbClosures>,ProbClosures >> ProbRHS;
-//typedef rhs_dt<riemann_t<false, ProbClosures>, viscousLES_t<user_source_t<ProbClosures>, ProbClosures>, reactor_sourceLES_t<user_source_t<ProbClosures>,ProbClosures >> ProbRHS;
 typedef rhs_dt<skew_t<skewparm_t, ProbClosures>, viscousLES_t<user_source_t<ProbClosures>, ProbClosures>, reactor_sourceLES_t<user_source_t<ProbClosures>,ProbClosures >> ProbRHS;
+//typedef rhs_dt<weno_t<ReconScheme::Teno5, ProbClosures>, viscousLES_t<user_source_t<ProbClosures>, ProbClosures>, reactor_sourceLES_t<user_source_t<ProbClosures>,ProbClosures >> ProbRHS;
 
 
 // define type of wall and EBM class
@@ -189,9 +206,9 @@ prob_initdata(int i, int j, int k, Array4<Real> const &state,
   const Real *prob_hi = geomdata.ProbHi();
   const Real *dx = geomdata.CellSize();
 
-  Real x = prob_lo[0] + (i + Real(0.5)) * dx[0];
-  Real y = prob_lo[1] + (j + Real(0.5)) * dx[1];
-  Real z = prob_lo[2] + (k + Real(0.5)) * dx[2];
+  //Real x = prob_lo[0] + (i + Real(0.5)) * dx[0];
+  //Real y = prob_lo[1] + (j + Real(0.5)) * dx[1];
+  //Real z = prob_lo[2] + (k + Real(0.5)) * dx[2];
 
   // local vars
   Real rhot,eint,u[3],y_sp[NUM_SPECIES];
@@ -216,17 +233,25 @@ prob_initdata(int i, int j, int k, Array4<Real> const &state,
   }
   */
 
-  // put burn condistions
-  
-  if (z > 0.07)
-  { 
-    for (int n=0; n < NUM_SPECIES; n++) {
-      y_sp[n] = prob_parm.Y_burn[n];
-    }     
-    cls.PYT2R(prob_parm.p_0,y_sp, prob_parm.Tburn, rhot);
-    cls.RYP2E(rhot, y_sp, prob_parm.p_0, eint);
-  }
+  // put burn conditions inside combustor
+  bool comb_init = true;
+  if (comb_init)
+  {
+    // if (z > 0.035)
+    // { 
+      for (int n=0; n < NUM_SPECIES; n++) {
+        y_sp[n] = prob_parm.Y_burn[n];
+      }     
+      cls.PYT2R(prob_parm.p_0,y_sp, prob_parm.Tburn, rhot);
+      cls.RYP2E(rhot, y_sp, prob_parm.p_0, eint);
+    // }
+    // else
+    // {
+    //   u[2] = prob_parm.Q/prob_parm.rho_0;
+    // }
 
+
+  }
 
   Real kin = Real(0.5) * rhot * (u[0] * u[0] + u[1] * u[1] + u[2]*u[2]);
   //state(i, j, k, cls.URHO) = rhot;
@@ -247,12 +272,20 @@ bcnormal(const Real x[AMREX_SPACEDIM], Real dratio, const Real s_int[ProbClosure
 
   const int face = (idir+1)*sgn; // +/-1 (1D) +/- 2 (2D) +/- 3 (3D)
 
+  // snm comment for 0-gradient BCs (to be used for debugging)
+  // for (int n=0; n < ProbClosures::NCONS; n++) {
+  //   s_ext[n] = s_int[n];
+  // }
+  // return;
+
+
   switch(face)
   {
     case  3:  // LEFT/BOTTOM  z
 	    {                  
       GlobalBC::bc_inlet_fixmassflow(0.0,0.0,1.0,&closures,
         prob_parm.Q,prob_parm.T_inflow,prob_parm.Y_inflow, s_int, s_ext);  
+        
       break;
       }
     case  2:  // SOUTH        y  
@@ -287,6 +320,9 @@ user_tagging(int i, int j, int k, int nt_level, auto &tagfab,
 
   const Real *prob_lo = geomdata.ProbLo();
   const Real *dx = geomdata.CellSize();
+
+  NTNUglobalnumbers const combustor;
+
   Real x = prob_lo[0] + (i + Real(0.5)) * dx[0];
   Real y = prob_lo[1] + (j + Real(0.5)) * dx[1];
   Real z = prob_lo[2] + (k + Real(0.5)) * dx[2];
@@ -294,54 +330,46 @@ user_tagging(int i, int j, int k, int nt_level, auto &tagfab,
 
   bool refine = false;
   
-  // // refine exit of injector
-  // refine= (z > 0.035) && (z < 0.07);
-  // // refine close to exit  (avoid corner problem)
-  // refine= (z > 0.13) || refine;
 
+  //  U->Q 
+  Real Q[ProbClosures::NPRIM],U[ProbClosures::NCONS];
+  for (int n = 0; n < ProbClosures::NCONS; ++n) {
+    U[n] = sdatafab(i,j,k,n);
+  }
+  auto thermo = ProbClosures::multispecies_pele_gas_t();
+  thermo.cons2prims_point(U,Q);
+ 
 
-  //const int URHO= ProbClosures::URHO;
-
-  // // compoute | d rho | normalised with rho
-  // Real o_over_rhot = Real(1.0)/sdatafab(i,j,k,URHO);
-
-  // Real drhox = Math::abs(sdatafab(i+1,j,k,URHO) - sdatafab(i-1,j,k,URHO));
-  // Real drhoy = Math::abs(sdatafab(i,j+1,k,URHO) - sdatafab(i,j-1,k,URHO));
-  // Real drhoz = Math::abs(sdatafab(i,j,k+1,URHO) - sdatafab(i,j,k-1,URHO));
-
-  // Real gradrho= Real(0.5)*sqrt(drhox*drhox+drhoy*drhoy)*o_over_rhot;        
+  // use H2O as refinement
+  //const int UREF= ProbClosures::UFS + H2O_ID;  
+  // Real drhox =( sdatafab(i+1,j,k,UREF) - sdatafab(i-1,j,k,UREF) );
+  // Real drhoy =( sdatafab(i,j+1,k,UREF) - sdatafab(i,j-1,k,UREF) );
+  // Real drhoz =( sdatafab(i,j,k+1,UREF) - sdatafab(i,j,k-1,UREF) );
+  // Real gradrho= Real(0.5)*sqrt(drhox*drhox+drhoy*drhoy);
+  // refine = grad_rho > 0.1       
+  
+  // progress variable
+  //Real c =  (Q[ProbClosures::QT]-prob_parm.T_u)/(prob_parm.T_b - prob_parm.T_u);
 
 
  switch (level)
   {
-    case 0:
-      //refine=  (z < 0.20) && (r < 0.05);    
-      //refine = (z < prob_parm.zexit); 
-      //refine = (z < prob_parm.zexit) && (r < 0.025) ;    // refine combustor    
-
-      //refine = ( z < 0.07) && (z > 0.035) && (r < 0.03);    // refine injector exit
-
-      refine = (z < 0.15);
-
+    case 0:      
+      refine = (z < combustor.zexit) && (r < 1.1*combustor.radius) ;    
       break;
     case 1:
-      refine= (z > 0.035) && (z < 0.07);    
-      // refine = (z < prob_parm.zexit); 
-
-      // refine based on T
-
-
+      refine = (z < 0.08) && (r < 0.025);  
       break;
     case 2:
-      // refine= (z > 0.035) && (z < 0.07);    
+      refine = (z > 0.03) && (z < 0.06) && (r < 0.015);
       break;  
-      
+    case 3:  
+      //refine =  (c < 0.7) && (c > 0.3);
+      break;      
     default:
 
     break;
   }
-
- // refine = true; // temp
 
   tagfab(i,j,k) = refine;
 
@@ -353,19 +381,22 @@ class user_source_t {
   public:
 
   // ATF options
-  bool static constexpr ATF = true; // use adaptive thickening factor
-  static constexpr Real thickfactor = 5.0; // thickening factor
-
-  bool static constexpr do_reactions = true;
+  bool static constexpr use_ATF = true; // use adaptive thickening factor
+  static constexpr int ATF_model = 1;   // 1: Classic  Colin/Charlette , 2: Rathore transformation
   //
 
-  // viscous options
-  static constexpr int order = 2;                  // order numerical scheme   
-  static constexpr bool use_LES= true;
+  //...
+  
+  // viscous LES options
+  static constexpr bool use_LES= true;           // use LES model in viscous term
+  static constexpr int  order = 2;               // order numerical scheme   
 
+  // compute chemistry
+  bool static constexpr do_reactions = true;  // <<<<<<<<<<<<<<<<<<<<<<<<<
+  bool static constexpr mask_cells_boundary = true; // avoid compute reactions in cells partially covered
+  //
 
-
-
+  
 
   // to use as a user source term, the function name must be src:
   // void inline src(const Geometry& geomdata, const amrex::MFIter &mfi,
@@ -381,85 +412,60 @@ class user_source_t {
                   amrex::Real dt, amrex::Real real_time){
 
     const Box& bxg = mfi.tilebox();
-    // const Box& bxg = mfi.growntilebox(cls_t::NGHOST);
-    const Real *prob_lo = geomdata.ProbLo();
-    const Real *dx = geomdata.CellSize();
-
-    ProbParm const prob_parm;
-    const auto& cls = *cls_d;
-
-    // for spark
-    //SparkParm const spark;
-    //Real gauss_funt = std::exp( -0.5 * (real_time - spark.t0)*(real_time - spark.t0)/spark.dt2 );
-
+    
+    // use device-friendly arrays instead of pointers
+    //  const Real *prob_lo = geomdata.ProbLo();
+    //  const Real *dx = geomdata.CellSize();
+    auto prob_lo = geomdata.ProbLoArray();
+    auto dx     = geomdata.CellSizeArray();
+                
+    NTNUglobalnumbers const combustor;
 
     const Real tau_relax = 5.e-6;
     const Real coef =dt/tau_relax;
  
+    const Real zbuffer  = 0.16;
+    const Real p_0      = combustor.pressure;
 
+    // ------------------------------------------------------------------------------------
     amrex::ParallelFor(bxg,
       [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept
       {
       
-      const Real x = prob_lo[0] + (i + Real(0.5)) * dx[0];
-      const Real y = prob_lo[1] + (j + Real(0.5)) * dx[1];
+      // coordinates 
+      // const Real x = prob_lo[0] + (i + Real(0.5)) * dx[0];
+      // const Real y = prob_lo[1] + (j + Real(0.5)) * dx[1];
       const Real z = prob_lo[2] + (k + Real(0.5)) * dx[2];
-      const Real r = sqrt(x*x + y*y + (z-prob_parm.zexit)*(z-prob_parm.zexit));
-      
-      // pressure relax  if P > P0  P drops and to keep T constant rho drops
-      Real pres = prims(i,j,k,cls.QPRES);
+      // const Real r = sqrt(x*x + y*y + (z-zexit)*(z-zexit));
 
-      const Real dP = (prob_parm.p_0- pres)*coef;
-    
-      const Real T = prims(i,j,k,cls.QT); // dT =0
-      const Real rho  = prims(i, j, k, cls.QRHO);
-     
-      Real drho = 0.0; Real Y[NUM_SPECIES] = {1.0};
-      #if USE_PELEPHYSICS
-      for (int sp = 0; sp < NUM_SPECIES; sp ++) {
-        Y[sp] = prims(i, j, k, cls.QFS + sp);
-      }
-      #endif 
+      // get values from primitives
+      const Real pres = prims(i,j,k,cls_t::QPRES);
+      const Real T    = prims(i,j,k,cls_t::QT   ); 
+      const Real rho  = prims(i,j,k,cls_t::QRHO );     
+      Real Y[NUM_SPECIES]; for (int sp = 0; sp < NUM_SPECIES; sp ++) { Y[sp] = prims(i, j, k, cls_t::QFS + sp);}
+      // u v w      
+      const Real u  = prims(i,j,k,cls_t::QU );
+      const Real v  = prims(i,j,k,cls_t::QV );
+      const Real w  = prims(i,j,k,cls_t::QW );
+      // Kinetic and Total energy (per density unit)  [J/rho] 
+      const Real Et  = prims(i,j,k,cls_t::QEINT) + 0.5*(u*u + v*v + w*w);
 
-      cls.PYT2R(dP,Y,T,drho);  
-      Real drhodt = drho/dt;
-      //Real drhodt = drho;
-      Real kin = 0.5*(prims(i,j,k,cls.QU)*prims(i,j,k,cls.QU) + prims(i,j,k,cls.QV)*prims(i,j,k,cls.QV)
-                    + prims(i,j,k,cls.QW)*prims(i,j,k,cls.QW));
-      Real Et  = prims(i,j,k,cls.QEINT) + kin;
-    
-      bool buffer = (z > prob_parm.zexit) && (r > 0.06);
+      // pressure relaxation towards P0   
+      const Real dP = (p_0- pres)*coef; Real drho;
+      cls_d->PYT2R(dP,Y,T,drho);      // associated density change
+      const Real drhodt = drho/dt;  // rate of change
+   
+      // buffer zone where relaxation applies 
+      const bool buffer = (z > zbuffer); //&& (r > 0.06);
 
       if (buffer){        
-        rhs(i,j,k,cls.UMX) += prims(i,j,k,cls.QU)*drhodt;
-        rhs(i,j,k,cls.UMY) += prims(i,j,k,cls.QV)*drhodt; 
-        rhs(i,j,k,cls.UMZ) += prims(i,j,k,cls.QW)*drhodt;
-        rhs(i,j,k,cls.UET) += Et*drhodt;
-        for (int sp = 0; sp < NUM_SPECIES; sp++) {
-          rhs(i,j,k, cls.UFS + sp) += prims(i,j,k, cls.QFS + sp) * drhodt;  
-        }                        
-      }
-
-      // spark ignition --------------------
-      // const Real rs2 = (x- spark.x0)*(x- spark.x0) + (y- spark.y0)*(y- spark.y0) + (z- spark.z0)*(z- spark.z0);
-      // Real gauss_funr = std::exp( -0.5 * rs2/spark.ds2 );        
-      // rhs(i,j,k,cls.UET) += spark.energy*gauss_funt*gauss_funr*spark.o_Volt ;
-
-      
-      // damps energy if T > 3000 K
-      if (T > 3000.0)
-      {
-        const Real Ts = 3000.0;       
-        Real Etarget = 0.0;
-        Real rhos = 0.0;
-        cls.PYT2R(pres,Y,Ts,rhos);  
-        cls.RYP2E(rhos,Y,pres,Etarget);
-
-        Real tau = 5.0e-6; //5e-3 slow relaxation
-
-        rhs(i,j,k,cls.UET) += (rhos*Etarget - rho*prims(i,j,k,cls.QEINT))/tau;
-
-      }
+ 
+        rhs(i,j,k,cls_t::UMX) += u*drhodt;
+        rhs(i,j,k,cls_t::UMY) += v*drhodt; 
+        rhs(i,j,k,cls_t::UMZ) += w*drhodt;
+        rhs(i,j,k,cls_t::UET) += Et*drhodt;
+        for (int sp = 0; sp < NUM_SPECIES; sp++)  rhs(i,j,k, cls_t::UFS + sp) += Y[sp] * drhodt;  
+      }                        
 
     });
 

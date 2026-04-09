@@ -4,15 +4,36 @@
 #ifdef USE_PELEPHYSICS
 #include <PelePhysics.H>
 
+
+#if (PELEPVERSION==23)
 // v23
-static pele::physics::transport::TransportParams<
-       pele::physics::PhysicsType::transport_type> trans_parms;
+static  pele::physics::transport::TransportParams<
+        pele::physics::PhysicsType::transport_type> trans_parms;
 
+// check (not validated v23)
+using trans_parm_t =
+ 	pele::physics::transport::TransParm<
+	pele::physics::PhysicsType::eos_type,
+	pele::physics::PhysicsType::transport_type>;	
+
+#else
 // v25       
-// static pele::physics::transport::TransParm<
-// pele::physics::PhysicsType::eos_type,
-// pele::physics::PhysicsType::transport_type> trans_parms;
+extern  pele::physics::PeleParams<
+        pele::physics::transport::TransParm<
+        pele::physics::PhysicsType::eos_type,
+        pele::physics::PhysicsType::transport_type > > trans_parms;
 
+using trans_parm_t =
+	typename pele::physics::transport::TransParm<
+	pele::physics::PhysicsType::eos_type,
+	pele::physics::PhysicsType::transport_type>;
+
+#endif
+
+
+#else
+
+  struct trans_parm_t {}; //dummy type definition for compiling
 
 #endif
 ////////////////////////////////TRANSPORT/////////////////////////////////

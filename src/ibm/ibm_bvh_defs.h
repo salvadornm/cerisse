@@ -161,6 +161,99 @@ struct ClosestPointResult {
 using Bbox = AABB;
 
 // ============================================================================
+// 1b. RIGID BODY TRANSFORM
+//
+// Stores a rigid-body transform T = (R, d) for body-frame BVH queries.
+// Instead of rebuilding the BVH every time step for moving rigid bodies,
+// we keep geometry in its reference (body) frame and transform query points:
+//   world → body:  p_body  = R^T (p_world - d)
+//   body → world:  p_world = R p_body + d
+// Distances, inside/outside, and closest-point results are invariant under
+// rigid transforms, so the results are identical to a full BVH rebuild.
+// ============================================================================
+
+struct RigidTransform {
+    amrex::Real R[AMREX_SPACEDIM][AMREX_SPACEDIM]; ///< rotation matrix (body→world)
+    amrex::Real d[AMREX_SPACEDIM];                  ///< translation vector (body origin in world)
+
+    /// Construct as identity transform
+    AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
+    RigidTransform () {
+        for (int i = 0; i < AMREX_SPACEDIM; ++i) {
+            d[i] = amrex::Real(0.0);
+            for (int j = 0; j < AMREX_SPACEDIM; ++j)
+                R[i][j] = (i == j) ? amrex::Real(1.0) : amrex::Real(0.0);
+        }
+    }
+
+    /// Transform a point from world frame to body frame: p_body = R^T (p_world - d)
+    AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
+    Point to_body (const Point& p_world) const {
+        Point p;
+        for (int i = 0; i < AMREX_SPACEDIM; ++i) {
+            p[i] = amrex::Real(0.0);
+            for (int j = 0; j < AMREX_SPACEDIM; ++j)
+                p[i] += R[j][i] * (p_world[j] - d[j]);  // R^T * (p - d)
+        }
+        return p;
+    }
+
+    /// Transform a point from body frame to world frame: p_world = R * p_body + d
+    AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
+    Point to_world (const Point& p_body) const {
+        Point p;
+        for (int i = 0; i < AMREX_SPACEDIM; ++i) {
+            p[i] = d[i];
+            for (int j = 0; j < AMREX_SPACEDIM; ++j)
+                p[i] += R[i][j] * p_body[j];
+        }
+        return p;
+    }
+
+    /// Rotate a direction vector from body frame to world frame (no translation)
+    AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
+    void rotate_to_world (const amrex::Real* v_body, amrex::Real* v_world) const {
+        for (int i = 0; i < AMREX_SPACEDIM; ++i) {
+            v_world[i] = amrex::Real(0.0);
+            for (int j = 0; j < AMREX_SPACEDIM; ++j)
+                v_world[i] += R[i][j] * v_body[j];
+        }
+    }
+
+    /// Transform an AABB from body frame to world frame (conservative expansion)
+    AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
+    AABB transform_bbox (const AABB& body_box) const {
+        AABB world_box;
+        // Transform all 2^DIM corners and take their bounding box
+        // For efficiency, use the separable property of rotation on AABB
+        for (int i = 0; i < AMREX_SPACEDIM; ++i) {
+            world_box.lo[i] = d[i];
+            world_box.hi[i] = d[i];
+            for (int j = 0; j < AMREX_SPACEDIM; ++j) {
+                amrex::Real a = R[i][j] * body_box.lo[j];
+                amrex::Real b = R[i][j] * body_box.hi[j];
+                world_box.lo[i] += amrex::min(a, b);
+                world_box.hi[i] += amrex::max(a, b);
+            }
+        }
+        return world_box;
+    }
+
+    /// Check if this is the identity transform (no motion)
+    AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
+    bool is_identity () const {
+        for (int i = 0; i < AMREX_SPACEDIM; ++i) {
+            if (d[i] != amrex::Real(0.0)) return false;
+            for (int j = 0; j < AMREX_SPACEDIM; ++j) {
+                amrex::Real expected = (i == j) ? amrex::Real(1.0) : amrex::Real(0.0);
+                if (R[i][j] != expected) return false;
+            }
+        }
+        return true;
+    }
+};
+
+// ============================================================================
 // 2. BVH NODE
 // ============================================================================
 
@@ -172,6 +265,23 @@ struct BVHNode {
 
     AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
     bool is_leaf () const { return left == -1 && right == -1; }
+};
+
+/// 4-wide BVH node for reduced tree depth and better GPU occupancy.
+/// Each node stores up to 4 child AABBs and child indices inline.
+/// Children are either internal BVH4 nodes or leaf primitives.
+struct BVH4Node {
+    AABB child_box[4];      ///< Bounding boxes of up to 4 children
+    int  child_idx[4];      ///< Child index: >= 0 for internal, (LEAF_FLAG | prim_id) for leaf
+    int  n_children = 0;    ///< Number of valid children (0–4)
+
+    static constexpr int LEAF_FLAG = 1 << 30;
+
+    AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
+    bool child_is_leaf (int c) const { return child_idx[c] & LEAF_FLAG; }
+
+    AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
+    int child_prim (int c) const { return child_idx[c] & ~LEAF_FLAG; }
 };
 
 // ============================================================================

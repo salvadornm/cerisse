@@ -10,6 +10,17 @@
 #include <fsi/RigidBodyProperties.h>
 #endif
 
+#ifdef USE_PELEPHYSICS
+#include "TransPele.h"
+
+pele::physics::PeleParams<
+  pele::physics::transport::TransParm<
+    pele::physics::PhysicsType::eos_type,
+    pele::physics::PhysicsType::transport_type
+  >> trans_parms;
+#endif
+
+
 using namespace amrex;
 
 bool CNS::verbose = true;
@@ -32,7 +43,7 @@ std::string CNS::eb_redistribution_type = "NoRedist";
 int CNS::nstep_screen_output = 10;
 int CNS::order_rk = 2;
 int CNS::stages_rk = 2;
-int CNS::do_reflux = 1;
+int CNS::do_reflux = 0; // default reflux is off
 int CNS::refine_max_dengrad_lev = -1;
 Real CNS::cfl = 0.0_rt;
 Real CNS::dt_constant = 0.0_rt;
@@ -188,6 +199,16 @@ void CNS::read_params() {
 #endif
 
 
+#ifdef USE_PELEPHYSICS
+  // One-time transport parameter initialization (host->device)
+  static bool trans_inited = false;
+  if (!trans_inited) {
+    trans_parms.initialize();
+    trans_inited = true;
+  }
+#endif
+
+
 #if AMREX_USE_GPU
   amrex::Gpu::htod_memcpy(d_prob_closures, h_prob_closures,
                           sizeof(PROB::ProbClosures));
@@ -263,6 +284,10 @@ void CNS::initData() {
     setupStats();
   }
 
+
+   prob_rhs.init_coeffs(); // CGPT dixit
+
+
 }
 
 void CNS::buildMetrics() {
@@ -295,7 +320,13 @@ void CNS::post_init(Real stop_time) {
   if (record_probe) {
     setupTimeProbe();
   }
+
   
+#if CNS_USE_EB
+  EBM::eb.check_geometry(level);
+#endif
+  
+
 }
 // -----------------------------------------------------------------------------
 
@@ -613,7 +644,7 @@ void CNS::postCoarseTimeStep(Real time) {
   }
 
 #ifdef CNS_USE_FSI
-  // Report aerodynamic loads on each IBM geometry
+  // Calculate and print FSI loads and properties
   {
     auto& ib = IBM::ib;
     if (ParallelDescriptor::IOProcessor()) {
@@ -627,7 +658,13 @@ void CNS::postCoarseTimeStep(Real time) {
             amrex::Print() << "Geometry " << i << ":\n"
                            << "  Mass: " << props.mass << "\n"
                            << "  Center of Mass: " << props.xcenter << "\n"
-                           << "  Fluid Force: " << loads.force << "\n"
+                           << "  Inertia Tensor:\n";
+            for (int r = 0; r < 3; ++r) {
+                amrex::Print() << "    [ " << props.inertia[r][0] << ", "
+                               << props.inertia[r][1] << ", "
+                               << props.inertia[r][2] << " ]\n";
+            }
+            amrex::Print() << "  Fluid Force: " << loads.force << "\n"
                            << "  Fluid Moment (about CM): " << loads.moment << "\n"
                            << "----------------------------------------\n";
         }
@@ -679,6 +716,9 @@ void CNS::post_regrid(int lbase, int new_finest) {
 
   // Calculate markers  
   EBM::eb.computeMarkers(level);
+  
+  EBM::eb.check_geometry(level);
+
 
 #endif
 
@@ -774,6 +814,8 @@ amrex::Print() << " recreate markers " << std::endl;
 
   // Calculate markers  
   EBM::eb.computeMarkers(level);
+
+  EBM::eb.check_geometry(level);
 
 #endif
 
@@ -1086,7 +1128,7 @@ void CNS::rebuildIBM() {
   IBM::ib.build_mf(grids, dmap, level);
   IBM::ib.computeMarkers(level);
   IBM::ib.initialiseGPs(level);
-  if (plot_surf && level == parent->finestLevel()) {
+  if (level == parent->finestLevel()) {
      for (int lev = parent->finestLevel(); lev >= 0; --lev) {
         IBM::ib.computeSurfIndices(lev);
      }
@@ -1095,7 +1137,7 @@ void CNS::rebuildIBM() {
 
 void CNS::writeSurfFile() {
       
-  // claculate and  write surface data  
+  // calculate and  write surface data  
   int istep = parent->levelSteps(0);
 
   if (plot_surf && (istep % surf_int == 0))  {
@@ -1123,6 +1165,7 @@ void CNS::writeSurfFile() {
     }
 
     const PROB::ProbClosures* cls_d = CNS::d_prob_closures;
+    const PROB::ProbClosures* cls_h = CNS::h_prob_closures; 
 
     IBM::ib.computeSURFs(prims_mf,cls_d,this->level); // computed at each level. From low to high.
 

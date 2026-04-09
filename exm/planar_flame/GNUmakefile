@@ -29,13 +29,14 @@ AMREX_NO_PROBINIT = TRUE
 USE_GPIBM = FALSE
 USE_EB = FALSE
 USE_PELEPHYSICS = TRUE
-#USE_SUNDIALS_PP = TRUE #for CVODE on GPU -- NOT needed https://github.com/AMReX-Combustion/PelePhysics/pull/194
-#PELE_USE_KLU = FALSE #for direct solve
 
 # GNU Make
 AMR_SOLVER = $(abspath ../../)
 AMREX_HOME = $(abspath ../../lib/amrex)
 PELE_PHYSICS_HOME = $(abspath ../../lib/PelePhysics)
+SUNDIALS_HOME = $(abspath ../../lib/sundials/)
+PELEPVERSION = 25
+AMREXVERSION = 25
 
 CEXE_headers += prob.h
 include $(AMR_SOLVER)/src/Make.CNS

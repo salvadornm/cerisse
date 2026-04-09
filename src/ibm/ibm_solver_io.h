@@ -217,22 +217,28 @@ void plotSURF(
         // ==================================================================
         ofs << "      <Points>\n";
         ofs << "        <DataArray type=\"Float64\" Name=\"Points\" NumberOfComponents=\"3\" format=\"ascii\">\n";
+        // Write vertices transformed from body frame to world frame
+        const auto& T = transform_a[i];
 #if (AMREX_SPACEDIM == 3)
 #ifdef AMREX_USE_CGAL
         for (auto vit = geom_a[i].vertices_begin(); vit != geom_a[i].vertices_end(); ++vit) {
-            const auto& p = vit->point();
-            ofs << p.x() << " " << p.y() << " " << p.z() << " ";
+            Point pw = T.to_world(vit->point());
+            ofs << pw.x() << " " << pw.y() << " " << pw.z() << " ";
         }
 #else
         for (int v = 0; v < geom_a[i].num_vertices(); ++v) {
-            ofs << geom_a[i].vertices[v][0] << " "
-                << geom_a[i].vertices[v][1] << " "
-                << geom_a[i].vertices[v][2] << " ";
+            Point pw = T.to_world(geom_a[i].vertices[v]);
+            ofs << pw[0] << " " << pw[1] << " " << pw[2] << " ";
         }
 #endif
 #else
         for (auto v = geom_a[i].vertices_begin(); v != geom_a[i].vertices_end(); ++v) {
-            ofs << (*v)[0] << " " << (*v)[1] << " 0.0 ";
+            Point pw = T.to_world(*v);
+#ifdef AMREX_USE_CGAL
+            ofs << pw.x() << " " << pw.y() << " 0.0 ";
+#else
+            ofs << pw[0] << " " << pw[1] << " 0.0 ";
+#endif
         }
 #endif
         ofs << "\n        </DataArray>\n";
@@ -486,6 +492,8 @@ void read_geom()
     this->bvh_a.resize(this->ngeom);
 #endif
     this->bbox_a.resize(this->ngeom);
+    this->bbox_body_a.resize(this->ngeom);
+    this->transform_a.resize(this->ngeom);  // initialized to identity
     this->LocalFrame_a.clear();
     this->SurfElem_a.clear();
     this->geom_offsets.resize(this->ngeom + 1);
@@ -540,7 +548,8 @@ void read_geom()
         Print() << "2D in/out testing functor constructed for polygon " << files_a[i] << "\n";
 #endif
 
-        bbox_a[i] = geom_a[i].bbox();
+        bbox_body_a[i] = geom_a[i].bbox();
+        bbox_a[i] = transform_a[i].transform_bbox(bbox_body_a[i]);
         ntotalfaces += geom_a[i].size();
 
 #elif (AMREX_SPACEDIM == 3)
@@ -574,17 +583,19 @@ void read_geom()
         Print() << "In out testing function constructed for geometry " << files_a[i] << "\n";
 #else
         bvh_a[i].build(geom_a[i]);
-        Print() << "BVH constructed" << std::endl;
+        Print() << "BVH constructed (" << bvh_a[i].nodes.size() << " BVH2 nodes, "
+                << bvh_a[i].nodes4.size() << " BVH4 nodes)" << std::endl;
 
         inout_fa[i] = new inside_t(geom_a[i], bvh_a[i]);
         Print() << "In out testing function constructed for geometry " << files_a[i] << "\n";
 #endif
 
 #ifdef AMREX_USE_CGAL
-        bbox_a[i] = PMP::bbox(geom_a[i]);
+        bbox_body_a[i] = PMP::bbox(geom_a[i]);
 #else
-        bbox_a[i] = geom_a[i].bbox();
+        bbox_body_a[i] = geom_a[i].bbox();
 #endif
+        bbox_a[i] = transform_a[i].transform_bbox(bbox_body_a[i]);
         ntotalfaces += geom_a[i].size_of_facets();
 
 #endif
@@ -593,6 +604,8 @@ void read_geom()
 #ifdef AMREX_USE_CGAL
         build_geometry_cache(geom_a[i], SurfElem_a, LocalFrame_a,
                              idxmap_a[i], this->geom_offsets[i], i);
+#elif defined(AMREX_USE_GPU)
+        build_geometry_cache_gpu(geom_a[i], SurfElem_a, LocalFrame_a, i);
 #else
         build_geometry_cache(geom_a[i], SurfElem_a, LocalFrame_a, this->geom_offsets[i], i);
 #endif

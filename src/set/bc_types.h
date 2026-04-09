@@ -35,27 +35,28 @@ class manual_bc_t
 
     // pghost = pinner
     const Real P = Qinner[cls_t::QPRES];            
-    // adjust density ghost to match fix temperature (as P is fix, simple relation)
-    const Real rho  = Qinner[cls_t::QRHO] * Qinner[cls_t::QT]/Tfix;  
-  
+
     // ensure mass flow rate is constant - no acoustic reflection at inlet      
     Ughost[cls_t::UMX] = nx*rhoUfix;
     Ughost[cls_t::UMY] = ny*rhoUfix;
     Ughost[cls_t::UMZ] = nz*rhoUfix;
         
-#if NUM_SPECIES > 1      
+    // adjust density ghost to match fix temperature with fix P (and Y)
+#if NUM_SPECIES > 1       
+    Real rho=0.0; cls->PYT2R(P,Yfix,Tfix,rho); // recalculate rho in case of multiple species
     for (int n = 0; n < NUM_SPECIES; ++n) {
       Ughost[cls_t::UFS+n] = rho*Yfix[n];		
     } 
 #else
+    Real rho  = Qinner[cls_t::QRHO] * Qinner[cls_t::QT]/Tfix;  
     Ughost[cls_t::URHO] = rho;
 #endif     
     // internal specific energy ghost point
     Real e_ext    = 0.0; cls->RYP2E(rho, Yfix, P, e_ext);      
     // kinetic energy ghost point
     Real rhoe_kin = 0.5*( Ughost[cls_t::UMX]*Ughost[cls_t::UMX] + 
-                        Ughost[cls_t::UMY]*Ughost[cls_t::UMY] +
-                        Ughost[cls_t::UMZ]*Ughost[cls_t::UMZ])/rho; 
+                          Ughost[cls_t::UMY]*Ughost[cls_t::UMY] +
+                          Ughost[cls_t::UMZ]*Ughost[cls_t::UMZ])/rho; 
     Ughost[cls_t::UET] = rho* e_ext + rhoe_kin;    
   }
   // .......................................................................//

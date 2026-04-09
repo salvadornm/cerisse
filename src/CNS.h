@@ -52,6 +52,10 @@ class CNS : public amrex::AmrLevel {
                    amrex::FluxRegister* fr_as_crse,
                    amrex::FluxRegister* fr_as_fine);
 
+#if NUM_SPECIES > 1                   
+  void clip_species_state(amrex::MultiFab& S);                   
+#endif  
+
   // void computeTemp(amrex::MultiFab& State, int ng);
 
   GpuArray<Real,AMREX_SPACEDIM> maxEigen();
@@ -198,11 +202,11 @@ class CNS : public amrex::AmrLevel {
   static bool use_LES;
 
  public:
-  PROB::ProbRHS prob_rhs;   // per-level RHS object (Euler + diffusive + source functors)
+  PROB::ProbRHS prob_rhs{};   // per-level RHS object (Euler + diffusive + source functors)
   static PROB::ProbClosures* h_prob_closures;
   static PROB::ProbClosures* d_prob_closures;
-  static PROB::ProbParm* h_prob_parm;
-  static PROB::ProbParm* d_prob_parm;
+  static PROB::ProbParm* h_prob_parm;       // host-resident objects used on CPU and as sources for copies
+  static PROB::ProbParm* d_prob_parm;       // device-resident objects used on GPU (copied from host at initialization)
   static BCRec* h_phys_bc;
   static BCRec* d_phys_bc;
 };

@@ -18,19 +18,24 @@ template <typename idx_t>
 class calorifically_perfect_gas_t {
  protected:
  public:
-  Real gamma   = 1.40;   // ratio of specific heats
-  Real mw = 28.96e-3;  // mean molecular weight air kg/mol
+  static constexpr Real gamma   = 1.40;   // ratio of specific heats
+  static constexpr Real mw = 28.96e-3;  // mean molecular weight air kg/mol
 
   Real gamma_m1 = gamma - Real(1.0);
+  Real o_gamma_m1 = Real(1.0)/gamma_m1;
   Real Ru = gas_constant;
   Real cv = Ru / (mw * gamma_m1);
   Real cp = gamma * cv;
   Real Rspec = Ru / mw;
-#if CLIP_TEMPERATURE_MIN  
-  Real ei_min = Rspec*min_euler_temp/gamma_m1;    // if physical T used
-#else  
-  Real ei_min = 1.0*min_euler_press/gamma_m1;     // if no physical T used
-#endif  
+
+
+  AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE Real get_ei_min() const {
+#if CLIP_TEMPERATURE_MIN
+    return Rspec * min_temp() * o_gamma_m1;
+#else
+    return min_press() * o_gamma_m1;
+#endif
+  }
 
   AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE void RYP2E(const Real R,
                                                       const Real* /*Y*/,
@@ -77,19 +82,17 @@ class calorifically_perfect_gas_t {
   }
   
   // \brief this function ensures P and T  do not violate bounds
-  // and then fills the q-array  to ensure consistency
-  // used in IBM to claculate aux primitives corerctly
+  // and then fills the q-array  to ensure consistency.
+  // Used in IBM to calculate auxiliar primitives corerctly
 
   AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE void ensurePTYfillq(
     Real& P, Real& T, Real* /*Y*/, 
     const Real ux, const Real uy, const Real uz,
     Real* Q ) const {
 
-    // avoid std::max — it ODR-uses the constexpr by-ref, which is
-    // undefined in CUDA device code.  Plain if-clamp is safe.
-    if (P < min_euler_press) P = min_euler_press;
+    P = amrex::max(min_press(),P);  
 #if CLIP_TEMPERATURE_MIN        
-    if (T < min_euler_temp) T = min_euler_temp;
+    T = amrex::max(min_temp(),T);
 #endif    
     Q[idx_t::QRHO] = P/(T*Rspec);
     Q[idx_t::QT] = T;
@@ -120,7 +123,7 @@ class calorifically_perfect_gas_t {
                            vel[0] * vel[0] + vel[1] * vel[1] + vel[2] * vel[2]);
     ke = Real(0.5) * rho * ke;
     Real eint = (cons(i, j, k, idx_t::UET) - ke) / rho;
-    eint = max(eint,ei_min); //clip energy
+    eint = max(eint, get_ei_min() ); //clip energy
     Real T = eint / cv;
 
     Real cs = std::sqrt(gamma * Rspec * T);
@@ -166,7 +169,7 @@ class calorifically_perfect_gas_t {
       Real uz = cons(i, j, k, idx_t::UMZ) * rhoinv;
       Real rhoke = Real(0.5) * rho * (ux * ux + uy * uy + uz * uz);
       Real rhoei = cons(i, j, k, idx_t::UET) - rhoke ;
-      rhoei = max(rhoei,rho*(this->ei_min)); //clip energy
+      rhoei = max(rhoei,rho*(this->get_ei_min() )); //clip energy
       Real p = (this->gamma_m1) * rhoei;
 
       prims(i, j, k, idx_t::QRHO) = rho;
@@ -191,7 +194,7 @@ class calorifically_perfect_gas_t {
     cons[idx_t::UMX] = prims(iv, idx_t::QRHO) * prims(iv, idx_t::QU);
     cons[idx_t::UMY] = prims(iv, idx_t::QRHO) * prims(iv, idx_t::QV);
     cons[idx_t::UMZ] = prims(iv, idx_t::QRHO) * prims(iv, idx_t::QW);
-    const Real E = max(prims(iv, idx_t::QEINT),ei_min) +
+    const Real E = max(prims(iv, idx_t::QEINT),get_ei_min()) +
                    Real(0.5) * (prims(iv, idx_t::QU) * prims(iv, idx_t::QU) +
                                 prims(iv, idx_t::QV) * prims(iv, idx_t::QV) +
                                 prims(iv, idx_t::QW) * prims(iv, idx_t::QW));
@@ -342,7 +345,7 @@ class calorifically_perfect_gas_t {
     // T and P
     Real rhoke = Real(0.5) * rho * (ux * ux+ uy* uy + uz * uz);
     Real rhoei = U[idx_t::UET] - rhoke;
-    rhoei = max(rhoei,rho*(this->ei_min)); //clip energy
+    rhoei = max(rhoei,rho*(this->get_ei_min() )); //clip energy
     Real p = (this->gamma_m1) * rhoei;
     Real T = p / (rho * this->Rspec);
     Q[idx_t::QT] = T;
@@ -549,11 +552,10 @@ class multispecies_pele_gas_t {
     const Real ux, const Real uy, const Real uz,
     Real* Q ) const {
 
-    //local vars  
-    
-    if (P < min_euler_press) P = min_euler_press;
+    //local vars      
+    P = amrex::max(min_press(),P);  
 #if CLIP_TEMPERATURE_MIN        
-    if (T < min_euler_temp) T = min_euler_temp;
+    T = amrex::max(min_temp(),T);
 #endif    
           
     // compute rho,ei,gamma,cs from eos   SI->cgs

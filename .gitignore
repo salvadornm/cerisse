@@ -50,3 +50,5 @@ tools/combustion/onedim.csv
 tools/combustion/pmf-X.txt
 tools/combustion/pmf-Y.txt
 
+gifdemo/
+*.stl

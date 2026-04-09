@@ -1,0 +1,239 @@
+\documentclass[11pt,a4paper]{article}
+\usepackage[utf8]{inputenc}
+\usepackage[margin=2.5cm]{geometry}
+\usepackage{booktabs}
+\usepackage{longtable}
+\usepackage{xcolor}
+\usepackage{hyperref}
+\usepackage{enumitem}
+\usepackage{amsmath}
+
+\definecolor{kept}{RGB}{0,100,0}
+\definecolor{reverted}{RGB}{180,0,0}
+\definecolor{newfile}{RGB}{0,0,160}
+
+\title{\textbf{Cerisse Code Modifications Overview}\\[4pt]
+       \large Branch \texttt{ibm\_gpu} vs.\ \texttt{eib\_dev} baseline}
+\author{Auto-generated changelog}
+\date{March 2026}
+
+\begin{document}
+\maketitle
+
+%==========================================================================
+\section{Summary}
+%==========================================================================
+
+This document catalogues \emph{all} modifications on the \texttt{ibm\_gpu}
+branch relative to the \texttt{eib\_dev} baseline commit
+(\texttt{8666588}).  Changes fall into three categories:
+
+\begin{enumerate}[leftmargin=2em]
+  \item \textbf{GPU correctness \& portability} --- fixes for data races,
+        CUDA device-code issues, and lambda capture bugs.
+  \item \textbf{RZ axisymmetric coordinate support} --- new finite-volume
+        divergence, geometric sources, volume-weighted diagnostics.
+  \item \textbf{IBM (Immersed Boundary Method) refactor} --- GPStore,
+        BVH acceleration, modular file split, moving-geometry support.
+\end{enumerate}
+
+%==========================================================================
+\section{File-by-File Change Table}
+%==========================================================================
+
+\begin{longtable}{p{4.2cm} p{1.2cm} p{8.5cm}}
+\toprule
+\textbf{File} & \textbf{Status} & \textbf{Description} \\
+\midrule
+\endfirsthead
+\toprule
+\textbf{File} & \textbf{Status} & \textbf{Description} \\
+\midrule
+\endhead
+
+%--- Non-IBM files --------------------------------------------------------
+\multicolumn{3}{l}{\textit{Core solver (non-IBM)}} \\
+\midrule
+
+\texttt{src/CNS.h}
+  & \color{kept}kept
+  & Added \texttt{rz\_sanity\_check()} static method; checks
+    \texttt{SPACEDIM==2}, non-periodic $r$, and \texttt{prob\_lo[0]==0}.
+    Added \texttt{\#include <AMReX\_Math.H>}. \\
+
+\texttt{src/CNS.cpp}
+  & \color{kept}kept
+  & \textbf{maxEigen():} Rewritten from \texttt{AsyncArray} to
+    \texttt{ReduceOps<ReduceOpMax>}; original had a GPU data race.
+    Per-\texttt{SPACEDIM} specialisation (1D/2D/3D). \\
+
+  & \color{kept}kept
+  & \textbf{printTotal():} Volume-weighted integral via
+    \texttt{geom.GetVolume()} + \texttt{ReduceOps<ReduceOpSum>};
+    required for correct RZ integrals. \\
+
+  & \color{kept}kept
+  & \textbf{postCoarseTimeStep():} Commented out the \texttt{computeSURFs}
+    + \texttt{FillPatch} path; GPStore refactor has not yet re-enabled
+    surface force computation at coarse-time-step. \\
+
+  & \color{kept}kept
+  & Constructor calls \texttt{rz\_sanity\_check(Geom())}. \\
+
+\texttt{src/cls/Thermodynamics.h}
+  & \color{kept}kept
+  & Replaced \texttt{std::max(min\_euler\_press, P)} with
+    \texttt{if (P < ...) P = ...} in \texttt{ensurePTYfillq} (both
+    \texttt{calorifically\_perfect\_gas\_t} and
+    \texttt{multispecies\_pele\_gas\_t}).  Reason: \texttt{std::max}
+    ODR-uses the \texttt{constexpr} by reference, undefined in CUDA
+    device code. \\
+
+\texttt{src/rhs/Weno.h}
+  & \color{kept}kept
+  & Changed \texttt{[=,this]} $\to$ \texttt{[=]} in GPU lambda inside
+    \texttt{ParallelFor}; capturing \texttt{this} is invalid in device
+    code. \\
+
+\midrule
+\multicolumn{3}{l}{\textit{Time integration}} \\
+\midrule
+
+\texttt{src/tim/advance.cpp}
+  & \color{kept}kept
+  & \textbf{Moving geometry:} New \texttt{\#ifdef AMREX\_USE\_GPIBM}
+    block calls \texttt{update\_geometry()} $\to$
+    \texttt{rebuildGeometryData()} $\to$ \texttt{rebuildIBM()} at each
+    step when \texttt{ib\_move} is true. \\
+
+  & \color{kept}kept
+  & \textbf{GPStore 3-phase:}
+    Phase~1: level-wide \texttt{cons2prims} into \texttt{prims\_mf}.
+    Phase~2: \texttt{computeAllGPs(prims\_mf)}.
+    Phase~3: \texttt{prims2cons} at GP cells only.
+    Replaces per-FAB \texttt{computeGPs}. \\
+
+  & \color{kept}kept
+  & Changed \texttt{cls\_h.prims2cons} $\to$ \texttt{cls\_d->prims2cons}
+    and loop bound to \texttt{PROB::ProbClosures::NCONS} for GPU safety. \\
+
+\texttt{src/tim/compute\_rhs.cpp}
+  & \color{kept}kept
+  & \textbf{Compile guard:}
+    \texttt{\#error} if both \texttt{AMREX\_USE\_GPIBM} and
+    \texttt{CNS\_USE\_EB} are defined (marker paths incompatible). \\
+
+  & \color{kept}kept
+  & \textbf{GPStore pre-loop:} Level-wide \texttt{cons2prims} +
+    \texttt{computeAllGPs} before the MFIter loop; inside the loop
+    \texttt{prims} aliases \texttt{prims\_mf}. \\
+
+  & \color{kept}kept
+  & \textbf{geoMarkers:} Direct alias to \texttt{IBMultiFab} /
+    \texttt{EBMultiFab} array; removes the old auxiliary
+    \texttt{BaseFab<uint8\_t>} + \texttt{ParallelFor} copy. \\
+
+  & \color{kept}kept
+  & \textbf{RZ divergence:} Geometry-aware FV divergence with
+    cylindrical metrics; \texttt{p/r} Euler source; viscous geometric
+    source call.  See \texttt{docs/changes\_rz.tex}. \\
+
+  & \color{kept}kept
+  & \textbf{Solid RHS zeroing:} Replaced \texttt{state *= (1-marker)}
+    with explicit \texttt{if (marker != 0)} branch + inner loop.
+    Avoids floating-point multiplication for a boolean mask. \\
+
+\midrule
+\multicolumn{3}{l}{\textit{IBM module --- modified files}} \\
+\midrule
+
+\texttt{src/ibm/IBMultiFab.h}
+  & \color{kept}kept
+  & Rewritten: cleaner doxygen, explicit \texttt{delete} copy ctors,
+    \texttt{default} move ctors; \texttt{copytoRealMF()} helper.
+    Forces \texttt{The\_Managed\_Arena()}. \\
+
+\texttt{src/ibm/eib.h}
+  & \color{kept}kept
+  & Major refactor ($-$2157 / $+$1030 lines): \texttt{eib\_t} template
+    now includes modular headers; adds \texttt{GPStore},
+    \texttt{computeAllGPs()}, \texttt{rebuildGeometryData()}. \\
+
+\texttt{src/ibm/eib\_cgal.h}
+  & \color{kept}kept
+  & Extended CGAL wrappers; new BVH-based inside/outside testing and
+    closest-point queries. \\
+
+\texttt{src/ibm/ib\_walltypes.h}
+  & \color{kept}kept
+  & Updated wall-model parameter structs, added
+    \texttt{interior\_is\_solid} flag, multi-arg
+    \texttt{compute\_surfIB}. \\
+
+\texttt{src/ibm/Make.package}
+  & \color{kept}kept
+  & Updated include paths for new header split. \\
+
+\midrule
+\multicolumn{3}{l}{\textit{IBM module --- new files}} \\
+\midrule
+
+\texttt{src/ibm/bvh\_types.h}
+  & \color{newfile}new
+  & POD types: \texttt{Point}, \texttt{AABB}, \texttt{BVHNode},
+    \texttt{TriMesh}, \texttt{Polygon2D}, \texttt{SurfElem},
+    \texttt{LocalFrame} (478 lines). \\
+
+\texttt{src/ibm/bvh.h}
+  & \color{newfile}new
+  & BVH tree: Morton-code build, stack-based GPU closest-point
+    traversal for \texttt{TriMesh}/\texttt{Polygon2D} (524 lines). \\
+
+\texttt{src/ibm/eib\_bvh.h}
+  & \color{newfile}new
+  & EIB--BVH bridge: \texttt{InsideTester} (ray-cast majority vote),
+    STL/OFF/2D-polygon reader, geometry-cache builder (942 lines). \\
+
+\texttt{src/ibm/eib\_data.h}
+  & \color{newfile}new
+  & SoA data: \texttt{gpData\_t}, \texttt{surfImp\_t},
+    \texttt{surfPhys\_t}, \texttt{FaceCSR}, compile-time constants
+    (637 lines). \\
+
+\texttt{src/ibm/eib\_interp.h}
+  & \color{newfile}new
+  & Interpolation helpers: image-point search, bi-/tri-linear weights,
+    Lagrange extrapolation, local/global frame transforms (519 lines). \\
+
+\texttt{src/ibm/eib\_io.h}
+  & \color{newfile}new
+  & I/O helpers: \texttt{read\_geom()}, VTK surface output
+    (\texttt{.vtp}), MPI gather, CSR builder (544 lines). \\
+
+\bottomrule
+\end{longtable}
+
+%==========================================================================
+\section{Reverted Changes}
+%==========================================================================
+
+During a cleanup pass the following modifications were identified as
+debug/test artifacts and reverted to the \texttt{eib\_dev} baseline:
+
+\begin{longtable}{p{4.5cm} p{9cm}}
+\toprule
+\textbf{Item} & \textbf{Reason for revert} \\
+\midrule
+\texttt{const int istep} in \texttt{compute\_rhs.cpp}
+  & Only used by the diagnostic print block (also removed). \\
+50-line \texttt{/* ... */} diagnostic block in RZ divergence
+  & Debug \texttt{AllPrint} profiling of RZ-vs-Cartesian RHS; not needed
+    in production. \\
+Commented-out \texttt{rhs\_cartesian} + unused \texttt{inv\_dr}
+  & Leftover from RZ development comparison. \\
+\texttt{avgDown()} closing brace indentation in staged \texttt{CNS.cpp}
+  & Whitespace-only bug introduced by staging. \\
+\bottomrule
+\end{longtable}
+
+\end{document}

@@ -69,11 +69,13 @@ public:
   Vector<BVH> bvh_a;                                        // BVH per geometry (replaces CGAL AABB tree)
 #endif
   Vector<inside_t*> inout_fa;                               // in out testing function per geometry
-  Vector<Bbox> bbox_a;                                      // bounding box per geometry (for fast rejection)
+  Vector<Bbox> bbox_a;                                      // bounding box per geometry (world-frame, for fast rejection)
+  Vector<Bbox> bbox_body_a;                                 // bounding box per geometry (body-frame, constant after init)
+  Vector<RigidTransform> transform_a;                       // rigid-body transform per geometry (body→world)
   Vector<std::string> geom_names;                           // geometry names stripped from input filenames
 
-  Gpu::ManagedVector<LocalFrame> LocalFrame_a;              // local orthonormal frame matrix (flattened)
-  Gpu::ManagedVector<SurfElem> SurfElem_a;                  // surface element area and coordinates (flattened)
+  Gpu::ManagedVector<LocalFrame> LocalFrame_a;              // local orthonormal frame matrix (flattened, body-frame)
+  Gpu::ManagedVector<SurfElem> SurfElem_a;                  // surface element area and coordinates (flattened, body-frame)
   Gpu::ManagedVector<int> geom_offsets;                     // Start index for each geometry in flattened arrays
  
   // surface related data
@@ -129,8 +131,10 @@ public:
 #else
     { decltype(bvh_a) tmp; tmp.swap(bvh_a); }
 #endif
-    { decltype(bbox_a)     tmp; tmp.swap(bbox_a);     }
-    { decltype(geom_names) tmp; tmp.swap(geom_names); }
+    { decltype(bbox_a)      tmp; tmp.swap(bbox_a);      }
+    { decltype(bbox_body_a) tmp; tmp.swap(bbox_body_a); }
+    { decltype(transform_a) tmp; tmp.swap(transform_a); }
+    { decltype(geom_names)  tmp; tmp.swap(geom_names);  }
     { decltype(gpstore_a)  tmp; tmp.swap(gpstore_a);  }
 
     // These structs have their own clear() with shrink_to_fit()
@@ -235,6 +239,36 @@ public:
    * bounding boxes, and the surface cache (LocalFrame_a, SurfElem_a).
    * Must be called BEFORE rebuildIBM().
    */
+  /**
+   * \brief Lightweight rigid-body transform update (replaces full BVH rebuild).
+   *
+   * For rigid-body FSI, the geometry shape never changes — only its position
+   * and orientation.  Instead of moving all vertices and rebuilding the BVH
+   * tree, InsideTester, LocalFrame, and SurfElem every time step, we store
+   * the geometry in its reference (body) frame and only update the transform.
+   *
+   * All query functions (computeMarkers, initialiseGPs, computeAllGPs, etc.)
+   * apply the inverse transform to query points before using the body-frame
+   * BVH, then forward-transform the results back to the world frame.
+   * The results are mathematically identical to a full rebuild.
+   *
+   * \param geomIdx  Index of the geometry to update.
+   * \param T        New rigid-body transform (body → world).
+   */
+  void updateRigidTransform(int geomIdx, const RigidTransform& T)
+  {
+      transform_a[geomIdx] = T;
+      // Update world-frame bounding box from body-frame bbox + new transform
+      bbox_a[geomIdx] = T.transform_bbox(bbox_body_a[geomIdx]);
+  }
+
+  /**
+   * \brief Full geometry rebuild (for deformable bodies or re-initialization).
+   *
+   * This is the expensive path that rebuilds BVH, InsideTester, LocalFrame,
+   * and SurfElem from scratch.  For rigid-body FSI, use updateRigidTransform()
+   * instead — it is O(1) per geometry.
+   */
   void rebuildGeometryData()
   {
     LocalFrame_a.clear();
@@ -242,7 +276,6 @@ public:
 
     for (int i = 0; i < ngeom; i++) {
 #ifdef AMREX_USE_CGAL
-      // Rebuild CGAL AABB tree from current geometry
       tree_a[i].clear();
 #if (AMREX_SPACEDIM == 2)
       tree_a[i].insert(geom_a[i].edges_begin(), geom_a[i].edges_end());
@@ -261,15 +294,18 @@ public:
 #endif
 
 #if defined(AMREX_USE_CGAL) && (AMREX_SPACEDIM == 3)
-      bbox_a[i] = PMP::bbox(geom_a[i]);
+      bbox_body_a[i] = PMP::bbox(geom_a[i]);
 #else
-      bbox_a[i] = geom_a[i].bbox();
+      bbox_body_a[i] = geom_a[i].bbox();
 #endif
+      bbox_a[i] = transform_a[i].transform_bbox(bbox_body_a[i]);
 
       geom_offsets[i] = static_cast<int>(LocalFrame_a.size());
 #ifdef AMREX_USE_CGAL
       build_geometry_cache(geom_a[i], SurfElem_a, LocalFrame_a,
                            idxmap_a[i], geom_offsets[i], i);
+#elif defined(AMREX_USE_GPU)
+      build_geometry_cache_gpu(geom_a[i], SurfElem_a, LocalFrame_a, i);
 #else
       build_geometry_cache(geom_a[i], SurfElem_a, LocalFrame_a,
                            geom_offsets[i], i);
@@ -321,15 +357,19 @@ public:
       // Pre-extract GPU-friendly views (trivially-copyable POD structs)
       GpuArray<InsideTesterView, MAX_NGEOM> inout_views;
       GpuArray<AABB, MAX_NGEOM> bboxes;
+      GpuArray<RigidTransform, MAX_NGEOM> transforms;
       for (int ii = 0; ii < ngeom; ii++) {
           inout_views[ii] = inout_fa[ii]->view();
-          bboxes[ii] = bbox_a[ii];
+          bboxes[ii] = bbox_a[ii];           // world-frame bbox
+          transforms[ii] = transform_a[ii];  // body→world transform
       }
 
       const int ngeom_local = ngeom;
       const auto dx_lev = dx_a[lev];
 
       // --- Step 1: Compute solid markers (component 0) ---
+      // Query points are in world frame; we fast-reject with world-frame bbox,
+      // then inverse-transform to body frame for the BVH inside/outside test.
       const Box& bxg = amrex::grow(bx, cls_t::NGHOST);
       amrex::ParallelFor(bxg,
         [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept
@@ -340,11 +380,14 @@ public:
         Point gridpoint = make_grid_point(prob_lo, dx_lev, i, j, k);
 
         for (int ii = 0; ii < ngeom_local; ii++) {
+          // Fast rejection with world-frame bounding box
           if (!bbox_contains(bboxes[ii], gridpoint)) {
               continue;
           }
 
-          BoundedSide result = inout_views[ii](gridpoint);
+          // Transform query point to body frame for BVH query
+          Point gp_body = transforms[ii].to_body(gridpoint);
+          BoundedSide result = inout_views[ii](gp_body);
 
           if (result == BoundedSide::Inside || result == BoundedSide::OnBoundary) {
             ibMarkers(i, j, k, 0) = static_cast<uint8_t>(ii + 1);
@@ -407,8 +450,10 @@ public:
               continue;
           }
 
+          // Transform to body frame for inside/outside test
+          Point gp_body = transform_a[ii].to_body(gridpoint);
           inside_t& inside = *inout_fa[ii];
-          BoundedSide result = inside(gridpoint);
+          BoundedSide result = inside(gp_body);
           IB_WarnOnBoundary(ii, lev, i, j, k, result, gridpoint);
 
           if (result == BoundedSide::Inside || result == BoundedSide::OnBoundary) {
@@ -482,14 +527,16 @@ public:
     // GPU path: ParallelFor with atomic counter for GP index
     // ================================================================
 
-    // Pre-build GPU-capturable BVHQueryViews for each geometry
+    // Pre-build GPU-capturable BVH4QueryViews for each geometry
     AMREX_ALWAYS_ASSERT_WITH_MESSAGE(ngeom <= MAX_NGEOM,
         "ngeom exceeds MAX_NGEOM; increase MAX_NGEOM in ibm_containers.h");
-    GpuArray<BVHQueryView, MAX_NGEOM> bqv;
+    GpuArray<BVH4QueryView, MAX_NGEOM> bqv;
     GpuArray<int, MAX_NGEOM + 1> geom_off;
+    GpuArray<RigidTransform, MAX_NGEOM> transforms;
     for (int ii = 0; ii < ngeom; ii++) {
         bqv[ii]        = bvh_a[ii].query_view(geom_a[ii]);
         geom_off[ii]   = geom_offsets[ii];
+        transforms[ii] = transform_a[ii];
     }
     geom_off[ngeom] = geom_offsets[ngeom];
 
@@ -538,20 +585,30 @@ public:
         AMREX_ASSERT(geomIdx >= 0 && geomIdx < ngeom_local);
         gpview.geomIdx_w[gidx] = geomIdx;
 
-        // BVH closest point query via GPU-capturable BVHQueryView
-        ClosestPointResult closest_elem = bqv[geomIdx].closest_point_query(gp);
+        // Transform query point to body frame, then BVH closest-point query
+        const auto& T = transforms[geomIdx];
+        Point gp_body = T.to_body(gp);
+        ClosestPointResult closest_elem = bqv[geomIdx].closest_point_query(gp_body);
         int f_idx = closest_elem.prim_id + geom_off[geomIdx];
         gpview.elemIdx_w[gidx] = f_idx;
 
-        Point cp = closest_elem.point;
+        // Transform closest point back to world frame
+        Point cp = T.to_world(closest_elem.point);
 
-        // Distance from ghost point to IB surface
+        // Distance (invariant under rigid transform, but computed in world frame)
         Real disGP_val = std::sqrt(point_distance_sq(gp, cp));
         AMREX_ASSERT(disGP_val < diag_lev);
         gpview.disGP_w[gidx] = disGP_val;
         gpview.ib_xyz_w[gidx] = make_vec<Real>(cp);
 
-        const LocalFrame& localframe = lf_ptr[f_idx];
+        // Rotate body-frame LocalFrame to world frame
+        const LocalFrame& lf_body = lf_ptr[f_idx];
+        LocalFrame localframe;
+        T.rotate_to_world(lf_body.normal,   localframe.normal);
+        T.rotate_to_world(lf_body.tangent1, localframe.tangent1);
+#if (AMREX_SPACEDIM == 3)
+        T.rotate_to_world(lf_body.tangent2, localframe.tangent2);
+#endif
 
         // Image points
         Array2D<Real, 0, eorder_tparm - 1, 0, AMREX_SPACEDIM - 1> imp_xyz;
@@ -962,6 +1019,17 @@ public:
     auto const* lf_ptr = LocalFrame_a.data();
     const int nfabs_local = gpview.nfabs;
 
+    // Capture per-geometry transforms for rotating body-frame LocalFrame to world
+    AMREX_ALWAYS_ASSERT(ngeom <= MAX_NGEOM);
+    GpuArray<RigidTransform, MAX_NGEOM> transforms;
+    GpuArray<int, MAX_NGEOM + 1> geom_off;
+    for (int ii = 0; ii < ngeom; ii++) {
+        transforms[ii] = transform_a[ii];
+        geom_off[ii]   = geom_offsets[ii];
+    }
+    geom_off[ngeom] = geom_offsets[ngeom];
+    const int ngeom_local = ngeom;
+
     // Build device array of Array4 pointers (one per local FAB).
     // No snapshot needed: GPs write only to ghost cells (ibMarkers==1)
     // while image-point interpolation reads only from fluid cells (ibMarkers==0).
@@ -991,18 +1059,30 @@ public:
       int ifab = gpview.gp_fab[ii];
       auto prims = prims_arr[ifab];  // read image points & write ghost cells
 
-      // 1) Reconstruct local orthonormal frame
+      // 1) Reconstruct local orthonormal frame — rotate from body to world frame
       int elem_idx = gpview.elemIdx[ii];
       const auto& frame = lf_ptr[elem_idx];
 
+      // Find which geometry this GP belongs to (for transform lookup)
+      int geomIdx = gpview.geomIdx[ii];
+      const auto& xform = transforms[geomIdx];
+
       int type_solid_bc = 0;
+
+      // Rotate body-frame vectors to world frame
+      amrex::Real n_w[AMREX_SPACEDIM], t1_w[AMREX_SPACEDIM], t2_w[AMREX_SPACEDIM];
+      xform.rotate_to_world(frame.normal,   n_w);
+      xform.rotate_to_world(frame.tangent1, t1_w);
+#if (AMREX_SPACEDIM == 3)
+      xform.rotate_to_world(frame.tangent2, t2_w);
+#endif
 
       Array1D<Real, 0, AMREX_SPACEDIM - 1> nvec, t1vec, t2vec;
       for (int d = 0; d < AMREX_SPACEDIM; ++d) {
-          nvec(d)  = frame.normal[d];
-          t1vec(d) = frame.tangent1[d];
+          nvec(d)  = n_w[d];
+          t1vec(d) = t1_w[d];
 #if (AMREX_SPACEDIM == 3)
-          t2vec(d) = frame.tangent2[d];
+          t2vec(d) = t2_w[d];
 #else
           t2vec(d) = Real(0.0);
 #endif
@@ -1303,12 +1383,26 @@ public:
             continue;
         }
 
-        // Convert centroid to cell index
+        // Convert body-frame centroid to world frame, then to cell index
         const SurfElem& surfelem = SurfElem_a[f_idx];
+        int gIdx = getGeomIdx(f_idx);
+        const auto& T = transform_a[gIdx];
+#ifdef AMREX_USE_CGAL
+#if (AMREX_SPACEDIM == 2)
+        Point c_body(surfelem.centroid[0], surfelem.centroid[1]);
+#else
+        Point c_body(surfelem.centroid[0], surfelem.centroid[1], surfelem.centroid[2]);
+#endif
+#else
+        Point c_body;
+        for (int dd = 0; dd < AMREX_SPACEDIM; ++dd) c_body[dd] = surfelem.centroid[dd];
+#endif
+        Point c_world = T.to_world(c_body);
+
         IntVect iv;
         for (int d = 0; d < AMREX_SPACEDIM; ++d) {
             iv[d] = static_cast<int>(std::floor(
-                    (surfelem.centroid[d] - prob_lo[d]) * inv_dx[d]));
+                    (c_world[d] - prob_lo[d]) * inv_dx[d]));
         }
 
         if (!domain.contains(iv)) { faces_out_domain++; continue; }
@@ -1374,20 +1468,31 @@ public:
         surfimp_soa.elemIdx[f_idx]  = f_idx;
         surfphys_soa.elemIdx[f_idx] = f_idx;
 
-        const LocalFrame& localframe = LocalFrame_a[f_idx];
-        const SurfElem&   surfelem   = SurfElem_a[f_idx];
+        // Rotate body-frame LocalFrame to world frame
+        const LocalFrame& lf_body = LocalFrame_a[f_idx];
+        const SurfElem&   surfelem = SurfElem_a[f_idx];
+        int gIdx = getGeomIdx(f_idx);
+        const auto& T = transform_a[gIdx];
 
-        // Build centroid Point
+        LocalFrame localframe;
+        T.rotate_to_world(lf_body.normal,   localframe.normal);
+        T.rotate_to_world(lf_body.tangent1, localframe.tangent1);
+#if (AMREX_SPACEDIM == 3)
+        T.rotate_to_world(lf_body.tangent2, localframe.tangent2);
+#endif
+
+        // Transform body-frame centroid to world frame
 #ifdef AMREX_USE_CGAL
 #if (AMREX_SPACEDIM == 2)
-        Point surf_centroid(surfelem.centroid[0], surfelem.centroid[1]);
+        Point c_body(surfelem.centroid[0], surfelem.centroid[1]);
 #else
-        Point surf_centroid(surfelem.centroid[0], surfelem.centroid[1], surfelem.centroid[2]);
+        Point c_body(surfelem.centroid[0], surfelem.centroid[1], surfelem.centroid[2]);
 #endif
 #else
-        Point surf_centroid;
-        for (int d = 0; d < AMREX_SPACEDIM; ++d) surf_centroid[d] = surfelem.centroid[d];
+        Point c_body;
+        for (int dd = 0; dd < AMREX_SPACEDIM; ++dd) c_body[dd] = surfelem.centroid[dd];
 #endif
+        Point surf_centroid = T.to_world(c_body);
 
         // Temporary storage for this face's image point data
         Array2D<Real, 0, eorder_tparm_surf - 1, 0, IDIM> imp_xyz;
@@ -1513,6 +1618,17 @@ public:
     auto const* lf_ptr = LocalFrame_a.data();
     auto const* se_ptr = SurfElem_a.data();
 
+    // Capture transforms and geom_offsets for body→world rotation
+    AMREX_ALWAYS_ASSERT(ngeom <= MAX_NGEOM);
+    GpuArray<RigidTransform, MAX_NGEOM> transforms;
+    GpuArray<int, MAX_NGEOM + 1> geom_off;
+    for (int ii = 0; ii < ngeom; ii++) {
+        transforms[ii] = transform_a[ii];
+        geom_off[ii]   = geom_offsets[ii];
+    }
+    geom_off[ngeom] = geom_offsets[ngeom];
+    const int ngeom_local = ngeom;
+
     auto* copy = this;
 
     ParallelFor(nfaces_local, [=] AMREX_GPU_DEVICE (int ii) noexcept
@@ -1522,24 +1638,54 @@ public:
       int ifab = sp_ifab[f_idx];
       auto prims = prims_arr[ifab];
 
-      // 1) Reconstruct local orthonormal frame
+      // Find geometry index for this face (to get the right transform)
+      int gIdx = 0;
+      for (int g = 0; g < ngeom_local; ++g) {
+          if (f_idx >= geom_off[g] && f_idx < geom_off[g + 1]) { gIdx = g; break; }
+      }
+      const auto& T = transforms[gIdx];
+
+      // 1) Reconstruct local orthonormal frame — rotate body→world
       const auto& frame = lf_ptr[f_idx];
+
+      amrex::Real n_w[AMREX_SPACEDIM], t1_w[AMREX_SPACEDIM], t2_w[AMREX_SPACEDIM];
+      T.rotate_to_world(frame.normal,   n_w);
+      T.rotate_to_world(frame.tangent1, t1_w);
+#if (AMREX_SPACEDIM == 3)
+      T.rotate_to_world(frame.tangent2, t2_w);
+#endif
 
       Array1D<Real, 0, AMREX_SPACEDIM - 1> nvec, t1vec, t2vec;
       for (int d = 0; d < AMREX_SPACEDIM; ++d) {
-          nvec(d)  = frame.normal[d];
-          t1vec(d) = frame.tangent1[d];
+          nvec(d)  = n_w[d];
+          t1vec(d) = t1_w[d];
 #if (AMREX_SPACEDIM == 3)
-          t2vec(d) = frame.tangent2[d];
+          t2vec(d) = t2_w[d];
 #else
           t2vec(d) = Real(0.0);
 #endif
       }
 
-      // Surface centroid coordinates
+      // Surface centroid coordinates — transform body→world
       Array1D<Real, 0, AMREX_SPACEDIM - 1> xyz;
-      for (int d = 0; d < AMREX_SPACEDIM; ++d) {
-          xyz(d) = se_ptr[f_idx].centroid[d];
+      {
+#ifdef AMREX_USE_CGAL
+#if (AMREX_SPACEDIM == 2)
+        Point c_body(se_ptr[f_idx].centroid[0], se_ptr[f_idx].centroid[1]);
+#else
+        Point c_body(se_ptr[f_idx].centroid[0], se_ptr[f_idx].centroid[1], se_ptr[f_idx].centroid[2]);
+#endif
+        Point c_world = T.to_world(c_body);
+        xyz(0) = c_world.x(); xyz(1) = c_world.y();
+#if (AMREX_SPACEDIM == 3)
+        xyz(2) = c_world.z();
+#endif
+#else
+        Point c_body;
+        for (int dd = 0; dd < AMREX_SPACEDIM; ++dd) c_body[dd] = se_ptr[f_idx].centroid[dd];
+        Point c_world = T.to_world(c_body);
+        for (int dd = 0; dd < AMREX_SPACEDIM; ++dd) xyz(dd) = c_world[dd];
+#endif
       }
 
       // 2) Zero-initialize primsNormal

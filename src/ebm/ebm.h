@@ -8,7 +8,6 @@
 #include <AMReX_EBFArrayBox.H>
 #include <AMReX_ParmParse.H>
 
-// snm new
 #include <AMReX_EBFluxRegister.H>
 #include <AMReX_Geometry.H>
 
@@ -92,28 +91,32 @@ public:
   // mask
   Vector<iMultiFab> level_mask_a;  // object not pointers
  
-  const amrex::Real isodxerr = 1.e-8;        // relative isotropy error ||dx-dy||/dx
-  const amrex::Real vfracmin = 1.e-6;        // minimum to consider a cell "empty"
-  const amrex::Real vfracmax = 1.0-vfracmin; // maximum to consider a cell "not-full"
-
   // variables for redistribution (originally declared static)
   amrex::Real eb_weight;
   std::string redistribution_type;
 
-  // aux vars for redistribution
+  // EB constants and parameters --------------------------------------------------------
+  static constexpr Real isodxerr = 1.e-8;        // relative isotropy error ||dx-dy||/dx
+  //  for redistribution
   const bool use_wts_in_divnc = false; //true
   const int srd_max_order = 2; // 2
-  const amrex::Real target_volfrac = 0.5; //0.5
-  const amrex::Real fac_for_deltaR = 1.0;
+  const Real target_volfrac = 0.5; //0.5
+  const Real fac_for_deltaR = 1.0;
 
-  
+  //  for interpolation
+  static constexpr bool use_weighted_interp = false;  //false: unweighted average; true: inverse-distance weighted average
+  static constexpr int nb = 1; // number of neighbours for interpolation     
+  static constexpr Real vfracmin = 1.e-9; // minimum vfrac to consider a cell "not empty" 
+  static constexpr Real vfracmax = 1.0 - vfracmin; // maximum vfrac to consider a cell "not full"
+
   ///////////////////////////////////////////////////////////////////////////
   void init(Amr* pointer_amr,const Geometry& geom, const int required_level, 
                                                          const int max_level)
   {
     BL_PROFILE("initializeEB2");
 
-    amrex::Print() << " Initialize EB at maxlevel = " << max_level << std::endl;
+    amrex::Print() << " Initialize EB at level = " << required_level ;
+    amrex::Print() << " out of "<< max_level << std::endl;
 
    static_assert(AMREX_SPACEDIM > 1, "EB only supports 2D and 3D"); 
 
@@ -183,6 +186,8 @@ public:
   ////////////////////////////////////////////////////////////////////////////
   /**
   * @brief Update boolean markers solid and partially solid
+  *        i,j,k,0):  if cells is covered                         :1 (true) 0 (false)
+  *        i,j,k,1):  if cells is partially covered  (near solid) :1 (true) 0 (false)
   * @param lev current AMR level  
   **/
   void computeMarkers(int lev)
@@ -195,16 +200,186 @@ public:
       // make box including GHOST
       const Box& bxg = mfi.growntilebox(cls_t::NGHOST);
 
-      const auto& ebMarkers = mfab.array(mfi);           
       const auto& flag_arr = (*ebflags_a[lev]).const_array(mfi);
+      const auto vfrac     = (*volmf_a[lev]).const_array(mfi);    
+
+      // markers: comp 0 = solid mask, comp 1 = neighbor-of-solid mask
+      const auto& ebMarkers = mfab.array(mfi);           
+
+
+      const bool correct_cells = false; //treat small cells as solid
+      // -------------------------
+      // Pass 1: define "solid"
+      // -------------------------
+      int ncorr=0;
+      amrex::Gpu::DeviceScalar<int> ncorr_d(0);
+      int* p_ncorr = ncorr_d.dataPtr();
+
+      amrex::ParallelFor( bxg, [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept
+        {
+          // Start from AMReX EB classification
+          int is_solid = flag_arr(i,j,k).isCovered() ? 1 : 0;
+          // If it's a cut cell with very small fluid volume, treat it as solid
+          if (correct_cells)
+          {
+            if (flag_arr(i,j,k).isSingleValued() && (vfrac(i,j,k) < vfracmin)) {
+              is_solid = 1; 
+	      amrex::Gpu::Atomic::Add(p_ncorr, 1);
+            }
+          }  
+          ebMarkers(i,j,k,0) = is_solid;
+          // Initialize neighbor flag; will be rebuilt in Pass 2          
+          ebMarkers(i,j,k,1) = flag_arr(i,j,k).isSingleValued(); //old      
+
+        });
+      ncorr = ncorr_d.dataValue();  // bring device counter back to host
+      // ---------------------------------------------------------
+      // Pass 2: rebuild "neighbor-of-solid" using updated marker0
+      // ---------------------------------------------------------
+      
+      if (ncorr > 0)
+      {
+      // We need i±1/j±1/k±1 accesses; avoid OOB by shrinking one layer.
+      amrex::Box bx_inner = bxg;
+      bx_inner.grow(-1);
+
+      if (bx_inner.ok()) // is box ok
+      {
+        amrex::ParallelFor( bx_inner, [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept
+          {
+          // Only fluid cells can be "neighbors of solid"
+          if (ebMarkers(i,j,k,0) != 0) {
+            ebMarkers(i,j,k,1) = 0;
+            return;
+          }
+
+          int nbr_solid = 0;
+          // Face-neighbors (6-neighborhood in 3D, 4-neighborhood in 2D)
+          nbr_solid |= (ebMarkers(i-1,j,k,0) != 0);
+          nbr_solid |= (ebMarkers(i+1,j,k,0) != 0);
+          nbr_solid |= (ebMarkers(i,j-1,k,0) != 0);
+          nbr_solid |= (ebMarkers(i,j+1,k,0) != 0);
+#if (AMREX_SPACEDIM == 3)
+          nbr_solid |= (ebMarkers(i,j,k-1,0) != 0);
+          nbr_solid |= (ebMarkers(i,j,k+1,0) != 0);
+#endif
+          ebMarkers(i,j,k,1) = nbr_solid ? 1 : 0;
+          });
+      } // endif box ok
+      } // endif ncorr
+    }  // end loop mfi
+
+      // Optional: if you rely on marker(.,.,.,1) being valid in  ALL ghost cells
+      // need to mfab.FillBoundary(geom[lev].periodicity()) outside the MFIter
+  }
+  ////////////////////////////////////////////////////////////////////////////
+  /**
+  * @brief check if the geometry is properly defined by printing out some geometric parameters
+  * @param lev current AMR level  
+  **/
+  void check_geometry (int lev)
+  {
+
+    auto& mfab = *bmf_a[lev];
+
+    amrex::Print() << " Check EB geometry at level " << lev << "\n";
+
+    // init counters
+    int empty_cutcells = 0;
+    int distorted_cutcells = 0;
+    int corr_cutcells = 0;
+
+    amrex::Gpu::DeviceScalar<int> empty_d(0);
+    amrex::Gpu::DeviceScalar<int> distorted_d(0);
+    amrex::Gpu::DeviceScalar<int> corr_d(0);
+
+    int* p_empty     = empty_d.dataPtr();
+    int* p_distorted = distorted_d.dataPtr();
+    int* p_corr      = corr_d.dataPtr();
+
+    for (amrex::MFIter mfi(mfab, false); mfi.isValid(); ++mfi)
+    {
+      const Box& ebbox  = mfi.growntilebox(0);  // box without ghost points 
+
+      const auto& flag = (*ebflags_a[lev])[mfi];
+      FabType t = flag.getType(ebbox);
+      const bool fab_with_eb     = (FabType::singlevalued == t);  
+
+      if (!fab_with_eb) { continue;}
+
+      // geometry arrays for this tile
+      const auto apx       = areamcf_a[lev][0]->const_array(mfi);
+      const auto apy       = areamcf_a[lev][1]->const_array(mfi);
+#if (AMREX_SPACEDIM == 3)
+      const auto apz       = areamcf_a[lev][2]->const_array(mfi);
+#endif
+      const auto vfrac     = (*volmf_a[lev]).const_array(mfi);    
+      const auto flag_arr  = (*ebflags_a[lev]).const_array(mfi);           
+      const auto normxyz   = (*normmcf_a[lev]).const_array(mfi);
+      const auto bcarea    = (*bcareamcf_a[lev]).const_array(mfi);
+      // markers
+      const auto& ebMarkers = mfab.array(mfi);      
 
       amrex::ParallelFor(
-        bxg, [=] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {                       
-        ebMarkers(i, j, k, 0) = flag_arr(i,j,k).isCovered();  
-        ebMarkers(i, j, k, 1) = flag_arr(i,j,k).isSingleValued();    
+        ebbox, [=] AMREX_GPU_DEVICE(int i, int j, int k) noexcept
+      {
+
+        if (ebMarkers(i,j,k,1) == 0) return; // not neighbour of solid
+
+
+        // normal to surface (pointing towards the fluid)
+        amrex::Real norm_wall[AMREX_SPACEDIM] = {0.0_rt};
+        for (int n = 0; n < AMREX_SPACEDIM; ++n) {
+          norm_wall[n] = -normxyz(i,j,k,n);
+        }
+        amrex::Real areaw = bcarea(i,j,k,0);
+        // calculate error divergence 
+        amrex::Real Err_A[AMREX_SPACEDIM] = {0.0_rt};
+        Err_A[0] = apx(i,j,k)   - apx(i+1,j,k)   + areaw*norm_wall[0];
+        Err_A[1] = apy(i,j,k)   - apy(i,j+1,k)   + areaw*norm_wall[1];
+#if (AMREX_SPACEDIM == 3)
+        Err_A[2] = apz(i,j,k)   - apz(i,j,k+1)   + areaw*norm_wall[2];
+#endif
+        amrex::Real sumError = 0.0_rt;
+        for (int n = 0; n < AMREX_SPACEDIM; ++n) {sumError += Err_A[n];} 
+
+        // check if vfrac is in the expected range
+        if (vfrac(i,j,k) < vfracmin)  {
+           //++empty_cutcells;          
+	  amrex::Gpu::Atomic::Add(p_empty, 1);
+        }                
+
+        if (amrex::Math::abs(sumError) > 1.e-6_rt) {
+           //++distorted_cutcells;
+	  amrex::Gpu::Atomic::Add(p_distorted, 1);
+        }        
+
+        // these cells were corrected because they were empty
+        if (!flag_arr(i,j,k).isSingleValued())
+        {
+          //++corr_cutcells;
+	  amrex::Gpu::Atomic::Add(p_corr, 1);
+        }
+
+
       });
 
     }
+
+
+    empty_cutcells     = empty_d.dataValue();
+    distorted_cutcells = distorted_d.dataValue();
+    corr_cutcells      = corr_d.dataValue();
+
+    // sum across MPI ranks
+    amrex::ParallelDescriptor::ReduceIntSum(empty_cutcells);
+    amrex::ParallelDescriptor::ReduceIntSum(distorted_cutcells);
+    amrex::ParallelDescriptor::ReduceIntSum(corr_cutcells);
+    
+    amrex::Print() << " Total number of empty cut-cells:  " << empty_cutcells ;
+    amrex::Print() << " and distorted cut-cells: " << distorted_cutcells << "\n";
+    amrex::Print() << " empty cells corrected:   " << corr_cutcells << "\n";
+    amrex::Print() << " ------------------------------------ \n";
   }
   ////////////////////////////////////////////////////////////////////////////
   /**
@@ -218,8 +393,10 @@ public:
                       const Array4<Real>& rhs, const cls_t* cls, int lev) {
 
     const Box& ebbox  = mfi.growntilebox(0);  // box without ghost points 
-    const GpuArray<Real, AMREX_SPACEDIM> dxinv = geom.InvCellSizeArray();
-    const Real *dx = geom.CellSize();
+
+    // avoid pointers
+    auto dxinv = geom.InvCellSizeArray();
+    auto dx    = geom.CellSizeArray();
 
     // extract EB arrays given a level and mfi
     Array4<const Real> vfrac = (*volmf_a[lev]).const_array(mfi);              // vfrac
@@ -235,44 +412,42 @@ public:
 
     // markers 
     const auto& ebMarkers = (*bmf_a[lev]).array(mfi);
-
-    // just in case 
-    const auto& flag = (*ebflags_a[lev])[mfi];
-
+    // fluxes
     auto const& flx_x = flxt[0]->array(); 
     auto const& flx_y = flxt[1]->array(); 
 #if (AMREX_SPACEDIM==3)     
     auto const& flx_z = flxt[2]->array(); 
 #endif
 
+#ifdef USE_PELEPHYSICS    
+    // transport properties
+    auto const* ltransparm = trans_parms.device_parm();
+    AMREX_ALWAYS_ASSERT(ltransparm != nullptr);
+#else
+    auto const* ltransparm = (trans_parm_t const*)nullptr;  //null pointer      
+#endif    
+
     amrex::ParallelFor(
         ebbox, [=] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {
 
-          // only applied to covered cells (could be done with flags)
+          // only solve flux in cut cells (not in regular or almost empty cells)
+          bool solve_fluxwall = ebMarkers(i,j,k,1) && (vfrac(i,j,k) > vfracmin); 
 
-          if (ebMarkers(i,j,k,1)){
-            Real vfracinv = 1.0/vfrac(i,j,k);
+          if (solve_fluxwall){            
+            Real inv_hvfrac = dxinv[0]/(vfrac(i,j,k)+vfracmin); //only isotropic cells
 
-            // rebuild fluxes
+            // rebuild fluxes in the cut cells
             for (int n = 0; n < cls_t::NCONS; n++) {
-              Real fxp = flx_x(i+1,j,k,n); 
-              Real fxm = flx_x(i,j,k,n);
-              Real fyp = flx_y(i,j+1,k,n); 
-              Real fym = flx_y(i,j,k,n);
-
-              //  overwrite rhs in the cut-cells
-
+              
 #if (AMREX_SPACEDIM==3)            
-              Real fzp = flx_z(i,j,k+1,n); 
-              Real fzm = flx_z(i,j,k,n);
-              rhs(i, j, k, n) = -vfracinv*(
-                dxinv[0] * (apx(i + 1, j, k) * fxp - apx(i, j, k) * fxm) +
-                dxinv[1] * (apy(i, j + 1, k) * fyp - apy(i, j, k) * fym) +
-                dxinv[2] * (apz(i, j, k + 1) * fzp - apz(i, j, k) * fzm) );
+              rhs(i, j, k, n) = -inv_hvfrac*(
+                (apx(i + 1, j, k) * flx_x(i+1,j,k,n)  - apx(i, j, k) * flx_x(i,j,k,n)) +
+                (apy(i, j + 1, k) * flx_y(i,j+1,k,n)  - apy(i, j, k) * flx_y(i,j,k,n)) +
+                (apz(i, j, k + 1) * flx_z(i,j,k+1,n)  - apz(i, j, k) * flx_z(i,j,k,n)) );
 #else
-              rhs(i, j, k, n) = -vfracinv*(
-                dxinv[0] * (apx(i + 1, j, k) * fxp - apx(i, j, k) * fxm) +
-                dxinv[1] * (apy(i, j + 1, k) * fyp - apy(i, j, k) * fym) );            
+              rhs(i, j, k, n) = -inv_hvfrac *(
+                (apx(i + 1, j, k) * flx_x(i+1,j,k,n) - apx(i, j, k) * flx_x(i,j,k,n)) +
+                (apy(i, j + 1, k) * flx_y(i,j+1,k,n) - apy(i, j, k) * flx_y(i,j,k,n)) );            
 #endif      
             }
 
@@ -280,92 +455,132 @@ public:
             amrex::GpuArray<Real, cls_t::NCONS> flux_wall = {0.0};                             
             // primitive array at surface
             amrex::GpuArray<Real, cls_t::NPRIM> prim_wall = {0.0};
-
-
-            // compute weights
-            // loop over neighbours  ii,jj,kk
-            // xcell 
-            // if (ii=i jj=j kk=k) xcell=xcentrp
-            // r = (bc_centroid(i,j,k,n) - xcell[n]);
-            // solid phi=0 othwersie phi=1
-            // w = phi/r
-
-
-
-
-            for (int n = 0; n < cls_t::NPRIM; n++) {
-              prim_wall[n] = prims(i,j,k,n);   // interpolate   ???????????   
-              
-              // use same tecniques weighted based on distance phi = sum w phi(node)/sum w
-              // w is 1/r (only connected)
-
-
-            }  
-            // normal to surface (point towards the fluid)
-            Real norm_wall[AMREX_SPACEDIM]= {0.0};
+      
+            if (use_weighted_interp){
+              Real sumw = 1e-30;                
+              // position of centroid in cell units
+              Real x_bc = i + 0.5 + bc_centroid(i,j,k,0);
+              Real y_bc = j + 0.5 + bc_centroid(i,j,k,1) ;
+#if (AMREX_SPACEDIM == 3)
+              Real z_bc =  k  + 0.5 + bc_centroid(i,j,k,2);
+              for (int kk = k - nb; kk <= k + nb; kk++) {
+#else
+              int kk = 0;              
+#endif
+                for (int jj = j - nb; jj <= j + nb; jj++) {
+                  for (int ii = i - nb; ii <= i + nb; ii++) {
+                  // loop over neighbour cells                          
+                    if (!ebMarkers(ii,jj,kk,0)) {
+                      // regular or cut-cell neighbour coordinates in cell units
+                      Real xx = ii + 0.5;
+                      Real yy = jj + 0.5;
+#if (AMREX_SPACEDIM == 3)
+                      Real zz = kk + 0.5;
+#endif
+                      if (ebMarkers(ii,jj,kk,1)) { // cut cell (use position of centroid)
+                        xx += vol_centroid(ii,jj,kk,0);
+                        yy += vol_centroid(ii,jj,kk,1);
+#if (AMREX_SPACEDIM == 3)
+                        zz += vol_centroid(ii,jj,kk,2);
+#endif
+                      }              
+                      // distance from nighbour cell (ii,jj,kk) centroid  to target cell (i,j,k) boundary centroid (in cell units)
+#if (AMREX_SPACEDIM == 3)
+                      Real r = std::sqrt( (xx - x_bc)*(xx - x_bc) + (yy - y_bc)*(yy - y_bc) + (zz - z_bc)*(zz - z_bc) );                        
+#else                                          
+                      Real r = std::sqrt( (xx - x_bc)*(xx - x_bc) + (yy - y_bc)*(yy - y_bc) );
+#endif                                                           
+                      // interpolation weight based on distance 
+                      r = amrex::max(r, 1e-6_rt);
+                      Real w = 1.0_rt/r; sumw += w;
+                      for (int n = 0; n < cls_t::NPRIM; n++) { prim_wall[n] += w*prims(ii,jj,kk,n);    } 
+                    }  //  endif not-empty 
+                  } //endfor ii
+                } //endfor jj
+#if (AMREX_SPACEDIM == 3)                
+              } //end for kk
+#endif              
+              //--o  
+              sumw = 1.0/sumw; //normalise weights          
+              for (int n = 0; n < cls_t::NPRIM; n++) {
+                prim_wall[n] = prim_wall[n]*sumw;             
+              }
+            }
+            else {
+              for (int n = 0; n < cls_t::NPRIM; n++) {
+                prim_wall[n] = prims(i,j,k,n);               
+              }
+            }    
+            // normal to surface (pointing towards the fluid)
+            Real norm_wall[AMREX_SPACEDIM]= {0.0}; 
             for (int n = 0; n < AMREX_SPACEDIM; n++) {
-              norm_wall[n] = -normxyz(i,j,k,n); // -1 to point twds fluid
+              norm_wall[n] = -normxyz(i,j,k,n);  
             }
 
+            // area/normal correction to ensure divergence free fluxes in cut cells 
+            //====================================================================
+            Real Err_A[AMREX_SPACEDIM]= {0.0};
+            Real areaw = bcarea(i,j,k,0);
+            Err_A[0] = apx(i,j,k) - apx(i+1,j,k) + areaw*norm_wall[0];
+            Err_A[1] = apy(i,j,k) - apy(i,j+1,k) + areaw*norm_wall[1];
+#if (AMREX_SPACEDIM == 3)                      
+            Err_A[2] = apz(i,j,k) - apz(i,j,k+1) + areaw*norm_wall[2]; 
+#endif
+            // error measure (temp)
+            Real sumError = 0.0_rt; Real sumnorm=0.0_rt;
+            for (int n = 0; n < AMREX_SPACEDIM; n++) { sumError += Err_A[n];}
+            for (int n = 0; n < AMREX_SPACEDIM; n++) { sumnorm += norm_wall[n];}
+
+            // correct area projections 
+            Real Areai[AMREX_SPACEDIM]= {0.0}; 
+            for (int n = 0; n < AMREX_SPACEDIM; n++){
+              Areai[n] = areaw*norm_wall[n] - Err_A[n];
+            }  
+            // recalculate normal based on corrected area projections
+	    Real areanew = 0.0_rt;
+	    for (int n = 0; n < AMREX_SPACEDIM; n++) {
+              areanew += Areai[n]*Areai[n];
+            }
+            areanew = std::sqrt(areanew);
+            Real normnew[AMREX_SPACEDIM]= {0.0};
+            for (int n = 0; n < AMREX_SPACEDIM; n++) {
+              normnew[n] = Areai[n]/areanew;
+            }
+            // update wall normal and area with corrected values
+            areaw = areanew;
+            for (int n = 0; n < AMREX_SPACEDIM; n++) {
+              norm_wall[n] = normnew[n];
+            }
+            //=================================================================
+
+	          wallmodel wm;  // create local instance
             // calculate wall flux and add it to rhs
-            wallmodel::wall_flux(geom,i,j,k,norm_wall,prim_wall,flux_wall,cls);      
-            
+            wm.wall_flux(geom,i,j,k,norm_wall,prim_wall,flux_wall,cls);      
+                                  
             // calculate viscous walls
             if (param::solve_diffwall)
             {
               // from volume and area centroid compute distance to wall 
               // and project into normal direction
-              Real x_dis[AMREX_SPACEDIM]= {0.0};
-              Real dis = 1.e-8; 
-              for (int n = 0; n < AMREX_SPACEDIM; n++) {
-                x_dis[n] = vol_centroid(i,j,k,n)- bc_centroid(i,j,k,n);
-                dis += x_dis[n]*norm_wall[n];
-              }   
-              dis = dis*dx[0]; // units
-              //         
-              
-      // temp snm
-      // amrex::GpuArray<Real, cls_t::NCONS> flux_visc = {0.0};  
-      // printf(" i=%d j=%d k=%d \n",i,j,k);
-      // printf(" vol_centroid = %f %f \n",vol_centroid(i,j,k,0),vol_centroid(i,j,k,1));
-      // printf(" bc_centroid = %f %f \n",bc_centroid(i,j,k,0),bc_centroid(i,j,k,1));
-      // printf(" distance = %f nx =%f ny=%f\n", dis,norm_wall[0],norm_wall[1]);
+	            Real dis = 1e-6_rt; // min distance (cell units)   
+              for (int n = 0; n < AMREX_SPACEDIM; n++) {                
+                dis += (vol_centroid(i,j,k,n)- bc_centroid(i,j,k,n)) *norm_wall[n];       
+              }    
+	            dis = dis*dx[0];  // units
+	            wm.wall_flux_diff(geom,i,j,k,dis,norm_wall,prims,prim_wall,flux_wall,cls,ltransparm);
+            } 
 
-      // for (int n = 0; n < cls_t::NPRIM; n++) {
-      //   printf(" %d q=%f \n",n,prim_wall[n]);         
-      // }
-      // printf(" o  \n");
-      // for (int n = 0; n < cls_t::NCONS; n++) {
-      //   printf(" %d flux=%f \n",n,flux_wall[n]);  
-      //   flux_visc[n]= flux_wall[n];
-      // }    
-
-      // printf(" ---  \n");
-      // snm
-
-              wallmodel::wall_flux_diff(geom,i,j,k,dis,norm_wall,prims,prim_wall,flux_wall,cls);
-
-      // temp snm              
-      
-        // for (int n = 0; n < cls_t::NCONS; n++) {
-        //   flux_visc[n]= flux_wall[n]- flux_visc[n];
-        //   printf(" %d visc flux=%f \n",n,flux_visc[n]);  
-        //  }
-        //  printf(" ---  \n");
-      //
-
-            }
-
+            // add wall flux to rhs 
             for (int n = 0; n < cls_t::NCONS; n++) {
-              rhs(i,j,k,n) += flux_wall[n]*vfracinv*bcarea(i,j,k,0)*dxinv[0]; 
-            }
+              rhs(i,j,k,n) += flux_wall[n]*areaw*inv_hvfrac; 
+            }                           
 
-          }
-         
+          }  //end if partially covered       
 
         });
 
-  }                      
+  }
+
   ///////////////////////////////////////////////////////////////////////////
   /**
   * @brief Compute fluxes in the EB wall and add it to rhs
@@ -375,65 +590,54 @@ public:
   * @param rhs  
   **/
 
-  //(geom,mfi,cons,divc, {AMREX_D_DECL(&fluxt[0], &fluxt[1], &fluxt[2])},
-  //state, cls_d,level,dt,h_phys_bc);
-
   void inline redist (const Geometry& geom, const MFIter& mfi,
                       const Array4<Real>& cons, const Array4<Real>& divc, 
                       std::array<FArrayBox*, AMREX_SPACEDIM> const &flxt,
                       const Array4<Real>& rhs, const cls_t* cls, int lev, Real dt,
                       BCRec const* phys_bc) {
 
-    const Box& ebbox  = mfi.growntilebox(0);  // box without ghost points 
-    const GpuArray<Real, AMREX_SPACEDIM> dxinv = geom.InvCellSizeArray();
-    const Real *dx = geom.CellSize();
+    const Box& ebbox  = mfi.growntilebox(0); 
+    const Box& bxg    = mfi.growntilebox(cls_t::NGHOST);
+    auto dx    = geom.CellSizeArray();
 
     // printf(" [ebm::redist] in ebm redist... (SNM temp) \n ");
-
                     
-    // extract EB-related arrays given a level and mfi
-    Array4<const Real> vfrac = (*volmf_a[lev]).const_array(mfi);             // vfrac
-    Array4<const Real> const& apx = areamcf_a[lev][0]->const_array(mfi);     // areas fraction x
-    Array4<const Real> const& apy = areamcf_a[lev][1]->const_array(mfi);     //                y 
+    // extract EB-related arrays/flags  given a level and mfi
+    Array4<const Real> vfrac = (*volmf_a[lev]).const_array(mfi);               // vfrac
+    Array4<const Real> const& apx = areamcf_a[lev][0]->const_array(mfi);       // area  fraction x
+    Array4<const Real> const& apy = areamcf_a[lev][1]->const_array(mfi);       //                y 
 #if (AMREX_SPACEDIM==3)    
-    Array4<const Real> const& apz = areamcf_a[lev][2]->const_array(mfi);     //                z
+    Array4<const Real> const& apz = areamcf_a[lev][2]->const_array(mfi);       //                z
 #endif    
-    Array4<const Real> const& bcarea  = (*bcareamcf_a[lev]).const_array(mfi); // bc area 
-    Array4<const Real> const& bcent   = (*bndrycent_a[lev]).const_array(mfi); // bc centroid
+    Array4<const Real> const& bcarea  = (*bcareamcf_a[lev]).const_array(mfi);  // bc area 
+    Array4<const Real> const& bcent   = (*bndrycent_a[lev]).const_array(mfi);  // bc centroid
+    Array4<const int> const& lev_mask = level_mask_a[lev].const_array(mfi);    // level mask is an object (not a pointer)
+    Array4<const EBCellFlag> const& flag = (*ebflags_a[lev]).const_array(mfi); // flags
 
-    Array4<const int> const& lev_mask = level_mask_a[lev].const_array(mfi);   // level mask is an object (not a pointer)
-
-    // flags
-    //const auto& flag = (*ebflags_a[lev])[mfi];
-
-    Array4<const EBCellFlag> const& flag = (*ebflags_a[lev]).const_array(mfi); ;
-
-    //flags.const_array(mfi)  /<------------------------------------------
-    // Array4<const EBCellFlag> const& fla
-
-    // store weights and ebwight in two arrays to prep for redist
-    const Box& bxg = mfi.growntilebox(cls_t::NGHOST);    
-    // redistribution weights arrays
-    FArrayBox redistwgt_fab(bxg, 1);       
-    FArrayBox srd_update_scale_fab(bxg, 1);  
-    auto const& redistwgt = redistwgt_fab.array();
-    auto const& srd_update_scale = srd_update_scale_fab.array();
-     
-    amrex::ParallelFor(bxg, [=, this]  AMREX_GPU_DEVICE(int i, int j, int k) noexcept {
-      redistwgt(i, j, k) = vfrac(i, j, k);
-      srd_update_scale(i, j, k) = eb_weight; 
+     // create temporary arrays to store the weights
+      FArrayBox redistwgt_fab(bxg, 1);        
+      FArrayBox srd_update_scale_fab(bxg, 1); 
+      int ncomp = cls_t::NCONS;
+      if (redistribution_type == "FluxRedist") ncomp = 1;
+      FArrayBox tmpfab(bxg, ncomp, The_Async_Arena());
+      auto const& redistwgt = redistwgt_fab.array();
+      auto const& srd_update_scale = srd_update_scale_fab.array();
+      Array4<Real> scratch = tmpfab.array();
+  
+    // fill temporary arrays
+    Real ebw = eb_weight;   // copy member to a plain scalar
+    amrex::ParallelFor(bxg, [=]  AMREX_GPU_DEVICE(int i, int j, int k) noexcept {
+      redistwgt(i, j, k)        = vfrac(i, j, k);
+     srd_update_scale(i, j, k)  = ebw; // eb_weight;
     });
 
-
-    
-    // create temporary array and fill first with weights (will be used as weights)
-    FArrayBox tmpfab(bxg, 1, The_Async_Arena()); // cls_t::NCONS
-    Array4<Real> scratch = tmpfab.array();    
+    //redist weights (in case of FluxRedist, otherwise use as scrap inside Reditribution)  // temp snm
     if (redistribution_type == "FluxRedist") {
       amrex::ParallelFor(bxg, [=] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {
         scratch(i, j, k) = redistwgt(i, j, k);
       });
     }
+
     // call MLRedistribution from AMReX
     int level_mask_not_covered = CNSConstants::level_mask_notcovered;
 
@@ -469,9 +673,16 @@ public:
 
     int as_crse = 0;
     int as_fine = 0;  // if 1 it crashes
-    FArrayBox dm_as_fine(Box::TheUnitBox(), cls_t::NCONS, The_Async_Arena());
-    FArrayBox fab_drho_as_crse(Box::TheUnitBox(), cls_t::NCONS, The_Async_Arena());
+    
+     FArrayBox dm_as_fine(Box::TheUnitBox(), cls_t::NCONS, The_Async_Arena()); //snm (new 2 lines  below, now commented)
+    //FArrayBox dm_as_fine(bxg, cls_t::NCONS, The_Async_Arena());
+    //dm_as_fine.setVal<RunOn::Device>(0.0);
+
+    FArrayBox fab_drho_as_crse(Box::TheUnitBox(), cls_t::NCONS, The_Async_Arena()); //snm ( new 2 lines below the lien belwo)
     IArrayBox fab_rrflag_as_crse(Box::TheUnitBox());
+    //FArrayBox fab_drho_as_crse(bxg, cls_t::NCONS, The_Async_Arena());   
+    //IArrayBox fab_rrflag_as_crse(bxg);   
+
     // in cerisse this call is different, depends on
     const IArrayBox* p_rrflag_as_crse = &fab_rrflag_as_crse;
     FArrayBox* p_drho_as_crse = &fab_drho_as_crse;
@@ -482,20 +693,26 @@ public:
     auto const& fcz = flxt[2]->array(); 
 #endif
     
-    // redistribution
+    // redistribution temp snm
     if (redistribution_type == "NewRedist")
     {
       cerisse_flux_redistribute( ebbox,rhs, divc, redistwgt, vfrac,flag,geom,cls_t::NCONS,dt);
-    }
-    else  
-    {
-      amrex::ApplyMLRedistribution(
+   }
+   else  
+   {
+     amrex::ApplyMLRedistribution(
       ebbox, cls_t::NCONS, rhs, divc, cons, scratch, flag, AMREX_D_DECL(apx, apy, apz), vfrac,
       AMREX_D_DECL(fcx, fcy, fcz), bcent, phys_bc, geom, dt, redistribution_type,
       as_crse, p_drho_as_crse->array(), p_rrflag_as_crse->const_array(), as_fine, dm_as_fine.array(), lev_mask,
       level_mask_not_covered, fac_for_deltaR, use_wts_in_divnc, 0, srd_max_order,
       target_volfrac, srd_update_scale);
-    }                                
+   }                                
+
+    // temp snm
+    //amrex::Gpu::streamSynchronize();
+    //AMREX_GPU_ERROR_CHECK();
+
+
   }  
 
   ////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -504,14 +721,4 @@ public:
 
 
 #endif
-
-// intrepolation based on distance
-// temp
-// #if (AMREX_SPACEDIM == 2)
-//         int kk(0);
-// #else
-//         for (int kk = -nb; kk <= nb; kk++) {
-// #endif
-//         for (int jj = -nb; jj <= nb; jj++) {
-//         for (int ii = -nb; ii <= nb; ii++) {
 

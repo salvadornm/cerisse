@@ -50,8 +50,19 @@ Real CNS::advance(Real time, Real dt, int /*iteration*/, int /*ncycle*/) {
       });
     }
 
+    // Rigid-body FSI path (default): update transforms only, no BVH rebuild.
+    // Deformable-body path: define CNS_FSI_DEFORMABLE in GNUmakefile.
+#ifdef CNS_USE_FSI
+#  ifdef CNS_FSI_DEFORMABLE
     PROB::update_geometry(time + dt, IBM::ib.geom_a, IBM::ib.ngeom);
     IBM::ib.rebuildGeometryData();
+#  else
+    PROB::update_rigid_transforms(time + dt, IBM::ib.transform_a, IBM::ib.ngeom);
+    for (int i = 0; i < IBM::ib.ngeom; ++i) {
+        IBM::ib.updateRigidTransform(i, IBM::ib.transform_a[i]);
+    }
+#  endif
+#endif
     rebuildIBM();
 
     // Initialise state in cells newly exposed by the moving boundary
@@ -70,7 +81,6 @@ Real CNS::advance(Real time, Real dt, int /*iteration*/, int /*ncycle*/) {
     compute_rhs(Stemp, Real(0.5) * dt, fr_as_crse, fr_as_fine);
     // U^* = U^n + dt*dUdt^n
     MultiFab::LinComb(S2, Real(1.0), S1, 0, dt, Stemp, 0, 0, ncons, 0);
-
     // RK2 stage 2
     // After fillpatch Sborder = U^n+dt*dUdt^n
     state[0].setNewTimeLevel(time + dt);
@@ -81,6 +91,8 @@ Real CNS::advance(Real time, Real dt, int /*iteration*/, int /*ncycle*/) {
     // S_new += 0.5*dt*dSdt
     MultiFab::Saxpy(S2, Real(0.5) * dt, Stemp, 0, 0, ncons, 0);
     // We now have S_new = U^{n+1} = (U^n+0.5*dt*dUdt^n) + 0.5*dt*dUdt^*
+
+
     ////////////////////////////////////////////////////////////////////////////
   } else if (order_rk == 0) {  // returns rhs
     FillPatch(*this, Stemp, nghost, time, State_Type, 0, ncons);
@@ -197,6 +209,10 @@ Real CNS::advance(Real time, Real dt, int /*iteration*/, int /*ncycle*/) {
     }
 
   }
+
+#if ENSURE_MASSFRACSUM_ONE  
+  clip_species_state(S2);
+#endif
 
 #ifdef AMREX_USE_GPIBM
   // End-of-step GP correction: recompute ghost-point primitive states and

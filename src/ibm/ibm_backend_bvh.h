@@ -753,6 +753,122 @@ inline void build_geometry_cache (
     std::copy(lf_tmp.begin(), lf_tmp.end(), localframe.begin() + old_lf);
 }
 
+/// GPU-parallel build of surface element data and local frames.
+/// Pre-allocates output arrays and fills them with a single ParallelFor.
+/// Degenerate faces (area ≈ 0) are included with zero measure — this avoids
+/// GPU-side compaction and keeps face indices aligned with the geometry.
+/// Called from build_geometry_cache when GPU is available and geometry is
+/// already in managed memory (BVH path only — CGAL path is always CPU).
+#ifdef AMREX_USE_GPU
+inline void build_geometry_cache_gpu (
+    const GeomType& geom,
+    Gpu::ManagedVector<SurfElem>& surfelem,
+    Gpu::ManagedVector<LocalFrame>& localframe,
+    int geomIdx = -1)
+{
+    using namespace amrex;
+#if (AMREX_SPACEDIM == 2)
+    const int n = static_cast<int>(geom.size());
+    const std::size_t old_se = surfelem.size();
+    const std::size_t old_lf = localframe.size();
+    surfelem.resize(old_se + n);
+    localframe.resize(old_lf + n);
+
+    auto* se_ptr = surfelem.data()   + old_se;
+    auto* lf_ptr = localframe.data() + old_lf;
+    const auto* v_ptr = geom.verts.data();
+    const int gIdx = geomIdx;
+    const int nv   = n;
+
+    ParallelFor(n, [=] AMREX_GPU_DEVICE (int i) noexcept {
+        Point a = v_ptr[i];
+        Point b = v_ptr[(i + 1) % nv];
+        Real cx = Real(0.5) * (a[0] + b[0]);
+        Real cy = Real(0.5) * (a[1] + b[1]);
+        Real dx_ = b[0] - a[0], dy_ = b[1] - a[1];
+        Real len = std::sqrt(dx_ * dx_ + dy_ * dy_);
+        Real inv = (len > Real(1e-30)) ? Real(1.0) / len : Real(0.0);
+        Real tx = dx_ * inv, ty = dy_ * inv;
+        Real c[2] = {cx, cy};
+        se_ptr[i] = SurfElem(c, len, gIdx);
+        Real n_arr[2]  = {ty, -tx};
+        Real t1_arr[2] = {tx, ty};
+        lf_ptr[i] = LocalFrame(n_arr, t1_arr);
+    });
+    Gpu::streamSynchronize();
+
+#elif (AMREX_SPACEDIM == 3)
+    const int nf = geom.num_faces();
+    const std::size_t old_se = surfelem.size();
+    const std::size_t old_lf = localframe.size();
+    surfelem.resize(old_se + nf);
+    localframe.resize(old_lf + nf);
+
+    auto* se_ptr = surfelem.data()   + old_se;
+    auto* lf_ptr = localframe.data() + old_lf;
+    const auto* vert_ptr = geom.vertices.data();
+    const auto* face_ptr = geom.faces.data();
+    const int gIdx = geomIdx;
+
+    ParallelFor(nf, [=] AMREX_GPU_DEVICE (int fi) noexcept {
+        const auto& f = face_ptr[fi];
+        const Point& p0 = vert_ptr[f[0]];
+        const Point& p1 = vert_ptr[f[1]];
+        const Point& p2 = vert_ptr[f[2]];
+
+        Real c[3];
+        for (int d = 0; d < 3; ++d) c[d] = (p0[d] + p1[d] + p2[d]) / Real(3.0);
+
+        Vec v1 = {p1[0]-p0[0], p1[1]-p0[1], p1[2]-p0[2]};
+        Vec v2 = {p2[0]-p0[0], p2[1]-p0[1], p2[2]-p0[2]};
+        Vec n_raw = {v1[1]*v2[2] - v1[2]*v2[1],
+                     v1[2]*v2[0] - v1[0]*v2[2],
+                     v1[0]*v2[1] - v1[1]*v2[0]};
+        Real n_len2 = n_raw[0]*n_raw[0] + n_raw[1]*n_raw[1] + n_raw[2]*n_raw[2];
+        Real area = Real(0.5) * std::sqrt(n_len2);
+
+        if (area <= Real(0.0)) {
+            // Degenerate face: write zero-measure entry (preserves index alignment)
+            se_ptr[fi] = SurfElem(c, Real(0.0), gIdx);
+            lf_ptr[fi] = LocalFrame();
+            return;
+        }
+
+        se_ptr[fi] = SurfElem(c, area, gIdx);
+
+        Real inv_n = Real(1.0) / std::sqrt(n_len2);
+        Vec n_unit = {n_raw[0]*inv_n, n_raw[1]*inv_n, n_raw[2]*inv_n};
+
+        Real t1_len2 = v1[0]*v1[0] + v1[1]*v1[1] + v1[2]*v1[2];
+        Vec t1;
+        if (t1_len2 > Real(1e-30)) {
+            Real inv_t = Real(1.0) / std::sqrt(t1_len2);
+            t1 = {v1[0]*inv_t, v1[1]*inv_t, v1[2]*inv_t};
+        } else {
+            Vec cross_x = {Real(0.0), -n_unit[2], n_unit[1]};
+            Real cx2 = cross_x[0]*cross_x[0] + cross_x[1]*cross_x[1] + cross_x[2]*cross_x[2];
+            if (cx2 < Real(1e-12)) {
+                cross_x = {n_unit[2], Real(0.0), -n_unit[0]};
+                cx2 = cross_x[0]*cross_x[0] + cross_x[1]*cross_x[1] + cross_x[2]*cross_x[2];
+            }
+            Real inv_c = Real(1.0) / std::sqrt(cx2);
+            t1 = {cross_x[0]*inv_c, cross_x[1]*inv_c, cross_x[2]*inv_c};
+        }
+
+        Vec t2 = {n_unit[1]*t1[2] - n_unit[2]*t1[1],
+                  n_unit[2]*t1[0] - n_unit[0]*t1[2],
+                  n_unit[0]*t1[1] - n_unit[1]*t1[0]};
+
+        Real n_arr[3]  = {n_unit[0], n_unit[1], n_unit[2]};
+        Real t1_arr[3] = {t1[0], t1[1], t1[2]};
+        Real t2_arr[3] = {t2[0], t2[1], t2[2]};
+        lf_ptr[fi] = LocalFrame(n_arr, t1_arr, t2_arr);
+    });
+    Gpu::streamSynchronize();
+#endif
+}
+#endif // AMREX_USE_GPU
+
 /// Flip normals for interior-is-fluid mode.
 inline void convert_inout (Gpu::ManagedVector<LocalFrame>& localframe_a) {
     for (auto& lf : localframe_a) {

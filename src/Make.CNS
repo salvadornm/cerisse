@@ -9,6 +9,9 @@ endif
 
 include $(AMREX_HOME)/Tools/GNUMake/Make.defs
 
+AMREXVERSION ?= 25
+DEFINES += -DAMREXVERSION
+
 ifeq ($(GTEST),TRUE) 
   include $(AMR_SOLVER)/tst/googletest/Make.main 
 else 
@@ -43,16 +46,26 @@ ifeq ($(USE_FSI),TRUE)
   VPATH_LOCATIONS   += $(AMR_SOLVER)/src/fsi/
 endif
 
-# ---------   IBM  -------------------- 
-ifeq ($(USE_GPIBM),TRUE)    
+# ---------   IBM  --------------------
+#
+# USE_GPIBM = TRUE           enables the IBM module (BVH backend by default)
+# USE_CGAL  = TRUE            switches to the CGAL backend (CPU-only, requires
+#                             USE_GPIBM=TRUE and USE_CUDA=FALSE)
+#
+# Logic:
+#   GPU build  → always BVH (CGAL silently ignored with a warning)
+#   CPU build  → BVH by default; set USE_CGAL=TRUE to use CGAL
+#   No IBM     → USE_CGAL has no effect
+#
+ifeq ($(USE_GPIBM),TRUE)
 
-  # IBM backend selection: BVH (default) or CGAL
-  # When CUDA is enabled, force BVH (CGAL is CPU-only)
-  IBM_BACKEND ?= BVH
-  ifeq ($(USE_CUDA),TRUE)
-    ifneq ($(IBM_BACKEND),BVH)
-      $(warning IBM_BACKEND=$(IBM_BACKEND) is not GPU-compatible. Forcing BVH.)
-      override IBM_BACKEND := BVH
+  USE_CGAL ?= FALSE
+
+  # CGAL is CPU-only: block it when CUDA is active
+  ifeq ($(USE_CGAL),TRUE)
+    ifeq ($(USE_CUDA),TRUE)
+      $(warning USE_CGAL=TRUE is incompatible with USE_CUDA=TRUE — falling back to BVH backend.)
+      override USE_CGAL := FALSE
     endif
   endif
 
@@ -61,8 +74,8 @@ ifeq ($(USE_GPIBM),TRUE)
   VPATH_LOCATIONS   += $(AMR_SOLVER)/src/ibm/
   DEFINES           += -DAMREX_USE_GPIBM
 
-  ifeq ($(IBM_BACKEND),CGAL)
-    #  CGAL backend: requires Boost, CGAL, GMP, MPFR
+  ifeq ($(USE_CGAL),TRUE)
+    # CGAL backend: requires Boost, CGAL, GMP, MPFR
     BOOST_HOME ?= $(AMR_SOLVER)/lib/install/boost
     CGAL_HOME  ?= $(AMR_SOLVER)/lib/install/cgal
 
@@ -119,7 +132,8 @@ endif
 ifeq ($(USE_PELEPHYSICS),TRUE)
 
 # PelePhysics version 25 or 23 (can be overrided in GNUMakefile )
-PELEPVERSION ?= 23
+PELEPVERSION ?= 25
+DEFINES += -DPELEPVERSION
 
 # version dependent paths
 ifeq ($(PELEPVERSION),25)

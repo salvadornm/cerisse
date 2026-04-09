@@ -94,7 +94,7 @@ struct skewparm_t {
 
   static constexpr bool dissipation = true;         // no dissipation
   static constexpr int  order = 4;                  // order numerical scheme   
-  static constexpr Real C2skew=1.5,C4skew=0.016;   // Skew symmetric values 
+  static constexpr Real C2skew=0.5,C4skew=0.016;   // Skew symmetric values 
 };
 
 struct ibmparm_t {
@@ -102,8 +102,14 @@ struct ibmparm_t {
   public:
 
   static constexpr int  interp_order = 1;
-  static constexpr int  extrap_order = ibm_eorder;
+  static constexpr int  extrap_order = 1;
   static constexpr Real alpha= 0.6;      
+
+  // surface parameters
+  static constexpr int  interp_order_surf = 1;
+  static constexpr int  extrap_order_surf = 1;
+  static constexpr Real alpha_surf= 0.6;
+
 };
 
 // CLOSURES (perfect gas + Sutherland's)
@@ -177,7 +183,7 @@ void prob_initdata (int i, int j, int k, amrex::Array4<amrex::Real> const& state
 
 AMREX_GPU_DEVICE AMREX_FORCE_INLINE 
 void user_tagging(int i, int j, int k, int nt, auto& tagfab, const auto &sdatafab, 
-                  const Array4<bool>&ibfab, const auto& geomdata, 
+                  const Array4<const unsigned char>& ibfab, const auto& geomdata, 
                   const ProbParm& pparm , int level) {
 
   const Real* dx  = geomdata.CellSize();

@@ -183,7 +183,16 @@ AMREX_GPU_DEVICE AMREX_FORCE_INLINE void prob_initdata(
   // pmf_vals[0] =T  pmf_vals[1]= Velocity  pmf_vals[2] = rho pmf_vals[3+k] = Y[k];
   GpuArray<Real, NUM_SPECIES + 4 > pmf_vals = {0.0}; 
 
-  pele::physics::PMF::PmfData::DataContainer *pmf_data = util->pmfData.getDeviceData();
+  //pele::physics::PMF::PmfData::DataContainer *pmf_data = util->pmfData.getDeviceData();
+
+#if (PELEPVERSION==23)
+  // old PMF wrapper API
+  auto* pmf_data = util->pmfData.getDeviceData();
+#else
+  // new PeleParams API
+  auto const* pmf_data = util->pmfData.device_parm();
+#endif
+
   pele::physics::PMF::pmf(pmf_data,y1,y2,pmf_vals);
 
   // PMF--> T,u and Y (P is assumed constant)
