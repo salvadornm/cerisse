@@ -32,11 +32,17 @@ Real CNS::advance(Real time, Real dt, int /*iteration*/, int /*ncycle*/) {
   }
 
 #ifdef AMREX_USE_GPIBM
-  // Moving-geometry update: advance vertex positions to t^{n+1}, rebuild BVH
-  // and GP markers, then restore conservative data in newly exposed (solid→fluid)
-  // cells to avoid downstream NaN propagation.
+  // Moving-geometry update.
+  //
+  // Geometry position is updated ONLY at the coarsest level (level 0).
+  // The transform is global — it applies to all levels simultaneously.
+  // Fine-level sub-cycles only rebuild markers and GPs at their own level
+  // (the geometry position was already set by the coarse-level advance).
+  //
+  // This prevents fine-level sub-steps from advancing the geometry to
+  // inconsistent times and avoids redundant transform updates.
   if (CNS::ib_move) {
-    // Snapshot pre-move markers to detect solid→fluid transitions
+    // Snapshot pre-move markers at THIS level
     auto& mfab_pre = *IBM::ib.bmf_a[level];
     FabArray<BaseFab<uint8_t>> old_markers(
         mfab_pre.boxArray(), mfab_pre.DistributionMap(),
@@ -50,22 +56,26 @@ Real CNS::advance(Real time, Real dt, int /*iteration*/, int /*ncycle*/) {
       });
     }
 
-    // Rigid-body FSI path (default): update transforms only, no BVH rebuild.
-    // Deformable-body path: define CNS_FSI_DEFORMABLE in GNUmakefile.
+    // Only the coarsest level updates the geometry transform.
+    // Fine levels reuse the transform already set by the coarse advance.
+    if (level == 0) {
 #ifdef CNS_USE_FSI
 #  ifdef CNS_FSI_DEFORMABLE
-    PROB::update_geometry(time + dt, IBM::ib.geom_a, IBM::ib.ngeom);
-    IBM::ib.rebuildGeometryData();
+      PROB::update_geometry(time + dt, IBM::ib.geom_a, IBM::ib.ngeom);
+      IBM::ib.rebuildGeometryData();
 #  else
-    PROB::update_rigid_transforms(time + dt, IBM::ib.transform_a, IBM::ib.ngeom);
-    for (int i = 0; i < IBM::ib.ngeom; ++i) {
-        IBM::ib.updateRigidTransform(i, IBM::ib.transform_a[i]);
-    }
+      PROB::update_rigid_transforms(time + dt, IBM::ib.transform_a, IBM::ib.ngeom);
+      for (int i = 0; i < IBM::ib.ngeom; ++i) {
+          IBM::ib.updateRigidTransform(i, IBM::ib.transform_a[i]);
+      }
 #  endif
 #endif
+    }
+
+    // Rebuild markers and GPs at THIS level only (geometry is already at t^{n+1})
     rebuildIBM();
 
-    // Initialise state in cells newly exposed by the moving boundary
+    // Fill cells newly exposed by the geometry motion at this level
     IBM::ib.fixExposedCells(old_markers, S1, level);
   }
 #endif
@@ -215,19 +225,32 @@ Real CNS::advance(Real time, Real dt, int /*iteration*/, int /*ncycle*/) {
 #endif
 
 #ifdef AMREX_USE_GPIBM
-  // End-of-step GP correction: recompute ghost-point primitive states and
-  // overwrite the corresponding conservative entries in S2.  Required because
-  // the RK accumulation writes stale values into GP cells, and subsequent
-  // operations (CFL estimation, total-energy diagnostics, FillPatch for AMR
-  // sub-cycling) scan all cells without distinguishing fluid from ghost points.
+  // ==========================================================================
+  // End-of-step IBM correction (runs on S2 = state at t^{n+1})
+  //
+  // After the RK stages, the conservative state in IBM cells needs cleanup:
+  //   [1] Ghost points: overwrite with wall-BC-reconstructed primitives
+  //                     (always — also needed for static geometry).
+  //   [2] Interior solid cells (FSI only): flood-fill from fluid/ghost
+  //                     neighbors, then zero momentum. This keeps solid
+  //                     cells carrying bounded, physically plausible data
+  //                     so that AMR FillPatch/avgDown during regrid does
+  //                     not interpolate garbage into fresh fluid cells.
+  //   [3] Safety net:   replace any cell with catastrophically broken
+  //                     values (NaN, Inf, or orders-of-magnitude outliers)
+  //                     with a neighbor-based fallback. This should rarely
+  //                     fire in a well-resolved simulation.
+  // ==========================================================================
   {
     const PROB::ProbClosures& cls_h = *CNS::h_prob_closures;
     const PROB::ProbClosures* cls_d = CNS::d_prob_closures;
     auto& ib_mf = *IBM::ib.bmf_a[level];
 
+    // ------------------------------------------------------------------------
+    // Reconstruct ghost-point primitives from the current flow state + wall BC
+    // ------------------------------------------------------------------------
     FillPatch(*this, Stemp, nghost, time + dt, State_Type, 0, ncons);
 
-    // cons2prims over the full domain
     MultiFab prims_mf(Stemp.boxArray(), Stemp.DistributionMap(),
                       cls_h.NPRIM, cls_h.NGHOST,
                       MFInfo().SetArena(The_Async_Arena()));
@@ -235,10 +258,18 @@ Real CNS::advance(Real time, Real dt, int /*iteration*/, int /*ncycle*/) {
       cls_h.cons2prims(mfi, Stemp.array(mfi), prims_mf.array(mfi));
     }
 
-    // Correct GP primitive values
+    // Sync wall-motion time so that compute_surfIB() sees the correct
+    // instantaneous wall velocity for moving-wall BCs.
+#ifdef CNS_USE_FSI
+    PROB::Motion::sim_time = time + dt;
+#endif
+
     IBM::ib.computeAllGPs(prims_mf, cls_d, level);
 
-    // Write corrected primitives back as conservatives for GP cells only
+    // ------------------------------------------------------------------------
+    // Pass 1 (ALWAYS): Write GP-corrected primitives back to S2 as conservatives.
+    //                   Only touches cells marked as ghost points (ibMarkers(,1)).
+    // ------------------------------------------------------------------------
     for (MFIter mfi(S2, false); mfi.isValid(); ++mfi) {
       const Box& bx = mfi.tilebox();
       Array4<Real> const& state = S2.array(mfi);
@@ -256,8 +287,182 @@ Real CNS::advance(Real time, Real dt, int /*iteration*/, int /*ncycle*/) {
         }
       });
     }
-  }
+
+    // ------------------------------------------------------------------------
+    // Pass 2 (FSI only): Flood-fill interior solid cells + zero their momentum.
+    //
+    // Why this is needed for FSI (but not static geometry):
+    //   Solid cells in the moving body don't evolve in the RK step, so their
+    //   values drift relative to the surrounding flow. When the body moves,
+    //   previously-solid cells become fluid and must have valid data. Also,
+    //   avgDown/FillPatch during regrid reads solid cell values and spreads
+    //   them into fresh fluid cells — if those are stale, the simulation
+    //   crashes. By flood-filling every step, solid cells track the local
+    //   flow. Zeroing momentum prevents spurious velocity amplification
+    //   when averaging fluid neighbors from different acoustic phases.
+    // ------------------------------------------------------------------------
+    if (CNS::ib_move) {
+      for (MFIter mfi(S2, false); mfi.isValid(); ++mfi) {
+        const Box& bx  = mfi.tilebox();
+        const Box& bxg = mfi.growntilebox(d_prob_closures->NGHOST);
+        auto const& state     = S2.array(mfi);
+        auto const& ibMarkers = ib_mf.array(mfi);
+        const int nc = ncons;
+
+        // Tag array: 0 = already valid (fluid or GP-corrected ghost point)
+        //            1 = interior solid, needs fixing
+        //            2 = solid, already fixed in a previous iteration
+        BaseFab<int> tagfab(bxg, 1, The_Managed_Arena());
+        auto const& tag = tagfab.array();
+
+        ParallelFor(bxg, [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept {
+          tag(i,j,k) = (ibMarkers(i,j,k,0) == 0 || ibMarkers(i,j,k,1) != 0)
+                       ? 0 : 1;
+        });
+
+        // Iterative flood-fill: each iteration propagates valid data one
+        // cell deeper into the solid region. Typically converges in 3-5
+        // iterations; cap at 32 for safety.
+        constexpr int MAX_FLOOD_ITER = 32;
+        for (int iter = 0; iter < MAX_FLOOD_ITER; ++iter) {
+          Gpu::DeviceScalar<int> d_nfixed(0);
+          int* p_nfixed = d_nfixed.dataPtr();
+
+          ParallelFor(bx, [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept {
+            if (tag(i,j,k) != 1) return;  // skip already-valid or already-fixed
+
+            Real sum[PROB::ProbClosures::NCONS] = {};
+            int count = 0;
+            for (int dj = -1; dj <= 1; ++dj) {
+              for (int di = -1; di <= 1; ++di) {
+#if (AMREX_SPACEDIM == 3)
+                for (int dk = -1; dk <= 1; ++dk) {
+#else
+                { int dk = 0;
 #endif
+                  if (di == 0 && dj == 0 && dk == 0) continue;
+                  const int ii = i+di, jj = j+dj, kk = k+dk;
+                  if (!bxg.contains(IntVect(AMREX_D_DECL(ii,jj,kk)))) continue;
+                  if (tag(ii,jj,kk) == 0 || tag(ii,jj,kk) == 2) {
+                    for (int n = 0; n < nc; ++n)
+                      sum[n] += state(ii,jj,kk,n);
+                    count++;
+                  }
+                }
+              }
+            }
+            if (count > 0) {
+              const Real inv = Real(1.0) / count;
+              for (int n = 0; n < nc; ++n)
+                state(i,j,k,n) = sum[n] * inv;
+              tag(i,j,k) = 2;
+              Gpu::Atomic::Add(p_nfixed, 1);
+            }
+          });
+
+          Gpu::streamSynchronize();
+          if (d_nfixed.dataValue() == 0) break;
+        }
+
+        // Zero momentum in interior solid cells.
+        // Rationale: averaging fluid neighbors from different acoustic
+        // phases can amplify velocity (observed solid |u| > fluid |u|
+        // by 50-100%). During regrid, these spurious momenta feed into
+        // FillPatch/avgDown and contaminate fresh fluid cells. Zeroing
+        // is conservative and prevents this amplification loop.
+        ParallelFor(bx, [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept {
+          if (ibMarkers(i,j,k,0) == 0) return;  // fluid
+          if (ibMarkers(i,j,k,1) != 0) return;  // ghost point (handled in Pass 1)
+
+          using PC = PROB::ProbClosures;
+          const Real rho = state(i,j,k, PC::URHO);
+          if (rho <= Real(0)) return;
+
+          // Subtract kinetic energy from total energy (keep internal energy)
+          const Real mx = state(i,j,k, PC::UMX);
+          const Real my = state(i,j,k, PC::UMY);
+#if (AMREX_SPACEDIM == 3)
+          const Real mz = state(i,j,k, PC::UMZ);
+          const Real ke = Real(0.5) * (mx*mx + my*my + mz*mz) / rho;
+#else
+          const Real ke = Real(0.5) * (mx*mx + my*my) / rho;
+#endif
+          state(i,j,k, PC::UMX) = Real(0.0);
+          state(i,j,k, PC::UMY) = Real(0.0);
+#if (AMREX_SPACEDIM == 3)
+          state(i,j,k, PC::UMZ) = Real(0.0);
+#endif
+          state(i,j,k, PC::UET) -= ke;
+        });
+      }
+    } // end FSI flood-fill
+
+    // ------------------------------------------------------------------------
+    // Pass 3 (SAFETY NET): Catch catastrophically broken cells (NaN/Inf or
+    // values outside [0.01, 100] for density). Replace with neighbor-median
+    // or freestream fallback. This should rarely trigger; if it fires often,
+    // there's a deeper numerical problem to investigate.
+    // ------------------------------------------------------------------------
+    {
+      // Permissive bounds — only catch truly broken cells, not moderate
+      // physical deviations (shocks, expansion fans, etc.).
+      constexpr Real rho_lo  = Real(0.01);
+      constexpr Real rho_hi  = Real(100.0);
+      constexpr Real E_lo    = Real(1.0e1);
+      constexpr Real E_hi    = Real(1.0e10);
+      // Freestream fallback (air at 1 atm, 300 K)
+      constexpr Real rho_ref  = Real(1.177);
+      constexpr Real eint_ref = Real(2.15e5);
+
+      for (MFIter mfi(S2, false); mfi.isValid(); ++mfi) {
+        const Box& bx  = mfi.tilebox();
+        const Box& bxg = mfi.growntilebox(1);
+        Array4<Real> const& state = S2.array(mfi);
+
+        ParallelFor(bx, [=] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {
+          using PC = PROB::ProbClosures;
+          const Real rho = state(i,j,k, PC::URHO);
+          const Real E   = state(i,j,k, PC::UET);
+
+          const bool bad = !std::isfinite(rho) || rho < rho_lo || rho > rho_hi
+                        || !std::isfinite(E)   || E   < E_lo   || E   > E_hi;
+          if (!bad) return;
+
+          // Find a representative neighbor density (median-ish of valid ones)
+          Real rho_nbrs[9] = {};
+          int n_nbrs = 0;
+          for (int dj = -1; dj <= 1; ++dj) {
+            for (int di = -1; di <= 1; ++di) {
+#if (AMREX_SPACEDIM == 3)
+              for (int dk = -1; dk <= 1; ++dk) {
+#else
+              { int dk = 0;
+#endif
+                if (di == 0 && dj == 0 && dk == 0) continue;
+                const int ii = i+di, jj = j+dj, kk = k+dk;
+                if (!bxg.contains(IntVect(AMREX_D_DECL(ii,jj,kk)))) continue;
+                const Real rho_n = state(ii,jj,kk, PC::URHO);
+                if (std::isfinite(rho_n) && rho_n >= rho_lo && rho_n <= rho_hi
+                    && n_nbrs < 9) {
+                  rho_nbrs[n_nbrs++] = rho_n;
+                }
+              }
+            }
+          }
+
+          const Real rho_new = (n_nbrs > 0) ? rho_nbrs[n_nbrs / 2] : rho_ref;
+          state(i,j,k, PC::URHO) = rho_new;
+          state(i,j,k, PC::UMX)  = Real(0);
+          state(i,j,k, PC::UMY)  = Real(0);
+#if (AMREX_SPACEDIM == 3)
+          state(i,j,k, PC::UMZ)  = Real(0);
+#endif
+          state(i,j,k, PC::UET)  = rho_new * eint_ref;
+        });
+      }
+    }
+  }
+#endif  // AMREX_USE_GPIBM
 
   return dt;
 }

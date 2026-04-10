@@ -1251,49 +1251,121 @@ public:
     }
 
     // Pass 2: sweep again for any remaining unfixed cells (all neighbours were also exposed).
-    // Use a 2-ring search. This is very rare for typical motions.
+    // Use progressively wider search rings (2, 4, 8) to handle large motion per step.
+    for (int ring = 2; ring <= 8; ring *= 2) {
+      for (MFIter mfi(mfab, false); mfi.isValid(); ++mfi) {
+        const Box& bx  = mfi.tilebox();
+        const Box& bxg = mfi.growntilebox(ring); // ensure we can read ring-width neighbours
+        auto const& old_mk = old_markers.const_array(mfi);
+        auto const& new_mk = mfab.const_array(mfi);
+        auto const& state  = state_mf.array(mfi);
+        const int R = ring;
+
+        ParallelFor(bx, [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept
+        {
+          if (old_mk(i,j,k,0) == 0) return;   // was already fluid
+          if (new_mk(i,j,k,0) != 0) return;   // still solid
+          if (state(i,j,k, cls_t::URHO) > Real(1.0e-10)) return; // already fixed
+
+          Real sum[cls_t::NCONS] = {};
+          int count = 0;
+          for (int dj = -R; dj <= R; ++dj) {
+            for (int di = -R; di <= R; ++di) {
+#if (AMREX_SPACEDIM == 3)
+              for (int dk = -R; dk <= R; ++dk) {
+#else
+              { int dk = 0;
+#endif
+                if (di == 0 && dj == 0 && dk == 0) continue;
+                int ii = i+di, jj = j+dj, kk = k+dk;
+                if (!bxg.contains(IntVect(AMREX_D_DECL(ii,jj,kk)))) continue;
+                if (new_mk(ii,jj,kk,0) == 0 && state(ii,jj,kk, cls_t::URHO) > Real(1.0e-10)) {
+                  for (int n = 0; n < ncons; ++n)
+                    sum[n] += state(ii,jj,kk,n);
+                  count++;
+                }
+              }
+            }
+          }
+          if (count > 0) {
+            Real inv = Real(1.0) / count;
+            for (int n = 0; n < ncons; ++n)
+              state(i,j,k,n) = sum[n] * inv;
+          }
+        });
+      }
+    } // end ring loop
+
+    // Pass 3 (fallback): any cell still unfixed gets freestream-like state
+    // derived from the nearest valid fluid cell in the entire FAB.
+    // This is a last resort — should only trigger for extremely large motions.
     for (MFIter mfi(mfab, false); mfi.isValid(); ++mfi) {
       const Box& bx = mfi.tilebox();
       auto const& old_mk = old_markers.const_array(mfi);
       auto const& new_mk = mfab.const_array(mfi);
       auto const& state  = state_mf.array(mfi);
 
-      ParallelFor(bx, [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept
+      // First find ANY valid fluid cell in this FAB to use as reference
+      const Box& bxg = mfi.growntilebox(cls_t::NGHOST);
+      ReduceOps<ReduceOpSum> reduce_op;
+      ReduceData<int> reduce_data(reduce_op);
+      using ReduceTuple = typename decltype(reduce_data)::Type;
+
+      reduce_op.eval(bx, reduce_data,
+        [=] AMREX_GPU_DEVICE (int i, int j, int k) -> ReduceTuple
       {
-        if (old_mk(i,j,k,0) == 0) return;
-        if (new_mk(i,j,k,0) != 0) return;
+        if (old_mk(i,j,k,0) == 0) return {0};
+        if (new_mk(i,j,k,0) != 0) return {0};
+        if (state(i,j,k, cls_t::URHO) > Real(1.0e-10)) return {0};
+        return {1}; // still unfixed
+      });
+      int n_unfixed = amrex::get<0>(reduce_data.value(reduce_op));
 
-        // Check if this cell was already fixed in pass 1
-        // (density should be reasonable if fixed)
-        if (state(i,j,k, cls_t::URHO) > Real(1.0e-10)) return;
+      if (n_unfixed > 0) {
+        amrex::Print() << "[fixExposedCells] WARNING: " << n_unfixed
+                       << " cells still unfixed after 8-ring search. "
+                       << "Using nearest-valid-fluid fallback.\n";
 
-        // Wider search: 2-ring
-        Real sum[cls_t::NCONS] = {};
-        int count = 0;
-        for (int dj = -2; dj <= 2; ++dj) {
-          for (int di = -2; di <= 2; ++di) {
+        // Brute-force: for each unfixed cell, scan the FAB for the nearest valid cell
+        ParallelFor(bx, [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept
+        {
+          if (old_mk(i,j,k,0) == 0) return;
+          if (new_mk(i,j,k,0) != 0) return;
+          if (state(i,j,k, cls_t::URHO) > Real(1.0e-10)) return;
+
+          // Expanding ring search until we find something
+          for (int r = 1; r <= 16; ++r) {
+            Real sum[cls_t::NCONS] = {};
+            int count = 0;
+            // Only check the shell at distance r (not the interior)
+            for (int dj = -r; dj <= r; ++dj) {
+              for (int di = -r; di <= r; ++di) {
 #if (AMREX_SPACEDIM == 3)
-            for (int dk = -2; dk <= 2; ++dk) {
+                for (int dk = -r; dk <= r; ++dk) {
+                  if (amrex::Math::abs(di) != r && amrex::Math::abs(dj) != r && amrex::Math::abs(dk) != r) continue;
 #else
-            { int dk = 0;
+                { int dk = 0;
+                  if (amrex::Math::abs(di) != r && amrex::Math::abs(dj) != r) continue;
 #endif
-              if (di == 0 && dj == 0 && dk == 0) continue;
-              int ii = i+di, jj = j+dj, kk = k+dk;
-              // Any cell that is now fluid with reasonable density
-              if (new_mk(ii,jj,kk,0) == 0 && state(ii,jj,kk, cls_t::URHO) > Real(1.0e-10)) {
-                for (int n = 0; n < ncons; ++n)
-                  sum[n] += state(ii,jj,kk,n);
-                count++;
+                  int ii = i+di, jj = j+dj, kk = k+dk;
+                  if (!bxg.contains(IntVect(AMREX_D_DECL(ii,jj,kk)))) continue;
+                  if (new_mk(ii,jj,kk,0) == 0 && state(ii,jj,kk, cls_t::URHO) > Real(1.0e-10)) {
+                    for (int n = 0; n < ncons; ++n)
+                      sum[n] += state(ii,jj,kk,n);
+                    count++;
+                  }
+                }
               }
             }
+            if (count > 0) {
+              Real inv = Real(1.0) / count;
+              for (int n = 0; n < ncons; ++n)
+                state(i,j,k,n) = sum[n] * inv;
+              break;
+            }
           }
-        }
-        if (count > 0) {
-          Real inv = Real(1.0) / count;
-          for (int n = 0; n < ncons; ++n)
-            state(i,j,k,n) = sum[n] * inv;
-        }
-      });
+        });
+      }
     }
   }
 

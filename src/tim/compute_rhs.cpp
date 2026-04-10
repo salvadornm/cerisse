@@ -46,6 +46,12 @@ void CNS::compute_rhs(MultiFab& statemf, Real dt, FluxRegister* fr_as_crse, Flux
     BL_PROFILE_VAR_STOP(prof_cons2prims);
   }
   {
+    // Sync wall-motion time before GP reconstruction so that
+    // compute_surfIB() sees the correct wall velocity.
+#ifdef CNS_USE_FSI
+    PROB::Motion::sim_time = cur_time;
+#endif
+
     BL_PROFILE_VAR("IBM::computeAllGPs", prof_gp);
     IBM::ib.computeAllGPs(prims_mf, cls_d, level);
     BL_PROFILE_VAR_STOP(prof_gp);

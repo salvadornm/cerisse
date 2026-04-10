@@ -713,7 +713,117 @@ void CNS::post_regrid(int lbase, int new_finest) {
 
 #ifdef AMREX_USE_GPIBM
   rebuildIBM();
+
+  // ==========================================================================
+  // FSI post-regrid state cleanup.
+  //
+  // After regrid, AMReX::FillPatch has populated the new-grid conservative
+  // state by interpolating from the old grids. If the old grids had any
+  // stale or extreme values in solid cells (which don't evolve during RK),
+  // those values can contaminate freshly-created fine cells near the solid
+  // boundary. This causes downstream WENO reconstruction to explode.
+  //
+  // Two passes:
+  //   [A] Flood-fill solid cells from valid fluid/ghost neighbors so they
+  //       carry bounded, physically plausible data.
+  //   [B] Zero momentum in interior solid cells (same rationale as
+  //       end-of-step pass in advance.cpp).
+  //
+  // Static geometry doesn't need this: solid cells never transition and
+  // their data stays consistent with the (unchanging) flow around them.
+  // ==========================================================================
+  if (ib_move) {
+    MultiFab& S = get_new_data(State_Type);
+    auto& ib_mf = *IBM::ib.bmf_a[level];
+    const int ncons = d_prob_closures->NCONS;
+    constexpr int MAX_FLOOD_ITER = 32;
+
+    for (MFIter mfi(S, false); mfi.isValid(); ++mfi) {
+      const Box& bx  = mfi.tilebox();
+      const Box& bxg = mfi.growntilebox(d_prob_closures->NGHOST);
+      auto const& state = S.array(mfi);
+      auto const& mk    = ib_mf.const_array(mfi);
+
+      // Tag array: 0 = fluid or ghost point (valid)
+      //            1 = interior solid (needs fixing)
+      //            2 = solid, already fixed this iteration
+      BaseFab<int> tagfab(bxg, 1, The_Managed_Arena());
+      auto const& tag = tagfab.array();
+
+      ParallelFor(bxg, [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept {
+        tag(i,j,k) = (mk(i,j,k,0) != 0 && mk(i,j,k,1) == 0) ? 1 : 0;
+      });
+
+      // [A] Iterative flood fill — propagate valid data inward one ring
+      //     per iteration until all solid cells are reached (or budget runs out).
+      for (int iter = 0; iter < MAX_FLOOD_ITER; ++iter) {
+        Gpu::DeviceScalar<int> d_nfixed(0);
+        int* p_nfixed = d_nfixed.dataPtr();
+
+        ParallelFor(bx, [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept {
+          if (tag(i,j,k) != 1) return;
+
+          Real sum[PROB::ProbClosures::NCONS] = {};
+          int count = 0;
+          for (int dj = -1; dj <= 1; ++dj) {
+            for (int di = -1; di <= 1; ++di) {
+#if (AMREX_SPACEDIM == 3)
+              for (int dk = -1; dk <= 1; ++dk) {
+#else
+              { int dk = 0;
 #endif
+                if (di == 0 && dj == 0 && dk == 0) continue;
+                const int ii = i+di, jj = j+dj, kk = k+dk;
+                if (!bxg.contains(IntVect(AMREX_D_DECL(ii,jj,kk)))) continue;
+                if (tag(ii,jj,kk) == 0 || tag(ii,jj,kk) == 2) {
+                  for (int n = 0; n < ncons; ++n)
+                    sum[n] += state(ii,jj,kk,n);
+                  count++;
+                }
+              }
+            }
+          }
+          if (count > 0) {
+            const Real inv = Real(1.0) / count;
+            for (int n = 0; n < ncons; ++n)
+              state(i,j,k,n) = sum[n] * inv;
+            tag(i,j,k) = 2;
+            Gpu::Atomic::Add(p_nfixed, 1);
+          }
+        });
+
+        Gpu::streamSynchronize();
+        if (d_nfixed.dataValue() == 0) break;
+      }
+
+      // [B] Zero momentum in interior solid cells to prevent spurious
+      //     velocity amplification from acoustic-phase averaging.
+      ParallelFor(bx, [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept {
+        if (mk(i,j,k,0) == 0) return;  // fluid
+        if (mk(i,j,k,1) != 0) return;  // ghost point
+
+        using PC = PROB::ProbClosures;
+        const Real rho = state(i,j,k, PC::URHO);
+        if (rho <= Real(0)) return;
+
+        const Real mx = state(i,j,k, PC::UMX);
+        const Real my = state(i,j,k, PC::UMY);
+#if (AMREX_SPACEDIM == 3)
+        const Real mz = state(i,j,k, PC::UMZ);
+        const Real ke = Real(0.5) * (mx*mx + my*my + mz*mz) / rho;
+#else
+        const Real ke = Real(0.5) * (mx*mx + my*my) / rho;
+#endif
+        state(i,j,k, PC::UMX) = Real(0);
+        state(i,j,k, PC::UMY) = Real(0);
+#if (AMREX_SPACEDIM == 3)
+        state(i,j,k, PC::UMZ) = Real(0);
+#endif
+        state(i,j,k, PC::UET) -= ke;
+      });
+    }
+  }  // end if (ib_move)
+#endif  // AMREX_USE_GPIBM
 
 #ifdef CNS_USE_EB
   EBM::eb.destroy_mf(level);
@@ -864,15 +974,104 @@ void CNS::avgDown() {
   MultiFab &S_crse = get_new_data(State_Type);
   MultiFab &S_fine = fine_lev.get_new_data(State_Type);
 
+  // Standard avgDown first.
   amrex::average_down(S_fine, S_crse, fine_lev.geom, geom, 0, S_fine.nComp(),
                       parent->refRatio(level));
+  Gpu::streamSynchronize();  // ensure GPU average_down is complete before CPU read
+
+#ifdef AMREX_USE_GPIBM
+  // IBM-aware avgDown correction.
+  // Standard average_down has already run above. Now correct coarse cells
+  // that overlap MIXED fine regions (some solid + some fluid fine sub-cells)
+  // by re-averaging using only fluid fine cells. Pure-fluid coarse cells
+  // keep the standard average; pure-solid coarse cells keep their own value.
+  if (IBM::ib.bmf_a[level + 1] != nullptr)
+  {
+    auto& fine_ibmf = *IBM::ib.bmf_a[level + 1];
+    const int nc = S_fine.nComp();
+    const IntVect rr = parent->refRatio(level);
+
+    // Build coarsened box array on fine's DistributionMap
+    BoxArray cba = S_fine.boxArray();
+    cba.coarsen(rr);
+
+    // Use ncons+1 components: first ncons are data, last is validity flag
+    const int ncp1 = nc + 1;
+    MultiFab S_corr(cba, S_fine.DistributionMap(), ncp1, 0);
+    S_corr.setVal(Real(0.0));
+
+    // Populate S_corr with fluid-only averages for MIXED cells
+    // Note: use GPU ParallelFor because in CUDA builds, MultiFab data
+    // lives in device memory and can't be accessed via raw CPU loops.
+    for (MFIter fmfi(S_fine, false); fmfi.isValid(); ++fmfi) {
+      const Box fbx = fmfi.tilebox();
+      const Box cbx = amrex::coarsen(fbx, rr);
+      auto const fine = S_fine.const_array(fmfi);
+      auto const fmk  = fine_ibmf.const_array(fmfi);
+      auto const corr = S_corr.array(fmfi);
+      const int ncomp = nc;
+      const IntVect ratio = rr;
+
+      amrex::ParallelFor(cbx,
+      [=] AMREX_GPU_DEVICE (int ci, int cj, int ck) noexcept
+      {
+        int n_fluid = 0, n_solid = 0;
+        Real sum[PROB::ProbClosures::NCONS] = {};
+#if (AMREX_SPACEDIM == 2)
+        for (int fj = cj*ratio[1]; fj < (cj+1)*ratio[1]; ++fj)
+        for (int fi = ci*ratio[0]; fi < (ci+1)*ratio[0]; ++fi) {
+          if (fmk(fi,fj,0,0) == 0) {
+            for (int n = 0; n < ncomp; ++n) sum[n] += fine(fi,fj,0,n);
+            ++n_fluid;
+          } else ++n_solid;
+        }
+#else
+        for (int fk = ck*ratio[2]; fk < (ck+1)*ratio[2]; ++fk)
+        for (int fj = cj*ratio[1]; fj < (cj+1)*ratio[1]; ++fj)
+        for (int fi = ci*ratio[0]; fi < (ci+1)*ratio[0]; ++fi) {
+          if (fmk(fi,fj,fk,0) == 0) {
+            for (int n = 0; n < ncomp; ++n) sum[n] += fine(fi,fj,fk,n);
+            ++n_fluid;
+          } else ++n_solid;
+        }
+#endif
+        // Only overwrite MIXED cells
+        if (n_fluid > 0 && n_solid > 0) {
+          Real inv = Real(1.0) / n_fluid;
+          for (int n = 0; n < ncomp; ++n) corr(ci,cj,ck,n) = sum[n] * inv;
+          corr(ci,cj,ck,ncomp) = Real(1.0);  // mark valid
+        }
+      });
+    }
+
+    // ParallelCopy S_corr to a MultiFab aligned with S_crse
+    MultiFab S_corr_aligned(S_crse.boxArray(), S_crse.DistributionMap(), ncp1, 0);
+    S_corr_aligned.setVal(Real(0.0));
+    S_corr_aligned.ParallelCopy(S_corr, 0, 0, ncp1);
+
+    // Apply corrections: where validity flag == 1, overwrite S_crse
+    for (MFIter mfi(S_crse, false); mfi.isValid(); ++mfi) {
+      const Box& bx = mfi.tilebox();
+      auto const& crse = S_crse.array(mfi);
+      auto const& corr = S_corr_aligned.const_array(mfi);
+      const int ncomp = nc;
+
+      ParallelFor(bx, [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept {
+        if (corr(i,j,k,ncomp) > Real(0.5)) {
+          for (int n = 0; n < ncomp; ++n)
+            crse(i,j,k,n) = corr(i,j,k,n);
+        }
+      });
+    }
+  }
+#endif
 
   if (compute_stats) {
     MultiFab &Sstat_crse = get_new_data(Stats_Type);
     MultiFab &Sstat_fine = fine_lev.get_new_data(Stats_Type);
     amrex::average_down(Sstat_fine, Sstat_crse, fine_lev.geom, geom, 0, Sstat_fine.nComp(),
                       parent->refRatio(level));
-  }  
+  }
 
 }
 
