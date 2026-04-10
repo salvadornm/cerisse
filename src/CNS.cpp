@@ -542,10 +542,27 @@ void CNS::computeNewDt(int finest_level, int sub_cycle, Vector<int> &n_cycle,
   ReduceData<Real, Real> reduce_data(reduce_op);
   using ReduceTuple = typename decltype(reduce_data)::Type;
 
+#ifdef AMREX_USE_GPIBM
+  // IBM-aware CFL: skip solid cells when computing max eigenvalue.
+  // Solid cells don't participate in time integration (their RHS is zeroed
+  // in compute_rhs), so their density/pressure values — which come from
+  // extrapolation, not from the flow — should not constrain the timestep.
+  // Without this, a solid cell with extrapolated ρ near zero produces a
+  // huge sound speed → dt → 0 → simulation stalls.
+  auto& ib_mf = *IBM::ib.bmf_a[level];
+#endif
+
   for (MFIter mfi(consmf, false); mfi.isValid(); ++mfi) {
     const Box &bx = mfi.tilebox();
     const Array4<Real>& cons = consmf.array(mfi);
+#ifdef AMREX_USE_GPIBM
+    const auto& ibm = ib_mf.const_array(mfi);
+#endif
     reduce_op.eval(bx, reduce_data, [=] AMREX_GPU_DEVICE(int i, int j, int k) -> ReduceTuple {
+#ifdef AMREX_USE_GPIBM
+      // Skip solid cells — they don't evolve and shouldn't constrain CFL
+      if (ibm(i,j,k,0) != 0) return {Real(0.0), Real(0.0)};
+#endif
       GpuArray<int, 3> vdir0 = {1, 0, 0};
       GpuArray<int, 3> vdir1 = {0, 1, 0};
       auto temp0 = d_cls->cons2eigenvals(i, j, k, cons, vdir0);
@@ -567,10 +584,20 @@ void CNS::computeNewDt(int finest_level, int sub_cycle, Vector<int> &n_cycle,
   ReduceData<Real, Real, Real> reduce_data(reduce_op);
   using ReduceTuple = typename decltype(reduce_data)::Type;
 
+#ifdef AMREX_USE_GPIBM
+  auto& ib_mf = *IBM::ib.bmf_a[level];
+#endif
+
   for (MFIter mfi(consmf, false); mfi.isValid(); ++mfi) {
     const Box &bx = mfi.tilebox();
     const Array4<Real>& cons = consmf.array(mfi);
+#ifdef AMREX_USE_GPIBM
+    const auto& ibm = ib_mf.const_array(mfi);
+#endif
     reduce_op.eval(bx, reduce_data, [=] AMREX_GPU_DEVICE(int i, int j, int k) -> ReduceTuple {
+#ifdef AMREX_USE_GPIBM
+      if (ibm(i,j,k,0) != 0) return {Real(0.0), Real(0.0), Real(0.0)};
+#endif
       GpuArray<int, 3> vdir0 = {1, 0, 0};
       GpuArray<int, 3> vdir1 = {0, 1, 0};
       GpuArray<int, 3> vdir2 = {0, 0, 1};
