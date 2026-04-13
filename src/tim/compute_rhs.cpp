@@ -116,9 +116,18 @@ void CNS::compute_rhs(MultiFab& statemf, Real dt, FluxRegister* fr_as_crse, Flux
     auto& marker_mf = *IBM::ib.bmf_a[level];
     auto const& geoMarkers = marker_mf.array(mfi);
 #elif (CNS_USE_EB && !AMREX_USE_GPIBM)
-    // EB markers are maintained elsewhere; no need to update them here.
-    auto& marker_mf = *EBM::eb.bmf_a[level];
-    auto const& geoMarkers = marker_mf.array(mfi);
+    // EB markers (bool) -> convert to uint8_t for interface compatibility
+    // with eflux_ibm/dflux_ibm which expect Array4<uint8_t>.
+    // EBM core uses bool internally; we convert at the boundary here
+    // to avoid modifying EBM code that is shared with other users.
+    auto& eb_marker_mf = *EBM::eb.bmf_a[level];
+    auto const& ebBoolMarkers = eb_marker_mf.array(mfi);
+    BaseFab<uint8_t> geoMarkerFab(bxg, 2, The_Async_Arena());
+    auto const& geoMarkers = geoMarkerFab.array();
+    amrex::ParallelFor(bxg, 2,
+      [=] AMREX_GPU_DEVICE (int i, int j, int k, int n) noexcept {
+        geoMarkers(i,j,k,n) = static_cast<uint8_t>(ebBoolMarkers(i,j,k,n));
+      });
 #endif
   
     // Euler/Diff Fluxes including boundary/discontinuity corrections
@@ -297,7 +306,11 @@ void CNS::compute_rhs(MultiFab& statemf, Real dt, FluxRegister* fr_as_crse, Flux
 #endif 
 
     // Source terms (body forces, chemistry, etc.)
+#if (AMREX_USE_GPIBM || CNS_USE_EB)
+    prob_rhs.src(geom,mfi, prims, state, cls_d, dt, cur_time, geoMarkers);
+#else
     prob_rhs.src(geom,mfi, prims, state, cls_d, dt, cur_time);
+#endif
 
     // Zero the RHS inside solid cells (state holds RHS at this point)
 #if (AMREX_USE_GPIBM || CNS_USE_EB)
