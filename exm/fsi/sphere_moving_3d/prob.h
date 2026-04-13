@@ -138,9 +138,9 @@ struct ibmparm_t {
   static constexpr int  extrap_order = ibm_eorder;
   static constexpr int  interp_order_surf = 1;
   static constexpr int  extrap_order_surf = 1;
-  static constexpr Real alpha        = 0.4;
-  static constexpr Real alpha_surf   = 0.4;
-  static constexpr int  ghost_layers = 1;
+  static constexpr Real alpha        = 0.6;
+  static constexpr Real alpha_surf   = 0.6;
+  static constexpr int  ghost_layers = 0;
   static constexpr bool interior_is_solid = true;
 };
 
