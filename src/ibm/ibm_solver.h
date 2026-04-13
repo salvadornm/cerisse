@@ -68,7 +68,7 @@ public:
 #else
   Vector<BVH> bvh_a;                                        // BVH per geometry (replaces CGAL AABB tree)
 #endif
-  Vector<inside_t*> inout_fa;                               // in out testing function per geometry
+  Vector<std::unique_ptr<inside_t>> inout_fa;                // in out testing function per geometry
   Vector<Bbox> bbox_a;                                      // bounding box per geometry (world-frame, for fast rejection)
   Vector<Bbox> bbox_body_a;                                 // bounding box per geometry (body-frame, constant after init)
   Vector<RigidTransform> transform_a;                       // rigid-body transform per geometry (body→world)
@@ -94,10 +94,8 @@ public:
       if (p) { delete p; p = nullptr; }
     }
 
-    // Release inside/outside testers
-    for (auto*& f : inout_fa) {
-        if (f) { delete f; f = nullptr; }
-    }
+    // Release inside/outside testers (unique_ptr handles cleanup automatically)
+    inout_fa.clear();
   }
 
   /**
@@ -113,7 +111,7 @@ public:
   {
     // Delete raw-pointer members first (their internals use arena memory)
     for (auto*& p : bmf_a)    { if (p) { delete p; p = nullptr; } }
-    for (auto*& f : inout_fa) { if (f) { delete f; f = nullptr; } }
+    inout_fa.clear();  // unique_ptr handles cleanup
 
     // Swap-with-empty idiom: guarantees capacity→0 and arena memory freed NOW,
     // so the post-Finalize destructor finds nothing to deallocate.
@@ -284,13 +282,11 @@ public:
 #endif
       tree_a[i].build();
 
-      delete inout_fa[i];
-      inout_fa[i] = new inside_t(geom_a[i]);
+      inout_fa[i] = std::make_unique<inside_t>(geom_a[i]);
 #else
       bvh_a[i].build(geom_a[i]);
 
-      delete inout_fa[i];
-      inout_fa[i] = new inside_t(geom_a[i], bvh_a[i]);
+      inout_fa[i] = std::make_unique<inside_t>(geom_a[i], bvh_a[i]);
 #endif
 
 #if defined(AMREX_USE_CGAL) && (AMREX_SPACEDIM == 3)
@@ -663,7 +659,13 @@ public:
       // Verify count matches
       int h_gp_count = d_gp_count.dataValue();
       if (h_gp_count != ngps_fab) {
-        amrex::Abort("Error in initialiseGPs (GPU): mismatch in ghost point count");
+        amrex::Print() << "Error in initialiseGPs (GPU): GP count mismatch\n"
+                       << "  level=" << lev
+                       << "  FAB=" << ifab_local
+                       << "  expected=" << ngps_fab
+                       << "  got=" << h_gp_count
+                       << "  gp_offset=" << gp_offset << "\n";
+        amrex::Abort("initialiseGPs: ghost point count mismatch");
       }
       ibFab.gpData.ngps = ngps_fab;
     } // end MFIter
@@ -1043,7 +1045,7 @@ public:
         h_prims[ifab] = prims_mf.array(mfi);
       }
       Gpu::copyAsync(Gpu::hostToDevice, h_prims.begin(), h_prims.end(), d_prims.begin());
-      Gpu::streamSynchronize();
+      // No streamSynchronize: copyAsync and ParallelFor share the same stream.
     }
 
     auto* prims_arr = d_prims.data();
@@ -1668,7 +1670,7 @@ public:
         h_prims[ifab] = prims_mf.array(mfi);
       }
       Gpu::copyAsync(Gpu::hostToDevice, h_prims.begin(), h_prims.end(), d_prims.begin());
-      Gpu::streamSynchronize();
+      // No streamSynchronize: copyAsync and ParallelFor share the same stream.
     }
 
     auto* prims_arr = d_prims.data();

@@ -1354,6 +1354,9 @@ void CNS::rebuildIBM() {
   IBM::ib.build_mf(grids, dmap, level);
   IBM::ib.computeMarkers(level);
   IBM::ib.initialiseGPs(level);
+  // Surface indices depend on all levels having valid bmf_a, so we can
+  // only rebuild them once the entire regrid cascade is complete (i.e.,
+  // when the finest level calls rebuildIBM).
   if (level == parent->finestLevel()) {
      for (int lev = parent->finestLevel(); lev >= 0; --lev) {
         IBM::ib.computeSurfIndices(lev);

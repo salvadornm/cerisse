@@ -479,7 +479,6 @@ void read_geom()
     }
 
     // Release inside/outside testers
-    for (auto* p : inout_fa) { delete p; }
     inout_fa.clear();
 
     // Resize all containers to match new geometry count
@@ -538,13 +537,13 @@ void read_geom()
         tree_a[i].build();
         Print() << "CGAL AABB tree constructed" << std::endl;
 
-        inout_fa[i] = new inside_t(geom_a[i]);
+        inout_fa[i] = std::make_unique<inside_t>(geom_a[i]);
         Print() << "2D in/out testing functor constructed for polygon " << files_a[i] << "\n";
 #else
         bvh_a[i].build(geom_a[i]);
         Print() << "BVH constructed" << std::endl;
 
-        inout_fa[i] = new inside_t(geom_a[i], bvh_a[i]);
+        inout_fa[i] = std::make_unique<inside_t>(geom_a[i], bvh_a[i]);
         Print() << "2D in/out testing functor constructed for polygon " << files_a[i] << "\n";
 #endif
 
@@ -579,14 +578,14 @@ void read_geom()
         tree_a[i].build();
         Print() << "CGAL AABB tree constructed" << std::endl;
 
-        inout_fa[i] = new inside_t(geom_a[i]);
+        inout_fa[i] = std::make_unique<inside_t>(geom_a[i]);
         Print() << "In out testing function constructed for geometry " << files_a[i] << "\n";
 #else
         bvh_a[i].build(geom_a[i]);
         Print() << "BVH constructed (" << bvh_a[i].nodes.size() << " BVH2 nodes, "
                 << bvh_a[i].nodes4.size() << " BVH4 nodes)" << std::endl;
 
-        inout_fa[i] = new inside_t(geom_a[i], bvh_a[i]);
+        inout_fa[i] = std::make_unique<inside_t>(geom_a[i], bvh_a[i]);
         Print() << "In out testing function constructed for geometry " << files_a[i] << "\n";
 #endif
 
@@ -622,7 +621,10 @@ void read_geom()
         ntotalfaces = static_cast<int>(SurfElem_a.size());
     }
 
-    check_ibm_geometry_consistency(ngeom, geom_a.data(), inout_fa.data(), files_a.data());
+    // Build temporary raw-pointer array for consistency check API
+    Vector<inside_t*> inout_raw(ngeom);
+    for (int i = 0; i < ngeom; ++i) inout_raw[i] = inout_fa[i].get();
+    check_ibm_geometry_consistency(ngeom, geom_a.data(), inout_raw.data(), files_a.data());
 
     if (interior_is_solid) {
         Print() << "Interior of geometry is marked as SOLID" << std::endl;

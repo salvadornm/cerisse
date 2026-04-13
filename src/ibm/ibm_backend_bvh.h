@@ -102,8 +102,8 @@ private:
             return 0;
         }
         int crossings = 0;
-        const Real eps = Real(1e-12);
-        const Real degen_eps = Real(1e-10);   // near-parallel threshold
+        const Real eps = IBM_EPS::RAYCAST;
+        const Real degen_eps = IBM_EPS::RAYCAST * Real(100.0);   // near-parallel threshold
         constexpr int MAX_STACK = 128;
         int stack[MAX_STACK];
         int top = 0;
@@ -155,7 +155,7 @@ private:
         Real tmin = Real(0.0);
         Real tmax = std::numeric_limits<Real>::max();
         for (int d = 0; d < 3; ++d) {
-            if (std::abs(dir[d]) < Real(1e-30)) {
+            if (std::abs(dir[d]) < IBM_EPS::GEOM) {
                 if (p[d] < box.lo[d] || p[d] > box.hi[d]) return false;
             } else {
                 Real inv_d = Real(1.0) / dir[d];
@@ -583,9 +583,9 @@ inline bool read_polygon_2d (const std::string& filename, Polygon2D& poly, Real 
         min_y = std::min(min_y, p[1]); max_y = std::max(max_y, p[1]);
     }
     Real bbox_diag = std::sqrt((max_x-min_x)*(max_x-min_x) + (max_y-min_y)*(max_y-min_y));
-    Real scale_ref = (dx > 0) ? dx : (bbox_diag > 1e-12 ? bbox_diag : 1.0);
-    Real eps_dedup = Real(1e-6) * scale_ref;
-    Real area_eps  = Real(1e-12) * scale_ref * scale_ref;
+    Real scale_ref = (dx > 0) ? dx : (bbox_diag > IBM_EPS::RAYCAST ? bbox_diag : 1.0);
+    Real eps_dedup = IBM_EPS::DEDUP * scale_ref;
+    Real area_eps  = IBM_EPS::RAYCAST * scale_ref * scale_ref;
     std::vector<Point> clean;
     clean.reserve(raw_points.size());
     clean.push_back(raw_points[0]);
@@ -688,7 +688,7 @@ inline void build_geometry_cache (
         Real dx_ = b[0]-a[0], dy_ = b[1]-a[1];
         Real len = std::sqrt(dx_*dx_ + dy_*dy_);
         se_tmp.push_back(SurfElem(c, len, geomIdx));
-        Real inv_len = (len > Real(1e-30)) ? Real(1.0)/len : Real(0.0);
+        Real inv_len = (len > IBM_EPS::GEOM) ? Real(1.0)/len : Real(0.0);
         Real tx = dx_ * inv_len, ty = dy_ * inv_len;
         Real n_arr[2]  = { ty, -tx };
         Real t1_arr[2] = { tx, ty };
@@ -712,23 +712,36 @@ inline void build_geometry_cache (
                      v1[0]*v2[1]-v1[1]*v2[0]};
         Real n_len2 = n_raw[0]*n_raw[0] + n_raw[1]*n_raw[1] + n_raw[2]*n_raw[2];
         Real area = Real(0.5) * std::sqrt(n_len2);
-        if (area <= Real(0.0)) {
-            amrex::Print() << "Warning: skipping degenerate face " << fi
-                           << " (area=" << area << ")\n";
-            continue;
+        if (area < IBM_EPS::GEOM) {
+            // Degenerate (zero-area) triangle: collapse to longest edge midpoint.
+            // This avoids skipping the face entirely which would leave a hole
+            // in closest-point queries near degenerate regions.
+            Real e0_2 = (p1[0]-p0[0])*(p1[0]-p0[0])+(p1[1]-p0[1])*(p1[1]-p0[1])+(p1[2]-p0[2])*(p1[2]-p0[2]);
+            Real e1_2 = (p2[0]-p1[0])*(p2[0]-p1[0])+(p2[1]-p1[1])*(p2[1]-p1[1])+(p2[2]-p1[2])*(p2[2]-p1[2]);
+            Real e2_2 = (p0[0]-p2[0])*(p0[0]-p2[0])+(p0[1]-p2[1])*(p0[1]-p2[1])+(p0[2]-p2[2])*(p0[2]-p2[2]);
+            if (e0_2 >= e1_2 && e0_2 >= e2_2) {
+                for (int d = 0; d < 3; ++d) c[d] = Real(0.5)*(p0[d]+p1[d]);
+            } else if (e1_2 >= e2_2) {
+                for (int d = 0; d < 3; ++d) c[d] = Real(0.5)*(p1[d]+p2[d]);
+            } else {
+                for (int d = 0; d < 3; ++d) c[d] = Real(0.5)*(p2[d]+p0[d]);
+            }
+            area = IBM_EPS::GEOM;  // assign minimal area so it participates in queries
+            amrex::Print() << "Warning: degenerate face " << fi
+                           << " collapsed to edge midpoint\n";
         }
         se_tmp.push_back(SurfElem(c, area, geomIdx));
         Real inv_n = Real(1.0) / std::sqrt(n_len2);
         Vec n_unit = {n_raw[0]*inv_n, n_raw[1]*inv_n, n_raw[2]*inv_n};
         Real t1_len2 = v1[0]*v1[0] + v1[1]*v1[1] + v1[2]*v1[2];
         Vec t1;
-        if (t1_len2 > Real(1e-30)) {
+        if (t1_len2 > IBM_EPS::GEOM) {
             Real inv_t = Real(1.0) / std::sqrt(t1_len2);
             t1 = {v1[0]*inv_t, v1[1]*inv_t, v1[2]*inv_t};
         } else {
             Vec cross_x = {Real(0.0), -n_unit[2], n_unit[1]};
             Real cx2 = cross_x[0]*cross_x[0]+cross_x[1]*cross_x[1]+cross_x[2]*cross_x[2];
-            if (cx2 < Real(1e-12)) {
+            if (cx2 < IBM_EPS::RAYCAST) {
                 cross_x = {n_unit[2], Real(0.0), -n_unit[0]};
                 cx2 = cross_x[0]*cross_x[0]+cross_x[1]*cross_x[1]+cross_x[2]*cross_x[2];
             }
@@ -787,7 +800,7 @@ inline void build_geometry_cache_gpu (
         Real cy = Real(0.5) * (a[1] + b[1]);
         Real dx_ = b[0] - a[0], dy_ = b[1] - a[1];
         Real len = std::sqrt(dx_ * dx_ + dy_ * dy_);
-        Real inv = (len > Real(1e-30)) ? Real(1.0) / len : Real(0.0);
+        Real inv = (len > IBM_EPS::GEOM) ? Real(1.0) / len : Real(0.0);
         Real tx = dx_ * inv, ty = dy_ * inv;
         Real c[2] = {cx, cy};
         se_ptr[i] = SurfElem(c, len, gIdx);
@@ -841,13 +854,13 @@ inline void build_geometry_cache_gpu (
 
         Real t1_len2 = v1[0]*v1[0] + v1[1]*v1[1] + v1[2]*v1[2];
         Vec t1;
-        if (t1_len2 > Real(1e-30)) {
+        if (t1_len2 > IBM_EPS::GEOM) {
             Real inv_t = Real(1.0) / std::sqrt(t1_len2);
             t1 = {v1[0]*inv_t, v1[1]*inv_t, v1[2]*inv_t};
         } else {
             Vec cross_x = {Real(0.0), -n_unit[2], n_unit[1]};
             Real cx2 = cross_x[0]*cross_x[0] + cross_x[1]*cross_x[1] + cross_x[2]*cross_x[2];
-            if (cx2 < Real(1e-12)) {
+            if (cx2 < IBM_EPS::RAYCAST) {
                 cross_x = {n_unit[2], Real(0.0), -n_unit[0]};
                 cx2 = cross_x[0]*cross_x[0] + cross_x[1]*cross_x[1] + cross_x[2]*cross_x[2];
             }

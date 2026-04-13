@@ -265,6 +265,7 @@ Real CNS::advance(Real time, Real dt, int /*iteration*/, int /*ncycle*/) {
 #endif
 
     IBM::ib.computeAllGPs(prims_mf, cls_d, level);
+    Gpu::streamSynchronize();  // ensure GP primitives are fully written before Pass 1 reads them
 
     // ------------------------------------------------------------------------
     // Pass 1 (ALWAYS): Write GP-corrected primitives back to S2 as conservatives.
