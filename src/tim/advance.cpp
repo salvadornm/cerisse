@@ -290,19 +290,24 @@ Real CNS::advance(Real time, Real dt, int /*iteration*/, int /*ncycle*/) {
     }
 
     // ------------------------------------------------------------------------
-    // Pass 2 (FSI only): Flood-fill interior solid cells + zero their momentum.
+    // Pass 2 (ALWAYS when AMR is active): Flood-fill interior solid cells
+    //                                     + zero their momentum.
     //
-    // Why this is needed for FSI (but not static geometry):
-    //   Solid cells in the moving body don't evolve in the RK step, so their
-    //   values drift relative to the surrounding flow. When the body moves,
-    //   previously-solid cells become fluid and must have valid data. Also,
-    //   avgDown/FillPatch during regrid reads solid cell values and spreads
-    //   them into fresh fluid cells — if those are stale, the simulation
-    //   crashes. By flood-filling every step, solid cells track the local
-    //   flow. Zeroing momentum prevents spurious velocity amplification
-    //   when averaging fluid neighbors from different acoustic phases.
+    // Why this is needed even for static geometry with AMR:
+    //   Solid cells don't evolve in the RK step (RHS is zeroed), but WENO
+    //   stencils near the surface still reach across the body and can
+    //   contaminate interior solid cells with numerical garbage. These
+    //   stale values then get read by avgDown/FillPatch during regrid and
+    //   spread into fresh fluid cells on newly refined patches — which is
+    //   exactly how AMR fails with T=0 outside the solid at step 1.
+    //
+    // For FSI (moving bodies), this is additionally critical because cells
+    // that were solid can become fluid as the body moves.
+    //
+    // Zeroing momentum prevents spurious velocity amplification when
+    // averaging fluid neighbors from different acoustic phases.
     // ------------------------------------------------------------------------
-    if (CNS::ib_move) {
+    if (parent->maxLevel() > 0 || CNS::ib_move) {
       for (MFIter mfi(S2, false); mfi.isValid(); ++mfi) {
         const Box& bx  = mfi.tilebox();
         const Box& bxg = mfi.growntilebox(d_prob_closures->NGHOST);
