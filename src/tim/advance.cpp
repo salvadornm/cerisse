@@ -404,24 +404,47 @@ Real CNS::advance(Real time, Real dt, int /*iteration*/, int /*ncycle*/) {
     } // end FSI flood-fill
 
     // ------------------------------------------------------------------------
-    // Pass 3 (SAFETY NET, FSI only): Catch broken cells (NaN/Inf, non-positive,
-    // or > 100x deviation from neighbor median) and replace with neighbor
-    // median values + zero momentum.
+    // Pass 3 (SAFETY NET): Catch NaN/Inf/non-positive fluid cells and replace
+    // with neighbor-median values + zero momentum.
     //
-    // WHY FSI-ONLY: For static geometry, Pass 1 (GP correction) + Pass 2
-    // (interior solid flood-fill) is sufficient. Unconditionally running
-    // Pass 3 with its previous hardcoded magnitude bounds (rho in [0.01, 100],
-    // rho_ref=1.177 SI air) silently replaces valid low-density cells in
-    // non-dimensional cases (e.g. cylinder_Re40 with rho~0.003), causing
-    // 300x density inflation and catastrophic eigenvalue blow-up. A
-    // scale-adaptive magnitude check (deviation from neighbor median) is
-    // also too aggressive in shock-dominated cases — early shock overshoots
-    // trigger the check and get wrongly replaced, destroying the shock.
+    // Always runs (not gated by ib_move) because:
+    //   - Long-running simulations on multi-body static geometries
+    //     (e.g. 2DSphere with 7 circles at Mach 4) can produce fluid cells
+    //     with NaN/Inf from shock interactions or other numerical pathology.
+    //     Without a safety net, a single bad cell collapses dt to 0 and
+    //     freezes the simulation.
     //
-    // For FSI, Pass 3 is still needed as a last-resort when cells transition
-    // from solid to fluid with stale extrapolated values.
-    if (CNS::ib_move) {
-      constexpr Real MAG_TOL = Real(100.0);
+    // SCALE-INDEPENDENT: Detection is only NaN/Inf/non-positive (no hardcoded
+    // magnitude bounds, no hardcoded freestream fallback). Replacement uses
+    // the neighbor median. This works for any non-dimensionalisation.
+    //
+    // Previous versions used hardcoded rho in [0.01, 100] and rho_ref = 1.177
+    // (SI air), which silently destroyed non-SI setups (cylinder_Re40 with
+    // rho ~ 0.003 was flagged as "broken" and overwritten with SI air values).
+    // A scale-adaptive magnitude check (e.g. > 100x deviation from neighbor
+    // median) was also too aggressive — shock overshoots tripped it.
+    //
+    // Magnitude-based detection is done ONLY for FSI, where cells transition
+    // from solid to fluid and may carry stale extrapolated values that need
+    // more aggressive cleanup.
+    {
+      // Scale from the case's own freestream (ProbParm); avoids hardcoding
+      // SI or non-SI assumptions in the solver.
+      PROB::ProbParm const* lpp = d_prob_parm;
+      const Real rho_oo    = lpp->rho_oo;
+      const Real eint_oo   = lpp->eint_oo;
+      const Real eint_sp_oo = (rho_oo > Real(0.0)) ? (eint_oo / rho_oo) : Real(1.0);
+      // Permissive scale-adaptive bounds (1e-3 .. 1e3 of freestream).
+      // A Mach-10 shock compresses rho by ~6x — well inside these bounds.
+      const Real RHO_LO = rho_oo * Real(1.0e-3);
+      const Real RHO_HI = rho_oo * Real(1.0e3);
+      const Real EINT_SP_LO = eint_sp_oo * Real(1.0e-3);
+      const Real EINT_SP_HI = eint_sp_oo * Real(1.0e3);
+
+      // Extra-aggressive magnitude check for FSI (exposed cells may have
+      // huge gradients from extrapolation).
+      const bool aggressive = CNS::ib_move;
+      const Real MAG_TOL = Real(100.0);  // used only when aggressive==true
 
       for (MFIter mfi(S2, false); mfi.isValid(); ++mfi) {
         const Box& bx  = mfi.tilebox();
@@ -433,9 +456,34 @@ Real CNS::advance(Real time, Real dt, int /*iteration*/, int /*ncycle*/) {
           const Real rho = state(i,j,k, PC::URHO);
           const Real E   = state(i,j,k, PC::UET);
 
-          // Quick check: NaN/Inf/non-positive — always bad
-          const bool hard_bad = !std::isfinite(rho) || rho <= Real(0.0)
-                             || !std::isfinite(E)   || E   <= Real(0.0);
+          // Hard check: NaN/Inf/non-positive — always bad regardless of scale
+          bool bad = !std::isfinite(rho) || rho <= Real(0.0)
+                  || !std::isfinite(E)   || E   <= Real(0.0);
+
+          // Scale-adaptive magnitude check against freestream (works for
+          // any non-dimensionalisation). Permissive 1e-3 .. 1e3 bounds.
+          if (!bad) {
+            if (rho < RHO_LO || rho > RHO_HI) bad = true;
+          }
+          if (!bad) {
+            const Real mx = state(i,j,k, PC::UMX);
+            const Real my = state(i,j,k, PC::UMY);
+#if (AMREX_SPACEDIM == 3)
+            const Real mz = state(i,j,k, PC::UMZ);
+            const Real ke = Real(0.5) * (mx*mx + my*my + mz*mz) / rho;
+#else
+            const Real ke = Real(0.5) * (mx*mx + my*my) / rho;
+#endif
+            const Real eint_sp = (E - ke) / rho;
+            if (!std::isfinite(eint_sp) || eint_sp <= Real(0.0)
+                || eint_sp < EINT_SP_LO || eint_sp > EINT_SP_HI) {
+              bad = true;
+            }
+          }
+
+          // Fast path: if cell looks healthy and we're not doing aggressive
+          // neighbor-median detection (FSI), skip the rest.
+          if (!bad && !aggressive) return;
 
           // Collect valid neighbor densities and internal energies
           Real rho_nbrs[9] = {};
@@ -487,14 +535,14 @@ Real CNS::advance(Real time, Real dt, int /*iteration*/, int /*ncycle*/) {
           const Real rho_med  = rho_nbrs[n_nbrs / 2];
           const Real eint_med = eint_nbrs[n_nbrs / 2];
 
-          // Scale-adaptive magnitude check
-          bool mag_bad = false;
-          if (!hard_bad) {
+          // For FSI, also flag cells whose density deviates from neighbors
+          // by > MAG_TOL (helps with exposed-cell stale values).
+          if (!bad && aggressive) {
             const Real ratio = (rho > rho_med) ? rho / rho_med : rho_med / rho;
-            if (ratio > MAG_TOL) mag_bad = true;
+            if (ratio > MAG_TOL) bad = true;
           }
 
-          if (!hard_bad && !mag_bad) return;
+          if (!bad) return;
 
           // Replace with neighbor-median values, zero momentum
           state(i,j,k, PC::URHO) = rho_med;
