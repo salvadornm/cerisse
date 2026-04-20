@@ -1,7 +1,7 @@
 #------------------------------------------------------------------------------#
 #  IBM Test: BVH CPU 2D — single circle, Mach 4 shock
 #------------------------------------------------------------------------------#
-max_step  = 10
+max_step  = 2600
 stop_time = 10.0
 cfl = 0.3
 
@@ -9,14 +9,13 @@ cns.order_rk  = 3
 cns.stages_rk = 4
 cns.lo_bc = 1 2
 cns.hi_bc = 2 2
-cns.nstep_screen_output = 10
+cns.nstep_screen_output = 0
 cns.verbose = 0
-amr.verbose = 1
 
 #-------------------------------- IMMERSED BOUNDARY ---------------------------#
 ib.filename = ../circle.dat
 ib.move = 0
-ib.plot_surf = 0
+ib.plot_surf = 1
 ib.surf_file = ./plot/surf
 ib.surf_int  = 100
 
@@ -39,7 +38,7 @@ amr.grid_eff        = 0.85
 #-------------------------------- PLOTFILES -----------------------------------#
 amr.plot_files_output = 1
 amr.plot_file         = ./plot/plt
-amr.plot_int          = 10
+amr.plot_int          = 100
 amr.derive_plot_vars  = pressure velocity temperature
 amr.v = 1
 

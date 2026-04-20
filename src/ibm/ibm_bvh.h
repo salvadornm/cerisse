@@ -557,7 +557,9 @@ struct BVH {
         Gpu::DeviceVector<uint32_t> d_codes(n);
         Gpu::DeviceVector<int>      d_indices(n);
 
-        Gpu::htod_memcpy(d_boxes.data(), prim_boxes.data(), n * sizeof(AABB));
+        // Gpu::htod_memcpy(d_boxes.data(), prim_boxes.data(), n * sizeof(AABB));  // Jiaye original line
+
+        Gpu::copy(Gpu::hostToDevice, prim_boxes.begin(), prim_boxes.end(), d_boxes.begin());  // new line
 
         auto* box_ptr = d_boxes.data();
         auto* cod_ptr = d_codes.data();
@@ -582,8 +584,13 @@ struct BVH {
         {
             std::vector<uint32_t> h_codes(n);
             std::vector<int>      h_idx(n);
-            Gpu::dtoh_memcpy(h_codes.data(), d_codes.data(), n * sizeof(uint32_t));
-            Gpu::dtoh_memcpy(h_idx.data(),   d_indices.data(), n * sizeof(int));
+            //Gpu::dtoh_memcpy(h_codes.data(), d_codes.data(), n * sizeof(uint32_t)); // original line 
+            Gpu::copy(Gpu::deviceToHost, d_codes.begin(), d_codes.end(), h_codes.begin()); // new
+
+            //Gpu::dtoh_memcpy(h_idx.data(),   d_indices.data(), n * sizeof(int));  // original
+            Gpu::copy(Gpu::deviceToHost,d_indices.begin(), d_indices.end(),h_idx.begin()); // new
+
+
             std::vector<int> order(n);
             std::iota(order.begin(), order.end(), 0);
             std::sort(order.begin(), order.end(),
@@ -594,8 +601,10 @@ struct BVH {
                 sorted_codes[i] = h_codes[order[i]];
                 sorted_idx[i]   = h_idx[order[i]];
             }
-            Gpu::htod_memcpy(d_codes.data(),   sorted_codes.data(), n * sizeof(uint32_t));
-            Gpu::htod_memcpy(d_indices.data(), sorted_idx.data(),   n * sizeof(int));
+            //Gpu::htod_memcpy(d_codes.data(),   sorted_codes.data(), n * sizeof(uint32_t)); //  original
+            //Gpu::htod_memcpy(d_indices.data(), sorted_idx.data(),   n * sizeof(int)); // original
+            Gpu::copy(Gpu::hostToDevice, sorted_codes.begin(), sorted_codes.end(), d_codes.begin());
+            Gpu::copy(Gpu::hostToDevice,sorted_idx.begin(), sorted_idx.end(),d_indices.begin());
         }
 #endif
 

@@ -54,7 +54,9 @@ struct ProbParm
   Real z0 = 0.0;
 #endif
   // initial shock position
-  Real xshock = -0.9;
+  //Real xshock = -0.9;
+  Real xshock = -0.4;
+
 };
 
 struct methodparm_t {

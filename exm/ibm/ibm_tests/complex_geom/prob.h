@@ -56,7 +56,7 @@ struct ProbParm
   Real z0 = 0.0;
 #endif
   // initial shock position  
-  Real xshock = -0.9;  
+  Real xshock = -0.2;  
 
 };
 
@@ -113,9 +113,6 @@ typedef rhs_dt<riemann_t<false, ProbClosures>, no_diffusive_t, no_source_t > Pro
 
 
 // IBM templates
-//using d_image = std::ratio<5, 5>;
-//typedef ibm_solver_t<1,1,d_image,ProbClosures> ProbIB;
-
 
 typedef ibm_adiabatic_noslip_wall_t<ibmparm_t,ProbClosures> TypeWall;
 typedef ibm_solver_t<TypeWall,ibmparm_t,ProbClosures> ProbIB;
