@@ -182,6 +182,8 @@ void CNS::compute_rhs(MultiFab& statemf, Real dt, FluxRegister* fr_as_crse, Flux
     // evaluations that would arise from a 4D (i,j,k,n) ParallelFor.
     const int ncons = cls_h.NCONS;
 
+#if (AMREX_SPACEDIM != 1)
+
     if (is_rz) {
 
         const Real dr = dx[0];
@@ -234,6 +236,8 @@ void CNS::compute_rhs(MultiFab& statemf, Real dt, FluxRegister* fr_as_crse, Flux
                     }
                 });
     } else {
+#endif
+
 #if (AMREX_SPACEDIM == 1)
         const Real invdx = Real(1.0) / dx[0];
         ParallelFor(bx,
@@ -265,16 +269,19 @@ void CNS::compute_rhs(MultiFab& statemf, Real dt, FluxRegister* fr_as_crse, Flux
                     }
                 });
 #endif
-    }
 
+#if (AMREX_SPACEDIM != 1) 
+    }
+#endif
+
+#if !(AMREX_USE_GPIBM || CNS_USE_EB)
     // RZ viscous geometric source (hoop-stress and related terms) not captured
     // by the metric FV divergence of the face fluxes.
     // The IBM/EB variant is pending; viscous RZ-IBM cases should not use this path.
-    if (is_rz) {
-    #if !(AMREX_USE_GPIBM || CNS_USE_EB)
+    if (is_rz) {   
         prob_rhs.rz_geometric_source(geom, mfi, prims, state, cls_d);
-    #endif
     }
+#endif    
                       
 #if CNS_USE_EB    
     // internal geometry fluxes
@@ -330,3 +337,48 @@ void CNS::compute_rhs(MultiFab& statemf, Real dt, FluxRegister* fr_as_crse, Flux
   }
  
 }
+
+//--------------------------------------------------------------------------------------
+// clip species state to ensure positivity and sum Y=1 (if NUM_SPECIES > 1)
+
+#if NUM_SPECIES > 1
+void CNS::clip_species_state(MultiFab& statemf) {
+  BL_PROFILE("CNS:clip_speciesstate()");
+
+  // local Indexing for convenience  
+  constexpr int UFS    = PROB::ProbClosures::UFS;
+  constexpr int NGHOST = PROB::ProbClosures::NGHOST;
+
+  for (MFIter mfi(statemf, false); mfi.isValid(); ++mfi) {
+    Array4<Real> const& cons = statemf.array(mfi);
+
+    const Box& bx  = mfi.growntilebox(0);
+    const Box& bxg = mfi.growntilebox(NGHOST);
+    
+    // clip state
+    amrex::ParallelFor(bx, [=] AMREX_GPU_DEVICE(int i, int j, int k) noexcept
+    {
+      // compute real rho 
+      Real rhoreal = 0.0;
+	    for (int n = 0; n < NUM_SPECIES; ++n) {
+	      rhoreal += max( cons(i, j, k, UFS + n) ,0.0);
+	    }
+      // ensure sum Y[k] =-1
+	    Real rhoinv = Real(1.0) / rhoreal;
+	    Real Y[NUM_SPECIES]; Real sumY=0.0;
+	    for (int n = 0; n < NUM_SPECIES; ++n) {
+	      Y[n] = max( cons(i, j, k, UFS + n),0.0) * rhoinv; 
+	      sumY += Y[n];
+	    }
+	    for (int n = 0; n < NUM_SPECIES; ++n) {Y[n] /= sumY;}
+	     
+      // readjust	      
+	    for (int n = 0; n < NUM_SPECIES; ++n) {
+	      cons(i, j, k, UFS + n) = rhoreal*Y[n]; 
+	    }
+    }); 
+
+  } // end looop mfi  
+
+}
+#endif
