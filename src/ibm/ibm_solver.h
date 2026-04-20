@@ -335,6 +335,9 @@ public:
     Vector<int> gp_counts(nfabs_local, 0);
     int ifab_local = 0;
 
+    // Cache level dx for fast-skip bbox intersection test (avoids per-FAB re-fetch)
+    const auto dx_lev_cached = dx_a[lev];
+
     for (MFIter mfi(mfab, false); mfi.isValid(); ++mfi, ++ifab_local) {
       auto& ibFab = mfab.get(mfi);
       const Box& bx = mfi.tilebox();
@@ -342,6 +345,55 @@ public:
 
       // Clear legacy per-fab ghost-point data
       ibFab.gpData.clear();
+
+      // =================================================================
+      // FAST-SKIP: if the FAB's working region (valid box + required ghost
+      // cells) does not intersect ANY geometry's world-frame AABB, then all
+      // cells are fluid (marker 0, not ghost point) and no BVH query is
+      // needed. This is mathematically equivalent to running the full
+      // computeMarkers kernel for FABs far from any body, but skips the
+      // GPU kernel launch and per-cell bbox test entirely.
+      //
+      // Working region: valid box grown by max(NGHOST, GP_BOX_EXTRA) + 2.
+      //   - NGHOST: stencil width read by compute_rhs
+      //   - GP_BOX_EXTRA: extra growth for ghost-point detection
+      //   - +2: safety margin for moving-geometry bbox inflation
+      //
+      // The check uses AABB-vs-AABB intersection in physical (world-frame)
+      // coordinates. For static geometry, bbox_a[ii] is the body bbox in
+      // world frame; for FSI, it is updated every regrid by the caller
+      // before computeMarkers runs, so this test uses the current body
+      // position.
+      // =================================================================
+      {
+        const int check_grow = std::max(int(cls_t::NGHOST), GP_BOX_EXTRA) + 2;
+        const Box bxcheck = amrex::grow(bx, check_grow);
+        bool any_touches = false;
+        for (int ii = 0; ii < ngeom; ++ii) {
+          bool intersects = true;
+          for (int d = 0; d < AMREX_SPACEDIM; ++d) {
+            const amrex::Real box_lo_d =
+                prob_lo[d] + bxcheck.smallEnd(d) * dx_lev_cached[d];
+            const amrex::Real box_hi_d =
+                prob_lo[d] + (bxcheck.bigEnd(d) + 1) * dx_lev_cached[d];
+            if (box_hi_d < bbox_a[ii].lo[d] || box_lo_d > bbox_a[ii].hi[d]) {
+              intersects = false;
+              break;
+            }
+          }
+          if (intersects) { any_touches = true; break; }
+        }
+        if (!any_touches) {
+          // Entire FAB is in pure freestream — mark every cell as fluid,
+          // no ghost points. setVal(0) covers both components (solid flag
+          // and ghost-point flag) across the FAB's full allocated region,
+          // matching the default state expected downstream.
+          mfab.get(mfi).setVal(0);
+          ibFab.gpData.ngps = 0;
+          gp_counts[ifab_local] = 0;
+          continue;
+        }
+      }
 
 #ifdef AMREX_USE_GPU
       // ================================================================
