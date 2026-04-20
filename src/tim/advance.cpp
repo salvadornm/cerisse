@@ -307,7 +307,7 @@ Real CNS::advance(Real time, Real dt, int /*iteration*/, int /*ncycle*/) {
     // Zeroing momentum prevents spurious velocity amplification when
     // averaging fluid neighbors from different acoustic phases.
     // ------------------------------------------------------------------------
-    if (parent->maxLevel() > 0 || CNS::ib_move) {
+    if (CNS::ib_move) {
       for (MFIter mfi(S2, false); mfi.isValid(); ++mfi) {
         const Box& bx  = mfi.tilebox();
         const Box& bxg = mfi.growntilebox(d_prob_closures->NGHOST);
