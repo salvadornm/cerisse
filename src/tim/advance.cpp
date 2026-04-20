@@ -404,21 +404,24 @@ Real CNS::advance(Real time, Real dt, int /*iteration*/, int /*ncycle*/) {
     } // end FSI flood-fill
 
     // ------------------------------------------------------------------------
-    // Pass 3 (SAFETY NET): Catch catastrophically broken cells (NaN/Inf or
-    // values outside [0.01, 100] for density). Replace with neighbor-median
-    // or freestream fallback. This should rarely trigger; if it fires often,
-    // there's a deeper numerical problem to investigate.
-    // ------------------------------------------------------------------------
-    {
-      // Permissive bounds — only catch truly broken cells, not moderate
-      // physical deviations (shocks, expansion fans, etc.).
-      constexpr Real rho_lo  = Real(0.01);
-      constexpr Real rho_hi  = Real(100.0);
-      constexpr Real E_lo    = Real(1.0e1);
-      constexpr Real E_hi    = Real(1.0e10);
-      // Freestream fallback (air at 1 atm, 300 K)
-      constexpr Real rho_ref  = Real(1.177);
-      constexpr Real eint_ref = Real(2.15e5);
+    // Pass 3 (SAFETY NET, FSI only): Catch broken cells (NaN/Inf, non-positive,
+    // or > 100x deviation from neighbor median) and replace with neighbor
+    // median values + zero momentum.
+    //
+    // WHY FSI-ONLY: For static geometry, Pass 1 (GP correction) + Pass 2
+    // (interior solid flood-fill) is sufficient. Unconditionally running
+    // Pass 3 with its previous hardcoded magnitude bounds (rho in [0.01, 100],
+    // rho_ref=1.177 SI air) silently replaces valid low-density cells in
+    // non-dimensional cases (e.g. cylinder_Re40 with rho~0.003), causing
+    // 300x density inflation and catastrophic eigenvalue blow-up. A
+    // scale-adaptive magnitude check (deviation from neighbor median) is
+    // also too aggressive in shock-dominated cases — early shock overshoots
+    // trigger the check and get wrongly replaced, destroying the shock.
+    //
+    // For FSI, Pass 3 is still needed as a last-resort when cells transition
+    // from solid to fluid with stale extrapolated values.
+    if (CNS::ib_move) {
+      constexpr Real MAG_TOL = Real(100.0);
 
       for (MFIter mfi(S2, false); mfi.isValid(); ++mfi) {
         const Box& bx  = mfi.tilebox();
@@ -430,12 +433,13 @@ Real CNS::advance(Real time, Real dt, int /*iteration*/, int /*ncycle*/) {
           const Real rho = state(i,j,k, PC::URHO);
           const Real E   = state(i,j,k, PC::UET);
 
-          const bool bad = !std::isfinite(rho) || rho < rho_lo || rho > rho_hi
-                        || !std::isfinite(E)   || E   < E_lo   || E   > E_hi;
-          if (!bad) return;
+          // Quick check: NaN/Inf/non-positive — always bad
+          const bool hard_bad = !std::isfinite(rho) || rho <= Real(0.0)
+                             || !std::isfinite(E)   || E   <= Real(0.0);
 
-          // Find a representative neighbor density (median-ish of valid ones)
+          // Collect valid neighbor densities and internal energies
           Real rho_nbrs[9] = {};
+          Real eint_nbrs[9] = {};
           int n_nbrs = 0;
           for (int dj = -1; dj <= 1; ++dj) {
             for (int di = -1; di <= 1; ++di) {
@@ -445,25 +449,61 @@ Real CNS::advance(Real time, Real dt, int /*iteration*/, int /*ncycle*/) {
               { int dk = 0;
 #endif
                 if (di == 0 && dj == 0 && dk == 0) continue;
+                if (n_nbrs >= 9) continue;
                 const int ii = i+di, jj = j+dj, kk = k+dk;
                 if (!bxg.contains(IntVect(AMREX_D_DECL(ii,jj,kk)))) continue;
                 const Real rho_n = state(ii,jj,kk, PC::URHO);
-                if (std::isfinite(rho_n) && rho_n >= rho_lo && rho_n <= rho_hi
-                    && n_nbrs < 9) {
-                  rho_nbrs[n_nbrs++] = rho_n;
-                }
+                const Real E_n   = state(ii,jj,kk, PC::UET);
+                if (!std::isfinite(rho_n) || rho_n <= Real(0.0)) continue;
+                if (!std::isfinite(E_n)   || E_n   <= Real(0.0)) continue;
+                const Real mx_n = state(ii,jj,kk, PC::UMX);
+                const Real my_n = state(ii,jj,kk, PC::UMY);
+#if (AMREX_SPACEDIM == 3)
+                const Real mz_n = state(ii,jj,kk, PC::UMZ);
+                const Real ke_n = Real(0.5) * (mx_n*mx_n + my_n*my_n + mz_n*mz_n) / rho_n;
+#else
+                const Real ke_n = Real(0.5) * (mx_n*mx_n + my_n*my_n) / rho_n;
+#endif
+                const Real eint_n = (E_n - ke_n) / rho_n;
+                if (!std::isfinite(eint_n) || eint_n <= Real(0.0)) continue;
+                rho_nbrs[n_nbrs]  = rho_n;
+                eint_nbrs[n_nbrs] = eint_n;
+                n_nbrs++;
               }
             }
           }
 
-          const Real rho_new = (n_nbrs > 0) ? rho_nbrs[n_nbrs / 2] : rho_ref;
-          state(i,j,k, PC::URHO) = rho_new;
+          if (n_nbrs == 0) return;  // no valid neighbors, leave alone
+
+          // Simple median via partial sort
+          for (int a = 0; a < n_nbrs - 1; ++a) {
+            for (int b = a + 1; b < n_nbrs; ++b) {
+              if (rho_nbrs[b] < rho_nbrs[a]) {
+                Real t = rho_nbrs[a]; rho_nbrs[a] = rho_nbrs[b]; rho_nbrs[b] = t;
+                t = eint_nbrs[a]; eint_nbrs[a] = eint_nbrs[b]; eint_nbrs[b] = t;
+              }
+            }
+          }
+          const Real rho_med  = rho_nbrs[n_nbrs / 2];
+          const Real eint_med = eint_nbrs[n_nbrs / 2];
+
+          // Scale-adaptive magnitude check
+          bool mag_bad = false;
+          if (!hard_bad) {
+            const Real ratio = (rho > rho_med) ? rho / rho_med : rho_med / rho;
+            if (ratio > MAG_TOL) mag_bad = true;
+          }
+
+          if (!hard_bad && !mag_bad) return;
+
+          // Replace with neighbor-median values, zero momentum
+          state(i,j,k, PC::URHO) = rho_med;
           state(i,j,k, PC::UMX)  = Real(0);
           state(i,j,k, PC::UMY)  = Real(0);
 #if (AMREX_SPACEDIM == 3)
           state(i,j,k, PC::UMZ)  = Real(0);
 #endif
-          state(i,j,k, PC::UET)  = rho_new * eint_ref;
+          state(i,j,k, PC::UET)  = rho_med * eint_med;
         });
       }
     }
