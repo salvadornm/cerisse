@@ -376,7 +376,7 @@ public:
                 prob_lo[d] + bxcheck.smallEnd(d) * dx_lev_cached[d];
             const amrex::Real box_hi_d =
                 prob_lo[d] + (bxcheck.bigEnd(d) + 1) * dx_lev_cached[d];
-            if (box_hi_d < bbox_a[ii].lo[d] || box_lo_d > bbox_a[ii].hi[d]) {
+            if (box_hi_d < bbox_min_d(bbox_a[ii], d) || box_lo_d > bbox_max_d(bbox_a[ii], d)) {
               intersects = false;
               break;
             }

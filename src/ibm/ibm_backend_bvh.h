@@ -976,6 +976,14 @@ bool bbox_contains (const AABB& bb, const Point& p) {
     return bb.contains(p);
 }
 
+/// Dimension-indexed min/max accessor for AABB (BVH backend) —
+/// mirrors bbox_min_d / bbox_max_d in ibm_backend_cgal.h so caller code
+/// (e.g. FAB-level bbox fast-skip in computeMarkers) is backend-agnostic.
+AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
+amrex::Real bbox_min_d (const AABB& bb, int d) { return bb.lo[d]; }
+AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
+amrex::Real bbox_max_d (const AABB& bb, int d) { return bb.hi[d]; }
+
 /// Create an AMReX Array1D from scalars
 template <typename T>
 AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
