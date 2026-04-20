@@ -87,6 +87,8 @@ class CNS : public amrex::AmrLevel {
 
   virtual void post_restart() override;
 
+  void set_state_in_checkpoint(amrex::Vector<int>& state_in_checkpoint) override;
+
   // -------------------------------------------------------------------------
 
   // Gridding ----------------------------------------------------------------

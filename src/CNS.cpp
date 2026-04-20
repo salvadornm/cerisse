@@ -956,11 +956,33 @@ amrex::Print() << " recreate markers " << std::endl;
 
 #endif
 
+  // Initialise stats arrays to zero when restarting from a checkpoint
+  // that was written without statistics (NSTAT was 0 in the old build).
+  if (compute_stats) {
+    if (!state[Stats_Type].hasNewData()) {
+      const Real cur_time = state[State_Type].curTime();
+      const Real dt_old   = cur_time - state[State_Type].prevTime();
+      state[Stats_Type].define(geom.Domain(), grids, dmap,
+                               desc_lst[Stats_Type], cur_time, dt_old,
+                               Factory());
+    }
+    setupStats();
+    time_stat_level[level] = 0.0;
+  }
+
   // Set up diagnostics after restart
   if (record_probe) {
     setupTimeProbe();
   }
 
+}
+
+void CNS::set_state_in_checkpoint(Vector<int>& state_in_checkpoint) {
+  // This is only called when the checkpoint has fewer state types than
+  // the current code.  Mark Stats_Type as absent so AMReX skips reading it.
+  if (compute_stats) {
+    state_in_checkpoint[Stats_Type] = 0;
+  }
 }
 
 // 
