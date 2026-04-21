@@ -67,7 +67,7 @@ make -j8 GMP_HOME=/usr MPFR_HOME=/usr
 | 3d_cgal         | CGAL     | 3   | no   | yes  | sphere              | Mach 4 shock      |
 | complex_geom    | BVH      | 2   | no   | no   | complex polygon     | Mach 4 shock      |
 | airfoil_static  | BVH      | 2   | no   | no   | diamond wedge       | Ma=2 steady flow  |
-| multi_body      | BVH      | 2   | both | no   | 7 cylinders         | Mach 4 shock      |
+| multi_body      | BVH      | 2   | both | no   | 7 cylinders         | Mach 4 shock (WENO-Z5 + NS + isothermal noslip, 1024^2) |
 
 ## Reference hardware configuration
 
@@ -117,3 +117,25 @@ make -j8 CUDA_ARCH=7.0   # for V100
 - CGAL backend is CPU-only. If `USE_CGAL=TRUE` and `USE_CUDA=TRUE` are both set,
   the build system automatically falls back to BVH with a warning.
 - `multi_body` provides both `GNUmakefile` (CPU) and `GNUmakefile.gpu` (GPU).
+
+## Internal-energy floor (CLIP_MINTEMP)
+
+The `CLIP_MINTEMP` flag in each GNUmakefile controls the lower bound used
+by `cons2prims` to clip internal energy. Strong shock-on-body interactions
+(Mach ≥ 3 impacting an IBM wall) can drive WENO/Roe reconstruction into
+negative-internal-energy overshoot and crash the run. Enable the floor to
+absorb the undershoot physically:
+
+- `CLIP_MINTEMP = TRUE`  → `ei_min = R * 10 K / (γ-1) ≈ 7200 J/kg`  (T_min = 10 K)
+- `CLIP_MINTEMP = FALSE` → `ei_min = p_min / (γ-1) ≈ 2.5e-8 J/kg`   (effectively off)
+
+Recommended: set `CLIP_MINTEMP = TRUE` for `multi_body`, `complex_geom`,
+`2d_bvh_{cpu,gpu}`, `3d_bvh_{cpu,gpu}`, and any other Mach ≥ 3 shock/body
+case. Low-Mach / smooth-flow cases (cylinder_Re40 etc.) are insensitive.
+
+## 2D axisymmetric (RZ) cases
+
+The 2D cases in this directory are Cartesian (`coord_sys=0`). The RZ
+example `exm/ibm/esa_2d/` exercises axisymmetric IBM; RZ + IBM + shock
+has a known residual instability near the r = 0 axis that is not yet
+covered by the above fixes.
