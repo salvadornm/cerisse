@@ -1,4 +1,4 @@
-CEXE_headers += ibm_solver.h ibm_containers.h ibm_solver_interp.h ibm_solver_io.h ibm_wallmodel.h
+CEXE_headers += ibm_solver.h ibm_containers.h ibm_solver_interp.h ibm_solver_io.h ibm_walltypes.h
 
 ifeq ($(IBM_BACKEND),CGAL)
   CEXE_headers += ibm_cgal_defs.h ibm_backend_cgal.h

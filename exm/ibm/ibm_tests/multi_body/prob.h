@@ -9,7 +9,7 @@
 #include <RHS.h>
 #include <ibm_solver.h>
 #include <Constants.h>
-#include <ibm_wallmodel.h>
+#include <ibm_walltypes.h>
 
 using namespace amrex;
 using namespace universal_constants;
