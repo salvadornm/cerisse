@@ -29,9 +29,13 @@ ib.surf_int  = 2
 #-------------------------------- COMPUTATIONAL DOMAIN ------------------------#
 geometry.is_periodic = 0 0 
 geometry.coord_sys   = 0  # 0 => cart, 1 => RZ  2=>spherical
-geometry.prob_lo     =   -1     -1    
-geometry.prob_hi     =   1       1     
-amr.n_cell           =   128     128    
+geometry.prob_lo     =   -1     -1
+geometry.prob_hi     =   1       1
+# Resolution note: 128^2 was too coarse for WENO-Z5 + IBM to handle the Mach-4
+# shock / body interaction — the shock collapses onto ~0.2 cell across, which
+# drives negative-density overshoot in the GP / Roe stencil near circle6.
+# 512^2 resolves the shock on ~1 cell and the run is stable to stop_time.
+amr.n_cell           =   512     512
 
 #-------------------------------- REFINEMENT / REGRIDDING ---------------------#
 amr.max_level       = 1  # maximum level number allowed
