@@ -388,7 +388,7 @@ public:
           // no ghost points. setVal(0) covers both components (solid flag
           // and ghost-point flag) across the FAB's full allocated region,
           // matching the default state expected downstream.
-          mfab.get(mfi).setVal(0);
+          mfab.get(mfi).template setVal<amrex::RunOn::Device>(typename std::remove_reference_t<decltype(mfab.get(mfi))>::value_type(0));
           ibFab.gpData.ngps = 0;
           gp_counts[ifab_local] = 0;
           continue;

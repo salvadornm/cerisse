@@ -433,8 +433,11 @@ Real CNS::advance(Real time, Real dt, int /*iteration*/, int /*ncycle*/) {
       // Threshold: 1e6 × the hard clipping floor. Well below any physical
       // value (nominal rho ~ 1, nominal eint ~ 2e5 J/kg) yet far enough
       // above the floor that numerical noise doesn't trip it.
-      const Real rho_floor = CNSConstants::smallr * Real(1.0e6);
-      const Real ei_floor  = cls_h.get_ei_min()   * Real(1.0e6);
+      // Capture the floor constants as locals so CUDA device lambdas don't
+      // reach back into CNSConstants:: namespace storage.
+      const Real smallr_local = CNSConstants::smallr;
+      const Real rho_floor = smallr_local * Real(1.0e6);
+      const Real ei_floor  = cls_h.get_ei_min() * Real(1.0e6);
 
       ReduceOps<ReduceOpSum, ReduceOpSum, ReduceOpMin, ReduceOpMin> rop;
       ReduceData<int, int, Real, Real> rdata(rop);
@@ -457,7 +460,7 @@ Real CNS::advance(Real time, Real dt, int /*iteration*/, int /*ncycle*/) {
             // eint ≈ E/rho - 0.5*|u|² ; comparing E/rho against ei_floor
             // is a lower bound (true eint is smaller when KE > 0, so this
             // is conservative w.r.t. abort).
-            const Real eint_approx = E / amrex::max(rho, CNSConstants::smallr);
+            const Real eint_approx = E / amrex::max(rho, smallr_local);
             if (rho < rho_floor || eint_approx < ei_floor) nonpos = 1;
           }
           return {nonfinite, nonpos, rho, E};
