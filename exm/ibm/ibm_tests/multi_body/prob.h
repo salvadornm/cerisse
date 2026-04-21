@@ -87,8 +87,9 @@ struct ibmparm_t {
 typedef closures_dt<indicies_t, transport_const_t<methodparm_t>,
                     calorifically_perfect_gas_t<indicies_t>> ProbClosures;
 
-// NUMERICAL SCHEME: Riemann + viscous (needed for shear stress and heat flux)
-typedef rhs_dt<riemann_t<false, ProbClosures>, viscous_t<methodparm_t, ProbClosures>, no_source_t> ProbRHS;
+// NUMERICAL SCHEME: WENO-Z5 (5th-order) + viscous (shear stress + heat flux)
+typedef rhs_dt<weno_t<ReconScheme::WenoZ5, ProbClosures>,
+               viscous_t<methodparm_t, ProbClosures>, no_source_t> ProbRHS;
 
 // IBM wall type: isothermal no-slip → nonzero dTdn (heat flux) and tau (shear)
 typedef ibm_isothermal_noslip_wall_t<ibmparm_t, ProbClosures> TypeWall;
