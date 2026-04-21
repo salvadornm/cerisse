@@ -38,6 +38,18 @@ void CNS::compute_rhs(MultiFab& statemf, Real dt, FluxRegister* fr_as_crse, Flux
   MultiFab prims_mf(statemf.boxArray(), statemf.DistributionMap(),
                     cls_h.NPRIM, cls_h.NGHOST,
                     MFInfo().SetArena(The_Async_Arena()));
+
+  // In 2D, prob_initdata and bcnormal do not write UMZ (z-momentum). That
+  // leaves UMZ in valid cells and physical-BC ghosts as uninitialized memory
+  // — occasionally NaN. cons2prims reads UMZ unconditionally, and a NaN
+  // there cascades: uz = NaN → rhoke = NaN → E' = NaN → all prims NaN at
+  // that cell → WENO stencils produce NaN flux → RHS = NaN → blow-up at
+  // step 1 (typically exposed by AMR because extra fab allocations deplete
+  // zero-pages and expose stale/NaN memory). Zero the UMZ component each
+  // call to guarantee a clean 2D slice regardless of prob.h conventions.
+#if (AMREX_SPACEDIM < 3)
+  statemf.setVal(Real(0.0), PROB::ProbClosures::UMZ, 1, statemf.nGrow());
+#endif
   {
     BL_PROFILE_VAR("CNS::compute_rhs::cons2prims", prof_cons2prims);
     for (MFIter mfi(statemf, false); mfi.isValid(); ++mfi) {
@@ -135,7 +147,7 @@ void CNS::compute_rhs(MultiFab& statemf, Real dt, FluxRegister* fr_as_crse, Flux
     {
     BL_PROFILE_VAR("CNS::compute_rhs::eflux", prof_eflux);
 #if (AMREX_USE_GPIBM || CNS_USE_EB)
-    prob_rhs.eflux_ibm(geom, mfi, prims, {AMREX_D_DECL(&fluxt[0], &fluxt[1], &fluxt[2])}, state, cls_d, geoMarkers);    
+    prob_rhs.eflux_ibm(geom, mfi, prims, {AMREX_D_DECL(&fluxt[0], &fluxt[1], &fluxt[2])}, state, cls_d, geoMarkers);
 #else
     prob_rhs.eflux(geom, mfi, prims, {AMREX_D_DECL(&fluxt[0], &fluxt[1], &fluxt[2])}, state, cls_d);
 #endif

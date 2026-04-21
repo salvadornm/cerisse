@@ -104,8 +104,9 @@ struct ibmparm_t {
 typedef closures_dt<indicies_t, transport_const_t<methodparm_t>,
                     calorifically_perfect_gas_t<indicies_t>> ProbClosures;
 
-// Numerical scheme: HLLC Riemann solver, inviscid, no source
-typedef rhs_dt<riemann_t<false, ProbClosures>, no_diffusive_t, no_source_t> ProbRHS;
+// Numerical scheme: WENO-Z5, inviscid, no source
+typedef rhs_dt<weno_t<ReconScheme::WenoZ5, ProbClosures>,
+               no_diffusive_t, no_source_t> ProbRHS;
 
 // IBM wall model: adiabatic slip wall
 typedef ibm_adiabatic_slip_wall_t<ibmparm_t, ProbClosures> TypeWall;

@@ -43,6 +43,8 @@ std::string CNS::eb_redistribution_type = "NoRedist";
 int CNS::nstep_screen_output = 10;
 int CNS::order_rk = 2;
 int CNS::stages_rk = 2;
+bool CNS::strict_positivity = false;
+bool CNS::pass2_static = false;
 int CNS::do_reflux = 0; // default reflux is off
 int CNS::refine_max_dengrad_lev = -1;
 Real CNS::cfl = 0.0_rt;
@@ -133,6 +135,16 @@ void CNS::read_params() {
     if (order_rk == 3 && !(stages_rk == 4 || stages_rk == 3)) {
       amrex::Abort("SSPRK3 number of stages must equal 3 or 4");
     }
+  }
+
+  pp.query("strict_positivity", strict_positivity);
+  if (strict_positivity) {
+    amrex::Print() << "  cns.strict_positivity = 1 (abort if state approaches smallr/ei_min floors)\n";
+  }
+
+  pp.query("pass2_static", pass2_static);
+  if (pass2_static) {
+    amrex::Print() << "  cns.pass2_static = 1 (Pass 2 flood-fill runs for static geometry too)\n";
   }
 
   //  Utilities options ----------------------------------------------------

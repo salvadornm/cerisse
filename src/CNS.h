@@ -185,6 +185,20 @@ class CNS : public amrex::AmrLevel {
   static int order_rk;
   static int stages_rk;
 
+  // When true, the end-of-step IBM abort check uses "approaching the
+  // smallr / ei_min clipping floors" as the failure criterion instead of
+  // "already non-positive". Catches silent clipping in cons2prims that
+  // would otherwise mask a numerical breakdown.
+  static bool strict_positivity;
+
+  // Pass 2 (flood-fill interior solid + zero momentum) always runs for FSI.
+  // For static geometry, it is opt-in: some complex-geometry / multi-body
+  // cases are actually *destabilised* by the flood-fill because the averaged
+  // neighbour values spread post-shock states into the body, which the next
+  // step's WENO stencil then reads back and oscillates on. Enable via
+  // cns.pass2_static = 1 only when you explicitly want that behaviour.
+  static bool pass2_static;
+
   // Utility-variables
   static bool use_utility;
   static Utility utilidades;
