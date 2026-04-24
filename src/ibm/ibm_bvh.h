@@ -56,7 +56,7 @@ uint32_t morton_code (const Point& p, const AABB& scene_box) {
     Point norm;
     for (int d = 0; d < AMREX_SPACEDIM; ++d) {
         Real range = scene_box.hi[d] - scene_box.lo[d];
-        norm[d] = (range > Real(1e-30))
+        norm[d] = (range > IBM_EPS::MORTON)
                 ? (p[d] - scene_box.lo[d]) / range
                 : Real(0.5);
         norm[d] = amrex::max(Real(0.0), amrex::min(Real(1.0), norm[d]));
@@ -92,7 +92,7 @@ Point closest_point_on_segment (const Point& p, const Point& a, const Point& b) 
         dot_ab_ab += ab[d] * ab[d];
         dot_ap_ab += ap[d] * ab[d];
     }
-    Real t = (dot_ab_ab > Real(1e-30)) ? dot_ap_ab / dot_ab_ab : Real(0.0);
+    Real t = (dot_ab_ab > IBM_EPS::GEOM) ? dot_ap_ab / dot_ab_ab : Real(0.0);
     t = amrex::max(Real(0.0), amrex::min(Real(1.0), t));
     Point cp;
     for (int d = 0; d < AMREX_SPACEDIM; ++d) cp[d] = a[d] + t * ab[d];
@@ -143,7 +143,10 @@ Point closest_point_on_triangle (const Point& p,
         Real w = (d4-d3) / ((d4-d3) + (d5-d6));
         return Point{v1[0]+w*(v2[0]-v1[0]), v1[1]+w*(v2[1]-v1[1]), v1[2]+w*(v2[2]-v1[2])};
     }
-    Real denom = Real(1.0) / (va + vb + vc);
+    Real sum_abc = va + vb + vc;
+    // Guard against degenerate (zero-area) triangles: fall back to v0.
+    if (amrex::Math::abs(sum_abc) < IBM_EPS::GEOM) return v0;
+    Real denom = Real(1.0) / sum_abc;
     Real v_val = vb * denom;
     Real w     = vc * denom;
     return Point{v0[0]+ab[0]*v_val+ac[0]*w,
@@ -537,6 +540,7 @@ struct BVH {
         return idx;
     }
 
+#ifdef AMREX_USE_GPU
     // ----- GPU LBVH build (Karras 2012) ---------------------------------
     //
     // Layout: internal nodes at [0, n-2], leaf nodes at [n-1, 2n-2].
@@ -670,15 +674,27 @@ struct BVH {
         Gpu::streamSynchronize();
 
         // --- 7. Bottom-up AABB propagation ---
+        // Each leaf thread walks up to the root.  The atomic counter ensures
+        // that only the *second* thread to arrive at each internal node does
+        // the merge — the first thread returns immediately.  A thread fence
+        // before the merge guarantees that the child AABB writes from the
+        // other thread (which arrived first and continued upward or returned)
+        // are visible in global memory.
         auto* cnt_ptr = d_counter.data();
         ParallelFor(n, [=] AMREX_GPU_DEVICE (int i) noexcept {
             int current = parent_ptr[(n - 1) + i];
             while (current >= 0) {
                 int old = Gpu::Atomic::Add(&cnt_ptr[current], 1);
-                if (old == 0) return;
+                if (old == 0) return;  // first arrival: child AABB not ready yet
+#ifdef AMREX_USE_GPU
+                __threadfence();       // ensure child AABB writes are visible
+#endif
                 nd_ptr[current].box = AABB();
                 nd_ptr[current].box.merge(nd_ptr[nd_ptr[current].left].box);
                 nd_ptr[current].box.merge(nd_ptr[nd_ptr[current].right].box);
+#ifdef AMREX_USE_GPU
+                __threadfence();       // publish this node's AABB before moving up
+#endif
                 current = parent_ptr[current];
             }
         });
@@ -686,6 +702,7 @@ struct BVH {
 
         root = 0;
     }
+#endif // AMREX_USE_GPU
 
     // ----- BVH4 collapse (CPU, runs once after build) -------------------
     //
@@ -716,18 +733,19 @@ struct BVH {
         if (nd.is_leaf())
             return BVH4Node::LEAF_FLAG | nd.prim_id;
 
-        // Gather up to 4 children by expanding internal children one level
+        // Gather up to 4 children by expanding internal children one level.
+        // Fixed-size array avoids heap allocation per recursive call.
         struct Child { int bin_idx; AABB box; };
-        std::vector<Child> children;
-        children.reserve(4);
+        Child children[4];
+        int nch = 0;
 
         auto expand = [&](int child_bi) {
             const auto& c = h_nodes[child_bi];
-            if (c.is_leaf() || static_cast<int>(children.size()) >= 3) {
-                children.push_back({child_bi, c.box});
+            if (c.is_leaf() || nch >= 3) {
+                children[nch++] = {child_bi, c.box};
             } else {
-                children.push_back({c.left,  h_nodes[c.left].box});
-                children.push_back({c.right, h_nodes[c.right].box});
+                children[nch++] = {c.left,  h_nodes[c.left].box};
+                children[nch++] = {c.right, h_nodes[c.right].box};
             }
         };
 
@@ -738,7 +756,7 @@ struct BVH {
         int bvh4_idx = static_cast<int>(out.size());
         out.push_back(BVH4Node{});
         BVH4Node& n4 = out.back();
-        n4.n_children = static_cast<int>(children.size());
+        n4.n_children = nch;
 
         for (int c = 0; c < n4.n_children; ++c) {
             n4.child_box[c] = children[c].box;

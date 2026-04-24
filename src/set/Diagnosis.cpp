@@ -42,22 +42,34 @@ void CNS::setupTimeProbe() {
   pp.query("time_probe_lev", time_probe_lev);  // default 0
   pp.query("time_probe_int", time_probe_int);  // default 1
 
+  if (time_probe_lev < 0 || time_probe_lev > parent->maxLevel()) {
+    amrex::Abort("time_probe_lev must be between 0 and amr.max_level");
+  }
+
+  // Probes are recorded at time_probe_lev; use that level's Geometry so the
+  // resulting Box indices live in the same index space as tiles at recording.
+  const Geometry& probe_geom = parent->Geom(time_probe_lev);
+
+  // Clear in case of restart (setupTimeProbe is called again in post_restart).
+  time_probe_names.clear();
+  time_probe_boxes.clear();
+
   for (int cnt = 0; cnt < num_probes; ++cnt) {
     ParmParse ppr(time_probes[cnt]);
 
     std::string field_name;
     ppr.get("field_name", field_name);
     time_probe_names.push_back(field_name);
-    
-    const Real *prob_lo = geom.ProbLo();
-    const Real *prob_hi = geom.ProbHi();
+
+    const Real *prob_lo = probe_geom.ProbLo();
+    const Real *prob_hi = probe_geom.ProbHi();
     std::vector<Real> box_lo = {AMREX_D_DECL(prob_lo[0], prob_lo[1], prob_lo[2])};
     std::vector<Real> box_hi = {AMREX_D_DECL(prob_hi[0], prob_hi[1], prob_hi[2])};
     ppr.queryarr("box_lo", box_lo, 0, amrex::SpaceDim);
     ppr.queryarr("box_hi", box_hi, 0, amrex::SpaceDim);
-    time_probe_boxes.push_back(realbox_to_box(box_lo, box_hi, geom));
+    time_probe_boxes.push_back(realbox_to_box(box_lo, box_hi, probe_geom));
 
-    if (!time_probe_boxes[cnt].ok()) {      
+    if (!time_probe_boxes[cnt].ok()) {
       amrex::Abort("Invalid time probe box for " + field_name);
     }
   }

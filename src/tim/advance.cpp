@@ -1,6 +1,8 @@
 #include <AMReX_FluxRegister.H>
 #include <CNS.h>
+#include <CNSconstants.h>
 #include <prob.h>
+#include <iomanip>
 
 #ifdef AMREX_USE_GPIBM
 #include <ibm_solver.h>
@@ -236,10 +238,11 @@ Real CNS::advance(Real time, Real dt, int /*iteration*/, int /*ncycle*/) {
   //                     cells carrying bounded, physically plausible data
   //                     so that AMR FillPatch/avgDown during regrid does
   //                     not interpolate garbage into fresh fluid cells.
-  //   [3] Safety net:   replace any cell with catastrophically broken
-  //                     values (NaN, Inf, or orders-of-magnitude outliers)
-  //                     with a neighbor-based fallback. This should rarely
-  //                     fire in a well-resolved simulation.
+  //
+  // NO SAFETY NET: if any fluid cell becomes NaN/Inf/non-positive, that is
+  // a numerical failure of the scheme (under-resolved shocks, wrong CFL,
+  // missing positivity limiter, etc.), not something to silently patch.
+  // We detect such cells and abort with a diagnostic — upstream policy.
   // ==========================================================================
   {
     const PROB::ProbClosures& cls_h = *CNS::h_prob_closures;
@@ -265,6 +268,7 @@ Real CNS::advance(Real time, Real dt, int /*iteration*/, int /*ncycle*/) {
 #endif
 
     IBM::ib.computeAllGPs(prims_mf, cls_d, level);
+    Gpu::streamSynchronize();  // ensure GP primitives are fully written before Pass 1 reads them
 
     // ------------------------------------------------------------------------
     // Pass 1 (ALWAYS): Write GP-corrected primitives back to S2 as conservatives.
@@ -289,19 +293,35 @@ Real CNS::advance(Real time, Real dt, int /*iteration*/, int /*ncycle*/) {
     }
 
     // ------------------------------------------------------------------------
-    // Pass 2 (FSI only): Flood-fill interior solid cells + zero their momentum.
+    // Pass 2: Flood-fill interior solid cells + zero their momentum.
     //
-    // Why this is needed for FSI (but not static geometry):
-    //   Solid cells in the moving body don't evolve in the RK step, so their
-    //   values drift relative to the surrounding flow. When the body moves,
-    //   previously-solid cells become fluid and must have valid data. Also,
-    //   avgDown/FillPatch during regrid reads solid cell values and spreads
-    //   them into fresh fluid cells — if those are stale, the simulation
-    //   crashes. By flood-filling every step, solid cells track the local
-    //   flow. Zeroing momentum prevents spurious velocity amplification
-    //   when averaging fluid neighbors from different acoustic phases.
+    // Runs when:
+    //   - ib_move = 1 (FSI): cells that were solid can become fluid as the
+    //     body moves, so solid cells must carry bounded, physically plausible
+    //     data that reflects something close to wall-BC conditions.
+    //   - pass2_static = 1 (opt-in for static geometry): some shock–body
+    //     interaction cases benefit from clean solid-cell data because
+    //     WENO stencils reach across the surface and read solid values.
+    //     Empirically, flood-filling helps simple geometries
+    //     (2d_bvh_cpu, airfoil_static) but *destabilises* complex geometries
+    //     (2DSphere, complex_geom) — the averaged post-shock state leaks
+    //     into the body and the next step's WENO oscillates on the gradient.
+    //     Hence opt-in, not default.
+    //
+    // Zeroing momentum prevents spurious velocity amplification when
+    // averaging fluid neighbors from different acoustic phases.
+    //
+    // Sync S2 ghost cells from neighboring fabs first: the RK stages only
+    // write the valid region of S2, so cross-fab ghost cells still hold
+    // data from the previous step. The flood-fill reads 3×3 neighbors,
+    // and at box boundaries those neighbors land in that stale ghost
+    // region — without FillBoundary, Pass 2 averages current-step valid
+    // cells with previous-step ghost values, silently polluting the solid
+    // state and feeding garbage into the next step's WENO stencils.
     // ------------------------------------------------------------------------
-    if (CNS::ib_move) {
+    if (CNS::ib_move || CNS::pass2_static) {
+    S2.FillBoundary(geom.periodicity());
+    {
       for (MFIter mfi(S2, false); mfi.isValid(); ++mfi) {
         const Box& bx  = mfi.tilebox();
         const Box& bxg = mfi.growntilebox(d_prob_closures->NGHOST);
@@ -389,76 +409,142 @@ Real CNS::advance(Real time, Real dt, int /*iteration*/, int /*ncycle*/) {
 #endif
           state(i,j,k, PC::UMX) = Real(0.0);
           state(i,j,k, PC::UMY) = Real(0.0);
-#if (AMREX_SPACEDIM == 3)
-          state(i,j,k, PC::UMZ) = Real(0.0);
-#endif
+          state(i,j,k, PC::UMZ) = Real(0.0);  // always: index exists in 2D
           state(i,j,k, PC::UET) -= ke;
         });
       }
-    } // end FSI flood-fill
+    } // inner block
+    } // end Pass 2 (ib_move || pass2_static)
 
     // ------------------------------------------------------------------------
-    // Pass 3 (SAFETY NET): Catch catastrophically broken cells (NaN/Inf or
-    // values outside [0.01, 100] for density). Replace with neighbor-median
-    // or freestream fallback. This should rarely trigger; if it fires often,
-    // there's a deeper numerical problem to investigate.
+    // Hard NaN/Inf/non-positive check on fluid cells. If any fluid cell is
+    // broken, abort with a useful diagnostic. No silent repair — if this
+    // fires, the scheme itself failed and needs fixing (resolution, CFL,
+    // positivity limiter, viscosity, ...).
+    //
+    // When cns.strict_positivity = 1, we also abort if any fluid cell's
+    // density or internal energy has collapsed to near the cons2prims
+    // clipping floors (smallr ~ 1e-19, ei_min ~ 2.5e-8). That catches
+    // silent clipping — the scheme may have kept marching because prims
+    // were clamped, but the underlying conservative state is unphysical.
     // ------------------------------------------------------------------------
     {
-      // Permissive bounds — only catch truly broken cells, not moderate
-      // physical deviations (shocks, expansion fans, etc.).
-      constexpr Real rho_lo  = Real(0.01);
-      constexpr Real rho_hi  = Real(100.0);
-      constexpr Real E_lo    = Real(1.0e1);
-      constexpr Real E_hi    = Real(1.0e10);
-      // Freestream fallback (air at 1 atm, 300 K)
-      constexpr Real rho_ref  = Real(1.177);
-      constexpr Real eint_ref = Real(2.15e5);
+      const bool strict = CNS::strict_positivity;
+      // Threshold: 1e6 × the hard clipping floor. Well below any physical
+      // value (nominal rho ~ 1, nominal eint ~ 2e5 J/kg) yet far enough
+      // above the floor that numerical noise doesn't trip it.
+      // Capture the floor constants as locals so CUDA device lambdas don't
+      // reach back into CNSConstants:: namespace storage.
+      const Real smallr_local = CNSConstants::smallr;
+      const Real rho_floor = smallr_local * Real(1.0e6);
+      const Real ei_floor  = cls_h.get_ei_min() * Real(1.0e6);
+
+      ReduceOps<ReduceOpSum, ReduceOpSum, ReduceOpMin, ReduceOpMin> rop;
+      ReduceData<int, int, Real, Real> rdata(rop);
+      using RT = typename decltype(rdata)::Type;
 
       for (MFIter mfi(S2, false); mfi.isValid(); ++mfi) {
-        const Box& bx  = mfi.tilebox();
-        const Box& bxg = mfi.growntilebox(1);
+        const Box& bx = mfi.tilebox();
         Array4<Real> const& state = S2.array(mfi);
+        const auto& ibMarkers = ib_mf.array(mfi);
 
-        ParallelFor(bx, [=] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {
+        rop.eval(bx, rdata, [=] AMREX_GPU_DEVICE(int i, int j, int k) -> RT {
           using PC = PROB::ProbClosures;
+          if (ibMarkers(i,j,k,0) != 0) return {0, 0, Real(1e300), Real(1e300)};
           const Real rho = state(i,j,k, PC::URHO);
           const Real E   = state(i,j,k, PC::UET);
-
-          const bool bad = !std::isfinite(rho) || rho < rho_lo || rho > rho_hi
-                        || !std::isfinite(E)   || E   < E_lo   || E   > E_hi;
-          if (!bad) return;
-
-          // Find a representative neighbor density (median-ish of valid ones)
-          Real rho_nbrs[9] = {};
-          int n_nbrs = 0;
-          for (int dj = -1; dj <= 1; ++dj) {
-            for (int di = -1; di <= 1; ++di) {
-#if (AMREX_SPACEDIM == 3)
-              for (int dk = -1; dk <= 1; ++dk) {
-#else
-              { int dk = 0;
-#endif
-                if (di == 0 && dj == 0 && dk == 0) continue;
-                const int ii = i+di, jj = j+dj, kk = k+dk;
-                if (!bxg.contains(IntVect(AMREX_D_DECL(ii,jj,kk)))) continue;
-                const Real rho_n = state(ii,jj,kk, PC::URHO);
-                if (std::isfinite(rho_n) && rho_n >= rho_lo && rho_n <= rho_hi
-                    && n_nbrs < 9) {
-                  rho_nbrs[n_nbrs++] = rho_n;
-                }
-              }
-            }
+          const int nonfinite = (!std::isfinite(rho) || !std::isfinite(E)) ? 1 : 0;
+          int nonpos = (rho <= Real(0.0) || E <= Real(0.0)) ? 1 : 0;
+          if (strict && !nonfinite && !nonpos) {
+            // Approaching-clipping check (uses conservative E, not eint).
+            // eint ≈ E/rho - 0.5*|u|² ; comparing E/rho against ei_floor
+            // is a lower bound (true eint is smaller when KE > 0, so this
+            // is conservative w.r.t. abort).
+            const Real eint_approx = E / amrex::max(rho, smallr_local);
+            if (rho < rho_floor || eint_approx < ei_floor) nonpos = 1;
           }
-
-          const Real rho_new = (n_nbrs > 0) ? rho_nbrs[n_nbrs / 2] : rho_ref;
-          state(i,j,k, PC::URHO) = rho_new;
-          state(i,j,k, PC::UMX)  = Real(0);
-          state(i,j,k, PC::UMY)  = Real(0);
-#if (AMREX_SPACEDIM == 3)
-          state(i,j,k, PC::UMZ)  = Real(0);
-#endif
-          state(i,j,k, PC::UET)  = rho_new * eint_ref;
+          return {nonfinite, nonpos, rho, E};
         });
+      }
+      auto hv = rdata.value(rop);
+      int  n_nonfinite = amrex::get<0>(hv);
+      int  n_nonpos    = amrex::get<1>(hv);
+      Real rho_min     = amrex::get<2>(hv);
+      Real E_min       = amrex::get<3>(hv);
+      ParallelDescriptor::ReduceIntSum(n_nonfinite);
+      ParallelDescriptor::ReduceIntSum(n_nonpos);
+      ParallelDescriptor::ReduceRealMin(rho_min);
+      ParallelDescriptor::ReduceRealMin(E_min);
+
+      if (n_nonfinite > 0 || n_nonpos > 0) {
+        const char* badlabel = strict
+          ? "rho<=0, E<=0, rho<rho_floor, or eint<ei_floor (strict_positivity=1)"
+          : "rho<=0 or E<=0";
+        amrex::Print() << "\n========================================================\n"
+                       << "NUMERICAL FAILURE at level " << level
+                       << ", t = " << time + dt << ", dt = " << dt << "\n"
+                       << "  fluid cells with NaN/Inf : " << n_nonfinite << "\n"
+                       << "  fluid cells with " << badlabel << " : " << n_nonpos << "\n"
+                       << "  min(rho) = " << rho_min
+                       << "   (rho_floor = " << rho_floor << ")\n"
+                       << "  min(E)   = " << E_min
+                       << "   (ei_floor*min(rho) ~ " << ei_floor * amrex::max(rho_min, Real(0.0)) << ")\n"
+                       << "========================================================\n";
+
+        // Second pass: locate bad cells and print (i,j,k, x,y,z, cons+neighbors)
+        const auto dx = geom.CellSizeArray();
+        const auto plo = geom.ProbLoArray();
+        int printed = 0;
+        const int MAX_PRINT = 8;
+        for (MFIter mfi(S2, false); mfi.isValid(); ++mfi) {
+          const Box& bx = mfi.tilebox();
+          Array4<Real> const& state = S2.array(mfi);
+          const auto& ibMarkers = ib_mf.array(mfi);
+          const int lo0 = bx.smallEnd(0), lo1 = bx.smallEnd(1);
+          const int hi0 = bx.bigEnd(0),   hi1 = bx.bigEnd(1);
+#if (AMREX_SPACEDIM == 3)
+          const int lo2 = bx.smallEnd(2), hi2 = bx.bigEnd(2);
+#else
+          const int lo2 = 0, hi2 = 0;
+#endif
+          for (int k = lo2; k <= hi2 && printed < MAX_PRINT; ++k) {
+          for (int j = lo1; j <= hi1 && printed < MAX_PRINT; ++j) {
+          for (int i = lo0; i <= hi0 && printed < MAX_PRINT; ++i) {
+            using PC = PROB::ProbClosures;
+            if (ibMarkers(i,j,k,0) != 0) continue;
+            const Real rho = state(i,j,k, PC::URHO);
+            const Real E   = state(i,j,k, PC::UET);
+            const bool bad = !std::isfinite(rho) || !std::isfinite(E)
+                           || rho <= Real(0.0)   || E   <= Real(0.0);
+            if (!bad) continue;
+            const Real x = plo[0] + (i + Real(0.5)) * dx[0];
+            const Real y = plo[1] + (j + Real(0.5)) * dx[1];
+            amrex::AllPrint() << "[BAD CELL #" << printed << "] level=" << level
+                              << " (i,j,k)=(" << i << "," << j << "," << k << ")"
+                              << " (x,y)=(" << x << "," << y << ")\n"
+                              << "  center:  rho=" << rho
+                              << "  mx=" << state(i,j,k,PC::UMX)
+                              << "  my=" << state(i,j,k,PC::UMY)
+                              << "  E=" << E
+                              << "  ibm0=" << int(ibMarkers(i,j,k,0))
+                              << "  ibm1=" << int(ibMarkers(i,j,k,1)) << "\n";
+            // 3x3 neighborhood dump
+            amrex::AllPrint() << "  rho 3x3 (j-1..j+1, i-1..i+1):\n";
+            for (int dj = 1; dj >= -1; --dj) {
+              amrex::AllPrint() << "    ";
+              for (int di = -1; di <= 1; ++di) {
+                const int ii = i+di, jj = j+dj;
+                amrex::AllPrint() << std::setw(13) << std::setprecision(4) << state(ii,jj,k,PC::URHO)
+                                  << "[" << int(ibMarkers(ii,jj,k,0)) << "] ";
+              }
+              amrex::AllPrint() << "\n";
+            }
+            printed++;
+          }}}
+        }
+        amrex::Print() << "\nFix the root cause — do not silently patch.\n"
+                       << "========================================================\n";
+        amrex::Abort("advance: non-finite / non-positive fluid state detected");
       }
     }
   }

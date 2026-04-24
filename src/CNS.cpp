@@ -43,6 +43,8 @@ std::string CNS::eb_redistribution_type = "NoRedist";
 int CNS::nstep_screen_output = 10;
 int CNS::order_rk = 2;
 int CNS::stages_rk = 2;
+bool CNS::strict_positivity = false;
+bool CNS::pass2_static = false;
 int CNS::do_reflux = 0; // default reflux is off
 int CNS::refine_max_dengrad_lev = -1;
 Real CNS::cfl = 0.0_rt;
@@ -133,6 +135,16 @@ void CNS::read_params() {
     if (order_rk == 3 && !(stages_rk == 4 || stages_rk == 3)) {
       amrex::Abort("SSPRK3 number of stages must equal 3 or 4");
     }
+  }
+
+  pp.query("strict_positivity", strict_positivity);
+  if (strict_positivity) {
+    amrex::Print() << "  cns.strict_positivity = 1 (abort if state approaches smallr/ei_min floors)\n";
+  }
+
+  pp.query("pass2_static", pass2_static);
+  if (pass2_static) {
+    amrex::Print() << "  cns.pass2_static = 1 (Pass 2 flood-fill runs for static geometry too)\n";
   }
 
   //  Utilities options ----------------------------------------------------
@@ -956,11 +968,33 @@ amrex::Print() << " recreate markers " << std::endl;
 
 #endif
 
+  // Initialise stats arrays to zero when restarting from a checkpoint
+  // that was written without statistics (NSTAT was 0 in the old build).
+  if (compute_stats) {
+    if (!state[Stats_Type].hasNewData()) {
+      const Real cur_time = state[State_Type].curTime();
+      const Real dt_old   = cur_time - state[State_Type].prevTime();
+      state[Stats_Type].define(geom.Domain(), grids, dmap,
+                               desc_lst[Stats_Type], cur_time, dt_old,
+                               Factory());
+    }
+    setupStats();
+    time_stat_level[level] = 0.0;
+  }
+
   // Set up diagnostics after restart
   if (record_probe) {
     setupTimeProbe();
   }
 
+}
+
+void CNS::set_state_in_checkpoint(Vector<int>& state_in_checkpoint) {
+  // This is only called when the checkpoint has fewer state types than
+  // the current code.  Mark Stats_Type as absent so AMReX skips reading it.
+  if (compute_stats) {
+    state_in_checkpoint[Stats_Type] = 0;
+  }
 }
 
 // 
@@ -1354,6 +1388,9 @@ void CNS::rebuildIBM() {
   IBM::ib.build_mf(grids, dmap, level);
   IBM::ib.computeMarkers(level);
   IBM::ib.initialiseGPs(level);
+  // Surface indices depend on all levels having valid bmf_a, so we can
+  // only rebuild them once the entire regrid cascade is complete (i.e.,
+  // when the finest level calls rebuildIBM).
   if (level == parent->finestLevel()) {
      for (int lev = parent->finestLevel(); lev >= 0; --lev) {
         IBM::ib.computeSurfIndices(lev);

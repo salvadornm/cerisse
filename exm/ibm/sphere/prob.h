@@ -9,6 +9,10 @@
 
 #include <Closures.h>
 #include <RHS.h>
+#include <ibm_solver.h>
+#include <ratio>
+#include <Constants.h>
+#include <ibm_walltypes.h>
 
 #include <ibm_solver.h>
 #include <Constants.h>

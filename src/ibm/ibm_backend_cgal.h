@@ -28,6 +28,12 @@
 //============================================================================
 
 //---------------------------------------------------------------------------
+// Helper: dimension-indexed min/max accessor for Bbox (CGAL backend)
+//---------------------------------------------------------------------------
+AMREX_FORCE_INLINE amrex::Real bbox_min_d(const Bbox& bb, int d) { return bb.min(d); }
+AMREX_FORCE_INLINE amrex::Real bbox_max_d(const Bbox& bb, int d) { return bb.max(d); }
+
+//---------------------------------------------------------------------------
 // Helper: Check if Point is inside BBox
 //---------------------------------------------------------------------------
 AMREX_FORCE_INLINE bool bbox_contains(const Bbox& bb, const Point& p)

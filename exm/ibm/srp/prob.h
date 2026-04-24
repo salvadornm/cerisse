@@ -13,7 +13,7 @@
 #include <ibm_solver.h>
 #include <Constants.h>
 #include <NozzleFunctions.h>
-#include <ibm_wallmodel.h>
+#include <ibm_walltypes.h>
 #include <numbers>
 
 using namespace amrex;

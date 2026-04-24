@@ -52,3 +52,9 @@ tools/combustion/pmf-Y.txt
 
 gifdemo/
 *.stl
+
+# IBM case test outputs
+exm/ibm/ibm_tests/*/plot/
+exm/ibm/ibm_tests/*/surf/
+exm/ibm/*/plot/
+exm/ibm/*/surf/

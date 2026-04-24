@@ -31,6 +31,29 @@
 // explicitly with amrex:: below.
 
 // ============================================================================
+// 0. NUMERICAL TOLERANCES
+//
+// Centralised constants to avoid scattered magic numbers throughout the BVH
+// and geometry modules.  All are relative or scaled to a reference length
+// where possible.
+// ============================================================================
+
+namespace IBM_EPS {
+    /// Degenerate-geometry guard (zero-length edges, zero-area triangles).
+    /// Used for denominators in barycentric coords, segment projection, etc.
+    constexpr amrex::Real GEOM   = amrex::Real(1.0e-14);
+
+    /// Morton-code normalisation: axes with extent < GEOM are mapped to 0.5.
+    constexpr amrex::Real MORTON = amrex::Real(1.0e-14);
+
+    /// Ray-cast / point-in-solid winding-number tolerance.
+    constexpr amrex::Real RAYCAST = amrex::Real(1.0e-12);
+
+    /// Polygon vertex deduplication (relative to bounding-box diagonal).
+    constexpr amrex::Real DEDUP  = amrex::Real(1.0e-6);
+}
+
+// ============================================================================
 // 1. PRIMITIVE TYPES
 // ============================================================================
 
@@ -530,8 +553,8 @@ private:
     static bool point_on_segment (const Point& p, const Point& a, const Point& b) {
         amrex::Real cross = (b[0]-a[0])*(p[1]-a[1]) - (b[1]-a[1])*(p[0]-a[0]);
         amrex::Real len2  = (b[0]-a[0])*(b[0]-a[0]) + (b[1]-a[1])*(b[1]-a[1]);
-        if (len2 < amrex::Real(1e-30)) return false;
-        amrex::Real eps = amrex::Real(1e-10) * len2;
+        if (len2 < IBM_EPS::GEOM) return false;
+        amrex::Real eps = IBM_EPS::RAYCAST * len2;
         if (cross * cross > eps) return false;
         amrex::Real dx = b[0] - a[0], dy = b[1] - a[1];
         amrex::Real t = ((p[0]-a[0])*dx + (p[1]-a[1])*dy) / len2;

@@ -68,7 +68,7 @@ public:
 #else
   Vector<BVH> bvh_a;                                        // BVH per geometry (replaces CGAL AABB tree)
 #endif
-  Vector<inside_t*> inout_fa;                               // in out testing function per geometry
+  Vector<std::unique_ptr<inside_t>> inout_fa;                // in out testing function per geometry
   Vector<Bbox> bbox_a;                                      // bounding box per geometry (world-frame, for fast rejection)
   Vector<Bbox> bbox_body_a;                                 // bounding box per geometry (body-frame, constant after init)
   Vector<RigidTransform> transform_a;                       // rigid-body transform per geometry (body→world)
@@ -94,10 +94,8 @@ public:
       if (p) { delete p; p = nullptr; }
     }
 
-    // Release inside/outside testers
-    for (auto*& f : inout_fa) {
-        if (f) { delete f; f = nullptr; }
-    }
+    // Release inside/outside testers (unique_ptr handles cleanup automatically)
+    inout_fa.clear();
   }
 
   /**
@@ -113,7 +111,7 @@ public:
   {
     // Delete raw-pointer members first (their internals use arena memory)
     for (auto*& p : bmf_a)    { if (p) { delete p; p = nullptr; } }
-    for (auto*& f : inout_fa) { if (f) { delete f; f = nullptr; } }
+    inout_fa.clear();  // unique_ptr handles cleanup
 
     // Swap-with-empty idiom: guarantees capacity→0 and arena memory freed NOW,
     // so the post-Finalize destructor finds nothing to deallocate.
@@ -284,13 +282,11 @@ public:
 #endif
       tree_a[i].build();
 
-      delete inout_fa[i];
-      inout_fa[i] = new inside_t(geom_a[i]);
+      inout_fa[i] = std::make_unique<inside_t>(geom_a[i]);
 #else
       bvh_a[i].build(geom_a[i]);
 
-      delete inout_fa[i];
-      inout_fa[i] = new inside_t(geom_a[i], bvh_a[i]);
+      inout_fa[i] = std::make_unique<inside_t>(geom_a[i], bvh_a[i]);
 #endif
 
 #if defined(AMREX_USE_CGAL) && (AMREX_SPACEDIM == 3)
@@ -339,6 +335,9 @@ public:
     Vector<int> gp_counts(nfabs_local, 0);
     int ifab_local = 0;
 
+    // Cache level dx for fast-skip bbox intersection test (avoids per-FAB re-fetch)
+    const auto dx_lev_cached = dx_a[lev];
+
     for (MFIter mfi(mfab, false); mfi.isValid(); ++mfi, ++ifab_local) {
       auto& ibFab = mfab.get(mfi);
       const Box& bx = mfi.tilebox();
@@ -346,6 +345,55 @@ public:
 
       // Clear legacy per-fab ghost-point data
       ibFab.gpData.clear();
+
+      // =================================================================
+      // FAST-SKIP: if the FAB's working region (valid box + required ghost
+      // cells) does not intersect ANY geometry's world-frame AABB, then all
+      // cells are fluid (marker 0, not ghost point) and no BVH query is
+      // needed. This is mathematically equivalent to running the full
+      // computeMarkers kernel for FABs far from any body, but skips the
+      // GPU kernel launch and per-cell bbox test entirely.
+      //
+      // Working region: valid box grown by max(NGHOST, GP_BOX_EXTRA) + 2.
+      //   - NGHOST: stencil width read by compute_rhs
+      //   - GP_BOX_EXTRA: extra growth for ghost-point detection
+      //   - +2: safety margin for moving-geometry bbox inflation
+      //
+      // The check uses AABB-vs-AABB intersection in physical (world-frame)
+      // coordinates. For static geometry, bbox_a[ii] is the body bbox in
+      // world frame; for FSI, it is updated every regrid by the caller
+      // before computeMarkers runs, so this test uses the current body
+      // position.
+      // =================================================================
+      {
+        const int check_grow = std::max(int(cls_t::NGHOST), GP_BOX_EXTRA) + 2;
+        const Box bxcheck = amrex::grow(bx, check_grow);
+        bool any_touches = false;
+        for (int ii = 0; ii < ngeom; ++ii) {
+          bool intersects = true;
+          for (int d = 0; d < AMREX_SPACEDIM; ++d) {
+            const amrex::Real box_lo_d =
+                prob_lo[d] + bxcheck.smallEnd(d) * dx_lev_cached[d];
+            const amrex::Real box_hi_d =
+                prob_lo[d] + (bxcheck.bigEnd(d) + 1) * dx_lev_cached[d];
+            if (box_hi_d < bbox_min_d(bbox_a[ii], d) || box_lo_d > bbox_max_d(bbox_a[ii], d)) {
+              intersects = false;
+              break;
+            }
+          }
+          if (intersects) { any_touches = true; break; }
+        }
+        if (!any_touches) {
+          // Entire FAB is in pure freestream — mark every cell as fluid,
+          // no ghost points. setVal(0) covers both components (solid flag
+          // and ghost-point flag) across the FAB's full allocated region,
+          // matching the default state expected downstream.
+          mfab.get(mfi).template setVal<amrex::RunOn::Device>(typename std::remove_reference_t<decltype(mfab.get(mfi))>::value_type(0));
+          ibFab.gpData.ngps = 0;
+          gp_counts[ifab_local] = 0;
+          continue;
+        }
+      }
 
 #ifdef AMREX_USE_GPU
       // ================================================================
@@ -663,7 +711,13 @@ public:
       // Verify count matches
       int h_gp_count = d_gp_count.dataValue();
       if (h_gp_count != ngps_fab) {
-        amrex::Abort("Error in initialiseGPs (GPU): mismatch in ghost point count");
+        amrex::Print() << "Error in initialiseGPs (GPU): GP count mismatch\n"
+                       << "  level=" << lev
+                       << "  FAB=" << ifab_local
+                       << "  expected=" << ngps_fab
+                       << "  got=" << h_gp_count
+                       << "  gp_offset=" << gp_offset << "\n";
+        amrex::Abort("initialiseGPs: ghost point count mismatch");
       }
       ibFab.gpData.ngps = ngps_fab;
     } // end MFIter
@@ -1043,7 +1097,7 @@ public:
         h_prims[ifab] = prims_mf.array(mfi);
       }
       Gpu::copyAsync(Gpu::hostToDevice, h_prims.begin(), h_prims.end(), d_prims.begin());
-      Gpu::streamSynchronize();
+      // No streamSynchronize: copyAsync and ParallelFor share the same stream.
     }
 
     auto* prims_arr = d_prims.data();
@@ -1668,7 +1722,7 @@ public:
         h_prims[ifab] = prims_mf.array(mfi);
       }
       Gpu::copyAsync(Gpu::hostToDevice, h_prims.begin(), h_prims.end(), d_prims.begin());
-      Gpu::streamSynchronize();
+      // No streamSynchronize: copyAsync and ParallelFor share the same stream.
     }
 
     auto* prims_arr = d_prims.data();

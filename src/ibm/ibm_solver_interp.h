@@ -290,7 +290,10 @@ void computeIPweights(
       AMREX_ASSERT_WITH_MESSAGE(
           sumfluid == imp_ninterp(iim),
           "computeIPweights: mismatch in fluid stencil count.");
-      Real inv_sum = Real(1.0) / sumweights;
+      // Runtime guard: in release builds ASSERT may be stripped; protect against FPE.
+      Real inv_sum = (sumweights > Real(1.0e-30))
+                   ? Real(1.0) / sumweights
+                   : Real(0.0);
       Real check_sum = Real(0.0);
       for (int corner = 0; corner < N_InterP; ++corner) {
           weights(iim, corner) *= inv_sum;
@@ -363,13 +366,20 @@ static void extrapolate(
                 Real x2 = disIM(1);
                 AMREX_ASSERT(x1 > 0 && x2 > 0);
 
-                Real x = -disGP;
-
-                Real L0 = (x - x1) * (x - x2) / (x1 * x2);
-                Real L1 = x * (x - x2) / (x1 * (x1 - x2));
-                Real L2 = x * (x - x1) / (x2 * (x2 - x1));
-
-                prims(0, n) = u0 * L0 + u1 * L1 + u2 * L2;
+                // Guard: if image points are nearly coincident, the quadratic
+                // Lagrange denominator (x1-x2) vanishes. Fall back to linear.
+                constexpr Real eps_dist = Real(1.0e-12);
+                if (amrex::Math::abs(x1 - x2) < eps_dist * amrex::max(x1, x2)) {
+                    // linear fallback using surface + first image point
+                    Real slope = (u1 - u0) / x1;
+                    prims(0, n) = u0 - slope * disGP;
+                } else {
+                    Real x = -disGP;
+                    Real L0 = (x - x1) * (x - x2) / (x1 * x2);
+                    Real L1 = x * (x - x2) / (x1 * (x1 - x2));
+                    Real L2 = x * (x - x1) / (x2 * (x2 - x1));
+                    prims(0, n) = u0 * L0 + u1 * L1 + u2 * L2;
+                }
             }
         }
         else if (eff_order == 1) {
