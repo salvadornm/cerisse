@@ -17,7 +17,7 @@ USE_FSI   = TRUE
 AMREX_NO_PROBINIT = TRUE
 CUDA_ARCH = 8.0
 
-AMR_SOLVER = $(abspath ../../../)
+AMR_SOLVER = $(abspath ../../../../)
 AMREX_HOME = $(AMR_SOLVER)/lib/amrex
 
 CEXE_headers += prob.h
