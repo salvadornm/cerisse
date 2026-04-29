@@ -254,5 +254,7 @@ Real CNS::advance(Real time, Real dt, int /*iteration*/, int /*ncycle*/) {
   //   exit(0);
   //   // TODO: SSPRK(10,4) C=6, Ceff=0.6
   // }
+  if (level == 0){
+  PROB::user_source_t<PROB::ProbClosures,PROB::IgnitionParm>::increase_src_dt();}
   return dt;
 }

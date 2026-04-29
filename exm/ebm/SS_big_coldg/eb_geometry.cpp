@@ -10,7 +10,7 @@ void Custom::build(const Geometry& geom, const int max_coarsening_level)
   const Real cm2m=0.01;  // change cm to m
 
   // centre of domain  
-  const Real x0 =  0.0; // was 2.2 
+  const Real x0 =  0.0; 
   const Real y0 =  0.0;
 
   // big chamber
@@ -37,10 +37,21 @@ void Custom::build(const Geometry& geom, const int max_coarsening_level)
 
 
   // atmospheric box out of combustor
-  const Real z0atmo =0.1675; 
-  //const Real z0atmo =0.155; 
-  const Real Hatmo = 0.065;
-  const Real Ratmo = 3.0*R_chamber; // 
+  
+  //const Real z0atmo =0.1475; const Real z0atmo =0.155; 
+  // const Real z0atmo =  0.1775;
+
+  const Real z0atmo =  0.235;
+  //const Real z0atmo =  0.335;
+
+
+  //const Real Hatmo = 0.06; //0.026
+  const Real Hatmo = 0.2;  //0.085;
+
+  // Z-H   0.1775-0.5*0.085 = 0.0925
+
+
+  const Real Ratmo = 6.0*R_chamber; // 
   auto atmo = EB2::CylinderIF(Ratmo,Hatmo,dir_chamber,{AMREX_D_DECL(x0, y0, z0atmo)}, false);
 
   // cylindrical domain

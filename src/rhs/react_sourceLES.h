@@ -215,6 +215,7 @@ class reactor_sourceLES_t {
 #ifdef AMREX_USE_GPU
     m_reactor->react(bx, rY, rYsrc, T, rEi, rEisrc, fc, mask, dt, current_time,
                      amrex::Gpu::gpuStream());
+    std::cout << "reaction happened" << std::endl; 
 #else
     m_reactor->react(bx, rY, rYsrc, T, rEi, rEisrc, fc, mask, dt, current_time);
 #endif
@@ -332,8 +333,8 @@ class reactor_sourceLES_t {
      
     // call user source term (passed as argument)
     //  - assume source_t is a user_source_t is lightweight (no persistent state, just logic),
-    source_t{}.rsrc(geomdata,mfi, prims, rhs, cls_d, dt, real_time);
-
+    //source_t{}.rsrc(geomdata,mfi, prims, rhs, cls_d, dt, real_time);
+    source_t{}.rsrc(geomdata,mfi, prims, rhs, cls_d, dt, real_time,source_t::src_dt);
   }
 };
 
