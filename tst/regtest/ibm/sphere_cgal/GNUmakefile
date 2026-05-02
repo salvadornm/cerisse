@@ -4,7 +4,7 @@ COMP      = gcc
 CXXSTD    = c++20
 PRECISION = DOUBLE
 
-TINY_PROFILE = TRUE
+TINY_PROFILE = FALSE
 
 # cerisse options
 CLIP_MINTEMP = FALSE
@@ -16,6 +16,7 @@ USE_OMP = FALSE
 
 # Boundaries
 USE_GPIBM=TRUE
+USE_CGAL  = TRUE
 
 AMREX_NO_PROBINIT=TRUE
 CUDA_ARCH=8.0
@@ -38,6 +39,12 @@ else
   MPFR_HOME=/opt/homebrew/opt/mpfr
 endif
 
+# IBM test: CGAL CPU 3D (single sphere)
+# files in  TEST_DIR
+TEST_DIR= $(AMR_SOLVER)/exm/ibm/ibm_tests/
+CEXE_headers += $(TEST_DIR)/3d_cgal/prob.h
+INCLUDE_LOCATIONS += $(TEST_DIR)
+VPATH_LOCATIONS   +=  $(TEST_DIR)
+#
 
-CEXE_headers += prob.h
 include $(AMR_SOLVER)/src/Make.CNS

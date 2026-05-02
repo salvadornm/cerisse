@@ -1,7 +1,7 @@
 #------------------------------------------------------------------------------#
 #  IBM Test: BVH CPU 2D — single circle, Mach 4 shock
 #------------------------------------------------------------------------------#
-max_step  = 10
+max_step  = 500
 stop_time = 10.0
 cfl = 0.3
 
@@ -39,7 +39,7 @@ amr.grid_eff        = 0.85
 #-------------------------------- PLOTFILES -----------------------------------#
 amr.plot_files_output = 1
 amr.plot_file         = ./plot/plt
-amr.plot_int          = 10
+amr.plot_int          = 100
 amr.derive_plot_vars  = pressure velocity temperature
 amr.v = 1
 

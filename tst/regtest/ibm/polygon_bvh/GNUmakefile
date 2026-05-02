@@ -18,5 +18,9 @@ CUDA_ARCH = 8.0
 AMR_SOLVER = $(abspath ../../../../)
 AMREX_HOME = $(AMR_SOLVER)/lib/amrex
 
-CEXE_headers += prob.h
+# files in  TEST_DIR
+TEST_DIR= $(AMR_SOLVER)/exm/ibm/ibm_tests/complex_geom
+CEXE_headers += $(TEST_DIR)/prob.h
+INCLUDE_LOCATIONS += $(TEST_DIR)
+
 include $(AMR_SOLVER)/src/Make.CNS

@@ -34,7 +34,7 @@ MAKE_DIRS=(
 	"../tst/regtest/react/flame_chem/"	
 	"../tst/regtest/mms/navsto3d/"
 	"../tst/regtest/tutorial/"
-	"../tst/moving/airfoil/"
+	"../tst/regtest/moving/airfoil/"
 )
 
 # List of dirs that include reaction
