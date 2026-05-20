@@ -7,7 +7,7 @@ coverY: 0
 
 # Input
 
-This page provides detailed info on the `input` file options. These arguments are passed to AMReX, not all arguments are required (see [examples](broken-reference))
+This page provides detailed info on the `input` file options. These arguments are passed to AMReX, not all arguments are required (see [examples](/broken/pages/A5SQyfZeJahu1TBz4Z9W))
 
 ## AMReX options
 

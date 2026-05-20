@@ -69,6 +69,81 @@ struct LESparm_t {
 | `fixDelta`    | `bool` | `false` | Flag to indicate whether the filter width is fixed.                                        |
 | `Delta`       | `Real` | `0.02`  | Filter width (only used if `fixDelta` is true)                                             |
 
+### TFM\_t
+
+The `TFM_t` class reads its parameters from the `atf` namespace in the input file. These values can be used to override the default thickened-flame model settings.&#x20;
+
+| Input option                  |     Default | Description                                                                     |
+| ----------------------------- | ----------: | ------------------------------------------------------------------------------- |
+| `atf.thickening_factor`       |       `1.0` | Maximum artificial thickening factor, `F0`. A value of `1` disables thickening. |
+| `atf.laminar_flame_speed`     |       `2.0` | Laminar flame speed, `SL0`, used by the wrinkling model.                        |
+| `atf.laminar_flame_thickness` |    `1.0e-4` | Laminar flame thickness, `deltaL0`, used to normalize the filter width.         |
+| `atf.Ret`                     |        `10` | Turbulent Reynolds number used in the wrinkling-efficiency model.               |
+| `atf.Cburn`                   |    `2200.0` | Burned-state value used to normalize the flame sensor.                          |
+| `atf.Cunburn`                 |     `298.0` | Unburned-state value used to normalize the flame sensor.                        |
+| `atf.Cindex`                  | `idx_t::QT` | Primitive-variable index used by the flame sensor, defaulting to temperature.   |
+
+Example input:
+
+```ini
+# ATF / TFM model
+atf.thickening_factor = 5
+atf.laminar_flame_speed = 1.2
+atf.laminar_flame_thickness = 1.0e-4
+atf.Ret = 10
+atf.Cburn = 2200.0
+atf.Cunburn = 298.0
+```
+
+TFM requires **two options** to pass to `react_sourceLES`  and  `viscous_LES` often to be defined in `user_source_t` (or other structure)
+
+```cpp
+public :  
+  // ATF options
+  bool static constexpr use_ATF = true; // use adaptive thickening factor
+  static constexpr int ATF_model = 1;   // 1: Classic  Colin/Charlette , 2: Rathore transformation  
+```
+
+These compile-time options control whether the **Artificially Thickened Flame (ATF)** model is applied and which formulation is used to modify the chemical source terms.
+
+```cpp
+static constexpr bool use_ATF = true;
+```
+
+Enables the ATF combustion model. When enabled, reaction rates are modified to account for flame thickening and unresolved flame wrinkling. If set to `false`, no ATF correction is applied.
+
+```cpp
+static constexpr int ATF_model = 1;
+```
+
+Selects the ATF formulation:
+
+* **`1` — Classic Colin/Charlette model**\
+  Applies both flame thickening and a wrinkling efficiency correction based on sub-grid turbulence, giving a source-term scaling of **E/F** and diffusion **F**
+* **`2` — Rathore transformation**\
+  Applies only the thickening correction without the wrinkling efficiency model, providing a simpler transformed-source formulation (check [Theory](theory/equations/turbcomb.md#atf))
+
+In practice, these options define how unresolved flame–turbulence interaction is represented in LES combustion simulations.
+
+### PaSR
+
+The `PaSR_t` class reads its parameters from the `pasr` namespace in the input file. These values can be used to override the default Partially Stirred Reactor model settings.
+
+{% hint style="warning" %}
+The mixing constant is not used yet (Jan 2026)
+{% endhint %}
+
+| Input option           | Default | Description                                                                                                                                                      |
+| ---------------------- | ------: | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `pasr.mixing_constant` |   `1.0` | Mixing-model constant controlling the turbulent mixing timescale. Smaller values increase the effective reaction rate; larger values increase mixing limitation. |
+
+Example input:
+
+```ini
+# PaSR combustion model
+pasr.mixing_constant = 0.7
+```
+
 ## rhs\_dt
 
 ### skew\_t
@@ -93,12 +168,7 @@ struct methodparm_t {
 };
 ```
 
-| Variable Name | Type   | Value   | Description                                                  |
-| ------------- | ------ | ------- | ------------------------------------------------------------ |
-| `dissipation` | `bool` | `true`  | Flag indicating whether dissipation is applied (true = yes). |
-| `order`       | `int`  | `4`     | Order of the numerical scheme used 2/4/6.                    |
-| `C2skew`      | `Real` | `0.1`   | Coefficient for 2nd-order skew-symmetric dissipation.        |
-| `C4skew`      | `Real` | `0.016` | Coefficient for 4th-order skew-symmetric dissipation.        |
+<table><thead><tr><th>Variable Name</th><th>Type</th><th width="143.140625">Value</th><th>Description</th></tr></thead><tbody><tr><td><code>dissipation</code></td><td><code>bool</code></td><td><code>true</code></td><td>Flag indicating whether dissipation is applied (true = yes).</td></tr><tr><td><code>order</code></td><td><code>int</code></td><td><code>4</code></td><td>Order of the numerical scheme used 2/4/6.</td></tr><tr><td><code>C2skew</code></td><td><code>Real</code></td><td><code>0.1</code></td><td>Coefficient for 2nd-order skew-symmetric dissipation.</td></tr><tr><td><code>C4skew</code></td><td><code>Real</code></td><td><code>0.016</code></td><td>Coefficient for 4th-order skew-symmetric dissipation.</td></tr></tbody></table>
 
 ### viscous\_t
 
@@ -123,7 +193,7 @@ struct methodparm_t {
 | `order`       | `int`  | `2`     | Order of the numerical scheme used 2/4/6.   |
 | `use_LES`     | `bool` | `false` | Flag indicating sgs model used (true =yes). |
 
-If `use_LES = true`, sub-grid viscosty/conductivity/ect.. will be added to the viscosity
+If `use_LES = true`, sub-grid viscosty/conductivity/etc. will be added to the molecular viscosity.
 
 ## IBM
 
