@@ -304,3 +304,29 @@ It follows [PelePhysics Utility](https://pelephysics.readthedocs.io/en/latest/Ut
 {% hint style="danger" %}
 Plots to add, soon ...
 {% endhint %}
+
+## Cylinders under supersonic flow
+
+The `exm/ibm/ibm_tests/multi_body` case simulates **seven cylinders** in a **Mach 4 perfect gas** at **Re = 10,000**, with **isothermal walls maintained at 300 K**.
+
+This example demonstrates the [Immersed Boundary Method](theory/ibmeb.md#immersed-boundaries) (IBM) implementation using the **BVH geometry infrastructure**, allowing complex multi-body simulations without requiring CGAL.
+
+The simulation uses a **1024 × 1024 base mesh**, **one AMR refinement level**, and the **WENO5** high-order scheme. Cylinder geometries are defined through simple `x,y` coordinate files (`circle1.dat`, `circle2.dat`, ...). \
+Per-body surface outputs for **heat flux** and **wall shear stress** are stored in:
+
+```
+surf/circle1/, surf/circle2/, ...
+```
+
+<figure><img src=".gitbook/assets/multi_Tavort.png" alt=""><figcaption><p>Figure 7: Composite temperature and vorticity magnitude (obtained with Visit) </p></figcaption></figure>
+
+All these options are defined in the input file
+
+```
+#-------------------------------- IMMERSED BOUNDARY ---------------------------#
+ib.filename = circle1.dat circle2.dat circle3.dat circle4.dat circle5.dat circle6.dat circle7.dat
+ib.move = 0
+ib.plot_surf = 1
+ib.surf_file = ./surf/surf
+ib.surf_int  = 50
+```
