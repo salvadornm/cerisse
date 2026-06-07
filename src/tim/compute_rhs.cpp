@@ -98,7 +98,7 @@ void CNS::compute_rhs(MultiFab& statemf, Real dt, FluxReg* fr_as_crse, FluxReg* 
     amrex::ParallelFor(bxg, 2,
     [=] AMREX_GPU_DEVICE (int i, int j, int k, int n) noexcept
     {
-    geoMarkers(i,j,k,n) = ebMarkers(i,j,k,n) && ibMarkers(i,j,k,n);
+    geoMarkers(i,j,k,n) = ebMarkers(i,j,k,n) && ibMarkers(i,j,k,n);  // TODO: Weno not compatable with mixed IB and EB
     });
 #endif    
 #if (AMREX_USE_GPIBM && !CNS_USE_EB)

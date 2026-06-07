@@ -1,5 +1,5 @@
 # Simulation time
-max_step  =  50000
+max_step  =  1000
 stop_time =  0.005
 cfl = 0.1
 #time_step = 1.2e-6
@@ -26,7 +26,7 @@ amr.v               = 1 # quiet
 
 # Refinement and regridding 
 amr.n_cell            = 80 160   # orign 80 x 160 with 1 lev
-amr.max_level         = 2      # maximum level number allowed
+amr.max_level         = 1      # maximum level number allowed
 amr.ref_ratio         = 2 2    # refinement ratio per level
 amr.regrid_int        = 5      # how often to regrid per level
 amr.blocking_factor_x = 8      # blocking factor in x per level
@@ -53,4 +53,4 @@ eb2.cylinder_center = 1.0 2.0
 eb2.cylinder_has_fluid_inside = 0
 
 eb2.eb_weight  = 1.0
-eb2.redistribution_type = "NewRedist"
+eb2.redistribution_type = "FluxRedist"

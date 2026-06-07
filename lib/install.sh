@@ -74,6 +74,7 @@ case  $1 in
       install)
         mkdir -p install
         cd $PWD/boost
+        # chmod +x bootstrap.sh tools/build/src/engine/build.sh
         ./bootstrap.sh --prefix=$PWD/../install/boost --with-toolset=gcc
         ./b2 install     
         cd ../cgal
