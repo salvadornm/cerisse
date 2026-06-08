@@ -907,7 +907,6 @@ void CNS::errorEst(TagBoxArray &tags, int /*clearval*/, int /*tagval*/,
   // }
 
 #ifdef AMREX_USE_GPIBM
-  // call function from cns_prob
   auto &ibdata = (*IBM::ib.bmf_a[level]);
 #elif defined CNS_USE_EB
   auto const& fact = dynamic_cast<EBFArrayBoxFactory const&>(Factory());
@@ -918,7 +917,7 @@ void CNS::errorEst(TagBoxArray &tags, int /*clearval*/, int /*tagval*/,
     auto const &tagfab = tags.array(mfi);
     auto const &sdatafab = sdata.array(mfi);
 #ifdef AMREX_USE_GPIBM
-    auto const &ibfab = ibdata.const_array(mfi);
+    auto const &ibfab = ibdata.array(mfi); // was const_array for user_tagging???
 #elif defined CNS_USE_EB
     auto const& flag = flags.const_array(mfi);
 #endif
@@ -927,13 +926,11 @@ void CNS::errorEst(TagBoxArray &tags, int /*clearval*/, int /*tagval*/,
     PROB::ProbParm const *lprobparm = d_prob_parm;
 
     ParallelFor(bx, [=] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {
+      // the user_tagging function is defined in prob.h
 #ifdef AMREX_USE_GPIBM
-      // call function from cns_prob
-      user_tagging(i, j, k, nt_lev, tagfab, sdatafab, ibfab, geomdata,
-                   *lprobparm, lev);
+      user_tagging(i, j, k, nt_lev, tagfab, sdatafab, ibfab, geomdata,*lprobparm, lev);
 #elif defined CNS_USE_EB
-      user_tagging(i, j, k, nt_lev, tagfab, sdatafab, flag, geomdata,
-                   *lprobparm, lev);
+      user_tagging(i, j, k, nt_lev, tagfab, sdatafab, flag, geomdata, *lprobparm, lev);
 #else
       user_tagging(i, j, k, nt_lev, tagfab, sdatafab, geomdata ,*lprobparm, lev);
 #endif

@@ -315,16 +315,16 @@ void CNS::compute_rhs(MultiFab& statemf, Real dt, FluxReg* fr_as_crse, FluxReg* 
     // redistribution 
     // WARNING: state is  the RHS array, prims is the prims 
     // compute divc here
-    amrex::ParallelFor(bxg, cls_h.NCONS,  
+    amrex::ParallelFor(bxg, ncons,  
     [=] AMREX_GPU_DEVICE (int i, int j, int k, int n) noexcept
     {
       divc(i,j,k,n) = state(i,j,k,n);
     });  
     
     // do redistribution only in box with EB
-    FArrayBox dm_as_fine(Box::TheUnitBox(), NCONS, The_Async_Arena());
+    FArrayBox dm_as_fine(Box::TheUnitBox(), ncons, The_Async_Arena());
     if (fr_as_fine) {
-        dm_as_fine.resize(amrex::grow(bx, 1), NCONS);
+        dm_as_fine.resize(amrex::grow(bx, 1), ncons);
         dm_as_fine.setVal<RunOn::Device>(0.0);
     }
     if (eb_redistribution && fab_with_eb){

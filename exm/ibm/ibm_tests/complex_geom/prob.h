@@ -167,7 +167,6 @@ void prob_initdata (int i, int j, int k, amrex::Array4<amrex::Real> const& state
 }
 
 
-
 AMREX_GPU_DEVICE AMREX_FORCE_INLINE 
 void user_tagging(int i, int j, int k, int nt, auto& tagfab, const auto &sdatafab, 
                   const Array4<uint8_t>&ibfab, const auto& geomdata, 
