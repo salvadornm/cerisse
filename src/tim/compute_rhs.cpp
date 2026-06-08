@@ -325,9 +325,9 @@ void CNS::compute_rhs(MultiFab& statemf, Real dt, FluxReg* fr_as_crse, FluxReg* 
     });  
     
     // do redistribution only in box with EB
-    FArrayBox dm_as_fine(Box::TheUnitBox(), NCONS, The_Async_Arena());
+    FArrayBox dm_as_fine(Box::TheUnitBox(), cls_h.NCONS, The_Async_Arena());
     if (fr_as_fine) {
-        dm_as_fine.resize(amrex::grow(bx, 1), NCONS);
+        dm_as_fine.resize(amrex::grow(bx, 1), cls_h.NCONS);
         dm_as_fine.setVal<RunOn::Device>(0.0);
     }
     if (eb_redistribution && fab_with_eb){
