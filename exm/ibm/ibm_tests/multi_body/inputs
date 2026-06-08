@@ -48,7 +48,7 @@ amr.plot_int          = 500
 amr.derive_plot_vars  = pressure velocity temperature
 amr.v = 1
 
-amr.checkpoint_files_output = 1
+amr.checkpoint_files_output = 0
 amr.check_file              = chk
 amr.check_int               = 5000
 

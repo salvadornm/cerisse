@@ -4,7 +4,7 @@ DIM       = 2
 COMP      = gcc
 CXXSTD    = c++20
 PRECISION = DOUBLE
-TINY_PROFILE = TRUE
+TINY_PROFILE = FALSE
 # Enable T_min floor: essential for Mach-4 shock/body interaction to avoid
 # negative internal-energy overshoot in WENO/Roe reconstruction near bodies.
 CLIP_MINTEMP = TRUE
