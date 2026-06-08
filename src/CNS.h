@@ -2,15 +2,21 @@
 #define CNS_H_
 
 #include <AMReX_AmrLevel.H>
-#include <AMReX_FluxRegister.H>
+#if CNS_USE_EB
+#include <AMReX_EBFluxRegister.H>
+using FluxReg = amrex::EBFluxRegister;
+#else
+#include <AMReX_YAFluxRegister.H>
 #include <AMReX_Math.H>
+using FluxReg = amrex::YAFluxRegister;
+#endif
 #include <prob.h>
 #include <CNSconstants.h>
 
 #include <Utilities.h>
 
 
-using namespace amrex;
+// using namespace amrex;
 
 class CNS : public amrex::AmrLevel {
  public:
@@ -49,8 +55,7 @@ class CNS : public amrex::AmrLevel {
 
   // Time-stepping -----------------------------------------------------------
   void compute_rhs(amrex::MultiFab& S, amrex::Real dt,
-                   amrex::FluxRegister* fr_as_crse,
-                   amrex::FluxRegister* fr_as_fine);
+                   FluxReg* fr_as_crse, FluxReg* fr_as_fine);
 
 #if NUM_SPECIES > 1                   
   void clip_species_state(amrex::MultiFab& S);                   
@@ -131,6 +136,8 @@ class CNS : public amrex::AmrLevel {
     }
   }
 
+  int okToContinue() override;
+
   void avgDown();
 
   void printTotal() const;
@@ -157,7 +164,7 @@ class CNS : public amrex::AmrLevel {
 
   // Parameters
   static int num_state_data_types;
-  std::unique_ptr<amrex::FluxRegister> flux_reg;
+  FluxReg flux_reg;
   static int do_reflux;
 
   static bool verbose;

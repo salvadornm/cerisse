@@ -161,7 +161,7 @@ bcnormal(const Real x[AMREX_SPACEDIM], Real dratio, const Real s_int[ProbClosure
 ///////////////////////////////AMR//////////////////////////////////////////////
 AMREX_GPU_DEVICE AMREX_FORCE_INLINE void
 user_tagging(int i, int j, int k, int nt_level, auto &tagfab,
-             const auto &sdatafab, const auto &geomdata,
+             const auto &sdatafab, const auto& ebflag, const auto &geomdata,
              const ProbParm &prob_parm, int level) {
 
   const Real *prob_lo = geomdata.ProbLo();

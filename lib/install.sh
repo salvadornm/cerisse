@@ -1,4 +1,4 @@
-AMREXVERSION=25.09
+AMREXVERSION=26.05
 #AMREXVERSION=23.11
 PELEPVERSION=25.04
 #PELEPVERSION=23.03
@@ -73,6 +73,7 @@ case  $1 in
       install)
         mkdir -p install
         cd $PWD/boost
+        # chmod +x bootstrap.sh tools/build/src/engine/build.sh
         ./bootstrap.sh --prefix=$PWD/../install/boost --with-toolset=gcc
         ./b2 install     
         cd ../cgal

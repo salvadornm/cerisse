@@ -593,6 +593,7 @@ public:
   void inline redist (const Geometry& geom, const MFIter& mfi,
                       const Array4<Real>& cons, const Array4<Real>& divc, 
                       std::array<FArrayBox*, AMREX_SPACEDIM> const &flxt,
+                      FluxReg* fr_as_crse, FluxReg* fr_as_fine, Array4<Real> const& dm_as_fine,
                       const Array4<Real>& rhs, const cls_t* cls, int lev, Real dt,
                       BCRec const* phys_bc) {
 
@@ -671,10 +672,12 @@ public:
     // target_volfrac         ::  (const set as 0.5)                                target_volfrac
     // srd_update_scale       :: Array of eb_weight (usually 1)                     srd_update_scale
 
-    int as_crse = 0;
-    int as_fine = 0;  // if 1 it crashes
+    // int as_crse = 0;
+    // int as_fine = 0;  // if 1 it crashes
+    int as_crse = int(fr_as_crse != nullptr);
+    int as_fine = int(fr_as_fine != nullptr);
     
-     FArrayBox dm_as_fine(Box::TheUnitBox(), cls_t::NCONS, The_Async_Arena()); //snm (new 2 lines  below, now commented)
+    //  FArrayBox dm_as_fine(Box::TheUnitBox(), cls_t::NCONS, The_Async_Arena()); //snm (new 2 lines  below, now commented)
     //FArrayBox dm_as_fine(bxg, cls_t::NCONS, The_Async_Arena());
     //dm_as_fine.setVal<RunOn::Device>(0.0);
 
@@ -684,8 +687,8 @@ public:
     //IArrayBox fab_rrflag_as_crse(bxg);   
 
     // in cerisse this call is different, depends on
-    const IArrayBox* p_rrflag_as_crse = &fab_rrflag_as_crse;
-    FArrayBox* p_drho_as_crse = &fab_drho_as_crse;
+    const IArrayBox* p_rrflag_as_crse = (fr_as_crse) ? fr_as_crse->getCrseFlag(mfi) : &fab_rrflag_as_crse;
+    FArrayBox* p_drho_as_crse = (fr_as_crse) ? fr_as_crse->getCrseData(mfi) : &fab_drho_as_crse;
         
     auto const& fcx = flxt[0]->array(); 
     auto const& fcy = flxt[1]->array(); 
@@ -703,7 +706,7 @@ public:
      amrex::ApplyMLRedistribution(
       ebbox, cls_t::NCONS, rhs, divc, cons, scratch, flag, AMREX_D_DECL(apx, apy, apz), vfrac,
       AMREX_D_DECL(fcx, fcy, fcz), bcent, phys_bc, geom, dt, redistribution_type,
-      as_crse, p_drho_as_crse->array(), p_rrflag_as_crse->const_array(), as_fine, dm_as_fine.array(), lev_mask,
+      as_crse, p_drho_as_crse->array(), p_rrflag_as_crse->const_array(), as_fine, dm_as_fine, lev_mask,
       level_mask_not_covered, fac_for_deltaR, use_wts_in_divnc, 0, srd_max_order,
       target_volfrac, srd_update_scale);
    }                                

@@ -20,7 +20,7 @@ using namespace amrex;
 // computation and data transfer, is not useful then. Therefore, we can have all
 // grid point computations, per fab, in a single MFIter loop (single stream).
 
-void CNS::compute_rhs(MultiFab& statemf, Real dt, FluxRegister* fr_as_crse, FluxRegister* fr_as_fine) {
+void CNS::compute_rhs(MultiFab& statemf, Real dt, FluxReg* fr_as_crse, FluxReg* fr_as_fine) {
   BL_PROFILE("CNS::compute_rhs()");
 
   // Variables
@@ -121,9 +121,14 @@ void CNS::compute_rhs(MultiFab& statemf, Real dt, FluxRegister* fr_as_crse, Flux
     cls_h.cons2prims(mfi, state, prims);
 #endif
 
-    // Geometry markers (one of IBM/EB is expected to be enabled).
-    // Alias geoMarkers to the underlying marker MultiFab to avoid
-    // allocating an auxiliary fab + doing a device copy.
+    // combine markers into one  (CAN BE DONE BETTER)
+#if (AMREX_USE_GPIBM && CNS_USE_EB)    
+    amrex::ParallelFor(bxg, 2,
+    [=] AMREX_GPU_DEVICE (int i, int j, int k, int n) noexcept
+    {
+    geoMarkers(i,j,k,n) = ebMarkers(i,j,k,n) && ibMarkers(i,j,k,n);  // TODO: Weno not compatable with mixed IB and EB
+    });
+#endif    
 #if (AMREX_USE_GPIBM && !CNS_USE_EB)
     auto& marker_mf = *IBM::ib.bmf_a[level];
     auto const& geoMarkers = marker_mf.array(mfi);
@@ -317,10 +322,15 @@ void CNS::compute_rhs(MultiFab& statemf, Real dt, FluxRegister* fr_as_crse, Flux
     });  
     
     // do redistribution only in box with EB
-    if (eb_redistribution && fab_with_eb){      
-
-      EBM::eb.redist(geom,mfi,cons,divc, {AMREX_D_DECL(&fluxt[0], &fluxt[1], &fluxt[2])},
-                    state, cls_d,level,dt,h_phys_bc);
+    FArrayBox dm_as_fine(Box::TheUnitBox(), NCONS, The_Async_Arena());
+    if (fr_as_fine) {
+        dm_as_fine.resize(amrex::grow(bx, 1), NCONS);
+        dm_as_fine.setVal<RunOn::Device>(0.0);
+    }
+    if (eb_redistribution && fab_with_eb){
+      EBM::eb.redist(geom, mfi, cons, divc, {AMREX_D_DECL(&fluxt[0], &fluxt[1], &fluxt[2])},
+                     fr_as_crse, fr_as_fine, dm_as_fine.array(), 
+                     state, cls_d, level, dt, h_phys_bc);
     }                    
 #endif 
 
@@ -346,7 +356,46 @@ void CNS::compute_rhs(MultiFab& statemf, Real dt, FluxRegister* fr_as_crse, Flux
             }
         });
 #endif
-  }
+
+    // TODO: IBM::set_solid_state(mfi,state,cls_d)
+
+    
+    // Flux register accumulation (conservation across AMR levels)
+    if (do_reflux && (fr_as_crse || fr_as_fine)) {
+        const Real* dx = geom.CellSize();
+        const int ncomp = PROB::ProbClosures::NCONS;
+#ifdef CNS_USE_EB
+        if (t == FabType::singlevalued) {
+            const FArrayBox& volfrac = (*EBM::eb.volmf_a[level])[mfi];
+            AMREX_D_TERM(const FArrayBox& areafracx = (*(EBM::eb.areamcf_a[level][0]))[mfi];,
+                         const FArrayBox& areafracy = (*(EBM::eb.areamcf_a[level][1]))[mfi];,
+                         const FArrayBox& areafracz = (*(EBM::eb.areamcf_a[level][2]))[mfi];)
+            if (fr_as_crse) {
+                fr_as_crse->CrseAdd(mfi, {AMREX_D_DECL(&fluxt[0], &fluxt[1], &fluxt[2])}, dx, dt,
+                                    volfrac, {AMREX_D_DECL(&areafracx, &areafracy, &areafracz)},
+                                    0, 0, ncomp, RunOn::Device);
+            }
+            if (fr_as_fine) {
+                fr_as_fine->FineAdd(mfi, {AMREX_D_DECL(&fluxt[0], &fluxt[1], &fluxt[2])}, dx, dt,
+                                    volfrac, {AMREX_D_DECL(&areafracx, &areafracy, &areafracz)}, dm_as_fine,
+                                    0, 0, ncomp, RunOn::Device);
+            }
+        } else 
+#endif
+        {
+            if (fr_as_crse) {
+                fr_as_crse->CrseAdd(mfi, {AMREX_D_DECL(&fluxt[0], &fluxt[1], &fluxt[2])}, dx, dt, 
+                                    0, 0, ncomp, RunOn::Device);
+            }
+            if (fr_as_fine) {
+                fr_as_fine->FineAdd(mfi, {AMREX_D_DECL(&fluxt[0], &fluxt[1], &fluxt[2])}, dx, dt, 
+                                    0, 0, ncomp, RunOn::Device);
+            }
+        }
+    }
+
+
+  } // end mfi loop
  
 }
 

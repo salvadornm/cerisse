@@ -72,7 +72,10 @@ CNS::CNS(Amr &papa, int lev, const Geometry &level_geom, const BoxArray &bl,
          const DistributionMapping &dm, Real time)
     : AmrLevel(papa, lev, level_geom, bl, dm, time) {
   if (do_reflux && level > 0) {
-    flux_reg.reset(new FluxRegister(grids, dmap, crse_ratio, level,PROB::ProbClosures::NCONS));
+    flux_reg.define(bl, papa.boxArray(level - 1), dm,
+                    papa.DistributionMap(level - 1), level_geom,
+                    papa.Geom(level - 1), papa.refRatio(level - 1), level,
+                    PROB::ProbClosures::NCONS);
   }
 
 #ifdef AMREX_USE_GPIBM
@@ -644,13 +647,22 @@ void CNS::post_timestep(int /* iteration*/) {
   //amrex::Print() << " oo CNS::post_timestep " << std::endl;
 
   if (do_reflux && level < parent->finestLevel()) {
-    MultiFab &S = get_new_data(State_Type);
-    CNS &fine_level = getLevel(level + 1);
-    fine_level.flux_reg->Reflux(S, Real(1.0), 0, 0, PROB::ProbClosures::NCONS, geom);
+    CNS& fine_level = getLevel(level + 1);
+    MultiFab& S_crse = get_new_data(State_Type);
+    const int ncomp = PROB::ProbClosures::NCONS;
+#if CNS_USE_EB
+    MultiFab& S_fine = fine_level.get_new_data(State_Type);
+    const MultiFab& volfrac_crse = *EBM::eb.volmf_a[level];
+    const MultiFab& volfrac_fine = *EBM::eb.volmf_a[level + 1];
+    fine_level.flux_reg.Reflux(S_crse, volfrac_crse, S_fine, volfrac_fine, 0, 0, ncomp);
+#else
+    fine_level.flux_reg.Reflux(S_crse, 0, 0, ncomp);
+#endif
   }
 
   if (level < parent->finestLevel()) {
     avgDown();
+    getLevel(level + 1).resetFillPatcher();
   }
 
   // Record time statistics
@@ -663,10 +675,6 @@ void CNS::post_timestep(int /* iteration*/) {
     time_stat_level[level] += parent->dtLevel(level);
     computeStats();
   }
-
-
-  
-    
 }
 
 void CNS::postCoarseTimeStep(Real time) {
@@ -901,13 +909,18 @@ void CNS::errorEst(TagBoxArray &tags, int /*clearval*/, int /*tagval*/,
 #ifdef AMREX_USE_GPIBM
   // call function from cns_prob
   auto &ibdata = (*IBM::ib.bmf_a[level]);
+#elif defined CNS_USE_EB
+  auto const& fact = dynamic_cast<EBFArrayBoxFactory const&>(Factory());
+  auto const& flags = fact.getMultiEBCellFlagFab();
 #endif
   for (MFIter mfi(tags, TilingIfNotGPU()); mfi.isValid(); ++mfi) {
     const Box &bx = mfi.tilebox();
     auto const &tagfab = tags.array(mfi);
     auto const &sdatafab = sdata.array(mfi);
 #ifdef AMREX_USE_GPIBM
-    auto const &ibfab = ibdata.array(mfi);
+    auto const &ibfab = ibdata.const_array(mfi);
+#elif defined CNS_USE_EB
+    auto const& flag = flags.const_array(mfi);
 #endif
     int lev = level;
     int nt_lev = nStep();
@@ -917,6 +930,9 @@ void CNS::errorEst(TagBoxArray &tags, int /*clearval*/, int /*tagval*/,
 #ifdef AMREX_USE_GPIBM
       // call function from cns_prob
       user_tagging(i, j, k, nt_lev, tagfab, sdatafab, ibfab, geomdata,
+                   *lprobparm, lev);
+#elif defined CNS_USE_EB
+      user_tagging(i, j, k, nt_lev, tagfab, sdatafab, flag, geomdata,
                    *lprobparm, lev);
 #else
       user_tagging(i, j, k, nt_lev, tagfab, sdatafab, geomdata ,*lprobparm, lev);
@@ -995,6 +1011,19 @@ void CNS::set_state_in_checkpoint(Vector<int>& state_in_checkpoint) {
   if (compute_stats) {
     state_in_checkpoint[Stats_Type] = 0;
   }
+}
+
+int CNS::okToContinue()
+{
+  if (level > 0) { return 1; }
+
+  int test = 1;
+  MultiFab &S = get_new_data(State_Type);
+  if (S.contains_nan(0, S.nComp())) {
+    test = 0;
+  }
+
+  return test;
 }
 
 // 

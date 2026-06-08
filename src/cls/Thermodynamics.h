@@ -395,7 +395,7 @@ class multispecies_pele_gas_t {
   idx_t idx;
 
  public:
-  
+
   /**
   *  @brief compute internal energy from density, pressure and mass fraction
   *  @param R density  (kg/m3)
@@ -435,6 +435,9 @@ class multispecies_pele_gas_t {
     Real p_cgs;
     T = 0.0;
     eos.REY2T(rho_cgs, e_cgs, Y, T);
+#if CLIP_TEMPERATURE_MIN
+    T = std::max(T, min_euler_temp);
+#endif
     eos.RTY2P(rho_cgs, T, Y, p_cgs);
 
     // CGS -> SI
@@ -461,6 +464,9 @@ class multispecies_pele_gas_t {
     auto eos = pele::physics::PhysicsType::eos();
     Real T = 0.0, p_cgs, G, cs_cgs;
     eos.REY2T(rho_cgs, e_cgs, Y, T);
+#if CLIP_TEMPERATURE_MIN
+    T = std::max(T, min_euler_temp);
+#endif
     eos.RTY2P(rho_cgs, T, Y, p_cgs);
     eos.RTY2G(rho_cgs, T, Y, G);
     cs_cgs = std::sqrt(G * p_cgs / rho_cgs);
@@ -486,6 +492,9 @@ class multispecies_pele_gas_t {
     Real p_cgs, cs_cgs;
     T = 0.0;
     eos.REY2T(rho_cgs, e_cgs, Y, T);
+// #if CLIP_TEMPERATURE_MIN
+//     T = std::max(T, min_euler_temp);
+// #endif
     eos.RTY2P(rho_cgs, T, Y, p_cgs);
     eos.RTY2G(rho_cgs, T, Y, G);
     cs_cgs = std::sqrt(G * p_cgs / rho_cgs);
@@ -506,20 +515,24 @@ class multispecies_pele_gas_t {
   *  @param Y array of mass fractions of chemical species
   */
   AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE void PYT2R(
-      const Real P, const Real Y[NUM_SPECIES], const Real T, Real& R) const {
- 
-      auto eos = pele::physics::PhysicsType::eos();                   
-      eos.PYT2R(P*pres_si2cgs, Y, T, R); R *= rho_cgs2si;
+    const Real P, const Real Y[NUM_SPECIES], const Real T, Real& R) const {
+
+    auto eos = pele::physics::PhysicsType::eos();                   
+    eos.PYT2R(P*pres_si2cgs, Y, T, R);
+    R *= rho_cgs2si;
   }            
 
   /**
   *  @brief compute temperature from density and enthalpy and mass fractions
   */
  AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE void RHY2T(
-      const Real R, const Real H, const Real Y[NUM_SPECIES], Real& T) const {
- 
-      auto eos = pele::physics::PhysicsType::eos();                   
-      eos.RHY2T(R*rho_si2cgs,H*specenergy_si2cgs, Y, T);
+    const Real R, const Real H, const Real Y[NUM_SPECIES], Real& T) const {
+
+    auto eos = pele::physics::PhysicsType::eos();                   
+    eos.RHY2T(R*rho_si2cgs,H*specenergy_si2cgs, Y, T);
+// #if CLIP_TEMPERATURE_MIN
+//     T = std::max(T, min_euler_temp);
+// #endif
   }     
 
   /**
@@ -546,7 +559,7 @@ class multispecies_pele_gas_t {
     eos.RTY2Hi(rho*rho_si2cgs, T, Y, hk); //eos.T2Hi(T, hk);
     for (int n = 0; n < NUM_SPECIES; n++) { hk[n] *= specenergy_cgs2si;}
   }
-  //------------------------------------------------------------------------------------- 
+  //-------------------------------------------------------------------------------------
   AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE void ensurePTYfillq(
     Real& P, Real& T, Real* Y, 
     const Real ux, const Real uy, const Real uz,
@@ -581,8 +594,8 @@ class multispecies_pele_gas_t {
     // aux primitives    
     Q[idx_t::QC] =  cs_cgs*speed_cgs2si;
     Q[idx_t::QG] = G; 
-    Q[idx_t::QEINT] = e_cgs*specenergy_cgs2si;    
-  }   
+    Q[idx_t::QEINT] = e_cgs*specenergy_cgs2si;
+  }
   //-------------------------------------------------------------------------------------
   AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE GpuArray<Real, idx_t::NWAVES>
   cons2eigenvals(const int i, const int j, const int k,

@@ -64,6 +64,29 @@ struct WenoZ5 {
     vr[0] = 2.0 * s[2] + 5.0 * s[1] - s[0];
   }
 
+  static AMREX_GPU_DEVICE AMREX_FORCE_INLINE void mod_stencil_near_solid(
+    amrex::Real optimal_weight[3], const int gl, const int gr) {
+      // Near-wall masking via linear (optimal) weights: disable stencils crossing solid
+      // |   | 0 | 1 | 2 | 3 | 4 |  right_stencil
+      //             ^ flux here
+      //               0   1   2   gr (eb)
+      //   2   1   0               gl (eb)
+      //               /   0   1   gr (ib, because of 1 ghost cell)
+      //   1   0   /               gl (ib)
+      //     <----------->         S0
+      //         <----------->     S1
+      //             <-----------> S2
+      if (gr <= 2) {
+        optimal_weight[2] = 0.0; // drop S2
+      }
+      if (gr <= 1 || gl == 0) {
+        optimal_weight[1] = 0.0; // drop S1
+      }
+      if (gl <= 1) {
+        optimal_weight[0] = 0.0; // drop S0
+      }
+    }
+
   /**
    * \brief (FV)WENO-Z5. Ref https://doi.org/10.1016/j.jcp.2010.11.028.
    * \param[in] s Stencil values at cells [i-2, i-1, i, i+1, i+2].
@@ -76,31 +99,24 @@ struct WenoZ5 {
     Real vr[3], beta[3], tmp;
     Real optimal_weight[3] = {3.0, 6.0, 1.0};
 
-    // Near-wall masking via linear (optimal) weights: disable stencils crossing IB
-    if (gr == 1) {
-      optimal_weight[0] = 1.0; // keep S0
-      optimal_weight[1] = 1.0; // keep S1
-      optimal_weight[2] = 0.0; // drop S2 (uses i+2)
-    }
-    if (gr == 0) {
-      optimal_weight[0] = 1.0; // keep S0
-      optimal_weight[1] = 0.0; // drop S1
-      optimal_weight[2] = 0.0; // drop S2
-    }
-    if (gl == 0) {
-      optimal_weight[0] = 0.0; // drop S0 (uses i-2)
-      optimal_weight[1] = 3.0; // favor S1
-      optimal_weight[2] = 1.0; // keep S2
-    }
-
-    //optimal_weight[0] = 3.0; 
-    //optimal_weight[1] = 6.0; 
-    //optimal_weight[2] = 1.0; 
+#if (AMREX_USE_GPIBM || CNS_USE_EB)
+    mod_stencil_near_solid(optimal_weight, gl, gr);
+#endif
     
     smoothness_indicator(s, beta);
+#if (AMREX_USE_GPIBM || CNS_USE_EB)
+    if (optimal_weight[2] > 0.0 && optimal_weight[0] > 0.0) {  // all stencils used
+      tmp = std::abs(beta[2] - beta[0]);
+    } else if (optimal_weight[2] > 0.0 && optimal_weight[0] == 0.0) {  // S0 dropped
+      tmp = std::abs(beta[2] - beta[1]);
+    } else if (optimal_weight[2] == 0.0 && optimal_weight[0] > 0.0) {  // S2 dropped
+      tmp = std::abs(beta[1] - beta[0]);
+    } else {  // only S0 or S2 used
+      tmp = 1.0;
+    }
+#else
     tmp = std::abs(beta[2] - beta[0]);
-    if (gr==1) tmp = std::abs(beta[1] - beta[0]);
-    if (gl==0) tmp = std::abs(beta[2] - beta[1]);
+#endif
 
     beta[2] = (1.0 + tmp / (eps + beta[2])) * optimal_weight[2];
     beta[1] = (1.0 + tmp / (eps + beta[1])) * optimal_weight[1];
@@ -129,33 +145,30 @@ struct Teno5 : public WenoZ5 {
     Real vr[3], beta[3], tmp;
     Real optimal_weight[3] = {3.0, 6.0, 1.0};
 
-    // Near-wall masking via linear (optimal) weights: disable stencils crossing IB
-    if (gr == 1) {
-      optimal_weight[0] = 1.0; // keep S0
-      optimal_weight[1] = 1.0; // keep S1
-      optimal_weight[2] = 0.0; // drop S2 (uses i+2)
-    }
-    if (gr == 0) {
-      optimal_weight[0] = 1.0; // keep S0
-      optimal_weight[1] = 0.0; // drop S1
-      optimal_weight[2] = 0.0; // drop S2
-    }
-    if (gl == 0) {
-      optimal_weight[0] = 0.0; // drop S0 (uses i-2)
-      optimal_weight[1] = 3.0; // favor S1
-      optimal_weight[2] = 1.0; // keep S2
-    }
+#if (AMREX_USE_GPIBM || CNS_USE_EB)
+    mod_stencil_near_solid(optimal_weight, gl, gr);
+#endif
 
-    //optimal_weight[0] = 3.0; 
-    //optimal_weight[1] = 6.0; 
-    //optimal_weight[2] = 1.0; 
-    
     smoothness_indicator(s, beta);
-    tmp = std::abs(std::abs(beta[2] - beta[0]) -
-                   (beta[2] + 4.0 * beta[1] + beta[0]) / 6.0);
-    if (gr==1) tmp = std::abs(beta[1] - beta[0]);
-    if (gl==0) tmp = std::abs(beta[2] - beta[1]);
-
+#if (AMREX_USE_GPIBM || CNS_USE_EB)
+    if (optimal_weight[2] > 0.0 && optimal_weight[0] > 0.0) {  // all stencils used
+      tmp = std::abs(std::abs(beta[2] - beta[0]) - (beta[2] + 4.0 * beta[1] + beta[0]) / 6.0);
+    } else if (optimal_weight[2] > 0.0 && optimal_weight[0] == 0.0) {  // S0 dropped
+      tmp = std::abs(beta[2] - beta[1]);
+    } else if (optimal_weight[2] == 0.0 && optimal_weight[0] > 0.0) {  // S2 dropped
+      tmp = std::abs(beta[1] - beta[0]);
+    } else {  // only S0 or S2 used
+      tmp = 1.0;
+    }
+    
+    const Real large_number = 1e6;
+    if (optimal_weight[0] == 0.0) beta[0] = large_number;
+    if (optimal_weight[1] == 0.0) beta[1] = large_number;
+    if (optimal_weight[2] == 0.0) beta[2] = large_number;
+#else
+    tmp = std::abs(std::abs(beta[2] - beta[0]) - (beta[2] + 4.0 * beta[1] + beta[0]) / 6.0);
+#endif
+    
     beta[2] = POWER6(1.0 + tmp / (eps + beta[2]));
     beta[1] = POWER6(1.0 + tmp / (eps + beta[1]));
     beta[0] = POWER6(1.0 + tmp / (eps + beta[0]));
@@ -295,7 +308,7 @@ class weno_t {
         int gl = ng, gr = ng;  // ghost point position on left and right
 
         // modify stencils near IBM:  ibMarkers(iv,0) true means solid, false means fluid
-#if AMREX_USE_GPIBM         
+#if AMREX_USE_GPIBM
         for (int mm = 0; mm < ng; ++mm) {
           if (ibMarkers(iv + mm * ivd, 0))       gr = amrex::min(gr, mm);
           if (ibMarkers(iv - (mm + 1) * ivd, 0)) gl = amrex::min(gl, mm);
@@ -304,18 +317,22 @@ class weno_t {
           return;  // skip solid cells
         }
         if ((gl == 0 && gr == 1) || (gl == 1 && gr == 0)) {
-          AMREX_ASSERT_WITH_MESSAGE(false, "Cell is fluid but both neighbors are solid: no valid stencil");
+          AMREX_ASSERT_WITH_MESSAGE(false, "Cell is fluid but both neighbours are solid: no valid stencil");
         }
+        gl += 1;  // to account for 1 ghost cell in IBM, which means that the first solid cell can be used
+        gr += 1;
 #endif
         // modify stencils near EBM  ibMarkers(iv,0) true means solid, false means fluid
 #if CNS_USE_EB
-        // TODO
-        if (ibMarkers(iv +  2*ivd, 0 )) gr = 1;
-        if (ibMarkers(iv +  ivd, 0)   ) gr = 0;
-        if (ibMarkers(iv -  2*ivd, 0) ) gl = 0;
-                
-        if (gl == 0 && gr == 0) {
+        for (int mm = 0; mm < ng; ++mm) {
+          if (ibMarkers(iv + mm * ivd, 0))       gr = amrex::min(gr, mm);
+          if (ibMarkers(iv - (mm + 1) * ivd, 0)) gl = amrex::min(gl, mm);
+        }
+        if (gl == 0 || gr == 0) {
           return;  // skip solid cells
+        }
+        if ((gl == 0 && gr == 1) || (gl == 1 && gr == 0)) {
+          AMREX_ASSERT_WITH_MESSAGE(false, "Cell is fluid but both neighbours are solid: no valid stencil");
         }
 #endif
         
