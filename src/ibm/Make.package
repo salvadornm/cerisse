@@ -1,2 +1,7 @@
-CEXE_headers += eib.h IBMultiFab.h ib_walltypes.h eib_cgal.h
+CEXE_headers += ibm_solver.h ibm_containers.h ibm_solver_interp.h ibm_solver_io.h ibm_walltypes.h
 
+ifeq ($(IBM_BACKEND),CGAL)
+  CEXE_headers += ibm_cgal_defs.h ibm_backend_cgal.h
+else
+  CEXE_headers += ibm_bvh_defs.h ibm_bvh.h ibm_backend_bvh.h
+endif

@@ -73,6 +73,11 @@ public:
             const Array4<Real>& rhs, Args&&... args) { }
 
 #endif  
+
+  // no-op RZ geometric viscous source (no diffusion => no hoop stress)
+  void inline rz_geometric_source(const Geometry& /*geom*/, const MFIter& /*mfi*/,
+            const Array4<Real>& /*prims*/, const Array4<Real>& /*state*/,
+            const auto* /*cls*/) { }
 };
 
 // no source

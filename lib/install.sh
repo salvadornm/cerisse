@@ -47,7 +47,6 @@ case  $1 in
     rm -rf sundials    
     echo " downloading SUNDIALS release version .." $SUNDIAL_VER
     wget https://github.com/LLNL/sundials/archive/refs/tags/v$SUNDIALS_VER.tar.gz
-    mv v$SUNDIALS_VER.tar.gz
     tar -xzf v$SUNDIALS_VER.tar.gz
     mv sundials-$SUNDIALS_VER sundials
     rm v$SUNDIALS_VER.tar.gz

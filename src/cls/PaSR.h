@@ -2,6 +2,7 @@
 #define PASR_H_
 
 #include <CNSconstants.h>
+#include <AMReX_ParmParse.H>
 
 //////////////////////////////// PaSR TEMPLATE /////////////////////////////////
 /**

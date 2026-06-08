@@ -2,6 +2,7 @@
 #define TFM_H_
 
 #include <CNSconstants.h>
+#include <AMReX_ParmParse.H>
 
 //////////////////////////////// TFM TEMPLATE /////////////////////////////////
 /**

@@ -11,6 +11,11 @@
 
 #include "diff_ops.H"
 
+// param
+//      :: order     spatial order of central derivatives
+//      :: useLES    use LES by modifying viscosity 
+//      :: useATF    use ATF fot turbulent combustion  modelling
+
 template <typename param, typename cls_t>
 class viscousLES_t {
 
@@ -617,12 +622,16 @@ class viscousLES_t {
 #endif 
 
 
-  }   
+  }
 
 
+  // RZ geometric viscous source terms (hoop stress etc.)
+  // TODO: implement proper RZ geometric viscous source
+  void inline rz_geometric_source(const Geometry& /*geom*/, const MFIter& /*mfi*/,
+            const Array4<Real>& /*prims*/, const Array4<Real>& /*state*/,
+            const cls_t* /*cls*/) { }
 
-
-  }; 
+  };
 
 //---------------------------------------------
 #endif

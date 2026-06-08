@@ -9,6 +9,7 @@ using FluxReg = amrex::EBFluxRegister;
 #include <AMReX_YAFluxRegister.H>
 using FluxReg = amrex::YAFluxRegister;
 #endif
+#include <AMReX_Math.H>
 #include <prob.h>
 #include <CNSconstants.h>
 
@@ -91,6 +92,8 @@ class CNS : public amrex::AmrLevel {
 
   virtual void post_restart() override;
 
+  void set_state_in_checkpoint(amrex::Vector<int>& state_in_checkpoint) override;
+
   // -------------------------------------------------------------------------
 
   // Gridding ----------------------------------------------------------------
@@ -109,16 +112,31 @@ class CNS : public amrex::AmrLevel {
   // init
   CNS& getLevel(int lev) { return dynamic_cast<CNS&>(parent->getLevel(lev)); }
 
-  // enum StateVariable {
-  //     Density = 0, Xmom, Ymom, Zmom, Etot
-  // };
-
-
   enum StateDataType { State_Type = 0, Stats_Type, Cost_Type };
 
   void buildMetrics();
 
   int okToContinue() override;
+
+  static AMREX_FORCE_INLINE void rz_sanity_check(amrex::Geometry const& geom)
+  {
+    // RZ axis sanity check: for RZ the axis must be at r=0 and r-direction
+    // cannot be periodic.
+    if (geom.IsRZ()) {
+#if (AMREX_SPACEDIM != 2)
+      amrex::Abort("RZ requires AMREX_SPACEDIM=2 (axisymmetric r-z)");
+#endif
+      if (geom.isPeriodic(0)) {
+        amrex::Abort(
+            "RZ requires geometry.is_periodic[0]=0 (non-periodic r-direction)");
+      }
+
+      const amrex::Real rlo = geom.ProbLo(0);
+      if (amrex::Math::abs(rlo) > amrex::Real(1.e-14)) {
+        amrex::Abort("RZ requires geometry.prob_lo[0]=0 (axis at r=0)");
+      }
+    }
+  }
 
   void avgDown();
 
@@ -174,6 +192,20 @@ class CNS : public amrex::AmrLevel {
   static int order_rk;
   static int stages_rk;
 
+  // When true, the end-of-step IBM abort check uses "approaching the
+  // smallr / ei_min clipping floors" as the failure criterion instead of
+  // "already non-positive". Catches silent clipping in cons2prims that
+  // would otherwise mask a numerical breakdown.
+  static bool strict_positivity;
+
+  // Pass 2 (flood-fill interior solid + zero momentum) always runs for FSI.
+  // For static geometry, it is opt-in: some complex-geometry / multi-body
+  // cases are actually *destabilised* by the flood-fill because the averaged
+  // neighbour values spread post-shock states into the body, which the next
+  // step's WENO stencil then reads back and oscillates on. Enable via
+  // cns.pass2_static = 1 only when you explicitly want that behaviour.
+  static bool pass2_static;
+
   // Utility-variables
   static bool use_utility;
   static Utility utilidades;
@@ -193,13 +225,7 @@ class CNS : public amrex::AmrLevel {
   static bool use_LES;
 
  public:
-  
-  //
-  //static PROB::ProbRHS prob_rhs;   // removed (we now use a local object in compute_rhs)
-  //inline static PROB::ProbRHS prob_rhs{};
-  PROB::ProbRHS prob_rhs{};
-  //
-
+  PROB::ProbRHS prob_rhs{};   // per-level RHS object (Euler + diffusive + source functors)
   static PROB::ProbClosures* h_prob_closures;
   static PROB::ProbClosures* d_prob_closures;
   static PROB::ProbParm* h_prob_parm;       // host-resident objects used on CPU and as sources for copies

@@ -73,7 +73,7 @@ public:
   Amr* amr_p;
 
   // define arrays of multifab to store markers (IBM-style)
-  Vector<EBMultiFab<bool>*> bmf_a;       
+  Vector<EBMultiFab<bool>*> bmf_a;
   //Vector<IBMultiFab<uint8_t, GPDATA>*> bmf_a;  
 
   // flag array

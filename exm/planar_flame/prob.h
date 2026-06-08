@@ -15,6 +15,8 @@
 #include "RHS.h"
 
 #include <numbers>
+#include <bc_types.h>
+
 
 namespace PROB {
 
@@ -81,6 +83,10 @@ struct ProbParm {
   Real p_u   = 1.0132e+05;            // pressure [Pa]  (5 atm)
   Real e_u   = -1.0255e+05;           // internal energy [J/kg]  
   GpuArray<Real, NUM_SPECIES> Y_u = { 0.014468, 0.22963 , 0.,0., 0., 0., 0.,0., 0.7559};  // mass fractions [-] 
+  Real Y_inflow[NUM_SPECIES] = {0.0};
+  ProbParm () {
+  Y_inflow[H2_ID] = 0.014468; Y_inflow[O2_ID] = 0.22963; Y_inflow[N2_ID] = 0.7559;
+  }
 
   // burn gases
   Real rho_b = 0.19626;                 // density  [kg/m^3]
@@ -91,17 +97,25 @@ struct ProbParm {
 
   // geometrical parameters                                     
   Real Lx     =   0.04;  // half-width domain
-  Real Ly     =   0.04;
+  Real Ly     =   0.08;
   Real Yflame =   0.5*Ly;
+  Real Yflame_front_PMF = 0.015634;
+ 
+  Real yshift = 0.0; // 0 if centred
 
-  Real pertur = 0.04; // perturbation of flame front based on flame thickness (0.1*lf)  
+
+
+  Real pertur = 0.001; // perturbation of flame front based on flame thickness (0.1*lf)  
 
   Real SL     =  0.49; // estimated burning velocity
   Real lf     =  417e-6; // estimated flame thickness  (417 microns) Using Cantera and 1d-flame-plot.py
   // unburn gases velocity
   Real u_u     = 0.534292484155303; // inflow velocity (unburn)
   
-  Real mflow =  rho_u*u_u;  // flow rate (per area)
+  Real mflow =  rho_u*u_u;  // flow rate per unit area
+
+  
+  Real p0 = p_u;
 
 };
 
@@ -116,12 +130,11 @@ struct methodparm_t {
 };
 
 
-
 using ProbClosures = closures_dt< indicies_t, transport_Pele_t, multispecies_pele_gas_t<indicies_t> >;
 
-using ProbRHS = rhs_dt< riemann_t<false, ProbClosures>, viscous_t<methodparm_t, ProbClosures>, no_source_t>;
-//using ProbRHS = rhs_dt< riemann_t<false, ProbClosures>, viscous_t<methodparm_t, ProbClosures>, no_source_t>;
-//using ProbRHS = rhs_dt< riemann_t<false, ProbClosures>, no_diffusive_t, reactor_t<ProbClosures> >;
+using ProbRHS = rhs_dt< weno_t<ReconScheme::WenoZ5, ProbClosures>, viscous_t<methodparm_t, ProbClosures>, reactor_t<ProbClosures> >;
+
+typedef manual_bc_t<ProbClosures> GlobalBC;
 
 
 void inline inputs() {
@@ -170,13 +183,16 @@ AMREX_GPU_DEVICE AMREX_FORCE_INLINE void prob_initdata(
   
   //--- Initialise 1D flame from data -------------------------------------------------------------------
   // PMF data from 0...to 0.04 (Flame front position: 0.015634 m) obtained from tools/combustion/1d-flame-plot.py
-  Real yflame_front = 0.015634;
+  Real yflame_front = prob_parm.Yflame_front_PMF;
   // upper and lower position of the cell (relative to flame)
   Real y1  = y - 0.5*dx[1]- yinterf;
   Real y2  = y + 0.5*dx[1]- yinterf;
   // shift to flame_front
   y1 += yflame_front;
   y2 += yflame_front;
+
+  y1 -= prob_parm.yshift;
+  y2 -= prob_parm.yshift;
 
   // read from PMF profile ----> pmf_vals
   //--------------------------------------------------------------------------------------
@@ -231,14 +247,6 @@ bcnormal(const Real x[AMREX_SPACEDIM], Real dratio, const Real s_int[ProbClosure
          const int sgn, const Real time, GeometryData const & /*geomdata*/,
          ProbClosures const &closures, ProbParm const &prob_parm) {
 
-  const int URHO = ProbClosures::URHO;
-  const int UMX  = ProbClosures::UMX;
-  const int UMY  = ProbClosures::UMY;
-  const int UMZ  = ProbClosures::UMZ;
-  const int UET  = ProbClosures::UET;
-  const int UFS  = ProbClosures::UFS;
-
-  Real rhot, vxt,et,Tt,Pt;
   const Real *Yt;
    
   const int face = (idir+1)*sgn;
@@ -247,25 +255,15 @@ bcnormal(const Real x[AMREX_SPACEDIM], Real dratio, const Real s_int[ProbClosure
   {
     case  2:  // SOUTH
       // inflow  unburn-----------------  
-      rhot = prob_parm.rho_u;
-      vxt  = prob_parm.u_u;
-      Yt   = prob_parm.Y_u.data();
-      et   = prob_parm.e_u;
-      
-      s_ext[URHO] = rhot;
-      s_ext[UMX]  = 0.0;
-      s_ext[UMY]  = rhot* vxt;
-      s_ext[UMZ]  = 0.0;    
-      s_ext[UET]  = rhot * et + Real(0.5) * rhot * vxt * vxt;  
-      for (int n = 0; n < NUM_SPECIES; ++n) {
-        s_ext[UFS+n] = rhot * Yt[n];
-      }        
+      GlobalBC::bc_inlet_fixmassflow(0.0,1.0,0.0,&closures,
+                                     prob_parm.mflow,prob_parm.T_u,prob_parm.Y_inflow, s_int, s_ext);
       break;
     case  1:  // WEST      
       break;
     case -1:  // EAST
       break;
     case -2:   // NORTH
+      GlobalBC::bc_fixP(0.0,-1.0,0.0,&closures,prob_parm.p0, s_int, s_ext);
       break;
     default:
 
