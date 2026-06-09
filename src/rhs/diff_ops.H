@@ -98,9 +98,9 @@ static constexpr Real ccw6_3 =   3.0 / 4.0;
 static constexpr Real ccw6_4 =  -3.0 / 20.0; 
 static constexpr Real ccw6_5 =  +1.0 / 60.0; 
 
-// coefficients in cell faces 
+// coefficients in cell faces  (removed AMREX_GPU_DEVICE)
 template <int order>
-AMREX_GPU_DEVICE AMREX_FORCE_INLINE void calc_CDcoeffs(  
+AMREX_FORCE_INLINE void calc_CDcoeffs(  
         amrex::Array1D<amrex::Real,0,order>  &INTcoef,  amrex::Array1D<amrex::Real,0,order>  &CDcoef) {
 
     switch (order)

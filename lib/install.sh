@@ -1,7 +1,11 @@
-AMREXVERSION=23.11
-PELEPVERSION=23.03
-CGALVERSION=6.0.1
+AMREXVERSION=26.05
+#AMREXVERSION=23.11
+PELEPVERSION=25.04
+#PELEPVERSION=23.03
 BOOSTVERSION=1.81.0
+SUNDIALS_VER=7.5.0
+#SUNDIALS_VER=6.5.0
+CGALVERSION=6.0.1
 #CGALVERSION=5.6.1
 #dir= $PWD
 case  $1 in
@@ -39,6 +43,15 @@ case  $1 in
     mv PelePhysics-$PELEPVERSION PelePhysics 
 		rm v$PELEPVERSION.zip
 		;;
+  sundials)
+    rm -rf sundials    
+    echo " downloading SUNDIALS release version .." $SUNDIAL_VER
+    wget https://github.com/LLNL/sundials/archive/refs/tags/v$SUNDIALS_VER.tar.gz
+    tar -xzf v$SUNDIALS_VER.tar.gz
+    mv sundials-$SUNDIALS_VER sundials
+    rm v$SUNDIALS_VER.tar.gz
+    echo " NOTE: install is done case-by-case by doing: make TPL" 
+    ;;  
   cgal)
     case $2 in
       download)        
@@ -60,6 +73,7 @@ case  $1 in
       install)
         mkdir -p install
         cd $PWD/boost
+        # chmod +x bootstrap.sh tools/build/src/engine/build.sh
         ./bootstrap.sh --prefix=$PWD/../install/boost --with-toolset=gcc
         ./b2 install     
         cd ../cgal
@@ -88,13 +102,14 @@ case  $1 in
     make && make install
     ;;
   *)
-	  echo " no option selected [git/safe/amrex/pelephys/cgal]"
-    echo "Options:"
-	  echo "  git           Install using git clone latest AMREX+PelePhysics"    
+    echo " no option selected [git/safe/amrex/pelephys/sundials/cgal]"
+    echo "Options: (with default versions 2025)"
+    echo "  git           Install using git clone latest AMREX+PelePhysics"    
     echo "  safe          Install using release versions of AMREX+PelePhysics"
     echo "  amrex         Install AMREX release version: $AMREXVERSION "
     echo "  pelephys      Install PelePhysics release version: $PELEPVERSION "
-    echo "  cgal          Download CGAL and Boost release versions: $CGALVERSION $BOOSTVERSION "
+    echo "  sundials      Download SUNDIALS release version: $SUNDIALS_VER "
+    echo "  cgal download Download CGAL and Boost release versions: $CGALVERSION and $BOOSTVERSION "
     echo "  cgal install  Install CGAL and Boost in install/ directory "
     exit
 esac

@@ -21,7 +21,7 @@ class visc_suth_t {
   Real Tvisc_ref = 110.4;
 
  public:
-  AMREX_GPU_DEVICE AMREX_FORCE_INLINE Real visc(const Real& T) const {
+  AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE Real visc(const Real& T) const {
     return visc_ref * T * sqrt(T) / (Tvisc_ref + T);
   }
 };
@@ -33,13 +33,9 @@ class cond_const_t {
  public:
   Real cond_ref = param::conductivity;
   
-  AMREX_GPU_DEVICE AMREX_FORCE_INLINE Real cond(Real& /*T*/) const {
+  AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE Real cond(Real& /*T*/) const {
     return cond_ref;
   }
-
-#ifdef AMREX_USE_GPU  // TODO: can't we use AMREX_HOST_DEVICE?
-  AMREX_FORCE_INLINE Real cond_cpu(Real& T) const { return cond_ref; }
-#endif
 };
 
 class cond_suth_t {
@@ -49,15 +45,9 @@ class cond_suth_t {
   Real Tcond_ref = 194.0;
 
  public:
-  AMREX_GPU_DEVICE AMREX_FORCE_INLINE Real cond(Real& T) const {
+  AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE Real cond(Real& T) const {
     return cond_ref * T * sqrt(T) / (Tcond_ref + T);
   }
-
-#ifdef AMREX_USE_GPU // TODO: can't we use AMREX_HOST_DEVICE?
-  AMREX_FORCE_INLINE Real cond_cpu(Real& T) const {
-    return cond_ref * T * sqrt(T) / (Tcond_ref + T);
-  }
-#endif
 };
 ////////////////////////////////////////////////////////////////////////////////
 

@@ -46,7 +46,7 @@ def plot_flame_structure(filename):
     fig, ax1 = plt.subplots(figsize=(8, 5))
 
     # Temperature profile
-    ax1.plot(shifted_x, temperature, color='tab:red', label='Temperature (K)')
+    ax1.plot(shifted_x.to_numpy(), temperature.to_numpy(), color='tab:red', label='Temperature (K)')
     ax1.set_xlabel('Position X (m) (Flame Front at X=0)')
     ax1.set_ylabel('Temperature (K)', color='tab:red')
     ax1.tick_params(axis='y', labelcolor='tab:red')
@@ -55,7 +55,7 @@ def plot_flame_structure(filename):
 
     # OH mole fraction
     ax2 = ax1.twinx()
-    ax2.plot(shifted_x, x_oh, color='tab:blue', label='X_OH')
+    ax2.plot(shifted_x.to_numpy(), x_oh.to_numpy(), color='tab:blue', label='X_OH')
     ax2.set_ylabel('Mole Fraction of OH', color='tab:blue')
     ax2.tick_params(axis='y', labelcolor='tab:blue')
 

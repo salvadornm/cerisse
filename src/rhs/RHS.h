@@ -15,10 +15,13 @@
 // viscous templates
 #include <DiffusionCD.h>
 #include <viscous.h>
+#include <viscousLES.h>
+
 
 #ifdef USE_PELEPHYSICS
 #include "react.h"
 #include "react_source.h"
+#include "react_sourceLES.h"
 #endif
 
 // _dt stands for derived type
@@ -51,6 +54,11 @@ public:
 class no_diffusive_t
 {
 public:
+
+  // No-op init, so ProbRHS::init_coeffs() is always valid
+  AMREX_GPU_HOST
+  void init_coeffs() {}
+
   template<typename... Args>
 #if (AMREX_USE_GPIBM || CNS_USE_EB )   
   //void dflux_ibm(Args&&... args) {}
@@ -65,6 +73,11 @@ public:
             const Array4<Real>& rhs, Args&&... args) { }
 
 #endif  
+
+  // no-op RZ geometric viscous source (no diffusion => no hoop stress)
+  void inline rz_geometric_source(const Geometry& /*geom*/, const MFIter& /*mfi*/,
+            const Array4<Real>& /*prims*/, const Array4<Real>& /*state*/,
+            const auto* /*cls*/) { }
 };
 
 // no source

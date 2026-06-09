@@ -69,16 +69,16 @@ for dir_name in base_dirs:
     print(f"Resolution: {N}, L2 Error: {l2_error:.5e}")
 
 # Step 3: Plot convergence
-resolutions = np.array(resolutions)
-errors = np.array(errors)
+#resolutions = np.array(resolutions)
+#errors = np.array(errors)
 
-plt.figure()
-plt.loglog(resolutions, errors, 'o-', label='L2 Error')
-plt.xlabel('Resolution (N)')
-plt.ylabel('L2 Error')
-plt.title('Grid Convergence Study')
-plt.grid(True, which='both')
-plt.legend()
+#plt.figure()
+#plt.loglog(resolutions, errors, 'o-', label='L2 Error')
+#plt.xlabel('Resolution (N)')
+#plt.ylabel('L2 Error')
+#plt.title('Grid Convergence Study')
+#plt.grid(True, which='both')
+#plt.legend()
 
 # Step 3: Plot convergence
 resolutions = np.array(resolutions)

@@ -11,34 +11,60 @@
 
 #include "diff_ops.H"
 
+// param
+//      :: order     spatial order of central derivatives
+//      :: useLES    use LES by modifying viscosity  (default false)
+
 template <typename param, typename cls_t>
 class viscous_t {
 
   public:
   
+  // trivial ctor/dtor
   AMREX_GPU_HOST_DEVICE
-  viscous_t() {
-    calc_CDcoeffs<param::order>(INTcoef,CDcoef);
-  }
+  constexpr viscous_t() = default;
 
   AMREX_GPU_HOST_DEVICE
-  ~viscous_t() {}
+  ~viscous_t() = default;
 
-  // vars accessed by functions 
-  //int order_sch=param::order;  
+  // half stencil size 
+  //int halfsten = param::order / 2;
+  static constexpr int halfsten = param::order / 2;
+
+#if NUM_SPECIES > 1
   typedef Array1D<Real, 0, param::order> arrayNumCoef;
   arrayNumCoef CDcoef,INTcoef;
-  int halfsten = param::order / 2;
+  // Host-only initialization of arrays
+  AMREX_GPU_HOST
+  void init_coeffs()
+  {
+    calc_CDcoeffs<param::order>(INTcoef, CDcoef);
+  }
+#else
+  // No-op init, so ProbRHS::init_coeffs() is always valid
+  AMREX_GPU_HOST
+  void init_coeffs() {}
+#endif
+   
+
 
 #if (AMREX_USE_GPIBM || CNS_USE_EB )  
   void inline dflux_ibm(const Geometry& geom, const MFIter& mfi,
             const Array4<Real>& prims, std::array<FArrayBox*, AMREX_SPACEDIM> const &flxt,            
-            const Array4<Real>& /*cons*/, const cls_t* cls,const Array4<bool>& ibMarkers) {
+            const Array4<Real>& /*cons*/, const cls_t* cls,const Array4<uint8_t>& ibMarkers) {
 #else
   void inline dflux(const Geometry& geom, const MFIter& mfi,
             const Array4<Real>& prims, std::array<FArrayBox*, AMREX_SPACEDIM> const &flxt, 
             const Array4<Real>& /*cons*/, const cls_t* cls) {
 #endif
+
+    // LES options 
+    constexpr bool useLES = []{
+    if constexpr (requires { param::use_LES; })
+        return param::use_LES;
+    else
+        return false;
+    }();
 
     // mesh sizes
     const GpuArray<Real, AMREX_SPACEDIM> dxinv = geom.InvCellSizeArray();
@@ -84,19 +110,22 @@ class viscous_t {
     
      
     BL_PROFILE("PelePhysics::get_transport_coeffs()");
-    Array4<Real> chi; // dummy Soret effect coef (not ready yet)
+    //Array4<Real> chi; // dummy Soret effect coef (not ready yet)
+    // Soret effect (not used yet)
+    const auto& chi_arr = coeffs.array(cls_t::CSORET); 
     
-    // temp snm
-    //pele::physics::transport::TransportParams< pele::physics::PhysicsType::transport_type> trans_parms;
+#if (PELEPVERSION==23)   
     trans_parms.allocate(); 
-
     auto const* ltransparm = trans_parms.device_trans_parm();
+#else
+    auto const* ltransparm = trans_parms.device_parm();
+#endif    
     
     amrex::launch(bxg, [=] AMREX_GPU_DEVICE(Box const& tbx) {
 
             auto trans = pele::physics::PhysicsType::transport();                      
             trans.get_transport_coeffs(tbx, q_y, q_T, q_rho, 
-                rhoD_arr, chi, mu_arr,xi_arr, lam_arr, ltransparm);
+                rhoD_arr, chi_arr, mu_arr,xi_arr, lam_arr, ltransparm);
           });
 
     // change units
@@ -107,20 +136,7 @@ class viscous_t {
         for (int n=0;n<NUM_SPECIES; n++){        
           rhoD_arr(i,j,k,n) *= rhodiff_cgs2si;
         }   
-        xi_arr(i,j,k) *= visc_cgs2si;
-
-        // SNM debug
-        // std::cout << " mu= "  << mu_arr(i,j,k) << std::endl;
-        // std::cout << " lam= " << lam_arr(i,j,k) << std::endl;
-        // std::cout << " xi= " << xi_arr(i,j,k) << std::endl;
-        // std::cout << " rho= " << q_rho(i,j,k) << std::endl;
-        // for (int n=0;n<NUM_SPECIES; n++){        
-        //   std::cout << " n= " << n <<  " Diff= "   << rhoD_arr(i,j,k)/q_rho(i,j,k);
-        //   std::cout << " rhoDiff= "   << rhoD_arr(i,j,k) << std::endl;
-        // }
-        //
-
-
+        xi_arr(i,j,k) *= visc_cgs2si;     
         });        
     //    
 #else
@@ -133,7 +149,7 @@ class viscous_t {
 #endif     
 
     // -------  LES Options  ----------- //
-    if constexpr (param::use_LES)
+    if constexpr(useLES)
     {
       Real Delta = cls->calc_delta(dx); // compute filter width
       Real mu_sgs,cond_sgs, diff_sgs;
@@ -162,14 +178,14 @@ class viscous_t {
       auto const& flx = flxt[dir]->array(); 
 
       // Yosihizawa model  tau_kk
-      if constexpr (param::use_LES)
-      {
-        Real Delta = cls->calc_delta(dx); // compute filter width
-        amrex::ParallelFor(bxgnodal,
-                  [=,*this] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {                     
-                    flx(i,j,k,cls_t::UMX+dir) += cls->compute_xisgs(i,j,k,dir,prims, dxinv, Delta);
-                  });        
-      }
+      // if constexpr(useLES)
+      // {
+      //   Real Delta = cls->calc_delta(dx); // compute filter width
+      //   amrex::ParallelFor(bxgnodal,
+      //             [=,*this] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {                     
+      //               flx(i,j,k,cls_t::UMX+dir) += cls->compute_xisgs(i,j,k,dir,prims, dxinv, Delta);
+      //             });        
+      // }
 
       // compute diffusion fluxes
 #if (AMREX_USE_GPIBM || CNS_USE_EB )   
@@ -375,7 +391,7 @@ class viscous_t {
       amrex::Array4<amrex::Real> const& flx,
       amrex::Array4<const amrex::Real> const& coeffs,
       amrex::GpuArray<amrex::Real, AMREX_SPACEDIM> const& dxinv,
-      const cls_t* cls, const Array4<bool>& marker) const {
+      const cls_t* cls, const Array4<uint8_t>& marker) const {
     
     using amrex::Real;
     const amrex::IntVect iv{AMREX_D_DECL(i, j, k)};
@@ -566,8 +582,12 @@ class viscous_t {
 
   }   
 
-
-
+  // RZ geometric viscous source terms (hoop stress etc.)
+  // TODO: implement proper RZ geometric viscous source
+  void inline rz_geometric_source(const Geometry& /*geom*/, const MFIter& /*mfi*/,
+            const Array4<Real>& /*prims*/, const Array4<Real>& /*state*/,
+            const cls_t* /*cls*/) { }
+            
 
   }; 
 

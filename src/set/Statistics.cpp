@@ -36,15 +36,12 @@ void CNS::computeStats(){
   // time_stats += dt; // obsolete
   Real time_aux = time_stat_level[level];
   
-  // amrex::Print( ) << " Compute  STATS " << std::endl; 
-  // amrex:: Print( ) << " level = " << level << std::endl;
-  // amrex::Print( ) << " dt= " << dt <<  std::endl; 
-  // amrex::Print( ) << " time_stat= " << time_stat_level[level] <<  std::endl; 
-  // amrex::Print( ) << " time_aux= " << time_aux <<  std::endl; 
-  // amrex::Print( ) << " time_old= "  << time_stat_level[level]-dt <<  std::endl; 
-  
   // closures
   const PROB::ProbClosures& cls_h = *CNS::h_prob_closures;
+  const PROB::ProbClosures* cls_d = CNS::d_prob_closures; 
+
+  // grab host copy of the base index for thermodynamic stats
+  int index_therm = CNS::INDEX_THERM;
                         
   // storing stats 
   for (MFIter mfi(S, false); mfi.isValid(); ++mfi) {
@@ -59,18 +56,24 @@ void CNS::computeStats(){
     Array4<Real> const& prims= primf.array();
     // from state variable to primitives (Thermodynamic closure) also update ghost
     cls_h.cons2prims(mfi, state_cons, prims); 
-    amrex::ParallelFor(bx, [=](int i, int j, int k) {       
-      Real rho = prims(i,j,k,cls_h.QRHO);
+    
+
+    amrex::ParallelFor(bx,
+                    [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept {
+
+      const auto& cls = *cls_d; // copy to device                         
+
+      Real rho = prims(i,j,k,cls.QRHO);
       //Real o_rho = 1.0/rho;
       // reset array  (so is sum (u*dt)
-      for (int n=0; n< cls_h.NSTAT; n++){
+      for (int n=0; n< cls.NSTAT; n++){
         data_stats(i, j, k, n) *= (time_aux - dt);    
       }                
 
       // store velocity mean and square  correlations
-      if (cls_h.record_velocity > 0) { 
+      if (cls.record_velocity > 0) { 
         Real vel[3]={0,0,0};         
-        vel[0] = prims(i,j,k,cls_h.QU);vel[1] = prims(i,j,k,cls_h.QV);vel[2] = prims(i,j,k,cls_h.QW);
+        vel[0] = prims(i,j,k,cls.QU);vel[1] = prims(i,j,k,cls.QV);vel[2] = prims(i,j,k,cls.QW);
       
         for (int n=0; n< AMREX_SPACEDIM; n++){
           data_stats(i, j, k, n) += vel[n]*dt;            
@@ -88,20 +91,20 @@ void CNS::computeStats(){
       }
     
       // store P,T,rho mean and square
-      if (cls_h.record_PTrho > 0 ){
+      if (cls.record_PTrho > 0 ){
                        
-        Real P = prims(i, j, k, cls_h.QPRES);
-        Real T = prims(i, j, k, cls_h.QT);            
-        data_stats(i, j, k, INDEX_THERM)   += P*dt;
-        data_stats(i, j, k, INDEX_THERM+1) += T*dt;
-        data_stats(i, j, k, INDEX_THERM+2) += rho*dt;
-        data_stats(i, j, k, INDEX_THERM+3) += P*P*dt;
-        data_stats(i, j, k, INDEX_THERM+4) += T*T*dt;
-        data_stats(i, j, k, INDEX_THERM+5) += rho*rho*dt;    
+        Real P = prims(i, j, k, cls.QPRES);
+        Real T = prims(i, j, k, cls.QT);            
+        data_stats(i, j, k, index_therm)   += P*dt;
+        data_stats(i, j, k, index_therm+1) += T*dt;
+        data_stats(i, j, k, index_therm+2) += rho*dt;
+        data_stats(i, j, k, index_therm+3) += P*P*dt;
+        data_stats(i, j, k, index_therm+4) += T*T*dt;
+        data_stats(i, j, k, index_therm+5) += rho*rho*dt;    
       }
     
       // store mean values  
-      for (int n=0; n< cls_h.NSTAT; n++){
+      for (int n=0; n< cls.NSTAT; n++){
         data_stats(i, j, k, n) /= time_aux;            
       }           
     }); 

@@ -10,10 +10,10 @@
 #include <Closures.h>
 #include <RHS.h>
 
-#include <eib.h>
+#include <ibm_solver.h>
 #include <Constants.h>
 #include <NozzleFunctions.h>
-#include <ib_walltypes.h>
+#include <ibm_walltypes.h>
 #include <numbers>
 
 using namespace amrex;
@@ -100,7 +100,11 @@ struct ibmparm_t {
 
   static constexpr int  interp_order = 1;
   static constexpr int  extrap_order = ibm_eorder;
-  static constexpr Real alpha= 0.6;      
+  static constexpr Real alpha= 0.6; 
+  // surface parameters
+  static constexpr int  interp_order_surf = 1;
+  static constexpr int  extrap_order_surf = 1;
+  static constexpr Real alpha_surf= 0.6;     
 };
 
 // CLOSURES
@@ -118,7 +122,7 @@ template < typename param, typename cls_t > class ibm_user_t;
 
 // IBM templates
 typedef ibm_user_t<ProbParm,ProbClosures> TypeWall;
-typedef eib_t<TypeWall,ibmparm_t,ProbClosures> ProbIB;
+typedef ibm_solver_t<TypeWall,ibmparm_t,ProbClosures> ProbIB;
 
 
 void inline inputs() {
@@ -167,7 +171,7 @@ void prob_initdata (int i, int j, int k, amrex::Array4<amrex::Real> const& state
 
 AMREX_GPU_DEVICE AMREX_FORCE_INLINE 
 void user_tagging(int i, int j, int k, int nt, auto& tagfab, const auto &sdatafab, 
-                  const Array4<bool>&ibfab, const auto& geomdata, 
+                  const Array4<const unsigned char>& ibfab, const auto& geomdata, 
                   const ProbParm& pparm , int level) {
 
   const Real* dx  = geomdata.CellSize();

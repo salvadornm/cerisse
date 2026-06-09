@@ -1,8 +1,25 @@
 #include <AMReX_MultiFabUtil.H>
 #include <AMReX_ParmParse.H>
+#include <AMReX_Reduce.H>
 #include <CNS.h>
 #include <CNS_K.h>
 #include <prob.h>
+
+#ifdef CNS_USE_FSI
+#include <fsi/Kinematics.h>
+#include <fsi/RigidBodyProperties.h>
+#endif
+
+#ifdef USE_PELEPHYSICS
+#include "TransPele.h"
+
+pele::physics::PeleParams<
+  pele::physics::transport::TransParm<
+    pele::physics::PhysicsType::eos_type,
+    pele::physics::PhysicsType::transport_type
+  >> trans_parms;
+#endif
+
 
 using namespace amrex;
 
@@ -26,7 +43,9 @@ std::string CNS::eb_redistribution_type = "NoRedist";
 int CNS::nstep_screen_output = 10;
 int CNS::order_rk = 2;
 int CNS::stages_rk = 2;
-int CNS::do_reflux = 1;
+bool CNS::strict_positivity = false;
+bool CNS::pass2_static = false;
+int CNS::do_reflux = 0; // default reflux is off
 int CNS::refine_max_dengrad_lev = -1;
 Real CNS::cfl = 0.0_rt;
 Real CNS::dt_constant = 0.0_rt;
@@ -47,19 +66,21 @@ BCRec *CNS::d_phys_bc = nullptr;
 // needed for CNSBld - derived from LevelBld (abstract class, pure virtual
 // functions must be implemented)
 
-CNS::CNS() {
-  // prob_rhs.init();
-}
+CNS::CNS() {}
 
 CNS::CNS(Amr &papa, int lev, const Geometry &level_geom, const BoxArray &bl,
          const DistributionMapping &dm, Real time)
     : AmrLevel(papa, lev, level_geom, bl, dm, time) {
   if (do_reflux && level > 0) {
-    flux_reg.reset(new FluxRegister(grids, dmap, crse_ratio, level,PROB::ProbClosures::NCONS));
+    flux_reg.define(bl, papa.boxArray(level - 1), dm,
+                    papa.DistributionMap(level - 1), level_geom,
+                    papa.Geom(level - 1), papa.refRatio(level - 1), level,
+                    PROB::ProbClosures::NCONS);
   }
 
 #ifdef AMREX_USE_GPIBM
   IBM::ib.build_mf(grids, dmap, level);
+  IBM::ib.computeMarkers(level);
 #endif
 
 #ifdef CNS_USE_EB
@@ -68,7 +89,7 @@ CNS::CNS(Amr &papa, int lev, const Geometry &level_geom, const BoxArray &bl,
 
   buildMetrics();
 
-  // prob_rhs.init();
+  rz_sanity_check(Geom());
 };
 
 CNS::~CNS() {}
@@ -119,6 +140,16 @@ void CNS::read_params() {
     }
   }
 
+  pp.query("strict_positivity", strict_positivity);
+  if (strict_positivity) {
+    amrex::Print() << "  cns.strict_positivity = 1 (abort if state approaches smallr/ei_min floors)\n";
+  }
+
+  pp.query("pass2_static", pass2_static);
+  if (pass2_static) {
+    amrex::Print() << "  cns.pass2_static = 1 (Pass 2 flood-fill runs for static geometry too)\n";
+  }
+
   //  Utilities options ----------------------------------------------------
   // specific keywords for Utilities
   pp.query("use_utility",use_utility);
@@ -151,8 +182,8 @@ void CNS::read_params() {
 
   }
 
-#if AMREX_USE_GPIBM
-  // specific keywords for IB boundaries
+#ifdef AMREX_USE_GPIBM
+  // IBM-specific input keywords (ib.* namespace)
   ParmParse ppib("ib");
   if (!ppib.query("move", ib_move)) {
     amrex::Abort("ib.move not specified (0=false, 1=true)");
@@ -160,13 +191,10 @@ void CNS::read_params() {
   if (!ppib.query("plot_surf", plot_surf)) {
     amrex::Abort("ib.plot_surf not specified (0=false, 1=true)");
   }
-
-  // surface plot options
   if (plot_surf) {
     ppib.query("surf_int", surf_int);
     ppib.query("surf_file", surf_filename);
   }
-
 #endif
   
 #if CNS_USE_EB 
@@ -183,6 +211,16 @@ void CNS::read_params() {
   EBM::eb.eb_weight = eb_weight;
   EBM::eb.redistribution_type = eb_redistribution_type; 
 
+#endif
+
+
+#ifdef USE_PELEPHYSICS
+  // One-time transport parameter initialization (host->device)
+  static bool trans_inited = false;
+  if (!trans_inited) {
+    trans_parms.initialize();
+    trans_inited = true;
+  }
 #endif
 
 
@@ -261,6 +299,10 @@ void CNS::initData() {
     setupStats();
   }
 
+
+   prob_rhs.init_coeffs(); // CGPT dixit
+
+
 }
 
 void CNS::buildMetrics() {
@@ -293,7 +335,13 @@ void CNS::post_init(Real stop_time) {
   if (record_probe) {
     setupTimeProbe();
   }
+
   
+#if CNS_USE_EB
+  EBM::eb.check_geometry(level);
+#endif
+  
+
 }
 // -----------------------------------------------------------------------------
 
@@ -475,47 +523,116 @@ void CNS::computeNewDt(int finest_level, int sub_cycle, Vector<int> &n_cycle,
  [[nodiscard]] GpuArray<Real,AMREX_SPACEDIM> CNS::maxEigen() {
   BL_PROFILE("CNS::maxEigen()");
 
-  //const auto dx = geom.CellSizeArray();
   PROB::ProbClosures const *d_cls = d_prob_closures;
 
   // Get multifabs
   MultiFab& consmf = get_new_data(State_Type);
-#if AMREX_USE_GPIBM
+
+  GpuArray<Real,AMREX_SPACEDIM> h_max_eigenvals;
+
+  // Use ReduceOps for proper GPU-parallel reduction (replaces the original
+  // AsyncArray approach which had a data race on the device max-reduction).
+#if (AMREX_SPACEDIM == 1)
+  ReduceOps<ReduceOpMax> reduce_op;
+  ReduceData<Real> reduce_data(reduce_op);
+  using ReduceTuple = typename decltype(reduce_data)::Type;
+
+  for (MFIter mfi(consmf, false); mfi.isValid(); ++mfi) {
+    const Box &bx = mfi.tilebox();
+    const Array4<Real>& cons = consmf.array(mfi);
+    reduce_op.eval(bx, reduce_data, [=] AMREX_GPU_DEVICE(int i, int j, int k) -> ReduceTuple {
+      GpuArray<int, 3> vdir0 = {1, 0, 0};
+      auto temp0 = d_cls->cons2eigenvals(i, j, k, cons, vdir0);
+      Real maxe0 = Real(0.0);
+      for (int iw = 0; iw < PROB::ProbClosures::NWAVES; iw++)
+        maxe0 = amrex::max(maxe0, std::abs(temp0[iw]));
+      return {maxe0};
+    });
+  }
+  auto hv = reduce_data.value(reduce_op);
+  h_max_eigenvals[0] = amrex::get<0>(hv);
+
+#elif (AMREX_SPACEDIM == 2)
+  ReduceOps<ReduceOpMax, ReduceOpMax> reduce_op;
+  ReduceData<Real, Real> reduce_data(reduce_op);
+  using ReduceTuple = typename decltype(reduce_data)::Type;
+
+#ifdef AMREX_USE_GPIBM
+  // IBM-aware CFL: skip solid cells when computing max eigenvalue.
+  // Solid cells don't participate in time integration (their RHS is zeroed
+  // in compute_rhs), so their density/pressure values — which come from
+  // extrapolation, not from the flow — should not constrain the timestep.
+  // Without this, a solid cell with extrapolated ρ near zero produces a
+  // huge sound speed → dt → 0 → simulation stalls.
   auto& ib_mf = *IBM::ib.bmf_a[level];
 #endif
 
-  // CPU arrays
-  typedef GpuArray<Real,AMREX_SPACEDIM> Array_t;
-  Array_t h_max_eigenvals;
-  for (int idir = 0; idir < AMREX_SPACEDIM; idir++) {
-    h_max_eigenvals[idir] = - std::numeric_limits<Real>::min();
-  }
-
-  // CPU-GPU transfer array
-  AsyncArray<Array_t> aa_max_eigenvals(&h_max_eigenvals, 1);  
-  Array_t* d_max_eigenvals = aa_max_eigenvals.data(); // Get associated device pointer
-
-  // Compute max eigenvalues
-  // Can be made more efficient by computing all the eigenvalues in all directions at once. Rather than per direction.
   for (MFIter mfi(consmf, false); mfi.isValid(); ++mfi) {
     const Box &bx = mfi.tilebox();
-    const Array4<Real>& cons= consmf.array(mfi);
-    ParallelFor(
-        bx, [=] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {
-          for (int idir = 0; idir < AMREX_SPACEDIM; idir++) {
+    const Array4<Real>& cons = consmf.array(mfi);
+#ifdef AMREX_USE_GPIBM
+    const auto& ibm = ib_mf.const_array(mfi);
+#endif
+    reduce_op.eval(bx, reduce_data, [=] AMREX_GPU_DEVICE(int i, int j, int k) -> ReduceTuple {
+#ifdef AMREX_USE_GPIBM
+      // Skip solid cells — they don't evolve and shouldn't constrain CFL
+      if (ibm(i,j,k,0) != 0) return {Real(0.0), Real(0.0)};
+#endif
+      GpuArray<int, 3> vdir0 = {1, 0, 0};
+      GpuArray<int, 3> vdir1 = {0, 1, 0};
+      auto temp0 = d_cls->cons2eigenvals(i, j, k, cons, vdir0);
+      auto temp1 = d_cls->cons2eigenvals(i, j, k, cons, vdir1);
+      Real maxe0 = Real(0.0), maxe1 = Real(0.0);
+      for (int iw = 0; iw < PROB::ProbClosures::NWAVES; iw++) {
+        maxe0 = amrex::max(maxe0, std::abs(temp0[iw]));
+        maxe1 = amrex::max(maxe1, std::abs(temp1[iw]));
+      }
+      return {maxe0, maxe1};
+    });
+  }
+  auto hv = reduce_data.value(reduce_op);
+  h_max_eigenvals[0] = amrex::get<0>(hv);
+  h_max_eigenvals[1] = amrex::get<1>(hv);
 
-            GpuArray<int, 3> vdir = {int(idir == 0), int(idir == 1), int(idir == 2)};
+#else // 3D
+  ReduceOps<ReduceOpMax, ReduceOpMax, ReduceOpMax> reduce_op;
+  ReduceData<Real, Real, Real> reduce_data(reduce_op);
+  using ReduceTuple = typename decltype(reduce_data)::Type;
 
-            GpuArray<Real,PROB::ProbClosures::NWAVES> temp = d_cls->cons2eigenvals(i, j, k, cons, vdir);
+#ifdef AMREX_USE_GPIBM
+  auto& ib_mf = *IBM::ib.bmf_a[level];
+#endif
 
-            for (int iwave = 0; iwave < PROB::ProbClosures::NWAVES; iwave++) {
-              (*d_max_eigenvals)[idir] = max((*d_max_eigenvals)[idir],
-                                            std::abs((temp[iwave])));
-            }
-          }
-        });
-  };
-  aa_max_eigenvals.copyToHost(&h_max_eigenvals, 1); // Copy the value back to host
+  for (MFIter mfi(consmf, false); mfi.isValid(); ++mfi) {
+    const Box &bx = mfi.tilebox();
+    const Array4<Real>& cons = consmf.array(mfi);
+#ifdef AMREX_USE_GPIBM
+    const auto& ibm = ib_mf.const_array(mfi);
+#endif
+    reduce_op.eval(bx, reduce_data, [=] AMREX_GPU_DEVICE(int i, int j, int k) -> ReduceTuple {
+#ifdef AMREX_USE_GPIBM
+      if (ibm(i,j,k,0) != 0) return {Real(0.0), Real(0.0), Real(0.0)};
+#endif
+      GpuArray<int, 3> vdir0 = {1, 0, 0};
+      GpuArray<int, 3> vdir1 = {0, 1, 0};
+      GpuArray<int, 3> vdir2 = {0, 0, 1};
+      auto temp0 = d_cls->cons2eigenvals(i, j, k, cons, vdir0);
+      auto temp1 = d_cls->cons2eigenvals(i, j, k, cons, vdir1);
+      auto temp2 = d_cls->cons2eigenvals(i, j, k, cons, vdir2);
+      Real maxe0 = Real(0.0), maxe1 = Real(0.0), maxe2 = Real(0.0);
+      for (int iw = 0; iw < PROB::ProbClosures::NWAVES; iw++) {
+        maxe0 = amrex::max(maxe0, std::abs(temp0[iw]));
+        maxe1 = amrex::max(maxe1, std::abs(temp1[iw]));
+        maxe2 = amrex::max(maxe2, std::abs(temp2[iw]));
+      }
+      return {maxe0, maxe1, maxe2};
+    });
+  }
+  auto hv = reduce_data.value(reduce_op);
+  h_max_eigenvals[0] = amrex::get<0>(hv);
+  h_max_eigenvals[1] = amrex::get<1>(hv);
+  h_max_eigenvals[2] = amrex::get<2>(hv);
+#endif
 
   // Communicate across processors
   for (int idir = 0; idir < AMREX_SPACEDIM; idir++) {
@@ -530,13 +647,22 @@ void CNS::post_timestep(int /* iteration*/) {
   //amrex::Print() << " oo CNS::post_timestep " << std::endl;
 
   if (do_reflux && level < parent->finestLevel()) {
-    MultiFab &S = get_new_data(State_Type);
-    CNS &fine_level = getLevel(level + 1);
-    fine_level.flux_reg->Reflux(S, Real(1.0), 0, 0, PROB::ProbClosures::NCONS, geom);
+    CNS& fine_level = getLevel(level + 1);
+    MultiFab& S_crse = get_new_data(State_Type);
+    const int ncomp = PROB::ProbClosures::NCONS;
+#if CNS_USE_EB
+    MultiFab& S_fine = fine_level.get_new_data(State_Type);
+    const MultiFab& volfrac_crse = *EBM::eb.volmf_a[level];
+    const MultiFab& volfrac_fine = *EBM::eb.volmf_a[level + 1];
+    fine_level.flux_reg.Reflux(S_crse, volfrac_crse, S_fine, volfrac_fine, 0, 0, ncomp);
+#else
+    fine_level.flux_reg.Reflux(S_crse, 0, 0, ncomp);
+#endif
   }
 
   if (level < parent->finestLevel()) {
     avgDown();
+    getLevel(level + 1).resetFillPatcher();
   }
 
   // Record time statistics
@@ -549,62 +675,175 @@ void CNS::post_timestep(int /* iteration*/) {
     time_stat_level[level] += parent->dtLevel(level);
     computeStats();
   }
-
-
-  
-    
 }
 
 void CNS::postCoarseTimeStep(Real time) {
 
   // amrex::Print() << " oo CNS::postCoarseTimeStep " << std::endl;
 
-#if AMREX_USE_GPIBM
-  // if (ib_move) {
-  //   IBM::ib.moveGeom();
-  //   // reallocate variables?
-  //   // Print() << parent->finestLevel() << std::endl;
-  //   for (int lev=0; lev <= parent->finestLevel(); lev++) {
-  //     IBM::ib.computeMarkers(0);
-  //     IBM::ib.initialiseGPs(0);
-  //   }
-  // }
+#ifdef AMREX_USE_GPIBM
+  // Surface output at user-specified step interval
+  const int istep = parent->levelSteps(0);
+  if (plot_surf && (istep % surf_int == 0)) {
+      for (int lev = 0; lev <= parent->finestLevel(); ++lev) {
+          dynamic_cast<CNS&>(parent->getLevel(lev)).writeSurfFile();
+      }
+  }
 
-  // plot surface is handled in writePlotFilePost 
-  // if (plot_surf) {
-  //   writeSurfFile( );
-  // }
-
-#endif
-
-   // make sure species sum to 1??
-
-
+#ifdef CNS_USE_FSI
+  // Calculate and print FSI loads and properties
+  {
+    auto& ib = IBM::ib;
+    if (ParallelDescriptor::IOProcessor()) {
+        amrex::Print() << "\n=== FSI Loads (Step " << istep
+                       << ", Time " << time << ") ===\n";
+    }
+    for (int i = 0; i < ib.ngeom; ++i) {
+        auto props = FSI::RigidBodyProperties::readOrCompute(ib.geom_a[i], i);
+        auto loads = FSI::Kinematics::computeLoads(i, props.xcenter);
+        if (ParallelDescriptor::IOProcessor()) {
+            amrex::Print() << "Geometry " << i << ":\n"
+                           << "  Mass: " << props.mass << "\n"
+                           << "  Center of Mass: " << props.xcenter << "\n"
+                           << "  Inertia Tensor:\n";
+            for (int r = 0; r < 3; ++r) {
+                amrex::Print() << "    [ " << props.inertia[r][0] << ", "
+                               << props.inertia[r][1] << ", "
+                               << props.inertia[r][2] << " ]\n";
+            }
+            amrex::Print() << "  Fluid Force: " << loads.force << "\n"
+                           << "  Fluid Moment (about CM): " << loads.moment << "\n"
+                           << "----------------------------------------\n";
+        }
+    }
+  }
+#endif  // CNS_USE_FSI
+#endif  // AMREX_USE_GPIBM
 
   if (verbose && ((this->nStep() % nstep_screen_output) == 0)) {
     printTotal();
   }
-
-  // print surface
-
-
 }
 // -----------------------------------------------------------------------------
 
 // Gridding -------------------------------------------------------------------
 // Called for each level from 0,1...nlevs-1
+
 void CNS::post_regrid(int lbase, int new_finest) {
 
-  //amrex::Print() << " oo CNS::post_regrid " << std::endl;
-  
-
 #ifdef AMREX_USE_GPIBM
-  IBM::ib.destroy_mf(level);
-  IBM::ib.build_mf(grids, dmap, level);
-  IBM::ib.computeMarkers(level);
-  IBM::ib.initialiseGPs(level);
-  if (plot_surf) IBM::ib.compute_surface_index(level);
+  rebuildIBM();
+
+  // ==========================================================================
+  // FSI post-regrid state cleanup.
+  //
+  // After regrid, AMReX::FillPatch has populated the new-grid conservative
+  // state by interpolating from the old grids. If the old grids had any
+  // stale or extreme values in solid cells (which don't evolve during RK),
+  // those values can contaminate freshly-created fine cells near the solid
+  // boundary. This causes downstream WENO reconstruction to explode.
+  //
+  // Two passes:
+  //   [A] Flood-fill solid cells from valid fluid/ghost neighbors so they
+  //       carry bounded, physically plausible data.
+  //   [B] Zero momentum in interior solid cells (same rationale as
+  //       end-of-step pass in advance.cpp).
+  //
+  // Static geometry doesn't need this: solid cells never transition and
+  // their data stays consistent with the (unchanging) flow around them.
+  // ==========================================================================
+  if (ib_move) {
+    MultiFab& S = get_new_data(State_Type);
+    auto& ib_mf = *IBM::ib.bmf_a[level];
+    const int ncons = d_prob_closures->NCONS;
+    constexpr int MAX_FLOOD_ITER = 32;
+
+    for (MFIter mfi(S, false); mfi.isValid(); ++mfi) {
+      const Box& bx  = mfi.tilebox();
+      const Box& bxg = mfi.growntilebox(d_prob_closures->NGHOST);
+      auto const& state = S.array(mfi);
+      auto const& mk    = ib_mf.const_array(mfi);
+
+      // Tag array: 0 = fluid or ghost point (valid)
+      //            1 = interior solid (needs fixing)
+      //            2 = solid, already fixed this iteration
+      BaseFab<int> tagfab(bxg, 1, The_Managed_Arena());
+      auto const& tag = tagfab.array();
+
+      ParallelFor(bxg, [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept {
+        tag(i,j,k) = (mk(i,j,k,0) != 0 && mk(i,j,k,1) == 0) ? 1 : 0;
+      });
+
+      // [A] Iterative flood fill — propagate valid data inward one ring
+      //     per iteration until all solid cells are reached (or budget runs out).
+      for (int iter = 0; iter < MAX_FLOOD_ITER; ++iter) {
+        Gpu::DeviceScalar<int> d_nfixed(0);
+        int* p_nfixed = d_nfixed.dataPtr();
+
+        ParallelFor(bx, [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept {
+          if (tag(i,j,k) != 1) return;
+
+          Real sum[PROB::ProbClosures::NCONS] = {};
+          int count = 0;
+          for (int dj = -1; dj <= 1; ++dj) {
+            for (int di = -1; di <= 1; ++di) {
+#if (AMREX_SPACEDIM == 3)
+              for (int dk = -1; dk <= 1; ++dk) {
+#else
+              { int dk = 0;
 #endif
+                if (di == 0 && dj == 0 && dk == 0) continue;
+                const int ii = i+di, jj = j+dj, kk = k+dk;
+                if (!bxg.contains(IntVect(AMREX_D_DECL(ii,jj,kk)))) continue;
+                if (tag(ii,jj,kk) == 0 || tag(ii,jj,kk) == 2) {
+                  for (int n = 0; n < ncons; ++n)
+                    sum[n] += state(ii,jj,kk,n);
+                  count++;
+                }
+              }
+            }
+          }
+          if (count > 0) {
+            const Real inv = Real(1.0) / count;
+            for (int n = 0; n < ncons; ++n)
+              state(i,j,k,n) = sum[n] * inv;
+            tag(i,j,k) = 2;
+            Gpu::Atomic::Add(p_nfixed, 1);
+          }
+        });
+
+        Gpu::streamSynchronize();
+        if (d_nfixed.dataValue() == 0) break;
+      }
+
+      // [B] Zero momentum in interior solid cells to prevent spurious
+      //     velocity amplification from acoustic-phase averaging.
+      ParallelFor(bx, [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept {
+        if (mk(i,j,k,0) == 0) return;  // fluid
+        if (mk(i,j,k,1) != 0) return;  // ghost point
+
+        using PC = PROB::ProbClosures;
+        const Real rho = state(i,j,k, PC::URHO);
+        if (rho <= Real(0)) return;
+
+        const Real mx = state(i,j,k, PC::UMX);
+        const Real my = state(i,j,k, PC::UMY);
+#if (AMREX_SPACEDIM == 3)
+        const Real mz = state(i,j,k, PC::UMZ);
+        const Real ke = Real(0.5) * (mx*mx + my*my + mz*mz) / rho;
+#else
+        const Real ke = Real(0.5) * (mx*mx + my*my) / rho;
+#endif
+        state(i,j,k, PC::UMX) = Real(0);
+        state(i,j,k, PC::UMY) = Real(0);
+#if (AMREX_SPACEDIM == 3)
+        state(i,j,k, PC::UMZ) = Real(0);
+#endif
+        state(i,j,k, PC::UET) -= ke;
+      });
+    }
+  }  // end if (ib_move)
+#endif  // AMREX_USE_GPIBM
 
 #ifdef CNS_USE_EB
   EBM::eb.destroy_mf(level);
@@ -634,6 +873,9 @@ void CNS::post_regrid(int lbase, int new_finest) {
 
   // Calculate markers  
   EBM::eb.computeMarkers(level);
+  
+  EBM::eb.check_geometry(level);
+
 
 #endif
 
@@ -665,25 +907,30 @@ void CNS::errorEst(TagBoxArray &tags, int /*clearval*/, int /*tagval*/,
   // }
 
 #ifdef AMREX_USE_GPIBM
-  // call function from cns_prob
   auto &ibdata = (*IBM::ib.bmf_a[level]);
+#elif defined CNS_USE_EB
+  auto const& fact = dynamic_cast<EBFArrayBoxFactory const&>(Factory());
+  auto const& flags = fact.getMultiEBCellFlagFab();
 #endif
   for (MFIter mfi(tags, TilingIfNotGPU()); mfi.isValid(); ++mfi) {
     const Box &bx = mfi.tilebox();
     auto const &tagfab = tags.array(mfi);
     auto const &sdatafab = sdata.array(mfi);
 #ifdef AMREX_USE_GPIBM
-    auto const &ibfab = ibdata.array(mfi);
+    auto const &ibfab = ibdata.array(mfi); // was const_array for user_tagging???
+#elif defined CNS_USE_EB
+    auto const& flag = flags.const_array(mfi);
 #endif
     int lev = level;
     int nt_lev = nStep();
     PROB::ProbParm const *lprobparm = d_prob_parm;
 
     ParallelFor(bx, [=] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {
+      // the user_tagging function is defined in prob.h
 #ifdef AMREX_USE_GPIBM
-      // call function from cns_prob
-      user_tagging(i, j, k, nt_lev, tagfab, sdatafab, ibfab, geomdata,
-                   *lprobparm, lev);
+      user_tagging(i, j, k, nt_lev, tagfab, sdatafab, ibfab, geomdata,*lprobparm, lev);
+#elif defined CNS_USE_EB
+      user_tagging(i, j, k, nt_lev, tagfab, sdatafab, flag, geomdata, *lprobparm, lev);
 #else
       user_tagging(i, j, k, nt_lev, tagfab, sdatafab, geomdata ,*lprobparm, lev);
 #endif
@@ -698,11 +945,7 @@ amrex::Print() << " recreate markers " << std::endl;
 
 
 #ifdef AMREX_USE_GPIBM
-  IBM::ib.destroy_mf(level);
-  IBM::ib.build_mf(grids, dmap, level);
-  IBM::ib.computeMarkers(level);
-  IBM::ib.initialiseGPs(level);
-  if (plot_surf) IBM::ib.compute_surface_index(level);
+  rebuildIBM();
 #endif
 
 #ifdef CNS_USE_EB
@@ -734,13 +977,50 @@ amrex::Print() << " recreate markers " << std::endl;
   // Calculate markers  
   EBM::eb.computeMarkers(level);
 
+  EBM::eb.check_geometry(level);
+
 #endif
+
+  // Initialise stats arrays to zero when restarting from a checkpoint
+  // that was written without statistics (NSTAT was 0 in the old build).
+  if (compute_stats) {
+    if (!state[Stats_Type].hasNewData()) {
+      const Real cur_time = state[State_Type].curTime();
+      const Real dt_old   = cur_time - state[State_Type].prevTime();
+      state[Stats_Type].define(geom.Domain(), grids, dmap,
+                               desc_lst[Stats_Type], cur_time, dt_old,
+                               Factory());
+    }
+    setupStats();
+    time_stat_level[level] = 0.0;
+  }
 
   // Set up diagnostics after restart
   if (record_probe) {
     setupTimeProbe();
   }
 
+}
+
+void CNS::set_state_in_checkpoint(Vector<int>& state_in_checkpoint) {
+  // This is only called when the checkpoint has fewer state types than
+  // the current code.  Mark Stats_Type as absent so AMReX skips reading it.
+  if (compute_stats) {
+    state_in_checkpoint[Stats_Type] = 0;
+  }
+}
+
+int CNS::okToContinue()
+{
+  if (level > 0) { return 1; }
+
+  int test = 1;
+  MultiFab &S = get_new_data(State_Type);
+  if (S.contains_nan(0, S.nComp())) {
+    test = 0;
+  }
+
+  return test;
 }
 
 // 
@@ -754,15 +1034,104 @@ void CNS::avgDown() {
   MultiFab &S_crse = get_new_data(State_Type);
   MultiFab &S_fine = fine_lev.get_new_data(State_Type);
 
+  // Standard avgDown first.
   amrex::average_down(S_fine, S_crse, fine_lev.geom, geom, 0, S_fine.nComp(),
                       parent->refRatio(level));
+  Gpu::streamSynchronize();  // ensure GPU average_down is complete before CPU read
+
+#ifdef AMREX_USE_GPIBM
+  // IBM-aware avgDown correction.
+  // Standard average_down has already run above. Now correct coarse cells
+  // that overlap MIXED fine regions (some solid + some fluid fine sub-cells)
+  // by re-averaging using only fluid fine cells. Pure-fluid coarse cells
+  // keep the standard average; pure-solid coarse cells keep their own value.
+  if (IBM::ib.bmf_a[level + 1] != nullptr)
+  {
+    auto& fine_ibmf = *IBM::ib.bmf_a[level + 1];
+    const int nc = S_fine.nComp();
+    const IntVect rr = parent->refRatio(level);
+
+    // Build coarsened box array on fine's DistributionMap
+    BoxArray cba = S_fine.boxArray();
+    cba.coarsen(rr);
+
+    // Use ncons+1 components: first ncons are data, last is validity flag
+    const int ncp1 = nc + 1;
+    MultiFab S_corr(cba, S_fine.DistributionMap(), ncp1, 0);
+    S_corr.setVal(Real(0.0));
+
+    // Populate S_corr with fluid-only averages for MIXED cells
+    // Note: use GPU ParallelFor because in CUDA builds, MultiFab data
+    // lives in device memory and can't be accessed via raw CPU loops.
+    for (MFIter fmfi(S_fine, false); fmfi.isValid(); ++fmfi) {
+      const Box fbx = fmfi.tilebox();
+      const Box cbx = amrex::coarsen(fbx, rr);
+      auto const fine = S_fine.const_array(fmfi);
+      auto const fmk  = fine_ibmf.const_array(fmfi);
+      auto const corr = S_corr.array(fmfi);
+      const int ncomp = nc;
+      const IntVect ratio = rr;
+
+      amrex::ParallelFor(cbx,
+      [=] AMREX_GPU_DEVICE (int ci, int cj, int ck) noexcept
+      {
+        int n_fluid = 0, n_solid = 0;
+        Real sum[PROB::ProbClosures::NCONS] = {};
+#if (AMREX_SPACEDIM == 2)
+        for (int fj = cj*ratio[1]; fj < (cj+1)*ratio[1]; ++fj)
+        for (int fi = ci*ratio[0]; fi < (ci+1)*ratio[0]; ++fi) {
+          if (fmk(fi,fj,0,0) == 0) {
+            for (int n = 0; n < ncomp; ++n) sum[n] += fine(fi,fj,0,n);
+            ++n_fluid;
+          } else ++n_solid;
+        }
+#else
+        for (int fk = ck*ratio[2]; fk < (ck+1)*ratio[2]; ++fk)
+        for (int fj = cj*ratio[1]; fj < (cj+1)*ratio[1]; ++fj)
+        for (int fi = ci*ratio[0]; fi < (ci+1)*ratio[0]; ++fi) {
+          if (fmk(fi,fj,fk,0) == 0) {
+            for (int n = 0; n < ncomp; ++n) sum[n] += fine(fi,fj,fk,n);
+            ++n_fluid;
+          } else ++n_solid;
+        }
+#endif
+        // Only overwrite MIXED cells
+        if (n_fluid > 0 && n_solid > 0) {
+          Real inv = Real(1.0) / n_fluid;
+          for (int n = 0; n < ncomp; ++n) corr(ci,cj,ck,n) = sum[n] * inv;
+          corr(ci,cj,ck,ncomp) = Real(1.0);  // mark valid
+        }
+      });
+    }
+
+    // ParallelCopy S_corr to a MultiFab aligned with S_crse
+    MultiFab S_corr_aligned(S_crse.boxArray(), S_crse.DistributionMap(), ncp1, 0);
+    S_corr_aligned.setVal(Real(0.0));
+    S_corr_aligned.ParallelCopy(S_corr, 0, 0, ncp1);
+
+    // Apply corrections: where validity flag == 1, overwrite S_crse
+    for (MFIter mfi(S_crse, false); mfi.isValid(); ++mfi) {
+      const Box& bx = mfi.tilebox();
+      auto const& crse = S_crse.array(mfi);
+      auto const& corr = S_corr_aligned.const_array(mfi);
+      const int ncomp = nc;
+
+      ParallelFor(bx, [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept {
+        if (corr(i,j,k,ncomp) > Real(0.5)) {
+          for (int n = 0; n < ncomp; ++n)
+            crse(i,j,k,n) = corr(i,j,k,n);
+        }
+      });
+    }
+  }
+#endif
 
   if (compute_stats) {
     MultiFab &Sstat_crse = get_new_data(Stats_Type);
     MultiFab &Sstat_fine = fine_lev.get_new_data(Stats_Type);
     amrex::average_down(Sstat_fine, Sstat_crse, fine_lev.geom, geom, 0, Sstat_fine.nComp(),
                       parent->refRatio(level));
-  }  
+  }
 
 }
 
@@ -770,10 +1139,24 @@ void CNS::printTotal() const {
   // Get conservatives multifab
   const MultiFab& consmf = get_new_data(State_Type);
 
-  // Compute peicewise constant sum of conserved variables
-  std::array<Real, PROB::ProbClosures::NCONS> tot;
+  // Volume-weighted integral of conserved variables (works for Cartesian and RZ)
+  MultiFab volume(consmf.boxArray(), consmf.DistributionMap(), 1, 0);
+  geom.GetVolume(volume, consmf.boxArray(), consmf.DistributionMap(), 0);
+
+  std::array<Real, PROB::ProbClosures::NCONS> tot{};
   for (int comp = 0; comp < PROB::ProbClosures::NCONS; ++comp) {
-    tot[comp] = consmf.sum(comp, true) * geom.ProbSize();
+    ReduceOps<ReduceOpSum> reduce_op;
+    ReduceData<Real> reduce_data(reduce_op);
+
+    auto const& a = consmf.const_arrays();
+    auto const& v = volume.const_arrays();
+    reduce_op.eval(consmf, IntVect(0), reduce_data,
+                   [=] AMREX_GPU_DEVICE(int box_no, int i, int j, int k) noexcept -> Real {
+                     return a[box_no](i, j, k, comp) * v[box_no](i, j, k);
+                   });
+    Gpu::streamSynchronize();
+    auto const& hv = reduce_data.value(reduce_op);
+    tot[comp] = amrex::get<0>(hv);
   }
 
   // Communicate across processors
@@ -1017,72 +1400,36 @@ void CNS::writePlotFile(const std::string &dir, std::ostream &os,
 void CNS::writePlotFilePost(const std::string &dir, std::ostream &os) {
 
 #if AMREX_USE_GPIBM
-
-  writeSurfFile();
-
-  // // claculate and  write surface data  
-  // int istep = parent->levelSteps(0);
-
-  // Print() << " istep= " << istep << " surf_int= " << surf_int << std::endl;
-
-  // Print()<< "should print ? " << (istep % surf_int == 0) << std::endl;
-
-  // if (plot_surf && (istep % surf_int == 0))  {
-     
-  //   MultiFab& Sdata = get_new_data(State_Type); 
-
-  //   int ncons = CNS::d_prob_closures->NCONS;
-  //   int nghost= CNS::d_prob_closures->NGHOST;
-
-  //   Real time = parent->cumTime();
-
-  //   if (this->level == parent->maxLevel()) {
-  //     Print() << "Computing surface properties ";
-  //     Print() << " at time= " << time << " and step= " << istep << std::endl;
-  //   }
-    
-  //   FillPatch(*this, Sdata, nghost, time, State_Type, 0, ncons);
-
-  //   const PROB::ProbClosures* cls_d = CNS::d_prob_closures;
-
-  //   IBM::ib.compute_surface_props(Sdata,cls_d,this->level); // computed at each level. From low to high.
-
-  //   const int igeom=0; // put in a loop
-
-  //   // collect data to rank 0
-  //   IBM::ib.gather_surfdata_to_rank0(this->level); 
-
-  //   if (this->level == parent->maxLevel()){
-
-  //     // select name file
-  //     std::ostringstream sname;
-  //     sname << surf_filename << igeom << "_"
-  //         << std::setw(3) << std::setfill('0') << istep
-  //         << ".vtk";
-  //     std::string surf_name = sname.str();
-
-  //     Print() << "Writing surface data to file: " << surf_name << std::endl;
-      
-  //     if (amrex::ParallelDescriptor::IOProcessor()){
-  //       IBM::ib.plot_surface(time,igeom,surf_name); 
-  //     } 
-  //   }
-
-  // }
-
+  // writeSurfFile();
 #endif
+
 }
 
-
-// this subroutine is called from the main loop (WORK IN PROGRESS)
+// this subroutine is called from the main loop 
 // should be called per level
 #if AMREX_USE_GPIBM
-void CNS::writeSurfFile( ) {
+
+void CNS::rebuildIBM() {
+  IBM::ib.destroy_mf(level);
+  IBM::ib.build_mf(grids, dmap, level);
+  IBM::ib.computeMarkers(level);
+  IBM::ib.initialiseGPs(level);
+  // Surface indices depend on all levels having valid bmf_a, so we can
+  // only rebuild them once the entire regrid cascade is complete (i.e.,
+  // when the finest level calls rebuildIBM).
+  if (level == parent->finestLevel()) {
+     for (int lev = parent->finestLevel(); lev >= 0; --lev) {
+        IBM::ib.computeSurfIndices(lev);
+     }
+  }
+}
+
+void CNS::writeSurfFile() {
       
-  // claculate and  write surface data  
+  // calculate and  write surface data  
   int istep = parent->levelSteps(0);
 
-  if (istep % surf_int == 0)  {
+  if (plot_surf && (istep % surf_int == 0))  {
      
     MultiFab& Sdata = get_new_data(State_Type); 
 
@@ -1098,28 +1445,26 @@ void CNS::writeSurfFile( ) {
     
     FillPatch(*this, Sdata, nghost, time, State_Type, 0, ncons);
 
+    // Convert conservative to primitive variables for surface interpolation
+    int nprim = PROB::ProbClosures::NPRIM;
+    MultiFab prims_mf(Sdata.boxArray(), Sdata.DistributionMap(),
+                      nprim, nghost, MFInfo().SetArena(The_Async_Arena()));
+    for (MFIter mfi(Sdata, false); mfi.isValid(); ++mfi) {
+      CNS::h_prob_closures->cons2prims(mfi, Sdata.array(mfi), prims_mf.array(mfi));
+    }
+
     const PROB::ProbClosures* cls_d = CNS::d_prob_closures;
+    const PROB::ProbClosures* cls_h = CNS::h_prob_closures; 
 
-    IBM::ib.compute_surface_props(Sdata,cls_d,this->level); // computed at each level. From low to high.
+    IBM::ib.computeSURFs(prims_mf,cls_d,this->level); // computed at each level. From low to high.
 
-    const int igeom=0; // put in a loop
+    // Only gather and write on the finest level to ensure all levels are processed
+    if (this->level == parent->finestLevel()){
+      // collect data to rank 0
+      IBM::ib.gatherSurfData(); 
 
-    // collect data to rank 0
-    IBM::ib.gather_surfdata_to_rank0(this->level); 
-
-    if (this->level == parent->maxLevel()){
-
-      // select name file
-      std::ostringstream sname;
-      sname << surf_filename << igeom << "_"
-          << std::setw(3) << std::setfill('0') << istep
-          << ".vtk";
-      std::string surf_name = sname.str();
-
-      Print() << "Writing surface data to file: " << surf_name << std::endl;
-      
       if (amrex::ParallelDescriptor::IOProcessor()){
-        IBM::ib.plot_surface(time,igeom,surf_name); 
+        IBM::ib.plotSURF(time, istep, surf_filename); 
       } 
     }
 

@@ -15,9 +15,9 @@ void Custom::build(const Geometry& geom, const int max_coarsening_level)
 
   // big chamber
   const Real R_chamber = 2.2*cm2m;
-  const Real L_chamber = 9.0*cm2m;
+  const Real L_chamber = 10.0*cm2m;
   const int  dir_chamber=2; // points to  Z
-  const Real zchamber = 9*cm2m; //
+  const Real zchamber = 9.5*cm2m; //
   
   // injector
   const Real R_inj = 0.95*cm2m;
@@ -37,8 +37,10 @@ void Custom::build(const Geometry& geom, const int max_coarsening_level)
 
 
   // atmospheric box out of combustor
-  const Real z0atmo = 0.1475; const Real Hatmo=0.026; //0.026
-  const Real Ratmo = 3.0*R_chamber;
+  const Real z0atmo =0.1675; 
+  //const Real z0atmo =0.155; 
+  const Real Hatmo = 0.065;
+  const Real Ratmo = 3.0*R_chamber; // 
   auto atmo = EB2::CylinderIF(Ratmo,Hatmo,dir_chamber,{AMREX_D_DECL(x0, y0, z0atmo)}, false);
 
   // cylindrical domain
@@ -71,22 +73,24 @@ void Custom::build(const Geometry& geom, const int max_coarsening_level)
   auto bb_and_holder = EB2::UnionIF<EB2::IntersectionIF<EB2::PlaneIF, EB2::TranslationIF<EB2::LatheIF<EB2::PlaneIF>>>,
                         EB2::CylinderIF>(cone, bb_holder);
 
-  // Option 1: combustor only                        
-  // auto final_struct = EB2::UnionIF<
-  //                     EB2::DifferenceIF<EB2::CylinderIF, EB2::CylinderIF>,
-  //                     EB2::UnionIF<EB2::IntersectionIF<EB2::PlaneIF, EB2::TranslationIF<EB2::LatheIF<EB2::PlaneIF>>>,
-  //                     EB2::CylinderIF>
-  //                     >
-  //                     (cchamber_with_injector, bb_and_holder);
-
+  // Option 1: combustor only     
+  /**                    
+  auto final_struct = EB2::UnionIF<
+                       EB2::DifferenceIF<EB2::CylinderIF, EB2::CylinderIF>,
+                       EB2::UnionIF<EB2::IntersectionIF<EB2::PlaneIF, EB2::TranslationIF<EB2::LatheIF<EB2::PlaneIF>>>,
+                       EB2::CylinderIF>
+                       >
+                       (cchamber_with_injector, bb_and_holder);
+  */
   // Option 2: with Atmosphere end
+  
   auto final_struct = EB2::UnionIF<
                       EB2::DifferenceIF<EB2::DifferenceIF<EB2::CylinderIF, EB2::CylinderIF>, EB2::CylinderIF>,
                       EB2::UnionIF<EB2::IntersectionIF<EB2::PlaneIF, EB2::TranslationIF<EB2::LatheIF<EB2::PlaneIF>>>,
                       EB2::CylinderIF>
                       >
                       (cchamber_with_injector2, bb_and_holder);
-
+  
   auto gshop = EB2::makeShop(final_struct);
 
   EB2::Build(gshop, geom, max_coarsening_level, max_coarsening_level, 6, true);

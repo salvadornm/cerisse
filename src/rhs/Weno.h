@@ -2,10 +2,9 @@
 #define Weno_H
 
 #include <AMReX_FArrayBox.H>
+#include <limits>
 
 #include "Closures.h"
-
-#include "mandebug.h" //temp snm
 
 #define POWER2(x) ((x) * (x))
 #define POWER6(x) ((x) * (x) * (x) * (x) * (x) * (x))
@@ -65,22 +64,63 @@ struct WenoZ5 {
     vr[0] = 2.0 * s[2] + 5.0 * s[1] - s[0];
   }
 
+  static AMREX_GPU_DEVICE AMREX_FORCE_INLINE void mod_stencil_near_solid(
+    amrex::Real optimal_weight[3], const int gl, const int gr) {
+      // Near-wall masking via linear (optimal) weights: disable stencils crossing solid
+      // |   | 0 | 1 | 2 | 3 | 4 |  right_stencil
+      //             ^ flux here
+      //               0   1   2   gr (eb)
+      //   2   1   0               gl (eb)
+      //               /   0   1   gr (ib, because of 1 ghost cell)
+      //   1   0   /               gl (ib)
+      //     <----------->         S0
+      //         <----------->     S1
+      //             <-----------> S2
+      if (gr <= 2) {
+        optimal_weight[2] = 0.0; // drop S2
+      }
+      if (gr <= 1 || gl == 0) {
+        optimal_weight[1] = 0.0; // drop S1
+      }
+      if (gl <= 1) {
+        optimal_weight[0] = 0.0; // drop S0
+      }
+    }
+
   /**
    * \brief (FV)WENO-Z5. Ref https://doi.org/10.1016/j.jcp.2010.11.028.
    * \param[in] s Stencil values at cells [i-2, i-1, i, i+1, i+2].
    * \return Reconstructed value at i-1/2.
    */
   static AMREX_GPU_DEVICE AMREX_FORCE_INLINE amrex::Real recon(
-      const amrex::Real s[5]) noexcept {
+    const amrex::Real s[5], const int gl, const int gr) noexcept {
     using amrex::Real;
     constexpr Real eps = 1e-40;
     Real vr[3], beta[3], tmp;
+    Real optimal_weight[3] = {3.0, 6.0, 1.0};
 
+#if (AMREX_USE_GPIBM || CNS_USE_EB)
+    mod_stencil_near_solid(optimal_weight, gl, gr);
+#endif
+    
     smoothness_indicator(s, beta);
+#if (AMREX_USE_GPIBM || CNS_USE_EB)
+    if (optimal_weight[2] > 0.0 && optimal_weight[0] > 0.0) {  // all stencils used
+      tmp = std::abs(beta[2] - beta[0]);
+    } else if (optimal_weight[2] > 0.0 && optimal_weight[0] == 0.0) {  // S0 dropped
+      tmp = std::abs(beta[2] - beta[1]);
+    } else if (optimal_weight[2] == 0.0 && optimal_weight[0] > 0.0) {  // S2 dropped
+      tmp = std::abs(beta[1] - beta[0]);
+    } else {  // only S0 or S2 used
+      tmp = 1.0;
+    }
+#else
     tmp = std::abs(beta[2] - beta[0]);
-    beta[2] = 1.0 + tmp / (eps + beta[2]);
-    beta[1] = (1.0 + tmp / (eps + beta[1])) * 6.0;
-    beta[0] = (1.0 + tmp / (eps + beta[0])) * 3.0;
+#endif
+
+    beta[2] = (1.0 + tmp / (eps + beta[2])) * optimal_weight[2];
+    beta[1] = (1.0 + tmp / (eps + beta[1])) * optimal_weight[1];
+    beta[0] = (1.0 + tmp / (eps + beta[0])) * optimal_weight[0];
     tmp = 1.0 / (beta[2] + beta[1] + beta[0]);
 
     linear_polynomial_recon(s, vr);
@@ -97,23 +137,45 @@ struct Teno5 : public WenoZ5 {
    * \return Reconstructed value at i-1/2.
    */
   static AMREX_GPU_DEVICE AMREX_FORCE_INLINE amrex::Real recon(
-      const amrex::Real s[5]) noexcept {
+      const amrex::Real s[5], const int gl, const int gr) noexcept {
     using amrex::Real;
 
     constexpr Real eps = std::numeric_limits<Real>::epsilon();
     constexpr Real cutoff = 1e-4;
     Real vr[3], beta[3], tmp;
-    
+    Real optimal_weight[3] = {3.0, 6.0, 1.0};
+
+#if (AMREX_USE_GPIBM || CNS_USE_EB)
+    mod_stencil_near_solid(optimal_weight, gl, gr);
+#endif
+
     smoothness_indicator(s, beta);
-    tmp = std::abs(std::abs(beta[2] - beta[0]) -
-                   (beta[2] + 4.0 * beta[1] + beta[0]) / 6.0);
+#if (AMREX_USE_GPIBM || CNS_USE_EB)
+    if (optimal_weight[2] > 0.0 && optimal_weight[0] > 0.0) {  // all stencils used
+      tmp = std::abs(std::abs(beta[2] - beta[0]) - (beta[2] + 4.0 * beta[1] + beta[0]) / 6.0);
+    } else if (optimal_weight[2] > 0.0 && optimal_weight[0] == 0.0) {  // S0 dropped
+      tmp = std::abs(beta[2] - beta[1]);
+    } else if (optimal_weight[2] == 0.0 && optimal_weight[0] > 0.0) {  // S2 dropped
+      tmp = std::abs(beta[1] - beta[0]);
+    } else {  // only S0 or S2 used
+      tmp = 1.0;
+    }
+    
+    const Real large_number = 1e6;
+    if (optimal_weight[0] == 0.0) beta[0] = large_number;
+    if (optimal_weight[1] == 0.0) beta[1] = large_number;
+    if (optimal_weight[2] == 0.0) beta[2] = large_number;
+#else
+    tmp = std::abs(std::abs(beta[2] - beta[0]) - (beta[2] + 4.0 * beta[1] + beta[0]) / 6.0);
+#endif
+    
     beta[2] = POWER6(1.0 + tmp / (eps + beta[2]));
     beta[1] = POWER6(1.0 + tmp / (eps + beta[1]));
     beta[0] = POWER6(1.0 + tmp / (eps + beta[0]));
     tmp = 1.0 / (beta[2] + beta[1] + beta[0]);
-    beta[2] = beta[2] * tmp < cutoff ? 0.0 : 1.0;
-    beta[1] = beta[1] * tmp < cutoff ? 0.0 : 6.0;
-    beta[0] = beta[0] * tmp < cutoff ? 0.0 : 3.0;
+    beta[2] = beta[2] * tmp < cutoff ? 0.0 : optimal_weight[2];
+    beta[1] = beta[1] * tmp < cutoff ? 0.0 : optimal_weight[1];
+    beta[0] = beta[0] * tmp < cutoff ? 0.0 : optimal_weight[0];
     tmp = 1.0 / (beta[2] + beta[1] + beta[0]);
 
     linear_polynomial_recon(s, vr);
@@ -156,7 +218,7 @@ struct Teno6 {
    * \return Reconstructed value at i-1/2.
    */
   static AMREX_GPU_DEVICE AMREX_FORCE_INLINE amrex::Real recon(
-      const amrex::Real s[6]) noexcept {
+      const amrex::Real s[6], int /*gl*/, int /*gr*/) noexcept {
     using amrex::Real;
 
     constexpr Real eps = std::numeric_limits<Real>::epsilon();
@@ -219,10 +281,11 @@ class weno_t {
                         const amrex::Array4<const amrex::Real>& prims_in,
                         std::array<FArrayBox*, AMREX_SPACEDIM> const &flxt,
                         const amrex::Array4<amrex::Real>& rhs, const cls_t* cls,
-                        const amrex::Array4<const bool>& ibMarkers)
+                        //const amrex::Array4<const bool>& ibMarkers)
+                        const amrex::Array4<uint8_t>& ibMarkers)
 #else
   void inline eflux(const amrex::Geometry& geom, const amrex::MFIter& mfi,
-                    const amrex::Array4<const amrex::Real>& prims,
+                    const amrex::Array4<const amrex::Real>& prims_in,
                     std::array<FArrayBox*, AMREX_SPACEDIM> const &flxt,
                     const amrex::Array4<amrex::Real>& rhs, const cls_t* cls)
 #endif
@@ -238,32 +301,51 @@ class weno_t {
 
       auto const& flx = flxt[dir]->array(); // snm
 
-      ParallelFor(flxbx, [=,this] AMREX_GPU_DEVICE(int i, int j, int k) noexcept { // it was [=]
+      ParallelFor(flxbx, [=] AMREX_GPU_DEVICE(int i, int j, int k) noexcept { // [=] only: do not capture 'this' in GPU lambda
         IntVect iv(AMREX_D_DECL(i, j, k));
         IntVect ivd(IntVect::TheDimensionVector(dir));
 
-#if (AMREX_USE_GPIBM || CNS_USE_EB )
-        Real prims_ptr[2 * ng * cls_t::NPRIM];
-        Dim3 prims_begin = (iv - ng * ivd).dim3();
-        Dim3 prims_end = (iv + (ng - 1) * ivd).dim3();
-        prims_end.x += 1;
-        prims_end.y += 1;
-        prims_end.z += 1;
-        Array4<Real> prims(prims_ptr, prims_begin, prims_end, cls_t::NPRIM);
-        if (!fill_solid_prims(iv, ivd, dir, prims_in, prims, ibMarkers)) {
+        int gl = ng, gr = ng;  // ghost point position on left and right
+
+        // modify stencils near IBM:  ibMarkers(iv,0) true means solid, false means fluid
+#if AMREX_USE_GPIBM
+        for (int mm = 0; mm < ng; ++mm) {
+          if (ibMarkers(iv + mm * ivd, 0))       gr = amrex::min(gr, mm);
+          if (ibMarkers(iv - (mm + 1) * ivd, 0)) gl = amrex::min(gl, mm);
+        }
+        if (gl == 0 && gr == 0) {
           return;  // skip solid cells
         }
+        if ((gl == 0 && gr == 1) || (gl == 1 && gr == 0)) {
+          AMREX_ASSERT_WITH_MESSAGE(false, "Cell is fluid but both neighbours are solid: no valid stencil");
+        }
+        gl += 1;  // to account for 1 ghost cell in IBM, which means that the first solid cell can be used
+        gr += 1;
 #endif
+        // modify stencils near EBM  ibMarkers(iv,0) true means solid, false means fluid
+#if CNS_USE_EB
+        for (int mm = 0; mm < ng; ++mm) {
+          if (ibMarkers(iv + mm * ivd, 0))       gr = amrex::min(gr, mm);
+          if (ibMarkers(iv - (mm + 1) * ivd, 0)) gl = amrex::min(gl, mm);
+        }
+        if (gl == 0 || gr == 0) {
+          return;  // skip solid cells
+        }
+        if ((gl == 0 && gr == 1) || (gl == 1 && gr == 0)) {
+          AMREX_ASSERT_WITH_MESSAGE(false, "Cell is fluid but both neighbours are solid: no valid stencil");
+        }
+#endif
+        
 
-        const Real alpha = cls->max_char_speed(iv, dir, ng, prims);
-        const auto roe_avg = cls->roe_avg_state(iv, dir, prims);
+        const Real alpha = cls->max_char_speed(iv, dir, ng, prims_in);
+        const auto roe_avg = cls->roe_avg_state(iv, dir, prims_in);
 
         Real cons[cls_t::NCONS], f[cls_t::NCONS], fp[2 * ng][cls_t::NCONS],
             fm[2 * ng][cls_t::NCONS];
         for (int m = 0; m < 2 * ng; ++m) {
           // LLF splitting into left- and right-running fluxes
-          cls->prims2flux(iv + (m - ng) * ivd, dir, prims, f);
-          cls->prims2cons(iv + (m - ng) * ivd, prims, cons);
+          cls->prims2flux(iv + (m - ng) * ivd, dir, prims_in, f);
+          cls->prims2cons(iv + (m - ng) * ivd, prims_in, cons);
 
           for (int n = 0; n < cls_t::NCONS; ++n) {
             fp[m][n] = 0.5 * (cons[n] + f[n] / alpha);
@@ -279,10 +361,10 @@ class weno_t {
         Real fpL[cls_t::NCONS], fmR[cls_t::NCONS], s[2 * ng];
         for (int n = 0; n < cls_t::NCONS; ++n) {
           Scheme::left_stencil(n, fp, s);
-          fpL[n] = Scheme::recon(s);
+          fpL[n] = Scheme::recon(s, gr, gl);
 
           Scheme::right_stencil(n, fm, s);
-          fmR[n] = Scheme::recon(s);
+          fmR[n] = Scheme::recon(s, gl, gr);
         }
 
         // Convert back to conservative variables
@@ -293,24 +375,12 @@ class weno_t {
                 
           flx(iv, n) = alpha * (fpL[n] - fmR[n]);
 
-          // // snm
-          //  if (amrex::isnan( flx(iv, n) ) )
-          //  {
-          //   printf(" DIR=%d i=%d j=%d k=%d n=%d\n",dir,i,j,k,n);
-          //   printf(" flkx=%f \n",flx(iv, n));
-          //   printf(" alpha=%f \n",alpha);
-          //   printf(" fpL=%f  fmR=%f \n",fpL[n],fmR[n]);            
-          //   std::cout << " ibm0= " << ibMarkers(i,j,k,0) << " \n" ;
-          //   std::cout << " ibm1= " << ibMarkers(i,j,k,1) << " \n" ;
-          //   printarray_point(" crash point ",i,j,k,cls_t::NPRIM,prims);            
-          //   amrex::Abort();              
-          //  } 
-
         }
       });
     }  // end of for each direction
   }
 
+///// OBSOLETE //////// // ........
 #if (AMREX_USE_GPIBM || CNS_USE_EB )
   AMREX_GPU_DEVICE AMREX_FORCE_INLINE bool fill_solid_prims(
       amrex::IntVect iv, amrex::IntVect ivd, int cdir,
@@ -330,64 +400,9 @@ class weno_t {
     if (gl == 0 && gr == 0) return false;  // skip solid cells
 
 
-     //printf("  gl gr = %d %d \n ",gl,gr);
-
-    // // Option1: use first order recon up to ng cells away from GP
-    // int glr = std::min(gl, gr);
-    // if (glr < ng) {
-    //   glr = 0;
-    // }
-    // for (int m = 0; m < ng; ++m) {
-    //   if (m <= glr) {
-    //     for (int n = 0; n < cls_t::NPRIM; ++n) {
-    //       prims(iv + m * ivd, n) = prims_in(iv + m * ivd, n);
-    //       prims(iv - (m + 1) * ivd, n) = prims_in(iv - (m + 1) * ivd, n);
-    //     }
-    //   } else {
-    //     for (int n = 0; n < cls_t::NPRIM; ++n) {
-    //       prims(iv + m * ivd, n) = prims_in(iv + glr * ivd, n);
-    //       prims(iv - (m + 1) * ivd, n) = prims_in(iv - (glr + 1) * ivd, n);
-    //     }
-    //   }
-    // }
-
-    // 2. fill the other solid points with the ghost point values
-    // if (gl == 0 || gr == 0) {
-    //   gl = 0;
-    //   gr = 0; // use 1st order if next to GP
-    // }
-    // for (int m = 0; m < ng; ++m) {
-    //   if (m <= gr) {
-    //     for (int n = 0; n < cls_t::NPRIM; ++n) {
-    //       prims(iv + m * ivd, n) = prims_in(iv + m * ivd, n);
-    //     }
-    //   } else {
-    //     for (int n = 0; n < cls_t::NPRIM; ++n) {
-    //       prims(iv + m * ivd, n) = prims_in(iv + gr * ivd, n);
-    //     }
-    //   }
-    // }
-    // for (int m = 0; m < ng; ++m) {
-    //   if (m <= gl) {
-    //     for (int n = 0; n < cls_t::NPRIM; ++n) {
-    //       prims(iv - (m + 1) * ivd, n) = prims_in(iv - (m + 1) * ivd, n);
-    //     }
-    //   } else {
-    //     for (int n = 0; n < cls_t::NPRIM; ++n) {
-    //       prims(iv - (m + 1) * ivd, n) = prims_in(iv - (gl + 1) * ivd, n);
-    //     }
-    //   }
-    // }
-
+  
     // 3. fill using 1st order BC (adiabatic no-slip)
     for (int m = 0; m < 2 * ng; ++m) {
-
-      //  printf("  line 390 m = %d ng=%d \n ",m,ng);
-      //  printf("iv = %d %d %d \n ",iv);
-      //  printf("ivd = %d %d %d \n ",ivd);
-      //  printf("iv - (m -ng)*ivd = %d %d %d \n ",iv - (m -ng)*ivd);
-
-      // prims  <--- prims_in   at iv (i + h,j,k)    why looping?  
       for (int n = 0; n < cls_t::NPRIM; ++n) {        
         prims(iv + (m - ng) * ivd, n) = prims_in(iv + (m - ng) * ivd, n);
       }
@@ -415,7 +430,7 @@ class weno_t {
     }
 
     return true;
-  }
+  } // ........
 #endif
 };
 
