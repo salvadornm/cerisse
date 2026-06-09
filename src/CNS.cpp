@@ -5,6 +5,9 @@
 #include <CNS_K.h>
 #include <prob.h>
 
+#include <nscbc.h>
+
+
 #ifdef CNS_USE_FSI
 #include <fsi/Kinematics.h>
 #include <fsi/RigidBodyProperties.h>

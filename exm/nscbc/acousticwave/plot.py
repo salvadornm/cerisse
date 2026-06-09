@@ -19,6 +19,9 @@ latest_file = max(list_of_files, key=os.path.getctime)
 print(" LAST FILE=",latest_file)
 ds = yt.load(latest_file)
 
+
+#ds = yt.load("plot/plt00200")
+
 PREF=101325
 
 print(' ##################################################### ')

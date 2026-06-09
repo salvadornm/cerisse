@@ -35,7 +35,7 @@ struct methodparm_t {
   public:
 
   static constexpr bool dissipation = true;         // no dissipation
-  static constexpr int  order = 4;                  // order numerical scheme
+  static constexpr int  order = 6;                  // order numerical scheme
   static constexpr Real C2skew=0.1,C4skew=0.016;   // Skew symmetric default
 
 };
@@ -45,9 +45,9 @@ typedef closures_dt<indicies_t, visc_suth_t, cond_suth_t,
     ProbClosures;
 
 // HLLC Riemann solver    
-typedef rhs_dt<riemann_t<false, ProbClosures>, no_diffusive_t, no_source_t    > ProbRHS;
+//typedef rhs_dt<riemann_t<false, ProbClosures>, no_diffusive_t, no_source_t    > ProbRHS;
 // skew-symmetric
-//typedef rhs_dt<skew_t<methodparm_t, ProbClosures>, no_diffusive_t, no_source_t > ProbRHS;
+typedef rhs_dt<skew_t<methodparm_t, ProbClosures>, no_diffusive_t, no_source_t > ProbRHS;
 // KEEP 2/4/6
 //typedef rhs_dt<keep_euler_t<false,false,4, ProbClosures>, no_diffusive_t,  no_source_t> ProbRHS;
 // WENO & TENO   WenoZ5/Teno5/Teno6
@@ -82,9 +82,11 @@ prob_initdata(int i, int j, int k, Array4<Real> const &state,
 
   arg   = prob_parm.B*(x - Real(0.5)*prob_parm.L0)/prob_parm.L0;
 
-  uxt   = prob_parm.u0 + prob_parm.A*prob_parm.u0*exp(-arg*arg);
-  Pt    = prob_parm.p0 +  prob_parm.rho0 *c0*(uxt - prob_parm.u0);
-  rhot  = prob_parm.rho0 *( Real(1.0) + (uxt - prob_parm.u0)/c0);
+  // acoustic wave
+  Real dp = 1.0e-3 * prob_parm.p0 * exp(-arg*arg); // small
+  Pt   = prob_parm.p0 + dp;
+  rhot = prob_parm.rho0 + dp/(c0*c0);
+  uxt  = prob_parm.u0 + dp/(prob_parm.rho0*c0);
   //
 
   state(i, j, k, cls.URHO) = rhot;
