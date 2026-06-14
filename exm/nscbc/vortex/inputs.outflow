@@ -1,34 +1,29 @@
 # Simulation time
 # start time is assumed to be 0, unless re-starting
 max_step  = 1000
-#stop_time =  0.044457
-stop_time = 0.00013
+stop_time =  0.044457
+#stop_time =  0.0088914
 
-time_step = 5e-8
+time_step = 4e-6
 #cfl = 0.3
 cns.order_rk  = 3
 cns.stages_rk = 3
 
 # Geometry 
-geometry.is_periodic = 0 1
+geometry.is_periodic = 0 0
 geometry.coord_sys   = 0  # 0 => cart, 1 => RZ  2=>spherical
 geometry.prob_lo     = 0.0     0.0
-geometry.prob_hi     = 0.013   0.013
+geometry.prob_hi     = 1.0   1.0
 
 # -1 = N/A (In case of periodic)
 # 0 = Interior           3 = Symmetry
 # 1 = Inflow             4 = SlipWall
 # 2 = Outflow            5 = NoSlipWall
 # 6 = user defined
-cns.lo_bc = 2 -1
-cns.hi_bc = 2 -1
-# NSCBC
-cns.nscbc_lo   = 0 0
-cns.nscbc_hi   = 2 0
-cns.nscbc_order = 1
-#
-cns.nstep_screen_output = 100 # frequency of plotting information to screen
-cns.verbose = 1       # 0=quiet, 1=verbose
+cns.lo_bc = 2 2
+cns.hi_bc = 6 2
+cns.screen_output = 0 # 0=quiet, 1=verbose
+cns.verbose = 0       # 0=quiet, 1=verbose
 
 # Refinement and regridding 
 amr.n_cell          =128 128

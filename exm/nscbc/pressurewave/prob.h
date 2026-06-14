@@ -17,21 +17,22 @@ using namespace amrex;
 
 namespace PROB {
 
-// problem parameters  (1:bottom   2:top)
+// 2-D Lodato-style outward pressure-pulse test.
+// Quiet ideal-gas field, centered Gaussian pressure pulse, all faces outflow/NSCBC.
 struct ProbParm {
-  Real gamma = 1.4;        // ratio of specific heats
-  Real p0 = 101325.0;      
-  Real T0 = 300.0;  
-  Real Rair = 287.0;                 // specific gas constant
-  Real rho0 = p0 / (Rair * T0);      // Ideal gas law
-  Real c0 = sqrt(gamma * p0 / rho0); // speed of soundR
-  Real Ma = 0.575;
-  Real u0 = Ma * c0;       // reference velocity
-  Real Lx = 0.013;           // domain length in x
-  Real Ly = 0.013;           // domain length in y  
-  Real beta = 0.04;        // vortex strength
-  Real Y0[NUM_SPECIES] = {0.0};
-  Real Q =  rho0*u0;      // incoming flow rate (per area)
+  Real gamma = 1.4;
+  Real p0    = 101325.0;
+  Real T0    = 300.0;
+  Real Rair  = 287.0;
+  Real rho0  = p0 / (Rair * T0);
+  Real c0    = std::sqrt(gamma * p0 / rho0);
+
+  Real Lx    = 0.16;
+  Real Ly    = 0.16;
+  Real delta = 0.01;   // 1% pressure pulse, as in the 2-D version in Rathore thesis (bigger than Lodato)
+  Real Rp    = 0.02;  // Rp  is 12/5% domain pulse radius for L=0.16 m (bigger than Lodato)
+
+  Real Y0[NUM_SPECIES] = {1.0};
 };
 
 
@@ -63,13 +64,15 @@ typedef manual_bc_t<ProbClosures> GlobalBC;
 
 void inline inputs() {
   ProbParm data;
-  amrex::Print() << "**************                          ************ " << std::endl;
-  amrex::Print() << " Two-dimensional vortex convection " << std::endl;
-  amrex::Print() << "**************                          ************ " << std::endl;
-  Real Ma = data.u0 / data.c0;
-  amrex::Print() << " Mach   =  " << Ma << std::endl;
-  amrex::Print() << "**************                          ************ " << std::endl;
+  amrex::Print() << "************** 2-D pressure-pulse NSCBC test **************\n";
+  amrex::Print() << "p0=" << data.p0 << " Pa, T0=" << data.T0
+                 << " K, c0=" << data.c0 << " m/s\n";
+  amrex::Print() << "Lx=" << data.Lx << ", Ly=" << data.Ly
+                 << ", delta=" << data.delta << ", Rp=" << data.Rp << "\n";
+  amrex::Print() << "All physical faces should be cns.*_bc=2 and cns.nscbc_*=2.\n";
+  amrex::Print() << "***********************************************************\n";
 }
+
 
 // initial condition
 AMREX_GPU_DEVICE AMREX_FORCE_INLINE void
@@ -80,47 +83,34 @@ prob_initdata(int i, int j, int k, Array4<Real> const &state,
   const Real *prob_hi = geomdata.ProbHi();
   const Real *dx = geomdata.CellSize();
 
-  Real x = prob_lo[0] + (i + Real(0.5)) * dx[0];
-  Real y = prob_lo[1] + (j + Real(0.5)) * dx[1];
+  const Real x = prob_lo[0] + (Real(i) + Real(0.5)) * dx[0];
+  const Real y = prob_lo[1] + (Real(j) + Real(0.5)) * dx[1];
 
+  const Real xc = Real(0.0); //Real(0.5) * (geomdata.ProbLo(0) + geomdata.ProbHi(0));
+  const Real yc = Real(0.0); //Real(0.5) * (geomdata.ProbLo(1) + geomdata.ProbHi(1));
+
+  const Real r2 = (x - xc) * (x - xc) + (y - yc) * (y - yc);
   
-  // Vortex position (xc,yc) middle of domain
-  const Real xc = 0.5*prob_parm.Lx; const Real yc = 0.5*prob_parm.Ly;
+  const Real P  = prob_parm.p0 *
+                  (Real(1.0) + prob_parm.delta *
+                   std::exp(-r2 / (Real(2.0) * prob_parm.Rp * prob_parm.Rp)));
 
-  const Real rsq = (x - xc) * (x - xc) + (y - yc) * (y - yc);
+  // Isothermal initialization, exactly as Lodato's pressure-pulse test: rho=p/(R T0).
+  const Real rho = P / (prob_parm.Rair * prob_parm.T0);
+  const Real u = Real(0.0), v = Real(0.0), w = Real(0.0);
+  const Real rhoeint = P / (prob_parm.gamma - Real(1.0));
 
-  amrex::Real u[3]={0.0}, T, P,rhot;
-
-
-  //-- Lodato test case --------------------------------------
-
-  const Real Rv = 0.1 * prob_parm.Lx;
-  const Real Cv = 0.005; // dimensional Lodato value if L=0.013 m
-
-  const Real r2 = (x-xc)*(x-xc) + (y-yc)*(y-yc);
-  const Real e1 = exp(-r2/(2.0*Rv*Rv));
-  const Real e2 = exp(-r2/(Rv*Rv));
-
-  u[0] = prob_parm.u0 - Cv*(y-yc)/(Rv*Rv)*e1;
-  u[1] =              + Cv*(x-xc)/(Rv*Rv)*e1;
-
-  P = prob_parm.p0 * exp( -0.5*prob_parm.gamma
-    * (Cv/(prob_parm.c0*Rv))*(Cv/(prob_parm.c0*Rv))
-    * e2 );
-
-  //----------------------------------------------------
-  rhot = P/(prob_parm.Rair*prob_parm.T0);
-  
-  // Internal energy  (rhoe = P/(gamma-1)
-  Real rhoeint = P / (cls.gamma - Real(1.0));
-
-  // final state
-  state(i, j, k, cls.URHO) = rhot;
-  state(i, j, k, cls.UMX)  = rhot * u[0];
-  state(i, j, k, cls.UMY)  = rhot * u[1];
-  state(i, j, k, cls.UMZ)  = Real(0.0);  
-  state(i, j, k, cls.UET)  = rhoeint + Real(0.5) * rhot * (u[0] * u[0] + u[1] * u[1]); 
-
+#if NUM_SPECIES > 1
+  for (int n = 0; n < NUM_SPECIES; ++n) {
+    state(i,j,k,cls.UFS+n) = rho * prob_parm.Y0[n];
+  }
+#else
+  state(i,j,k,cls.URHO) = rho;
+#endif
+  state(i,j,k,cls.UMX) = rho * u;
+  state(i,j,k,cls.UMY) = rho * v;
+  state(i,j,k,cls.UMZ) = rho * w;
+  state(i,j,k,cls.UET) = rhoeint + Real(0.5) * rho * (u*u + v*v + w*w);
 }
 
 /////////////////////////////// BC /////////////////////////////////////////////
@@ -129,6 +119,14 @@ bcnormal(const Real x[AMREX_SPACEDIM], Real dratio, const Real s_int[ProbClosure
          const Real s_refl[ProbClosures::NCONS], Real s_ext[ProbClosures::NCONS], const int idir,
          const int sgn, const Real time, GeometryData const & /*geomdata*/,
          ProbClosures const &closures, ProbParm const &prob_parm) {
+
+  //        
+  for (int n = 0; n < ProbClosures::NCONS; ++n) {
+    s_ext[n] = s_int[n];
+  }
+
+  return;
+  //
 
   const int face = (idir+1)*sgn;
 
@@ -142,7 +140,7 @@ bcnormal(const Real x[AMREX_SPACEDIM], Real dratio, const Real s_int[ProbClosure
       
       break;
     case -1:  // EAST x= Lx
-      GlobalBC::bc_fixP(-1.0,0.0,0.0,&closures,prob_parm.p0, s_int, s_ext);
+     // GlobalBC::bc_fixP(-1.0,0.0,0.0,&closures,prob_parm.p0, s_int, s_ext);
      //GlobalBC::bc_subsonic_outflow_fixP(-1.0,0.0,0.0,&closures,prob_parm.p0, s_int, s_ext);
      
       break;

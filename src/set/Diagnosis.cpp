@@ -4,6 +4,7 @@
 
 #include "CNS.h"
 #include <cassert>
+#include <limits>
 #include <vector>
 
 using namespace amrex;
@@ -12,6 +13,7 @@ using namespace amrex;
 int CNS::time_probe_lev = 0;
 int CNS::time_probe_int = 1;
 Vector<std::string> CNS::time_probe_names;
+Vector<std::string> CNS::time_probe_reductions;
 Vector<Box> CNS::time_probe_boxes;
 
 // Convert RealBox to Box. If RealBox does not align with grid, return a smaller
@@ -52,6 +54,7 @@ void CNS::setupTimeProbe() {
 
   // Clear in case of restart (setupTimeProbe is called again in post_restart).
   time_probe_names.clear();
+  time_probe_reductions.clear();
   time_probe_boxes.clear();
 
   for (int cnt = 0; cnt < num_probes; ++cnt) {
@@ -60,6 +63,18 @@ void CNS::setupTimeProbe() {
     std::string field_name;
     ppr.get("field_name", field_name);
     time_probe_names.push_back(field_name);
+
+    // Optional: average/mean/avg (default), max/maximum, min/minimum
+    std::string reduction = "average";
+    ppr.query("reduction", reduction);
+    if (reduction == "avg" || reduction == "mean") reduction = "average";
+    if (reduction == "maximum") reduction = "max";
+    if (reduction == "minimum") reduction = "min";
+    if (reduction != "average" && reduction != "max" && reduction != "min") {
+      amrex::Abort("Invalid time probe reduction for " + time_probes[cnt] +
+                   ": use average, max, or min");
+    }
+    time_probe_reductions.push_back(reduction);
 
     const Real *prob_lo = probe_geom.ProbLo();
     const Real *prob_hi = probe_geom.ProbHi();
@@ -80,7 +95,8 @@ void CNS::setupTimeProbe() {
     std::ostream &data_log = parent->DataLog(log_index);
     data_log << "time";
     for (int cnt = 0; cnt < num_probes; ++cnt) {
-      data_log << ", " << time_probe_names[cnt] << "("
+      data_log << ", " << time_probe_names[cnt] << "_"
+               << time_probe_reductions[cnt] << "("
                << time_probe_boxes[cnt].smallEnd()
                << time_probe_boxes[cnt].bigEnd() << ")";
     }
@@ -106,63 +122,76 @@ void CNS::recordTimeProbe() {
   }
 
   const Real curtime = state[0].curTime();
-  const int num_probes = time_probe_names.size(); // uncoment if C99 stantdard used
-  //constexpr int num_probes = 1;
-  //Real probe[num_probes] = {0.0};  // C99 standard (not compatible w/o tinkering flags)
-  Real* probe = new Real[num_probes](); 
+  const int num_probes = time_probe_names.size();
+  if (num_probes == 0) return;
+
+  Vector<Real> probe(num_probes, Real(0.0));
+  for (int cnt = 0; cnt < num_probes; ++cnt) {
+    if (time_probe_reductions[cnt] == "max") {
+      probe[cnt] = -std::numeric_limits<Real>::max();
+    } else if (time_probe_reductions[cnt] == "min") {
+      probe[cnt] =  std::numeric_limits<Real>::max();
+    }
+  }
+
   MultiFab S(grids, dmap, h_prob_closures->NCONS, 1, MFInfo(), Factory());
   FillPatch(*this, S, 1, curtime, State_Type, 0, h_prob_closures->NCONS);
+
+  auto accumulate_probe = [&] (int cnt, Box const& bx, Array4<Real const> const& arr,
+                               int comp) {
+    const std::string& reduction = time_probe_reductions[cnt];
+
+    if (reduction == "average") {
+      ReduceOps<ReduceOpSum> reduce_op;
+      ReduceData<Real> reduce_data(reduce_op);
+      using ReduceTuple = typename decltype(reduce_data)::Type;
+      reduce_op.eval(bx, reduce_data,
+        [=] AMREX_GPU_DEVICE(int i, int j, int k) -> ReduceTuple {
+          return arr(i, j, k, comp);
+        });
+      probe[cnt] += amrex::get<0>(reduce_data.value());
+    } else if (reduction == "max") {
+      ReduceOps<ReduceOpMax> reduce_op;
+      ReduceData<Real> reduce_data(reduce_op);
+      using ReduceTuple = typename decltype(reduce_data)::Type;
+      reduce_op.eval(bx, reduce_data,
+        [=] AMREX_GPU_DEVICE(int i, int j, int k) -> ReduceTuple {
+          return arr(i, j, k, comp);
+        });
+      probe[cnt] = amrex::max(probe[cnt], amrex::get<0>(reduce_data.value()));
+    } else { // min
+      ReduceOps<ReduceOpMin> reduce_op;
+      ReduceData<Real> reduce_data(reduce_op);
+      using ReduceTuple = typename decltype(reduce_data)::Type;
+      reduce_op.eval(bx, reduce_data,
+        [=] AMREX_GPU_DEVICE(int i, int j, int k) -> ReduceTuple {
+          return arr(i, j, k, comp);
+        });
+      probe[cnt] = amrex::min(probe[cnt], amrex::get<0>(reduce_data.value()));
+    }
+  };
 
   for (int cnt = 0; cnt < num_probes; ++cnt) {
     const std::string &name = time_probe_names[cnt];
     const Box &in_box = time_probe_boxes[cnt];
 
-    // if name is a state variable, just copy from state
-    // if not, derive the box
     int index, scomp;
     if (isStateVariable(name, index, scomp)) {
-#ifdef AMREX_USE_OMP
-#pragma omp parallel if (Gpu::notInLaunchRegion())
-#endif
       for (MFIter mfi(S, TilingIfNotGPU()); mfi.isValid(); ++mfi) {
         const Box bx = mfi.tilebox() & in_box;
         if (bx.ok()) {
-          const auto &sarr = S[mfi].array();
-
-          ReduceOps<ReduceOpSum> reduce_op;
-          ReduceData<Real> reduce_data(reduce_op);
-          using ReduceTuple = typename decltype(reduce_data)::Type;
-          reduce_op.eval(
-              bx, reduce_data,
-              [=] AMREX_GPU_DEVICE(int i, int j, int k) -> ReduceTuple {
-                return sarr(i, j, k, scomp);
-              });
-          probe[cnt] += amrex::get<0>(reduce_data.value());
+          accumulate_probe(cnt, bx, S[mfi].const_array(), scomp);
         }
       }
     } else if (const DeriveRec *rec = derive_lst.get(name)) {
-#ifdef AMREX_USE_OMP
-#pragma omp parallel if (Gpu::notInLaunchRegion())
-#endif
       for (MFIter mfi(S, TilingIfNotGPU()); mfi.isValid(); ++mfi) {
         const Box bx = mfi.tilebox() & in_box;
         if (bx.ok()) {
           FArrayBox dfab(bx, 1);
           FArrayBox const &sfab = S[mfi];
-          // we skip checking rec->derFuncFab() != nullptr
           rec->derFuncFab()(bx, dfab, 0, 1, sfab, geom, curtime, rec->getBC(),
                             level);
-          const auto &darr = dfab.array();
-
-          ReduceOps<ReduceOpSum> reduce_op;
-          ReduceData<Real> reduce_data(reduce_op);
-          using ReduceTuple = typename decltype(reduce_data)::Type;
-          reduce_op.eval(
-              bx, reduce_data,
-              [=] AMREX_GPU_DEVICE(int i, int j, int k) -> ReduceTuple {
-                return darr(i, j, k, 0);
-              });
-          probe[cnt] += amrex::get<0>(reduce_data.value());
+          accumulate_probe(cnt, bx, dfab.const_array(), 0);
         }
       }
     } else {
@@ -170,19 +199,46 @@ void CNS::recordTimeProbe() {
     }
   }
 
-  // reduce over mpi
-  ParallelDescriptor::ReduceRealSum(probe, num_probes,
-                                    ParallelDescriptor::IOProcessorNumber());
+  // Reduce over MPI. Average probes reduce sums; max/min probes reduce extrema.
+  Vector<int> avg_ids, max_ids, min_ids;
+  Vector<Real> avg_vals, max_vals, min_vals;
+  for (int cnt = 0; cnt < num_probes; ++cnt) {
+    if (time_probe_reductions[cnt] == "average") {
+      avg_ids.push_back(cnt); avg_vals.push_back(probe[cnt]);
+    } else if (time_probe_reductions[cnt] == "max") {
+      max_ids.push_back(cnt); max_vals.push_back(probe[cnt]);
+    } else {
+      min_ids.push_back(cnt); min_vals.push_back(probe[cnt]);
+    }
+  }
 
-  // write to file
+  if (!avg_vals.empty()) {
+    ParallelDescriptor::ReduceRealSum(avg_vals.data(), avg_vals.size(),
+                                      ParallelDescriptor::IOProcessorNumber());
+    for (int n = 0; n < avg_ids.size(); ++n) probe[avg_ids[n]] = avg_vals[n];
+  }
+  if (!max_vals.empty()) {
+    ParallelDescriptor::ReduceRealMax(max_vals.data(), max_vals.size(),
+                                      ParallelDescriptor::IOProcessorNumber());
+    for (int n = 0; n < max_ids.size(); ++n) probe[max_ids[n]] = max_vals[n];
+  }
+  if (!min_vals.empty()) {
+    ParallelDescriptor::ReduceRealMin(min_vals.data(), min_vals.size(),
+                                      ParallelDescriptor::IOProcessorNumber());
+    for (int n = 0; n < min_ids.size(); ++n) probe[min_ids[n]] = min_vals[n];
+  }
+
   if (ParallelDescriptor::IOProcessor()) {
     const int log_index = 0;
     std::ostream &data_log = parent->DataLog(log_index);
     const int datprecision = 6;
     data_log << std::setprecision(datprecision) << curtime;
     for (int cnt = 0; cnt < num_probes; ++cnt) {
-      data_log << ", " << std::setprecision(datprecision)
-               << probe[cnt] / time_probe_boxes[cnt].numPts();
+      Real value = probe[cnt];
+      if (time_probe_reductions[cnt] == "average") {
+        value /= time_probe_boxes[cnt].numPts();
+      }
+      data_log << ", " << std::setprecision(datprecision) << value;
     }
     data_log << std::endl;
   }

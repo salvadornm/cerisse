@@ -113,6 +113,14 @@ void CNS::variableSetUp() {
   CNS::d_phys_bc = h_phys_bc;
 #endif
 
+  // 
+#ifdef AMREX_USE_GPU
+  CNS::d_nscbc_parm =
+    (NSCBCParm*)The_Arena()->alloc(sizeof(NSCBCParm));
+#else
+  CNS::d_nscbc_parm = &CNS::h_nscbc_parm;
+#endif
+
   // Read input parameters
   read_params();
 

@@ -159,8 +159,8 @@ class CNS : public amrex::AmrLevel {
   static int time_probe_lev;
   static int time_probe_int;
   static amrex::Vector<std::string> time_probe_names;
+  static amrex::Vector<std::string> time_probe_reductions;
   static amrex::Vector<amrex::Box> time_probe_boxes;
-
 
   // Parameters
   static int num_state_data_types;
@@ -221,7 +221,28 @@ class CNS : public amrex::AmrLevel {
   static bool eb_redistribution;
   static std::string eb_redistribution_type;
 
-  // LES -variables
+  // NSCBC-specific keywords  
+  static bool use_nscbc;
+  static int nscbc_order;
+  static amrex::GpuArray<int, AMREX_SPACEDIM> nscbc_lo;
+  static amrex::GpuArray<int, AMREX_SPACEDIM> nscbc_hi;
+  struct NSCBCParm {
+    amrex::Real Lchar   = 1.0;
+    amrex::Real Mmax    = 0.1;
+    amrex::Real Ptarget = 101325.0;
+    amrex::Real sigma   = 0.28;
+
+    amrex::Real utarget = 0.0;
+    amrex::Real vtarget = 0.0;
+    amrex::Real wtarget = 0.0;
+    amrex::Real Ttarget = 300.0;
+    amrex::Real eta     = 1.0;
+  };
+
+  static NSCBCParm h_nscbc_parm;
+  static NSCBCParm* d_nscbc_parm;
+
+  // LES-variables
   static bool use_LES;
 
  public:

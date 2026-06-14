@@ -47,11 +47,11 @@ typedef closures_dt<indicies_t, visc_suth_t, cond_suth_t,
 // HLLC Riemann solver    
 //typedef rhs_dt<riemann_t<false, ProbClosures>, no_diffusive_t, no_source_t    > ProbRHS;
 // skew-symmetric
-typedef rhs_dt<skew_t<methodparm_t, ProbClosures>, no_diffusive_t, no_source_t > ProbRHS;
+//typedef rhs_dt<skew_t<methodparm_t, ProbClosures>, no_diffusive_t, no_source_t > ProbRHS;
 // KEEP 2/4/6
 //typedef rhs_dt<keep_euler_t<false,false,4, ProbClosures>, no_diffusive_t,  no_source_t> ProbRHS;
 // WENO & TENO   WenoZ5/Teno5/Teno6
-//typedef rhs_dt<weno_t<ReconScheme::Teno5, ProbClosures>, no_diffusive_t,  no_source_t>  ProbRHS;
+typedef rhs_dt<weno_t<ReconScheme::Teno5, ProbClosures>, no_diffusive_t,  no_source_t>  ProbRHS;
     
 //
 void inline inputs() {
@@ -86,8 +86,9 @@ prob_initdata(int i, int j, int k, Array4<Real> const &state,
   Real dp = 1.0e-3 * prob_parm.p0 * exp(-arg*arg); // small
   Pt   = prob_parm.p0 + dp;
   rhot = prob_parm.rho0 + dp/(c0*c0);
-  uxt  = prob_parm.u0 + dp/(prob_parm.rho0*c0);
-  //
+  uxt  = prob_parm.u0 + dp/(prob_parm.rho0*c0);   //right wave 
+  //uxt  = prob_parm.u0 - dp/(prob_parm.rho0*c0); //left wave
+  
 
   state(i, j, k, cls.URHO) = rhot;
   state(i, j, k, cls.UMX) = rhot * uxt;

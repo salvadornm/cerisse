@@ -3,6 +3,8 @@
 #include <CNSconstants.h>
 #include <prob.h>
 #include <iomanip>
+// 
+#include "mandebug.h"
 
 #ifdef AMREX_USE_GPIBM
 #include <ibm_solver.h>
@@ -20,6 +22,12 @@ Real CNS::advance(Real time, Real dt, int /*iteration*/, int /*ncycle*/) {
 
   int ncons = d_prob_closures->NCONS;
   int nghost= d_prob_closures->NGHOST;
+
+  // temp
+  // int nglin = 0; int ngfill = nghost;
+  // if (CNS::use_nscbc) { nglin = nghost; ngfill = 0;}
+
+
   MultiFab Stemp(grids,dmap,ncons,nghost,MFInfo(),Factory());
 
   FluxReg* fr_as_crse = nullptr;
@@ -110,10 +118,42 @@ Real CNS::advance(Real time, Real dt, int /*iteration*/, int /*ncycle*/) {
     compute_rhs(Stemp, dt, fr_as_crse, fr_as_fine);
     MultiFab::Copy(S2, Stemp, 0, 0, ncons, 0);
   } else if (order_rk == 1) {
-    FillPatch(*this, Stemp, nghost, time, State_Type, 0,
-              ncons);  // filled at t_n to evalulate f(t_n,y_n).
-    compute_rhs(Stemp, dt, fr_as_crse, fr_as_fine);
-    MultiFab::LinComb(S2, Real(1.0), S1, 0, dt, Stemp, 0, 0, ncons, 0);
+    // Euler Scheme //
+
+    amrex::Print() << "  advance:: Euler  Scheme"  << std::endl;
+
+
+    printinfo_point_atState(S1, 127, 63, 0, "    S1 previous time step)   ");
+    printinfo_point_atState(S1, 128, 63, 0, "    GHOST POINT      ");
+    
+
+    FillPatch(*this, Stemp, nghost, time, State_Type, 0,  ncons);  // filled at t_n to evalulate F(t_n,y_n).
+
+    // check ghost 2
+    printinfo_point_atState(Stemp, 127, 63, 0, "  Stemp            ");
+    printinfo_point_atState(Stemp, 128, 63, 0, "  Stemp GP         ");
+ 
+
+    compute_rhs(Stemp, dt, fr_as_crse, fr_as_fine);                 // compute F(t_n,y_n) Stemp is now RHS
+
+
+    // check RHS
+    printinfo_point_atState(Stemp, 127, 63, 0, "    RHS            ");
+    printinfo_point_atState(Stemp, 128, 63, 0, "    RHS GP    ");
+
+    // check S2
+    printinfo_point_atState(S2, 127, 63, 0, "    S2 (before time) ");
+    printinfo_point_atState(S2, 128, 63, 0, "    S2 GP            ");
+
+    // CHANGE
+    MultiFab::LinComb(S2, Real(1.0), S1, 0, dt, Stemp, 0, 0, ncons, 0);    // U_n+1 = U_n + dt *F(t_n,y_n)  (was 0)
+
+    // check ghost 3
+    printinfo_point_atState(S2, 127, 63, 0, "    S2               ");
+    printinfo_point_atState(S2, 128, 63, 0, "    S2 GP            ");
+
+
+
   } else if (order_rk == 2) {
     // Low-storage SSP-RK(m,2): m stages, C=m-1, C_eff=1-1/m.
     // Ref: Gottlieb et al., "Strong Stability Preserving Runge-Kutta and

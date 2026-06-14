@@ -7,6 +7,9 @@
 
 #include <nscbc.h>
 
+// 
+#include "mandebug.h"
+
 
 #ifdef CNS_USE_FSI
 #include <fsi/Kinematics.h>
@@ -66,6 +69,14 @@ PROB::ProbParm *CNS::d_prob_parm = nullptr;
 BCRec *CNS::h_phys_bc = nullptr;
 BCRec *CNS::d_phys_bc = nullptr;
 
+bool CNS::use_nscbc = false;
+int CNS::nscbc_order = 2;
+amrex::GpuArray<int, AMREX_SPACEDIM> CNS::nscbc_lo = {AMREX_D_DECL(0,0,0)};
+amrex::GpuArray<int, AMREX_SPACEDIM> CNS::nscbc_hi = {AMREX_D_DECL(0,0,0)};
+
+CNS::NSCBCParm CNS::h_nscbc_parm{};
+CNS::NSCBCParm* CNS::d_nscbc_parm = nullptr;
+
 // needed for CNSBld - derived from LevelBld (abstract class, pure virtual
 // functions must be implemented)
 
@@ -98,8 +109,9 @@ CNS::CNS(Amr &papa, int lev, const Geometry &level_geom, const BoxArray &bl,
 CNS::~CNS() {}
 // -----------------------------------------------------------------------------
 
-// init ------------------------------------------------------------------------
-
+// ------------------------------------------------------------------------------------//
+// Read cerisse-specific parameters from input file, starting by cns.
+//
 void CNS::read_params() {
 
   ParmParse pp("cns");
@@ -117,6 +129,55 @@ void CNS::read_params() {
     h_phys_bc->setLo(i, lo_bc[i]);
     h_phys_bc->setHi(i, hi_bc[i]);
   }
+
+  // Read NSBC type 0 (N/A) 1:Inflow 2:Outflow (constant P)
+  Vector<int> nslo(AMREX_SPACEDIM, 0); Vector<int> nshi(AMREX_SPACEDIM, 0);
+
+  bool has_nslo = pp.queryarr("nscbc_lo", nslo, 0, AMREX_SPACEDIM);
+  bool has_nshi = pp.queryarr("nscbc_hi", nshi, 0, AMREX_SPACEDIM);
+
+  use_nscbc = false;
+
+  for (int d = 0; d < AMREX_SPACEDIM; ++d) {
+    nscbc_lo[d] = nslo[d];
+    nscbc_hi[d] = nshi[d];
+
+    if (nscbc_lo[d] != 0 || nscbc_hi[d] != 0) {
+      use_nscbc = true;
+    }
+  }
+
+
+  if (use_nscbc) {
+    amrex::Print() << "Using NSCBC/LODI flags: lo="
+                 << AMREX_D_TERM(nscbc_lo[0], << " " << nscbc_lo[1], << " " << nscbc_lo[2])
+                 << " hi="
+                 << AMREX_D_TERM(nscbc_hi[0], << " " << nscbc_hi[1], << " " << nscbc_hi[2])
+                 << "\n";
+   
+    // read NSBC parameters and store in host_nsbc_parm
+    pp.query("nscbc_Lchar",   h_nscbc_parm.Lchar);
+    pp.query("nscbc_Mmax",    h_nscbc_parm.Mmax);
+    pp.query("nscbc_Ptarget", h_nscbc_parm.Ptarget);
+    pp.query("nscbc_sigma",   h_nscbc_parm.sigma);
+    pp.query("nscbc_utarget", h_nscbc_parm.utarget);
+    pp.query("nscbc_vtarget", h_nscbc_parm.vtarget);
+    pp.query("nscbc_wtarget", h_nscbc_parm.wtarget);
+    pp.query("nscbc_Ttarget", h_nscbc_parm.Ttarget);
+    pp.query("nscbc_eta",     h_nscbc_parm.eta);
+    pp.query("nscbc_order", nscbc_order);
+
+
+#ifdef AMREX_USE_GPU
+  amrex::Gpu::htod_memcpy(d_nscbc_parm, &h_nscbc_parm, sizeof(NSCBCParm));
+#endif
+
+    // check parameters validity
+    const NSCBCParm* nscbc_parm =d_nscbc_parm;
+    nscbc::check_nscbc<PROB::ProbClosures>(nslo,nshi,*nscbc_parm);
+  } 
+  //
+
 
   pp.query("do_reflux", do_reflux);
 
@@ -235,6 +296,7 @@ void CNS::read_params() {
 #endif
 }
 
+// ------------------------------------------------------------------------------------//
 void CNS::init(AmrLevel &old) {
   auto &oldlev = dynamic_cast<CNS &>(old);
 
@@ -255,7 +317,7 @@ void CNS::init(AmrLevel &old) {
   }
 
 }
-
+// ------------------------------------------------------------------------------------//
 void CNS::init() {
 
   // amrex::Print( ) << " oo CNS::init -----  " << std::endl;  
@@ -271,7 +333,7 @@ void CNS::init() {
   FillCoarsePatch(S_new, 0, cur_time, State_Type, 0,PROB::ProbClosures::NCONS);
 };
 
-//-----
+// ------------------------------------------------------------------------------------//
 void CNS::initData() {
   BL_PROFILE("CNS::initData()");
 
@@ -281,8 +343,6 @@ void CNS::initData() {
 
   PROB::ProbClosures const *lclosures = d_prob_closures;
   PROB::ProbParm const *lprobparm = d_prob_parm;
-
-  //amrex::Print( ) << "  calling  prob_init in prob.h ...  " << std::endl; 
 
   // Initialise problem by calling user-given prob.h
 #if USE_UTILITY
@@ -307,6 +367,8 @@ void CNS::initData() {
 
 
 }
+
+// ------------------------------------------------------------------------------------//
 
 void CNS::buildMetrics() {
 
@@ -426,9 +488,11 @@ void CNS::computeInitialDt(int finest_level, int sub_cycle,
   }
 }
 
+// ------------------------------------------------------------------------------------//
 // Called at the end of a coarse grid timecycle or after regrid, to compute the
 // dt (time step) for all levels, for the next step.
 // Output dt_level
+// ------------------------------------------------------------------------------------//
 void CNS::computeNewDt(int finest_level, int sub_cycle, Vector<int> &n_cycle,
                        const Vector<IntVect> &ref_ratio, Vector<Real> &dt_min,
                        Vector<Real> &dt_level, Real stop_time,
@@ -644,10 +708,11 @@ void CNS::computeNewDt(int finest_level, int sub_cycle, Vector<int> &n_cycle,
 
   return h_max_eigenvals;
 }
-
-void CNS::post_timestep(int /* iteration*/) {
+// ------------------------------------------------------------------------------------//
+void CNS::post_timestep(int /* iteration */) {
   BL_PROFILE("post_timestep");
-  //amrex::Print() << " oo CNS::post_timestep " << std::endl;
+  
+  //amrex::Print() << " oo CNS::post_timestep "  << std::endl;
 
   if (do_reflux && level < parent->finestLevel()) {
     CNS& fine_level = getLevel(level + 1);
@@ -680,9 +745,10 @@ void CNS::post_timestep(int /* iteration*/) {
   }
 }
 
+// ------------------------------------------------------------------------------------//
 void CNS::postCoarseTimeStep(Real time) {
 
-  // amrex::Print() << " oo CNS::postCoarseTimeStep " << std::endl;
+ // amrex::Print() << " oo CNS::postCoarseTimeStep " << time <<  std::endl;
 
 #ifdef AMREX_USE_GPIBM
   // Surface output at user-specified step interval
