@@ -6,6 +6,7 @@
 
 // Euler numerical methods
 #include <Weno.h>
+#include <WenoEB.h>
 #include <CentralKEEP.h>
 #include <CentralDif.h>
 #include <Riemann.h>
@@ -49,6 +50,7 @@ public:
             const Array4<Real>& /*rhs*/, Args&&... args) { }
 #endif  
 };
+
 
 // no diffusive flux
 class no_diffusive_t
