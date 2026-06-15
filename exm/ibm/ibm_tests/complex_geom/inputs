@@ -1,9 +1,9 @@
 #------------------------------------------------------------------------------#
 #  IBM Test: Complex geometry — multiple polygons, BVH CPU 2D
 #------------------------------------------------------------------------------#
-max_step  = 500
+max_step  = 2000
 stop_time = 10.0
-cfl = 0.5
+cfl = 0.1
 
 cns.order_rk  = -2
 cns.stages_rk = 2

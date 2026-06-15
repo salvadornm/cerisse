@@ -107,9 +107,12 @@ typedef closures_dt<indicies_t, transport_const_t<methodparm_t>,
 // NUMERICAL SCHEME + EQNS TO SOLVE   (Euler/NS/Source)                 
 
 //typedef rhs_dt<rusanov_t<ProbClosures>, no_diffusive_t, no_source_t > ProbRHS;
-typedef rhs_dt<riemann_t<false, ProbClosures>, no_diffusive_t, no_source_t > ProbRHS;
+//typedef rhs_dt<riemann_t<false, ProbClosures>, no_diffusive_t, no_source_t > ProbRHS;
 //typedef rhs_dt<skew_t<skewparm_t,ProbClosures>, no_diffusive_t, no_source_t > ProbRHS;
 //typedef rhs_dt<skew_t<skewparm_t,ProbClosures>, viscous_t<methodparm_t, ProbClosures>, no_source_t > ProbRHS;
+
+typedef rhs_dt<weno_t<ReconScheme::WenoZ5, ProbClosures>, no_diffusive_t, no_source_t > ProbRHS;
+//typedef rhs_dt<weno_t<ReconScheme::Teno5, ProbClosures>, no_diffusive_t, no_source_t > ProbRHS;
 
 
 // IBM templates
@@ -159,9 +162,7 @@ void prob_initdata (int i, int j, int k, amrex::Array4<amrex::Real> const& state
   state(i, j, k, cls.URHO) = rhot;
   state(i, j, k, cls.UMX)  = rhot * u[0];
   state(i, j, k, cls.UMY)  = Real(0.0);
-#if (AMREX_SPACEDIM == 3)
   state(i, j, k, cls.UMZ)  = Real(0.0);
-#endif
   state(i, j, k, cls.UET)  = eint + Real(0.5) * rhot * u[0] * u[0] ; 
 
 }

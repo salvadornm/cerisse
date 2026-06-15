@@ -1,7 +1,7 @@
 #------------------------------------------------------------------------------#
 #  IBM Test: BVH CPU 2D — single circle, Mach 4 shock
 #------------------------------------------------------------------------------#
-max_step  = 500
+max_step  = 2000
 stop_time = 10.0
 cfl = 0.3
 
@@ -25,7 +25,7 @@ geometry.is_periodic = 0 0
 geometry.coord_sys   = 0
 geometry.prob_lo     = -0.5  -0.5
 geometry.prob_hi     =  0.5   0.5
-amr.n_cell           = 256   256
+amr.n_cell           = 128   128
 
 #-------------------------------- REFINEMENT / REGRIDDING ---------------------#
 amr.max_level       = 1

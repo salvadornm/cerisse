@@ -69,7 +69,7 @@ typedef closures_dt<indicies_t, visc_suth_t, cond_suth_t,
 //typedef rhs_dt<rusanov_t<ProbClosures>, no_diffusive_t, no_source_t > ProbRHS;
 //typedef rhs_dt<riemann_t<false, ProbClosures>, no_diffusive_t, no_source_t > ProbRHS;
 //typedef rhs_dt<skew_t<methodparm_t, ProbClosures>, no_diffusive_t, no_source_t > ProbRHS;
-typedef rhs_dt<weno_t<ReconScheme::Teno5, ProbClosures>, no_diffusive_t, no_source_t > ProbRHS;
+typedef rhs_dt<weno_t<ReconScheme::WenoZ5, ProbClosures>, no_diffusive_t, no_source_t > ProbRHS;
 
 
 // define type of wall and EBM class
@@ -79,10 +79,9 @@ typedef ebm_t<TypeWall,wall_param,ProbClosures> ProbEB;
 
 
 void inline inputs() {
-  // ParmParse pp;
 
-  // pp.add("cns.order_rk", -2);   // -2, 1, 2 or 3"  (was 3)
-  // pp.add("cns.stages_rk", 3);  // 1, 2 or 3
+///
+
 }
 
 // initial condition

@@ -1,11 +1,11 @@
 # Simulation time
-max_step  =  1000
+max_step  =  2000
 stop_time =  0.005
 cfl = 0.1
 #time_step = 1.2e-6
 
-cns.order_rk  = -2 # original -2 2
-cns.stages_rk = 2
+cns.order_rk  = 3 # original -2 2
+cns.stages_rk = 3
 
 # Geometry 
 geometry.is_periodic = 0 0
@@ -16,6 +16,9 @@ geometry.prob_hi     = 2.0   4.0
 # BC
 cns.lo_bc = 1 4
 cns.hi_bc = 2 4
+
+#reflux
+cns.do_reflux = 0
 
 
 
