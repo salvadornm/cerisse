@@ -51,6 +51,21 @@ struct methodparm_t {
   static constexpr Real C2skew=1.5,C4skew=0.0016;   // Skew symmetric default
 
 };
+
+struct reconsparm_t {
+
+  public:
+
+  // 1 Godunov, 2 PLM, 3 WENO-Z3, 4 WENO-JS5, 5 WENO-Z5, 6 TENO5
+  static constexpr int  recon_scheme = 5;     
+  static constexpr int  recon_sys = 1;    // 0 sound-speed char system, 1 gamma char system
+  static constexpr bool recon_char_var = true;
+  static constexpr Real plm_theta = 1.5_rt;
+  static constexpr Real teno_cutoff = 0.0_rt;
+
+};
+
+
 struct wall_param {
 
   public:
@@ -69,7 +84,11 @@ typedef closures_dt<indicies_t, visc_suth_t, cond_suth_t,
 //typedef rhs_dt<rusanov_t<ProbClosures>, no_diffusive_t, no_source_t > ProbRHS;
 //typedef rhs_dt<riemann_t<false, ProbClosures>, no_diffusive_t, no_source_t > ProbRHS;
 //typedef rhs_dt<skew_t<methodparm_t, ProbClosures>, no_diffusive_t, no_source_t > ProbRHS;
-typedef rhs_dt<wenoEB_t<ReconSchemeEB::Teno5, ProbClosures>, no_diffusive_t, no_source_t > ProbRHS;
+//typedef rhs_dt<wenoEB_t<ReconSchemeEB::WenoZ5 , ProbClosures>, no_diffusive_t, no_source_t > ProbRHS;
+//typedef rhs_dt<wenoEB_t<ReconSchemeEB::Teno5 , ProbClosures>, no_diffusive_t, no_source_t > ProbRHS;
+typedef rhs_dt< reconshllc_t<reconsparm_t, ProbClosures>, no_diffusive_t, no_source_t > ProbRHS;
+
+
 
 
 // define type of wall and EBM class

@@ -510,7 +510,6 @@ void add_lodi_rhs_to_cons (
     // Ideal-gas LODI energy closure for first implementation.
     const Real P = q(iv, cls_t::QPRES);
     const Real T = q(iv, cls_t::QT);
-    const Real c = q(iv, cls_t::QC);
     const Real gamma = q(iv, cls_t::QG); 
     const Real e = P / (rho*(gamma - Real(1.0)) );  //e perfect gas
     const Real cv = e/T;

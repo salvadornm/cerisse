@@ -12,6 +12,7 @@
 #include <Riemann.h>
 #include <Rusanov.h>
 #include <Skew.h>
+#include <ReconsHLLC.h>
 
 // viscous templates
 #include <DiffusionCD.h>
