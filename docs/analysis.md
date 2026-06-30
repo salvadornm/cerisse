@@ -57,7 +57,9 @@ user-specific statistics in progress
 
 ## Probes
 
-Probes record time-evolution of quantities . They are handled through the input files&#x20;
+Probes record time-evolution of seelcted quantities ,  they are handled through the **input** file.&#x20;
+
+A probe is defined by a **field name** and a **bounding box** (`box_lo` and `box_hi`). At every sampling interval (`cns.time_probe_int`), Cerisse extracts the requested quantity over that region and stores a single representative value in the output file. By default, this value is the **volume average** over the selected box, making probes useful for monitoring the evolution of global or local flow quantities. Alternatively, the reduction operation can be configured to record the **maximum** (or **minimum**) value within the box, which is particularly useful for tracking shock strength, peak temperature, maximum vorticity, or other localized extrema. Setting `box_lo` equal (or nearly equal) to `box_hi` effectively defines a point probe, allowing time histories to be recorded at a specific location.
 
 ```
 # DIAGNOSTICS
@@ -83,3 +85,4 @@ PressurePoint.box_hi = 3.19068 3.19068 3.19068
 In the example above, a file named `time_probe.log` is defined to store data, including four quantities: two derived ones—_energy_ and _enstrophy_—and two direct ones—_density_ and _pressure_. The first two are averaged over a box of size (0, 6.28), while the latter correspond to a much smaller box (a "point")
 
 The `cns.record_probe = 1` is needed to store the data. An example can be found in the [constant volume reactor ](onedim.md#constant-volume-reactor)where temperature is tracked over time. Results can then be plot with conventional python scripts.
+

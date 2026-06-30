@@ -316,9 +316,7 @@ $$
 \phi_{i+1/2}= \hat{\alpha}_0 \hat{\phi}_{i-1} +  \hat{\alpha}_1 \hat{\phi}_{i}  +  \hat{\alpha}_2 \hat{\phi}_{i+1}  +  \hat{\alpha}_3 \hat{\phi}_{i+2}
 $$
 
-In  common second order  approaches, both coefficients $$\alpha_k = \hat{\alpha}_k$$ are the same $$\alpha=\hat{\alpha}$$.  However, this changes for high order approximations.
-
-To build the matrix of coefficients, we re-use the Taylor expansion of the previous section, expanding from the face
+In   second order  methods, both coefficients $$\alpha_k = \hat{\alpha}_k$$ are the same $$\alpha=\hat{\alpha}$$.  However, this changes for higher order approximations. To build the matrix of coefficients, we re-use the Taylor expansion of the previous section, expanding from the face
 
 $$
 \phi(x) \approx \phi_{i+1/2}   +  x  f' + \frac{x^2}{2!}  f'' 
@@ -770,6 +768,70 @@ To ensure strong stability preservation, the method must satisfy:
 * $$\sum_{j=0}^{i-1} \alpha_{i,j} = 1$$ (convex combination)
 * Each stage $$U^{(i)}$$ is a convex combination of forward Euler steps
 
+## Boundary Conditions
+
+### Non-Reflecting Boundary Conditions
+
+Boundary conditions are often the most critical component of high-fidelity simulations of compressible flows. While modern numerical schemes introduce (little) numerical dissipation, they are also unable to damp spurious reflections generated at computational boundaries. Artificial reflections may contaminate the interior solution, generate standing acoustic waves, distort statistics, and even destabilize the simulation. Traditional boundary conditions based on simple extrapolation or fixed primitive variables do not distinguish between information leaving and entering the computational domain. As a consequence, they generally over-specify the problem and generate artificial wave reflections.\
+\
+Navier-Stokes Characteristic Boundary Conditions (NSCBC), originally introduced by [Poinsot and Lele (1992)](numerical-methods.md#references), overcome this difficulty by exploiting the hyperbolic nature of the compressible Navier-Stokes equations. Instead of prescribing primitive variables directly, the governing equations are decomposed into characteristic waves travelling normal to the boundary. Boundary conditions are then imposed only on waves entering the computational domain, while outgoing waves are computed entirely from the interior solution.&#x20;
+
+#### Physical Interpretation
+
+The compressible Navier-Stokes equations support several families of disturbances:
+
+* pressure (acoustic) waves,
+* entropy waves,
+* vorticity waves.
+
+Each propagates with a different speed relative to the fluid. Consider a subsonic outlet, the flow velocity is smaller than the local speed of sound,  $$|u| <  c$$&#x20;
+
+Although the fluid leaves the domain, acoustic disturbances are still able to travel upstream. Consequently,  **four** characteristic waves leave the domain, **one** acoustic wave enters the domain and therefore attempting to impose pressure, density and velocity simultaneously produces an over-constrained system that generates reflected waves.<br>
+
+#### Characteristic decomposition
+
+For clarity consider the one-dimensional Euler equations written in primitive variables,
+
+$$
+\frac{\partial \bf{Q} }{\partial t}+A \frac{\partial \bf{Q} }{\partial x}=0
+$$
+
+where  $$Q= (\rho, \rho u, p)$$ . The Jacobian matrix ,  $$A$$   possesses three eigenvalues,
+
+$$
+\lambda_1=u−c \;\;, \;\;\; \lambda_2=u \;\;, \;\;\;  \lambda_3​=u+c,
+$$
+
+which represent the propagation speeds of the characteristic waves.
+
+These correspond to
+
+* left-running acoustic wave,
+* entropy/vorticity wave,
+* right-running acoustic wave.
+
+The governing equations may therefore be rewritten in characteristic form,
+
+$$
+\frac{\partial  W_i}{\partial t}+\lambda_i \frac{\partial W_i }{\partial x}=0
+$$
+
+where  $$W_i$$    denote the characteristic variables. Instead of imposing primitive variables, NSCBC prescribes the evolution of the incoming characteristic amplitudes.
+
+The assumption is that the flow is locally one-dimensional in the vicinity of the boundary. If we consider a boundary whose outward normal is aligned with the x-direction. LODI assumes that only the normal derivatives determine the characteristic propagation and the equations therefore reduce locally to a one-dimensional characteristic system. This simplification makes it possible to derive explicit expressions for the amplitudes of the incoming and outgoing waves.\
+\
+**Incoming and outgoing characteristics**
+
+The sign of the characteristic speed determines whether information enters or leaves the computational domain. At a **subsonic outlet** _one_ acoustic characteristic enters, _two_ characteristics leave. Only the incoming waves require boundary conditions and outgoing waves are obtained directly from the numerical solution.\
+Rather than prescribing primitive variables directly, the NSCBC method specifies the amplitudes of the **incoming characteristic waves**, usually denoted by _&#x4C;_&#x200B;. The outgoing characteristic amplitudes are computed directly from one-sided spatial derivatives inside the computational domain and therefore carry the physical information generated by the solution itself. The incoming characteristic amplitudes are instead modified according to the desired boundary condition. For example, at a subsonic outlet the incoming acoustic wave is relaxed toward a target pressure, while at a subsonic inlet the incoming waves are relaxed toward prescribed velocity, temperature, or species values.\
+Once all characteristic amplitudes are known—both the outgoing waves computed from the interior and the incoming waves imposed through the boundary condition—the complete **LODI system** is assembled. The characteristic equations are then solved to obtain the time derivatives of the primitive variables:
+
+$$
+\frac{\partial \rho}{\partial t},  \;\;\;\ \frac{\partial u}{\partial t} \;\;\;\;  \frac{\partial p}{\partial t} \;\;\; ...
+$$
+
+These time derivatives are finally converted into the corresponding conservative variables and used by the numerical solver to advance the solution in time. I
+
 #### References
 
 \[1] Morinishi, Y. (1995). Conservative properties of finite difference schemes for incompressible flow. [Center for Turbulence Research Annual Research Briefs](https://ntrs.nasa.gov/citations/19960022304)
@@ -801,3 +863,5 @@ To ensure strong stability preservation, the method must satisfy:
 \[14] Jameson, A, Schmidt, W, Turkel, E (1981) Numerical solution of the Euler equations by finite volume methods using Runge Kutta time stepping schemes [_AIAA 1981-1259_ ](https://arc.aiaa.org/doi/abs/10.2514/6.1981-1259)
 
 \[15]  Batten, P,  Clarke, N, Lambert, C and Causon D M (1997) On the Choice of Wavespeeds for the HLLC Riemann Solver.  [_SIAM Journal on Scientific Computing 1997 18:6, 1553-1570_](https://doi.org/10.1137/S1064827593260140)
+
+\[16]  Poinsot, T.J. and Lele, S.K. (1992) Boundary Conditions for Direct Simulations of Compressible Viscous Flows. [_Journal of Computational Physics, 101, 104-129_](https://www.sciencedirect.com/science/article/pii/0021999192900462)<br>

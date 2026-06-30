@@ -140,7 +140,7 @@ $$
 
 corresponding to the Euler equations, with skew-symmetric numerical scheme (with order defined in `methodparm_t`, similar to **closures\_dt**  (see  [Options](options.md)). Available options in _**rhs\_dt**_ are:
 
-<table><thead><tr><th width="208">euler</th><th width="90">Options</th><th width="87" align="center">IBM</th><th width="152" align="center">defaults</th><th>Description</th></tr></thead><tbody><tr><td><code>riemann_t</code></td><td>no</td><td align="center">no</td><td align="center">-</td><td><a href="theory/equations/numerical-methods.md#riemann-solver-with-muscl">Second TVD - HLLC Riemann solver</a></td></tr><tr><td><code>skew_t</code></td><td>yes</td><td align="center">yes</td><td align="center">4th order, no dissipation</td><td><a href="theory/equations/numerical-methods.md#skew-symmetric">2/4/6 order Skew-symmetric scheme</a></td></tr><tr><td><code>keep_euler_t</code></td><td>yes</td><td align="center">no</td><td align="center">no default</td><td><a href="theory/equations/numerical-methods.md#keep">2/4/6 order KEEP scheme</a></td></tr><tr><td><code>weno_t</code></td><td>yes</td><td align="center">no</td><td align="center">no default</td><td><a href="theory/equations/numerical-methods.md#weno">WENO</a> or <a href="theory/equations/numerical-methods.md#teno">TENO</a> 5th order scheme</td></tr><tr><td><code>rusanov_t</code></td><td>no</td><td align="center">yes</td><td align="center">-</td><td><a href="theory/equations/numerical-methods.md#rusanov-scheme">Rusanov 2nd order scheme</a></td></tr><tr><td><code>no_euler_t</code></td><td>no</td><td align="center">yes</td><td align="center">-</td><td>0 (not solving Euler)</td></tr></tbody></table>
+<table><thead><tr><th width="208">euler</th><th width="90">Options</th><th width="87" align="center">IBM</th><th width="152" align="center">defaults</th><th>Description</th></tr></thead><tbody><tr><td><code>riemann_t</code></td><td>no</td><td align="center">no</td><td align="center">-</td><td><a href="theory/equations/numerical-methods.md#riemann-solver-with-muscl">Second TVD - HLLC Riemann solver</a></td></tr><tr><td><code>skew_t</code></td><td>yes</td><td align="center">yes</td><td align="center">4th order, no dissipation</td><td><a href="theory/equations/numerical-methods.md#skew-symmetric">2/4/6 order Skew-symmetric scheme</a></td></tr><tr><td><code>keep_euler_t</code></td><td>yes</td><td align="center">no</td><td align="center">no default</td><td><a href="theory/equations/numerical-methods.md#keep">2/4/6 order KEEP scheme</a></td></tr><tr><td><code>weno_t</code></td><td>yes</td><td align="center">no</td><td align="center">no default</td><td><a href="theory/equations/numerical-methods.md#weno">WENO</a> or <a href="theory/equations/numerical-methods.md#teno">TENO</a> 5th order scheme <br>(flux splitting)</td></tr><tr><td><code>rusanov_t</code></td><td>no</td><td align="center">yes</td><td align="center">-</td><td><a href="theory/equations/numerical-methods.md#rusanov-scheme">Rusanov 2nd order scheme</a></td></tr><tr><td><code>no_euler_t</code></td><td>no</td><td align="center">yes</td><td align="center">-</td><td>0 (not solving Euler)</td></tr><tr><td><code>reconshllc_t</code></td><td>yes</td><td align="center">yes</td><td align="center">WENO-Z5, characteristic reconstruction</td><td>HLLC solver with Godunov/PLM/WENO/<br>TENO reconstruction</td></tr></tbody></table>
 
 {% hint style="danger" %}
 Not all options available yet !!
@@ -148,11 +148,37 @@ Not all options available yet !!
 
 **diffusive** options in _**rhs\_dt**_ (October 2024)
 
-<table><thead><tr><th width="207">diffusive</th><th width="88">Options</th><th width="81" align="center">IBM</th><th align="center">defaults</th><th>Description</th></tr></thead><tbody><tr><td><code>diffusiveheat_t</code></td><td>yes</td><td align="center">no</td><td align="center">4th order</td><td>2/4/6 central scheme only heat</td></tr><tr><td><code>skew_t</code></td><td>yes</td><td align="center">yes</td><td align="center">4th order</td><td>2/4/6 central scheme</td></tr><tr><td><code>no_diffusive_t</code></td><td>no</td><td align="center">yes</td><td align="center">0</td><td>0 (not diffusive part)</td></tr></tbody></table>
+<table><thead><tr><th width="207">diffusive</th><th width="88">Options</th><th width="81" align="center">IBM</th><th align="center">defaults</th><th>Description</th></tr></thead><tbody><tr><td><code>diffusiveheat_t</code></td><td>yes</td><td align="center">no</td><td align="center">4th order</td><td>2/4/6 central scheme only heat</td></tr><tr><td><code>no_diffusive_t</code></td><td>no</td><td align="center">yes</td><td align="center">0</td><td>0 (not diffusive part)</td></tr></tbody></table>
 
 **source** options in _**rhs\_dt**_ (October 2024)
 
 <table><thead><tr><th width="201">diffusive</th><th width="84">Options</th><th width="81.1328125" align="center">IBM</th><th align="center">defaults</th><th>Description</th></tr></thead><tbody><tr><td><code>reactor_t</code></td><td>yes</td><td align="center">yes</td><td align="center">-</td><td>PelePhysics chemcail raection</td></tr><tr><td><code>user_source_t</code></td><td>no</td><td align="center">yes</td><td align="center">-</td><td>user-given source term</td></tr><tr><td><code>no_source_t</code></td><td>no</td><td align="center">yes</td><td align="center">0</td><td>0 (no source term part)</td></tr></tbody></table>
+
+The optiosn are often added by **struct**, for example to add in  `reconshllc_t`  options :
+
+{% code overflow="wrap" %}
+```cpp
+struct reconsparm_t {
+
+  public:
+
+  // 1 Godunov, 2 PLM, 3 WENO-Z3, 4 WENO-JS5, 5 WENO-Z5, 6 TENO5
+  static constexpr int  recon_scheme = 5;     
+  static constexpr int  recon_sys = 0;    // 0 sound-speed char system, 1 gamma char system
+  static constexpr bool recon_char_var = true;
+  static constexpr Real plm_theta = 1.5_rt;
+  static constexpr Real teno_cutoff = 0.0_rt;
+
+};
+
+...
+
+typedef rhs_dt< reconshllc_t<reconsparm_t, ProbClosures>, no_diffusive_t, no_source_t > ProbRHS;
+
+```
+{% endcode %}
+
+`reconshllc_t` solves the Euler inviscid fluxes using a reconstructed HLLC Riemann solver. It first reconstructs left and right face states using the scheme selected in `recon_scheme`, and then computes the face flux with HLLC. This makes it a higher-order alternative to `riemann_t`, useful for shock-dominated problems where a conservative upwind method is needed. The reconstruction can be performed either in primitive variables or, preferably, in characteristic variables using `recon_char_var = true`.
 
 ## Initial Conditions
 
@@ -269,7 +295,7 @@ The type of variables, keep as it is, scalars are 0 and vectors are given by the
 inline Vector<int> cons_vars_type={1,2,3,0,0};
 ```
 
-Data missed from input file
+Data missed from input file (usually not a good idea to do)
 
 ```cpp
 void inline inputs() {
