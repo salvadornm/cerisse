@@ -103,6 +103,23 @@ CNS::CNS(Amr &papa, int lev, const Geometry &level_geom, const BoxArray &bl,
 
   buildMetrics();
 
+
+  // build NSCBC ghost state if needed
+  if (use_nscbc)
+  {
+
+    amrex::Print() << "CNS::CNS() building NSCBC ghost state MultiFab " << std::endl;
+
+    const int ncons  = PROB::ProbClosures::NCONS;
+    const int nghost = PROB::ProbClosures::NGHOST;    
+
+    nscbc_ghost_state = std::make_unique<MultiFab>(
+        grids, dmap, ncons, nghost, MFInfo(), Factory());
+
+    nscbc_ghost_state->setVal(Real(0.0));
+  }
+
+
   rz_sanity_check(Geom());
 };
 
@@ -369,20 +386,72 @@ void CNS::initData() {
 }
 
 // ------------------------------------------------------------------------------------//
-
 void CNS::buildMetrics() {
-
   if (verbose) {
     const Real *dx = geom.CellSize();
     amrex::Print() << "Mesh size (dx,dy,dz) = ";
     amrex::Print() << AMREX_D_TERM(dx[0], << "  " << dx[1], << "  " << dx[2]) << "  \n";
   }  
-
 }
+//------------------------------------------------------------------------------------//
+void CNS::copy_nscbc_ghost_to_state(amrex::MultiFab& S)
+{
+  if (!nscbc_ghost_state) return;
 
-void CNS::post_init(Real stop_time) {
+  const int ncons  = d_prob_closures->NCONS;
+  const int nghost = d_prob_closures->NGHOST;
 
-  //amrex::Print() << " oo CNS::post_init level= "  << level << std::endl;
+  const Box dom  = Geom().Domain();
+  const Box gdom = amrex::grow(dom, nghost);
+
+  for (MFIter mfi(S, false); mfi.isValid(); ++mfi) {
+    auto const& s = S.array(mfi);
+    auto const& g = nscbc_ghost_state->const_array(mfi);
+
+    const Box gbx = mfi.growntilebox(nghost);
+
+    for (int dir = 0; dir < AMREX_SPACEDIM; ++dir) {
+
+      if (nscbc_lo[dir] > 0)
+      // low physical ghost slab
+      {
+        Box slab = gdom;
+        slab.setSmall(dir, dom.smallEnd(dir) - nghost);
+        slab.setBig  (dir, dom.smallEnd(dir) - 1);
+
+        Box b = gbx & slab;
+
+        if (b.ok()) {
+          ParallelFor(b, ncons,
+          [=] AMREX_GPU_DEVICE (int i, int j, int k, int n) noexcept {
+            s(i,j,k,n) = g(i,j,k,n);
+          });
+        }
+      }
+
+      if (nscbc_hi[dir] > 0)
+      // high physical ghost slab
+      {
+        Box slab = gdom;
+        slab.setSmall(dir, dom.bigEnd(dir) + 1);
+        slab.setBig  (dir, dom.bigEnd(dir) + nghost);
+
+        Box b = gbx & slab;
+
+        if (b.ok()) {
+          ParallelFor(b, ncons,
+          [=] AMREX_GPU_DEVICE (int i, int j, int k, int n) noexcept {
+            s(i,j,k,n) = g(i,j,k,n);
+          });
+        }
+      }
+    }
+  }
+}
+//--------------------------------------------------------------------------------//
+void CNS::post_init(Real /*stop_time*/) {
+
+  //amrex::Print() << " CNS::post_init level= "  << level << std::endl;
 
   if (level > 0) {
     return;
@@ -400,6 +469,9 @@ void CNS::post_init(Real stop_time) {
   if (record_probe) {
     setupTimeProbe();
   }
+
+  // Fill NSCBC ghost state at t=0
+  init_nscbc_ghost_state(state[State_Type].curTime());
 
   
 #if CNS_USE_EB

@@ -426,119 +426,6 @@ void primitive_rhs_from_L (
     amrex::ignore_unused(dYdt);
 #endif
 }
-
-//-----------------------------------------------------------------
-// Lodato/Rathore transverse (cross-plane) correction.
-//
-// The characteristic waves L contain only the contribution normal to the
-// boundary.  For multidimensional NSCBCs the in-plane convective terms,
-// transverse pressure gradients and transverse dilatation must be retained
-// in the boundary-cell primitive RHS.  This is the face treatment used by
-// Lodato et al. and Rathore; edge/corner cells use the already-filled AMReX
-// ghost values when a centred transverse stencil crosses an adjacent boundary.
-template <typename cls_t>
-AMREX_GPU_DEVICE AMREX_FORCE_INLINE
-void transverse_rhs_lodato (
-    amrex::IntVect const& iv,
-    int dir,
-    amrex::GpuArray<amrex::Real, AMREX_SPACEDIM> const& dxinv,
-    amrex::Array4<const amrex::Real> const& q,
-    amrex::Real& drhodt,
-    amrex::Real& dudt,
-    amrex::Real& dvdt,
-    amrex::Real& dwdt,
-    amrex::Real& dTdt,
-    amrex::Real* dYdt)
-{
-    using amrex::Real;
-
-    const Real rho   = q(iv, cls_t::QRHO);
-    const Real T     = q(iv, cls_t::QT);
-    const Real gamma = q(iv, cls_t::QG);
-
-    Real vel[3] = {Real(0.0), Real(0.0), Real(0.0)};
-    vel[0] = q(iv, cls_t::QU);
-#if AMREX_SPACEDIM >= 2
-    vel[1] = q(iv, cls_t::QV);
-#endif
-#if AMREX_SPACEDIM == 3
-    vel[2] = q(iv, cls_t::QW);
-#endif
-
-    auto Dc = [&] AMREX_GPU_DEVICE (int tdir, int n) noexcept -> Real {
-        const auto e = amrex::IntVect::TheDimensionVector(tdir);
-        return Real(0.5) * dxinv[tdir] * (q(iv+e,n) - q(iv-e,n));
-    };
-
-    Real trho = Real(0.0);
-    Real tT   = Real(0.0);
-    Real tu[3] = {Real(0.0), Real(0.0), Real(0.0)};
-    Real div_ut = Real(0.0);
-#if NUM_SPECIES > 1
-    Real tY[NUM_SPECIES] = {Real(0.0)};
-#endif
-
-    for (int tdir = 0; tdir < AMREX_SPACEDIM; ++tdir) {
-        if (tdir == dir) { continue; }
-
-        const Real ut = vel[tdir];
-        const Real drhodx = Dc(tdir, cls_t::QRHO);
-        const Real dTdx   = Dc(tdir, cls_t::QT);
-        const Real dpdx   = Dc(tdir, cls_t::QPRES);
-        const Real dudx   = Dc(tdir, cls_t::QU);
-#if AMREX_SPACEDIM >= 2
-        const Real dvdx   = Dc(tdir, cls_t::QV);
-#else
-        const Real dvdx   = Real(0.0);
-#endif
-#if AMREX_SPACEDIM == 3
-        const Real dwdx   = Dc(tdir, cls_t::QW);
-#else
-        const Real dwdx   = Real(0.0);
-#endif
-
-        trho += ut*drhodx + rho*Dc(tdir, qvel<cls_t>(tdir));
-        tT   += ut*dTdx;
-        div_ut += Dc(tdir, qvel<cls_t>(tdir));
-
-        tu[0] += ut*dudx;
-#if AMREX_SPACEDIM >= 2
-        tu[1] += ut*dvdx;
-#endif
-#if AMREX_SPACEDIM == 3
-        tu[2] += ut*dwdx;
-#endif
-
-        // Transverse pressure gradient appears only in the momentum equation
-        // associated with the transverse direction.
-        tu[tdir] += dpdx/rho;
-
-#if NUM_SPECIES > 1
-        for (int ns = 0; ns < NUM_SPECIES; ++ns) {
-            tY[ns] += ut*Dc(tdir, cls_t::QFS + ns);
-        }
-#endif
-    }
-
-    drhodt -= trho;
-    dudt   -= tu[0];
-#if AMREX_SPACEDIM >= 2
-    dvdt   -= tu[1];
-#endif
-#if AMREX_SPACEDIM == 3
-    dwdt   -= tu[2];
-#endif
-    dTdt   -= tT + (gamma - Real(1.0))*T*div_ut;
-
-#if NUM_SPECIES > 1
-    for (int ns = 0; ns < NUM_SPECIES; ++ns) {
-        dYdt[ns] -= tY[ns];
-    }
-#else
-    amrex::ignore_unused(dYdt);
-#endif
-}
-
 //-----------------------------------------------------------------
 // add Lwave sto RHS in the Ghost points
 template <typename cls_t, typename nscbc_parm_t>
@@ -547,7 +434,7 @@ void add_lodi_rhs_to_cons (
     amrex::IntVect const& iv,
     int dir,
     int side_sign,
-    amrex::GpuArray<amrex::Real, AMREX_SPACEDIM> const& dxinv,
+    amrex::Real dxinv,
     cls_t const*,
     amrex::Array4<const amrex::Real> const& q,
     amrex::Array4<amrex::Real> const& rhs,
@@ -560,7 +447,7 @@ void add_lodi_rhs_to_cons (
     Real dY[NUM_SPECIES] = {Real(0.0)};
 
     one_sided_deriv_prim<cls_t>(
-        iv, dir, side_sign, dxinv[dir], q,
+        iv, dir, side_sign, dxinv, q,
         drho, dun, dut1, dut2, dT, dY, second_order);
 
     Real L[5 + NUM_SPECIES] = {Real(0.0)};
@@ -590,10 +477,6 @@ void add_lodi_rhs_to_cons (
     Real dYdt[NUM_SPECIES] = {Real(0.0)};
 
     primitive_rhs_from_L<cls_t>( iv, dir, q, L, drhodt, dudt, dvdt, dwdt, dTdt, dYdt);
-
-    // Add Lodato/Rathore transverse cross-terms to the primitive RHS.
-    transverse_rhs_lodato<cls_t>(iv, dir, dxinv, q,
-                                  drhodt, dudt, dvdt, dwdt, dTdt, dYdt);
  
     const Real rho = q(iv, cls_t::QRHO);
     const Real u   = q(iv, cls_t::QU);
@@ -625,15 +508,14 @@ void add_lodi_rhs_to_cons (
 #endif
 
     // Ideal-gas LODI energy closure for first implementation.
-    // TO CHANGE and make general !! 
-
     const Real P = q(iv, cls_t::QPRES);
     const Real T = q(iv, cls_t::QT);
     const Real gamma = q(iv, cls_t::QG); 
     const Real e = P / (rho*(gamma - Real(1.0)) );  //e perfect gas
     const Real cv = e/T;
 
-    const Real dke = u*dudt
+    const Real dke =
+        u*dudt
 #if AMREX_SPACEDIM >= 2
         + v*dvdt
 #endif

@@ -53,8 +53,8 @@ typedef closures_dt<indicies_t, visc_suth_t, cond_suth_t,
 
 
 //typedef rhs_dt<riemann_t<false, ProbClosures>, no_diffusive_t, no_source_t > ProbRHS;
-//typedef rhs_dt<skew_t<methodparm_t, ProbClosures>, no_diffusive_t, no_source_t > ProbRHS;
-typedef rhs_dt<weno_t<ReconScheme::Teno5, ProbClosures>, no_diffusive_t,  no_source_t>  ProbRHS;
+typedef rhs_dt<skew_t<methodparm_t, ProbClosures>, no_diffusive_t, no_source_t > ProbRHS;
+//typedef rhs_dt<weno_t<ReconScheme::Teno5, ProbClosures>, no_diffusive_t,  no_source_t>  ProbRHS;
 
 
 // boundary conditions
@@ -83,11 +83,8 @@ prob_initdata(int i, int j, int k, Array4<Real> const &state,
   Real x = prob_lo[0] + (i + Real(0.5)) * dx[0];
   Real y = prob_lo[1] + (j + Real(0.5)) * dx[1];
 
-  
   // Vortex position (xc,yc) middle of domain
   const Real xc = 0.5*prob_parm.Lx; const Real yc = 0.5*prob_parm.Ly;
-
-  const Real rsq = (x - xc) * (x - xc) + (y - yc) * (y - yc);
 
   amrex::Real u[3]={0.0}, T, P,rhot;
 
@@ -127,7 +124,7 @@ prob_initdata(int i, int j, int k, Array4<Real> const &state,
 AMREX_GPU_DEVICE AMREX_FORCE_INLINE void
 bcnormal(const Real x[AMREX_SPACEDIM], Real dratio, const Real s_int[ProbClosures::NCONS],
          const Real s_refl[ProbClosures::NCONS], Real s_ext[ProbClosures::NCONS], const int idir,
-         const int sgn, const Real time, GeometryData const & /*geomdata*/,
+         const int sgn, const Real /*time*/, GeometryData const & /*geomdata*/,
          ProbClosures const &closures, ProbParm const &prob_parm) {
 
   const int face = (idir+1)*sgn;
@@ -142,9 +139,9 @@ bcnormal(const Real x[AMREX_SPACEDIM], Real dratio, const Real s_int[ProbClosure
       
       break;
     case -1:  // EAST x= Lx
-      GlobalBC::bc_fixP(-1.0,0.0,0.0,&closures,prob_parm.p0, s_int, s_ext);
+      //GlobalBC::bc_fixP(-1.0,0.0,0.0,&closures,prob_parm.p0, s_int, s_ext);
      //GlobalBC::bc_subsonic_outflow_fixP(-1.0,0.0,0.0,&closures,prob_parm.p0, s_int, s_ext);
-     
+   
       break;
     case -2:   // NORTH
       break;

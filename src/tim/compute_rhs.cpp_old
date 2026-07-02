@@ -373,136 +373,136 @@ void CNS::compute_rhs(MultiFab& statemf, Real dt, FluxReg* fr_as_crse, FluxReg* 
 // state currently contains dU/dt from flux divergence
 // This will overwrite RHS in the first/last interior point were NSBC will be applied
 // ========================================================
-// if (use_nscbc)
-// {
-//     // amrex::Print() << "Entering NSCBC \n"; 
+if (use_nscbc)
+{
+    // amrex::Print() << "Entering NSCBC \n"; 
 
-//     const CNS::NSCBCParm* nscbc_parm = CNS::d_nscbc_parm;
-//     const bool nscbc_second_order = (CNS::nscbc_order == 2);
+    const CNS::NSCBCParm* nscbc_parm = CNS::d_nscbc_parm;
+    const bool nscbc_second_order = (CNS::nscbc_order == 2);
 
-//     const auto dom   = geom.Domain();
-//     const auto dxinv = geom.InvCellSizeArray();
+    const auto dom   = geom.Domain();
+    const auto dxinv = geom.InvCellSizeArray();
 
-//     // X-low
-//     if (nscbc_lo[0] > 0) {
+    // X-low
+    if (nscbc_lo[0] > 0) {
 
-//         const int nscbc_type = nscbc_lo[0];
+        const int nscbc_type = nscbc_lo[0];
 
-//         Box blo = bx & dom;
+        Box blo = bx & dom;
 
-//         if (blo.ok() && blo.smallEnd(0) == dom.smallEnd(0)) {
-//             blo.setSmall(0, dom.smallEnd(0));
-//             blo.setBig  (0, dom.smallEnd(0));
+        if (blo.ok() && blo.smallEnd(0) == dom.smallEnd(0)) {
+            blo.setSmall(0, dom.smallEnd(0));
+            blo.setBig  (0, dom.smallEnd(0));
 
-//             ParallelFor(blo, [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept {
-//                 nscbc::add_lodi_rhs_to_cons<PROB::ProbClosures>(IntVect(AMREX_D_DECL(i,j,k)),
-//                     0, +1, dxinv, cls_d, prims, state,nscbc_second_order, nscbc_type, *nscbc_parm);
-//             });
-//         }
-//     }
+            ParallelFor(blo, [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept {
+                nscbc::add_lodi_rhs_to_cons<PROB::ProbClosures>(IntVect(AMREX_D_DECL(i,j,k)),
+                    0, +1, dxinv[0], cls_d, prims, state,nscbc_second_order, nscbc_type, *nscbc_parm);
+            });
+        }
+    }
 
-//     // X-high
-//     if (nscbc_hi[0] > 0) {
+    // X-high
+    if (nscbc_hi[0] > 0) {
 
-//         const int nscbc_type = nscbc_hi[0];
+        const int nscbc_type = nscbc_hi[0];
 
-//         Box bhi = bx & dom;
+        Box bhi = bx & dom;
 
-//         if (bhi.ok() && bhi.bigEnd(0) == dom.bigEnd(0)) {
-//             bhi.setSmall(0, dom.bigEnd(0));
-//             bhi.setBig  (0, dom.bigEnd(0));
+        if (bhi.ok() && bhi.bigEnd(0) == dom.bigEnd(0)) {
+            bhi.setSmall(0, dom.bigEnd(0));
+            bhi.setBig  (0, dom.bigEnd(0));
 
-//             ParallelFor(bhi, [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept {
-//                 nscbc::add_lodi_rhs_to_cons<PROB::ProbClosures>(IntVect(AMREX_D_DECL(i,j,k)),
-//                     0, -1, dxinv, cls_d, prims, state, nscbc_second_order, nscbc_type, *nscbc_parm);
-//             });
-//         }
-//     }
+            ParallelFor(bhi, [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept {
+                nscbc::add_lodi_rhs_to_cons<PROB::ProbClosures>(IntVect(AMREX_D_DECL(i,j,k)),
+                    0, -1, dxinv[0], cls_d, prims, state, nscbc_second_order, nscbc_type, *nscbc_parm);
+            });
+        }
+    }
 
-// #if (AMREX_SPACEDIM >= 2)
+#if (AMREX_SPACEDIM >= 2)
 
-//     // Y-low
-//     if (nscbc_lo[1] > 0) {
+    // Y-low
+    if (nscbc_lo[1] > 0) {
 
-//         const int nscbc_type = nscbc_lo[1];
+        const int nscbc_type = nscbc_lo[1];
 
-//         Box blo = bx & dom;
+        Box blo = bx & dom;
 
-//         if (blo.ok() && blo.smallEnd(1) == dom.smallEnd(1)) {
-//             blo.setSmall(1, dom.smallEnd(1));
-//             blo.setBig  (1, dom.smallEnd(1));
+        if (blo.ok() && blo.smallEnd(1) == dom.smallEnd(1)) {
+            blo.setSmall(1, dom.smallEnd(1));
+            blo.setBig  (1, dom.smallEnd(1));
 
-//             ParallelFor(blo, [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept {
-//             nscbc::add_lodi_rhs_to_cons<PROB::ProbClosures>(IntVect(AMREX_D_DECL(i,j,k)),
-//                 1, +1, dxinv, cls_d, prims, state,nscbc_second_order, nscbc_type, *nscbc_parm);
-//             });
-//         }
-//     }
+            ParallelFor(blo, [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept {
+            nscbc::add_lodi_rhs_to_cons<PROB::ProbClosures>(IntVect(AMREX_D_DECL(i,j,k)),
+                1, +1, dxinv[1], cls_d, prims, state,nscbc_second_order, nscbc_type, *nscbc_parm);
+            });
+        }
+    }
 
-//     // Y-high
-//     if (nscbc_hi[1] > 0) {
+    // Y-high
+    if (nscbc_hi[1] > 0) {
 
-//         const int nscbc_type = nscbc_hi[1];
+        const int nscbc_type = nscbc_hi[1];
 
-//         Box bhi = bx & dom;
+        Box bhi = bx & dom;
 
-//         if (bhi.ok() && bhi.bigEnd(1) == dom.bigEnd(1)) {
-//             bhi.setSmall(1, dom.bigEnd(1));
-//             bhi.setBig  (1, dom.bigEnd(1));
+        if (bhi.ok() && bhi.bigEnd(1) == dom.bigEnd(1)) {
+            bhi.setSmall(1, dom.bigEnd(1));
+            bhi.setBig  (1, dom.bigEnd(1));
 
-//             ParallelFor(bhi, [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept {
-//                 nscbc::add_lodi_rhs_to_cons<PROB::ProbClosures>(IntVect(AMREX_D_DECL(i,j,k)),
-//                     1, -1, dxinv, cls_d, prims, state,nscbc_second_order, nscbc_type, *nscbc_parm);
-//             });
-//         }
-//     }
+            ParallelFor(bhi, [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept {
+                nscbc::add_lodi_rhs_to_cons<PROB::ProbClosures>(IntVect(AMREX_D_DECL(i,j,k)),
+                    1, -1, dxinv[1], cls_d, prims, state,nscbc_second_order, nscbc_type, *nscbc_parm);
+            });
+        }
+    }
 
-// #endif
+#endif
 
-// #if (AMREX_SPACEDIM == 3)
+#if (AMREX_SPACEDIM == 3)
 
-// // Z-low
-// if (nscbc_lo[2] > 0) {
+// Z-low
+if (nscbc_lo[2] > 0) {
 
-//     const int nscbc_type = nscbc_lo[2];
+    const int nscbc_type = nscbc_lo[2];
 
-//     Box blo = bx & dom;
+    Box blo = bx & dom;
 
-//     if (blo.ok() && blo.smallEnd(2) == dom.smallEnd(2)) {
-//         blo.setSmall(2, dom.smallEnd(2));
-//         blo.setBig  (2, dom.smallEnd(2));
+    if (blo.ok() && blo.smallEnd(2) == dom.smallEnd(2)) {
+        blo.setSmall(2, dom.smallEnd(2));
+        blo.setBig  (2, dom.smallEnd(2));
 
-//         ParallelFor(blo, [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept {
-//             nscbc::add_lodi_rhs_to_cons<PROB::ProbClosures>(
-//                 IntVect(i,j,k),
-//                 2, +1, dxinv, cls_d, prims, state,
-//                 nscbc_second_order, nscbc_type, *nscbc_parm);
-//         });
-//     }
-// }
+        ParallelFor(blo, [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept {
+            nscbc::add_lodi_rhs_to_cons<PROB::ProbClosures>(
+                IntVect(i,j,k),
+                2, +1, dxinv[2], cls_d, prims, state,
+                nscbc_second_order, nscbc_type, *nscbc_parm);
+        });
+    }
+}
 
-// // Z-high
-// if (nscbc_hi[2] > 0) {
+// Z-high
+if (nscbc_hi[2] > 0) {
 
-//     const int nscbc_type = nscbc_hi[2];
+    const int nscbc_type = nscbc_hi[2];
 
-//     Box bhi = bx & dom;
+    Box bhi = bx & dom;
 
-//     if (bhi.ok() && bhi.bigEnd(2) == dom.bigEnd(2)) {
-//         bhi.setSmall(2, dom.bigEnd(2));
-//         bhi.setBig  (2, dom.bigEnd(2));
+    if (bhi.ok() && bhi.bigEnd(2) == dom.bigEnd(2)) {
+        bhi.setSmall(2, dom.bigEnd(2));
+        bhi.setBig  (2, dom.bigEnd(2));
 
-//         ParallelFor(bhi, [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept {
-//             nscbc::add_lodi_rhs_to_cons<PROB::ProbClosures>(
-//                 IntVect(i,j,k),
-//                 2, -1, dxinv, cls_d, prims, state,
-//                 nscbc_second_order, nscbc_type, *nscbc_parm);
-//         });
-//     }
-// }
+        ParallelFor(bhi, [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept {
+            nscbc::add_lodi_rhs_to_cons<PROB::ProbClosures>(
+                IntVect(i,j,k),
+                2, -1, dxinv[2], cls_d, prims, state,
+                nscbc_second_order, nscbc_type, *nscbc_parm);
+        });
+    }
+}
 
-// #endif
-// }       
+#endif
+}       
 //=================
 
     

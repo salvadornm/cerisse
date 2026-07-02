@@ -116,6 +116,8 @@ class CNS : public amrex::AmrLevel {
 
   void buildMetrics();
 
+  void copy_nscbc_ghost_to_state(amrex::MultiFab& S);
+
   static AMREX_FORCE_INLINE void rz_sanity_check(amrex::Geometry const& geom)
   {
     // RZ axis sanity check: for RZ the axis must be at r=0 and r-direction
@@ -241,6 +243,16 @@ class CNS : public amrex::AmrLevel {
 
   static NSCBCParm h_nscbc_parm;
   static NSCBCParm* d_nscbc_parm;
+
+  // store ghost state for NSCBC
+  std::unique_ptr<amrex::MultiFab> nscbc_ghost_state;
+
+
+  void init_nscbc_ghost_state(amrex::Real time);
+
+  void compute_nscbc_ghost_rhs(amrex::MultiFab& S,
+                             amrex::MultiFab& G_rhs,
+                             amrex::Real dt);
 
   // LES-variables
   static bool use_LES;

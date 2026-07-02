@@ -93,67 +93,103 @@ Real CNS::advance(Real time, Real dt, int /*iteration*/, int /*ncycle*/) {
     fr_as_crse->reset();
   }
 
+
+
+  ////////////////////////////////////////////////////////////////////////////
   if (order_rk == -2) {
-    // Original time integration ///////////////////////////////////////////////
-    // RK2 stage 1
+    // Original RK2 time integration ///////////////////////////////////////////////
+    
+    // //.. Stage 1
+    // FillPatch(*this, Stemp, nghost, time, State_Type, 0, ncons);
+    // compute_rhs(Stemp, Real(0.5) * dt, fr_as_crse, fr_as_fine);
+    // // U^* = U^n + dt*dUdt^n
+    // MultiFab::LinComb(S2, Real(1.0), S1, 0, dt, Stemp, 0, 0, ncons, 0);
+    
+    // //..  RK2 stage 2
+    // // After fillpatch Sborder = U^n+dt*dUdt^n
+    // state[0].setNewTimeLevel(time + dt);
+    // FillPatch(*this, Stemp, nghost, time + dt, State_Type, 0, ncons);
+    // compute_rhs(Stemp, Real(0.5) * dt, fr_as_crse, fr_as_fine);
+    // // S_new = 0.5*(Sborder+S_old) = U^n + 0.5*dt*dUdt^n
+    // MultiFab::LinComb(S2, Real(0.5), S1, 0, Real(0.5), S2, 0, 0, ncons, 0);
+    // // S_new += 0.5*dt*dSdt
+    // MultiFab::Saxpy(S2, Real(0.5) * dt, Stemp, 0, 0, ncons, 0);
+    // // We now have S_new = U^{n+1} = (U^n+0.5*dt*dUdt^n) + 0.5*dt*dUdt^*
+
+    // Save old persistent ghost state
+    std::unique_ptr<MultiFab> G_old; std::unique_ptr<MultiFab> G_rhs1;
+
+    if (use_nscbc) {
+      G_old = std::make_unique<MultiFab>(grids, dmap, ncons, nghost, MFInfo(), Factory());
+      MultiFab::Copy(*G_old, *nscbc_ghost_state, 0, 0, ncons, nghost);
+    }
+    //... Stage 1 ..........................................................
     FillPatch(*this, Stemp, nghost, time, State_Type, 0, ncons);
-    compute_rhs(Stemp, Real(0.5) * dt, fr_as_crse, fr_as_fine);
-    // U^* = U^n + dt*dUdt^n
-    MultiFab::LinComb(S2, Real(1.0), S1, 0, dt, Stemp, 0, 0, ncons, 0);
-    // RK2 stage 2
-    // After fillpatch Sborder = U^n+dt*dUdt^n
+
+    if (use_nscbc) {
+      copy_nscbc_ghost_to_state(Stemp);
+      G_rhs1 = std::make_unique<MultiFab>(grids, dmap, ncons, nghost, MFInfo(), Factory());
+      compute_nscbc_ghost_rhs(Stemp, *G_rhs1, Real(0.5) * dt);
+    }
+    compute_rhs(Stemp, Real(0.5) * dt, fr_as_crse, fr_as_fine);        // Stemp = RHS(t_n,y_n) 
+
+    MultiFab::LinComb(S2, Real(1.0), S1, 0,dt, Stemp, 0, 0, ncons, 0); // U* = U_n + dt *RHS(t_n,y_n)
+
+    // G* = G^n + dt*dGdt^n
+    if (use_nscbc) {
+    MultiFab::Saxpy(*nscbc_ghost_state,dt, *G_rhs1, 0, 0, ncons, nghost);
+    }
+    //... Stage 2 ..........................................................
+    std::unique_ptr<MultiFab> G_rhs2;
+
+    // After FillPatch, Stemp = U* = U^n + dt*dUdt^n
     state[0].setNewTimeLevel(time + dt);
     FillPatch(*this, Stemp, nghost, time + dt, State_Type, 0, ncons);
-    compute_rhs(Stemp, Real(0.5) * dt, fr_as_crse, fr_as_fine);
-    // S_new = 0.5*(Sborder+S_old) = U^n + 0.5*dt*dUdt^n
-    MultiFab::LinComb(S2, Real(0.5), S1, 0, Real(0.5), S2, 0, 0, ncons, 0);
-    // S_new += 0.5*dt*dSdt
+
+    if (use_nscbc) {
+      copy_nscbc_ghost_to_state(Stemp);
+      G_rhs2 = std::make_unique<MultiFab>( grids, dmap, ncons, nghost, MFInfo(), Factory());
+      compute_nscbc_ghost_rhs(Stemp, *G_rhs2, Real(0.5) * dt);
+    }
+
+    compute_rhs(Stemp, Real(0.5) * dt, fr_as_crse, fr_as_fine); // Stemp = RHS(t_n+1/2,y_*) 
+
+    // U^(n+1/2) = 0.5*(U_n+ U*)  intermediate state
+    MultiFab::LinComb(S2, Real(0.5), S1, 0,Real(0.5), S2, 0,0, ncons, 0);  
+
+    // U^(n+1) = U^(n+1/2)  + 0.5 dt *RHS(t_n+1/2,y_*) 
     MultiFab::Saxpy(S2, Real(0.5) * dt, Stemp, 0, 0, ncons, 0);
-    // We now have S_new = U^{n+1} = (U^n+0.5*dt*dUdt^n) + 0.5*dt*dUdt^*
 
-
-    ////////////////////////////////////////////////////////////////////////////
-  } else if (order_rk == 0) {  // returns rhs
+    // // advance persistent NSCBC ghosts  
+    if (use_nscbc) {
+      MultiFab::LinComb(*nscbc_ghost_state, Real(0.5), *G_old, 0, Real(0.5), *nscbc_ghost_state, 0, 0, ncons, nghost);      
+      MultiFab::Saxpy(*nscbc_ghost_state, Real(0.5) * dt, *G_rhs2, 0, 0, ncons, nghost);
+    }
+  ////////////////////////////////////////////////////////////////////////////
+  } else if (order_rk == 0) {  
+    // returns rhs  (debugging only)
     FillPatch(*this, Stemp, nghost, time, State_Type, 0, ncons);
     compute_rhs(Stemp, dt, fr_as_crse, fr_as_fine);
     MultiFab::Copy(S2, Stemp, 0, 0, ncons, 0);
+  ////////////////////////////////////////////////////////////////////////////  
   } else if (order_rk == 1) {
-    // Euler Scheme //
-
-    amrex::Print() << "  advance:: Euler  Scheme"  << std::endl;
-
-
-    printinfo_point_atState(S1, 127, 63, 0, "    S1 previous time step)   ");
-    printinfo_point_atState(S1, 128, 63, 0, "    GHOST POINT      ");
-    
+    // Euler Scheme // 
+    amrex::Print() << "Euler Scheme" << std::endl; 
+    std::unique_ptr<MultiFab> G_rhs; 
 
     FillPatch(*this, Stemp, nghost, time, State_Type, 0,  ncons);  // filled at t_n to evalulate F(t_n,y_n).
+    if (use_nscbc) {
+      copy_nscbc_ghost_to_state(Stemp);
+      G_rhs = std::make_unique<MultiFab>( grids, dmap, ncons, nghost, MFInfo(), Factory());
+      compute_nscbc_ghost_rhs(Stemp, *G_rhs, dt);       //calculate RHS for ghost cells 
+    }    
+    compute_rhs(Stemp, dt, fr_as_crse, fr_as_fine);                      // Stemp = RHS(t_n,y_n)    
+    MultiFab::LinComb(S2, Real(1.0), S1, 0, dt, Stemp, 0, 0, ncons, 0);  // U_n+1 = U_n + dt *RHS(t_n,y_n) 
 
-    // check ghost 2
-    printinfo_point_atState(Stemp, 127, 63, 0, "  Stemp            ");
-    printinfo_point_atState(Stemp, 128, 63, 0, "  Stemp GP         ");
- 
-
-    compute_rhs(Stemp, dt, fr_as_crse, fr_as_fine);                 // compute F(t_n,y_n) Stemp is now RHS
-
-
-    // check RHS
-    printinfo_point_atState(Stemp, 127, 63, 0, "    RHS            ");
-    printinfo_point_atState(Stemp, 128, 63, 0, "    RHS GP    ");
-
-    // check S2
-    printinfo_point_atState(S2, 127, 63, 0, "    S2 (before time) ");
-    printinfo_point_atState(S2, 128, 63, 0, "    S2 GP            ");
-
-    // CHANGE
-    MultiFab::LinComb(S2, Real(1.0), S1, 0, dt, Stemp, 0, 0, ncons, 0);    // U_n+1 = U_n + dt *F(t_n,y_n)  (was 0)
-
-    // check ghost 3
-    printinfo_point_atState(S2, 127, 63, 0, "    S2               ");
-    printinfo_point_atState(S2, 128, 63, 0, "    S2 GP            ");
-
-
-
+    if (use_nscbc) {
+      MultiFab::Saxpy(*nscbc_ghost_state, dt, *G_rhs, 0, 0, ncons, nghost); // advance persistent NSCBC ghosts 
+    }
+  ////////////////////////////////////////////////////////////////////////////    
   } else if (order_rk == 2) {
     // Low-storage SSP-RK(m,2): m stages, C=m-1, C_eff=1-1/m.
     // Ref: Gottlieb et al., "Strong Stability Preserving Runge-Kutta and
