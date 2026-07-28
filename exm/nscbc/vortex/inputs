@@ -16,12 +16,19 @@ geometry.prob_lo     = 0.0     0.0
 geometry.prob_hi     = 0.013   0.013
 
 # BC
+# -1 = N/A (Incase of periodic)
+# 0 = Interior           3 = Symmetry
+# 1 = Inflow             4 = SlipWall
+# 2 = Outflow            5 = NoSlipWall
+# 6 = user defined
 cns.lo_bc = 2 -1
-cns.hi_bc = 2 -1
+cns.hi_bc = 6 -1
 # NSCBC
 cns.nscbc_lo   = 0 0
-cns.nscbc_hi   = 2 0
+cns.nscbc_hi   = 3 0
 cns.nscbc_order = 1
+cns.nscbc_Lchar = 0.013
+cns.nscbc_sigma = 0.28
 #
 cns.nstep_screen_output = 100 # frequency of plotting information to screen
 cns.verbose = 1       # 0=quiet, 1=verbose

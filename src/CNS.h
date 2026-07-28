@@ -10,6 +10,9 @@ using FluxReg = amrex::EBFluxRegister;
 #include <AMReX_Math.H>
 using FluxReg = amrex::YAFluxRegister;
 #endif
+
+#include <AMReX_MultiFab.H>
+
 #include <prob.h>
 #include <CNSconstants.h>
 
@@ -29,6 +32,10 @@ class CNS : public amrex::AmrLevel {
 
   CNS(const CNS& rhs) = delete;
   CNS& operator=(const CNS& rhs) = delete;
+
+
+  using NSCBCFaceData = std::array<std::unique_ptr<amrex::MultiFab>, AMREX_SPACEDIM>;  
+
 
   // Read parameters
   static void read_params();
@@ -115,8 +122,6 @@ class CNS : public amrex::AmrLevel {
   enum StateDataType { State_Type = 0, Stats_Type, Cost_Type };
 
   void buildMetrics();
-
-  void copy_nscbc_ghost_to_state(amrex::MultiFab& S);
 
   static AMREX_FORCE_INLINE void rz_sanity_check(amrex::Geometry const& geom)
   {
@@ -223,7 +228,7 @@ class CNS : public amrex::AmrLevel {
   static bool eb_redistribution;
   static std::string eb_redistribution_type;
 
-  // NSCBC-specific keywords  
+  // NSCBC-specific keywords  --------------------------------------------------
   static bool use_nscbc;
   static int nscbc_order;
   static amrex::GpuArray<int, AMREX_SPACEDIM> nscbc_lo;
@@ -244,15 +249,38 @@ class CNS : public amrex::AmrLevel {
   static NSCBCParm h_nscbc_parm;
   static NSCBCParm* d_nscbc_parm;
 
-  // store ghost state for NSCBC
-  std::unique_ptr<amrex::MultiFab> nscbc_ghost_state;
+  // -------------------------------------------------------------------------
+  // NSCBC face-centred data.
+  //
+  // nscbc_ubc:
+  //   Persistent conservative boundary state U_BC. This is advanced in time.
+  //
+  // nscbc_qbc:
+  //   Primitive representation Q_BC of nscbc_ubc. Recomputed before evaluating
+  //   the characteristic boundary equations.
+  //
+  // nscbc_rhs_bc:
+  //   Conservative RHS dU_BC/dt produced by the NSCBC equations.
+  // -------------------------------------------------------------------------
+  NSCBCFaceData nscbc_ubc;
+  NSCBCFaceData nscbc_qbc;
+  NSCBCFaceData nscbc_rhs_bc;
+  
+  // NSCBC face-state storage and setup
+  void define_nscbc_face_data();
 
+  void initialise_nscbc_face_state( amrex::MultiFab const& cell_state);
 
-  void init_nscbc_ghost_state(amrex::Real time);
+  void update_nscbc_face_primitives();
 
-  void compute_nscbc_ghost_rhs(amrex::MultiFab& S,
-                             amrex::MultiFab& G_rhs,
-                             amrex::Real dt);
+  void clear_nscbc_face_rhs();
+
+  void compute_nscbc_face_rhs( amrex::MultiFab& cell_state, bool second_order = true);
+
+  void overwrite_nscbc_inviscid_flux( amrex::MFIter const& mfi, amrex::Array4<const amrex::Real> const& cell_prims,
+                                      std::array<amrex::FArrayBox*, AMREX_SPACEDIM> const& fluxes);
+
+  //-------------------------------------------------------------------------------
 
   // LES-variables
   static bool use_LES;

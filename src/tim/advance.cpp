@@ -11,6 +11,107 @@
 #endif
 using namespace amrex;
 
+namespace {
+
+using FaceData = CNS::NSCBCFaceData;
+
+void define_face_data_like( FaceData& destination, FaceData const& source, int ncomp, int ngrow = 0)
+{
+    for (int dir = 0; dir < AMREX_SPACEDIM; ++dir) {
+
+        if (!source[dir]) {
+            destination[dir].reset();
+            continue;
+        }
+
+        destination[dir] =
+            std::make_unique<amrex::MultiFab>(
+                source[dir]->boxArray(),
+                source[dir]->DistributionMap(),
+                ncomp,
+                ngrow);
+
+        destination[dir]->setVal(amrex::Real(0.0));
+    }
+}
+
+void copy_face_data(
+    FaceData& destination,
+    FaceData const& source,
+    int ncomp)
+{
+    for (int dir = 0; dir < AMREX_SPACEDIM; ++dir) {
+
+        if (!destination[dir] || !source[dir]) {
+            continue;
+        }
+
+        amrex::MultiFab::Copy(
+            *destination[dir],
+            *source[dir],
+            0,
+            0,
+            ncomp,
+            0);
+    }
+}
+
+void saxpy_face_data(
+    FaceData& destination,
+    amrex::Real factor,
+    FaceData const& source,
+    int ncomp)
+{
+    for (int dir = 0; dir < AMREX_SPACEDIM; ++dir) {
+
+        if (!destination[dir] || !source[dir]) {
+            continue;
+        }
+
+        amrex::MultiFab::Saxpy(
+            *destination[dir],
+            factor,
+            *source[dir],
+            0,
+            0,
+            ncomp,
+            0);
+    }
+}
+
+void lincomb_face_data(
+    FaceData& destination,
+    amrex::Real factor_a,
+    FaceData const& source_a,
+    amrex::Real factor_b,
+    FaceData const& source_b,
+    int ncomp)
+{
+    for (int dir = 0; dir < AMREX_SPACEDIM; ++dir) {
+
+        if (!destination[dir] ||
+            !source_a[dir] ||
+            !source_b[dir]) {
+            continue;
+        }
+
+        amrex::MultiFab::LinComb(
+            *destination[dir],
+            factor_a,
+            *source_a[dir],
+            0,
+            factor_b,
+            *source_b[dir],
+            0,
+            0,
+            ncomp,
+            0);
+    }
+}
+
+} // namespace
+
+
 Real CNS::advance(Real time, Real dt, int /*iteration*/, int /*ncycle*/) {
   BL_PROFILE("CNS::advance()");
 
@@ -97,59 +198,42 @@ Real CNS::advance(Real time, Real dt, int /*iteration*/, int /*ncycle*/) {
 
   ////////////////////////////////////////////////////////////////////////////
   if (order_rk == -2) {
-    // Original RK2 time integration ///////////////////////////////////////////////
     
-    // //.. Stage 1
-    // FillPatch(*this, Stemp, nghost, time, State_Type, 0, ncons);
-    // compute_rhs(Stemp, Real(0.5) * dt, fr_as_crse, fr_as_fine);
-    // // U^* = U^n + dt*dUdt^n
-    // MultiFab::LinComb(S2, Real(1.0), S1, 0, dt, Stemp, 0, 0, ncons, 0);
-    
-    // //..  RK2 stage 2
-    // // After fillpatch Sborder = U^n+dt*dUdt^n
-    // state[0].setNewTimeLevel(time + dt);
-    // FillPatch(*this, Stemp, nghost, time + dt, State_Type, 0, ncons);
-    // compute_rhs(Stemp, Real(0.5) * dt, fr_as_crse, fr_as_fine);
-    // // S_new = 0.5*(Sborder+S_old) = U^n + 0.5*dt*dUdt^n
-    // MultiFab::LinComb(S2, Real(0.5), S1, 0, Real(0.5), S2, 0, 0, ncons, 0);
-    // // S_new += 0.5*dt*dSdt
-    // MultiFab::Saxpy(S2, Real(0.5) * dt, Stemp, 0, 0, ncons, 0);
-    // // We now have S_new = U^{n+1} = (U^n+0.5*dt*dUdt^n) + 0.5*dt*dUdt^*
-
-    // Save old persistent ghost state
-    std::unique_ptr<MultiFab> G_old; std::unique_ptr<MultiFab> G_rhs1;
+    // Temporary arrays
+    NSCBCFaceData UBC_old; NSCBCFaceData UBC_rhs1; NSCBCFaceData UBC_rhs2;
 
     if (use_nscbc) {
-      G_old = std::make_unique<MultiFab>(grids, dmap, ncons, nghost, MFInfo(), Factory());
-      MultiFab::Copy(*G_old, *nscbc_ghost_state, 0, 0, ncons, nghost);
+      define_face_data_like( UBC_old, nscbc_ubc, ncons);
+      define_face_data_like( UBC_rhs1,nscbc_ubc, ncons);
+      define_face_data_like( UBC_rhs2,nscbc_ubc, ncons);
+      copy_face_data(UBC_old,nscbc_ubc,ncons);
     }
     //... Stage 1 ..........................................................
     FillPatch(*this, Stemp, nghost, time, State_Type, 0, ncons);
 
     if (use_nscbc) {
-      copy_nscbc_ghost_to_state(Stemp);
-      G_rhs1 = std::make_unique<MultiFab>(grids, dmap, ncons, nghost, MFInfo(), Factory());
-      compute_nscbc_ghost_rhs(Stemp, *G_rhs1, Real(0.5) * dt);
+      compute_nscbc_face_rhs(Stemp, nscbc_order == 2);
+      copy_face_data( UBC_rhs1, nscbc_rhs_bc, ncons);
     }
     compute_rhs(Stemp, Real(0.5) * dt, fr_as_crse, fr_as_fine);        // Stemp = RHS(t_n,y_n) 
 
     MultiFab::LinComb(S2, Real(1.0), S1, 0,dt, Stemp, 0, 0, ncons, 0); // U* = U_n + dt *RHS(t_n,y_n)
 
-    // G* = G^n + dt*dGdt^n
     if (use_nscbc) {
-    MultiFab::Saxpy(*nscbc_ghost_state,dt, *G_rhs1, 0, 0, ncons, nghost);
+      // UBC* = UBC^n + dt RHS_BC^n
+      saxpy_face_data(nscbc_ubc,dt,UBC_rhs1,ncons);
     }
+
     //... Stage 2 ..........................................................
-    std::unique_ptr<MultiFab> G_rhs2;
 
     // After FillPatch, Stemp = U* = U^n + dt*dUdt^n
     state[0].setNewTimeLevel(time + dt);
     FillPatch(*this, Stemp, nghost, time + dt, State_Type, 0, ncons);
 
     if (use_nscbc) {
-      copy_nscbc_ghost_to_state(Stemp);
-      G_rhs2 = std::make_unique<MultiFab>( grids, dmap, ncons, nghost, MFInfo(), Factory());
-      compute_nscbc_ghost_rhs(Stemp, *G_rhs2, Real(0.5) * dt);
+      /*  nscbc_ubc now contains UBC*, so this evaluates RHS_BC(UBC*, U*).*/
+      compute_nscbc_face_rhs(Stemp,nscbc_order == 2);
+      copy_face_data(UBC_rhs2, nscbc_rhs_bc, ncons);
     }
 
     compute_rhs(Stemp, Real(0.5) * dt, fr_as_crse, fr_as_fine); // Stemp = RHS(t_n+1/2,y_*) 
@@ -160,10 +244,13 @@ Real CNS::advance(Real time, Real dt, int /*iteration*/, int /*ncycle*/) {
     // U^(n+1) = U^(n+1/2)  + 0.5 dt *RHS(t_n+1/2,y_*) 
     MultiFab::Saxpy(S2, Real(0.5) * dt, Stemp, 0, 0, ncons, 0);
 
-    // // advance persistent NSCBC ghosts  
+    // NSBC BC
     if (use_nscbc) {
-      MultiFab::LinComb(*nscbc_ghost_state, Real(0.5), *G_old, 0, Real(0.5), *nscbc_ghost_state, 0, 0, ncons, nghost);      
-      MultiFab::Saxpy(*nscbc_ghost_state, Real(0.5) * dt, *G_rhs2, 0, 0, ncons, nghost);
+      /* UBC^(n+1/2) = 0.5 UBC^n + 0.5 UBC*/
+      lincomb_face_data( nscbc_ubc, Real(0.5), UBC_old, Real(0.5), nscbc_ubc, ncons);
+      /* UBC^(n+1)   = 0.5 UBC^n + 0.5 UBC + 0.5 dt RHS_BC(UBC*,U*) */
+      saxpy_face_data( nscbc_ubc, Real(0.5)*dt, UBC_rhs2, ncons);
+      update_nscbc_face_primitives();
     }
   ////////////////////////////////////////////////////////////////////////////
   } else if (order_rk == 0) {  
@@ -175,20 +262,21 @@ Real CNS::advance(Real time, Real dt, int /*iteration*/, int /*ncycle*/) {
   } else if (order_rk == 1) {
     // Euler Scheme // 
     amrex::Print() << "Euler Scheme" << std::endl; 
-    std::unique_ptr<MultiFab> G_rhs; 
 
     FillPatch(*this, Stemp, nghost, time, State_Type, 0,  ncons);  // filled at t_n to evalulate F(t_n,y_n).
+
     if (use_nscbc) {
-      copy_nscbc_ghost_to_state(Stemp);
-      G_rhs = std::make_unique<MultiFab>( grids, dmap, ncons, nghost, MFInfo(), Factory());
-      compute_nscbc_ghost_rhs(Stemp, *G_rhs, dt);       //calculate RHS for ghost cells 
-    }    
+      compute_nscbc_face_rhs(Stemp,nscbc_order == 2);
+    }
+
     compute_rhs(Stemp, dt, fr_as_crse, fr_as_fine);                      // Stemp = RHS(t_n,y_n)    
     MultiFab::LinComb(S2, Real(1.0), S1, 0, dt, Stemp, 0, 0, ncons, 0);  // U_n+1 = U_n + dt *RHS(t_n,y_n) 
 
     if (use_nscbc) {
-      MultiFab::Saxpy(*nscbc_ghost_state, dt, *G_rhs, 0, 0, ncons, nghost); // advance persistent NSCBC ghosts 
+      saxpy_face_data(nscbc_ubc,dt,nscbc_rhs_bc,ncons);
+      update_nscbc_face_primitives();
     }
+
   ////////////////////////////////////////////////////////////////////////////    
   } else if (order_rk == 2) {
     // Low-storage SSP-RK(m,2): m stages, C=m-1, C_eff=1-1/m.

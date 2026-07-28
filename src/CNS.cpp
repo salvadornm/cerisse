@@ -113,10 +113,11 @@ CNS::CNS(Amr &papa, int lev, const Geometry &level_geom, const BoxArray &bl,
     const int ncons  = PROB::ProbClosures::NCONS;
     const int nghost = PROB::ProbClosures::NGHOST;    
 
-    nscbc_ghost_state = std::make_unique<MultiFab>(
-        grids, dmap, ncons, nghost, MFInfo(), Factory());
+    //nscbc_ghost_state = std::make_unique<MultiFab>( grids, dmap, ncons, nghost, MFInfo(), Factory());
+    //nscbc_ghost_state->setVal(Real(0.0));
 
-    nscbc_ghost_state->setVal(Real(0.0));
+    define_nscbc_face_data();  
+    
   }
 
 
@@ -328,6 +329,11 @@ void CNS::init(AmrLevel &old) {
   MultiFab &S_new = get_new_data(State_Type);
   FillPatch(old, S_new, 0, cur_time, State_Type, 0,PROB::ProbClosures::NCONS);
 
+  if (use_nscbc) {
+    initialise_nscbc_face_state(S_new);
+    update_nscbc_face_primitives();
+  }
+
   if (compute_stats){
     MultiFab &Sstat_new = get_new_data(Stats_Type);
     FillPatch(old, Sstat_new, 0, cur_time, Stats_Type, 0,PROB::ProbClosures::NSTAT);
@@ -380,7 +386,13 @@ void CNS::initData() {
   }
 
 
-   prob_rhs.init_coeffs(); // CGPT dixit
+  // Initialise coefficients   
+   prob_rhs.init_coeffs();
+
+  // Initailise NSBC face values 
+  if (use_nscbc) {
+    initialise_nscbc_face_state(S_new);
+  }
 
 
 }
@@ -394,61 +406,6 @@ void CNS::buildMetrics() {
   }  
 }
 //------------------------------------------------------------------------------------//
-void CNS::copy_nscbc_ghost_to_state(amrex::MultiFab& S)
-{
-  if (!nscbc_ghost_state) return;
-
-  const int ncons  = d_prob_closures->NCONS;
-  const int nghost = d_prob_closures->NGHOST;
-
-  const Box dom  = Geom().Domain();
-  const Box gdom = amrex::grow(dom, nghost);
-
-  for (MFIter mfi(S, false); mfi.isValid(); ++mfi) {
-    auto const& s = S.array(mfi);
-    auto const& g = nscbc_ghost_state->const_array(mfi);
-
-    const Box gbx = mfi.growntilebox(nghost);
-
-    for (int dir = 0; dir < AMREX_SPACEDIM; ++dir) {
-
-      if (nscbc_lo[dir] > 0)
-      // low physical ghost slab
-      {
-        Box slab = gdom;
-        slab.setSmall(dir, dom.smallEnd(dir) - nghost);
-        slab.setBig  (dir, dom.smallEnd(dir) - 1);
-
-        Box b = gbx & slab;
-
-        if (b.ok()) {
-          ParallelFor(b, ncons,
-          [=] AMREX_GPU_DEVICE (int i, int j, int k, int n) noexcept {
-            s(i,j,k,n) = g(i,j,k,n);
-          });
-        }
-      }
-
-      if (nscbc_hi[dir] > 0)
-      // high physical ghost slab
-      {
-        Box slab = gdom;
-        slab.setSmall(dir, dom.bigEnd(dir) + 1);
-        slab.setBig  (dir, dom.bigEnd(dir) + nghost);
-
-        Box b = gbx & slab;
-
-        if (b.ok()) {
-          ParallelFor(b, ncons,
-          [=] AMREX_GPU_DEVICE (int i, int j, int k, int n) noexcept {
-            s(i,j,k,n) = g(i,j,k,n);
-          });
-        }
-      }
-    }
-  }
-}
-//--------------------------------------------------------------------------------//
 void CNS::post_init(Real /*stop_time*/) {
 
   //amrex::Print() << " CNS::post_init level= "  << level << std::endl;
@@ -469,10 +426,6 @@ void CNS::post_init(Real /*stop_time*/) {
   if (record_probe) {
     setupTimeProbe();
   }
-
-  // Fill NSCBC ghost state at t=0
-  init_nscbc_ghost_state(state[State_Type].curTime());
-
   
 #if CNS_USE_EB
   EBM::eb.check_geometry(level);
@@ -1122,6 +1075,13 @@ amrex::Print() << " recreate markers " << std::endl;
 
 #endif
 
+  // WARNING !! UBC not read from restart, it will be rebuild    
+  if (use_nscbc) {
+    MultiFab& S_new = get_new_data(State_Type);
+    initialise_nscbc_face_state(S_new);
+    update_nscbc_face_primitives();
+  }
+
   // Initialise stats arrays to zero when restarting from a checkpoint
   // that was written without statistics (NSTAT was 0 in the old build).
   if (compute_stats) {
@@ -1140,6 +1100,9 @@ amrex::Print() << " recreate markers " << std::endl;
   if (record_probe) {
     setupTimeProbe();
   }
+
+
+
 
 }
 
@@ -1564,7 +1527,10 @@ void CNS::rebuildIBM() {
      }
   }
 }
-
+//------------------------------------------------------------------------------
+//
+//
+//------------------------------------------------------------------------------
 void CNS::writeSurfFile() {
       
   // calculate and  write surface data  
@@ -1612,3 +1578,170 @@ void CNS::writeSurfFile() {
   }
 }
 #endif
+
+//------------------------------------------------------------------------------
+//
+//
+//------------------------------------------------------------------------------
+void CNS::define_nscbc_face_data()
+{
+    const int ncons = PROB::ProbClosures::NCONS;
+    const int nprim = PROB::ProbClosures::NPRIM;
+    /*
+     * qbc needs one tangential ghost face if transverse derivatives are used:
+     *
+     *     qbc(iv_face + e_t, n)
+     *     qbc(iv_face - e_t, n)
+     *
+     * Initially, you can still allocate one ghost layer even when the
+     * transverse correction is disabled.
+     */
+    constexpr int ng_qbc = 1;
+
+    for (int dir = 0; dir < AMREX_SPACEDIM; ++dir) {
+
+        const IntVect face_type =
+            IntVect::TheDimensionVector(dir);
+
+        BoxArray face_ba =
+            amrex::convert(grids, face_type);
+
+        // Persistent conservative face state
+        nscbc_ubc[dir] = std::make_unique<MultiFab>(face_ba, dmap,ncons,0);
+
+        // Primitive face state. One ghost layer is useful for transverse terms.
+        nscbc_qbc[dir] = std::make_unique<MultiFab>(face_ba,dmap,nprim, ng_qbc);
+
+        // Conservative face RHS
+        nscbc_rhs_bc[dir] = std::make_unique<MultiFab>( face_ba, dmap, ncons, 0);
+
+        nscbc_ubc[dir]->setVal(Real(0.0));
+        nscbc_qbc[dir]->setVal(Real(0.0));
+        nscbc_rhs_bc[dir]->setVal(Real(0.0));
+    }
+}
+//------------------------------------------------------------------------------
+// 
+//
+//------------------------------------------------------------------------------
+void CNS::initialise_nscbc_face_state(
+    MultiFab const& cell_state)
+{
+  const Box domain = geom.Domain();
+  const int ncons = PROB::ProbClosures::NCONS;
+
+  for (int dir = 0; dir < AMREX_SPACEDIM; ++dir) {
+
+    if (!nscbc_ubc[dir]) {continue;}
+
+    MultiFab& ubc_mf = *nscbc_ubc[dir];
+
+    const int lo_face = domain.smallEnd(dir);
+    const int hi_face = domain.bigEnd(dir) + 1;
+
+    const IntVect edir = IntVect::TheDimensionVector(dir);
+
+    for (MFIter mfi(ubc_mf, false); mfi.isValid(); ++mfi) {
+      const Box& valid_face_box = mfi.validbox();
+
+      auto const& ubc = ubc_mf.array(mfi);
+
+      auto const& state = cell_state.const_array(mfi);
+
+      // --------------------------------------------------------------
+      // Low boundary
+      //
+      // Face index and first interior cell index are equal:
+      //
+      //     iv_inner = iv_face
+      // --------------------------------------------------------------
+      if (nscbc_lo[dir] > 0 && valid_face_box.smallEnd(dir) <= lo_face && valid_face_box.bigEnd(dir)   >= lo_face) {
+        Box boundary_box = valid_face_box;
+        boundary_box.setSmall(dir, lo_face);
+        boundary_box.setBig(dir, lo_face);
+
+        ParallelFor(boundary_box, ncons, [=] AMREX_GPU_DEVICE( int i, int j, int k, int n) noexcept
+          {
+            IntVect iv_face(AMREX_D_DECL(i,j,k));
+            IntVect iv_inner = iv_face;
+            ubc(iv_face,n) =  state(iv_inner,n);
+           });
+      }
+      // --------------------------------------------------------------
+      // High boundary
+      //
+      // The adjacent interior cell is one index below the face:
+      //
+      //     iv_inner = iv_face - e_dir
+      // --------------------------------------------------------------
+      if (nscbc_hi[dir] > 0 && valid_face_box.smallEnd(dir) <= hi_face && valid_face_box.bigEnd(dir)   >= hi_face) {
+        Box boundary_box = valid_face_box;
+        boundary_box.setSmall(dir, hi_face);
+        boundary_box.setBig(dir, hi_face);
+
+        ParallelFor(boundary_box,ncons, [=] AMREX_GPU_DEVICE( int i, int j, int k, int n) noexcept
+          {
+            IntVect iv_face(AMREX_D_DECL(i,j,k));
+            const IntVect iv_inner = iv_face - edir;
+            ubc(iv_face,n) = state(iv_inner,n);
+          });
+      }
+    }
+  }
+}
+//------------------------------------------------------------------------------
+// 
+//
+//------------------------------------------------------------------------------
+void CNS::update_nscbc_face_primitives()
+{
+  const int ncons = PROB::ProbClosures::NCONS;
+  const int nprim = PROB::ProbClosures::NPRIM;
+
+  PROB::ProbClosures const* cls_d = d_prob_closures;
+
+  for (int dir = 0; dir < AMREX_SPACEDIM; ++dir) {
+
+    if (!nscbc_ubc[dir] || !nscbc_qbc[dir]) {continue;}
+
+    MultiFab const& ubc_mf =  *nscbc_ubc[dir];
+
+    MultiFab& qbc_mf = *nscbc_qbc[dir];
+
+    for (MFIter mfi(ubc_mf, false); mfi.isValid(); ++mfi) {
+
+      const Box& fbx = mfi.validbox();
+
+      auto const& ubc = ubc_mf.const_array(mfi);
+
+      auto const& qbc = qbc_mf.array(mfi);
+
+      ParallelFor( fbx, [=] AMREX_GPU_DEVICE( int i, int j, int k) noexcept
+        {
+          const IntVect iv(AMREX_D_DECL(i,j,k));
+
+          Real cons[PROB::ProbClosures::NCONS];
+          Real prim[PROB::ProbClosures::NPRIM];
+
+          for (int n = 0; n < ncons; ++n) { cons[n] = ubc(iv,n); }                    
+            cls_d->cons2prims_point(cons, prim);
+
+          for (int n = 0; n < nprim; ++n) { qbc(iv,n) = prim[n];}
+        });
+    }
+
+    // Needed for transverse differences qbc(iv +/- e_t,n).
+    qbc_mf.FillBoundary(geom.periodicity());
+    }
+}
+//------------------------------------------------------------------------------
+// 
+//
+//------------------------------------------------------------------------------
+void CNS::clear_nscbc_face_rhs()
+{
+    for (int dir = 0; dir < AMREX_SPACEDIM; ++dir)
+        if (nscbc_rhs_bc[dir])
+            nscbc_rhs_bc[dir]->setVal(0.0);
+}
+

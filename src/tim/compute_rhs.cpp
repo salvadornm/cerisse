@@ -155,8 +155,7 @@ void CNS::compute_rhs(MultiFab& statemf, Real dt, FluxReg* fr_as_crse, FluxReg* 
       });
 #endif
   
-    // Euler/Diff Fluxes including boundary/discontinuity corrections
-    // WARNING: state is the U array (cons)
+    // Euler/Diff Fluxes including boundary/discontinuity corrections (state is the U array)    
     {
     BL_PROFILE_VAR("CNS::compute_rhs::eflux", prof_eflux);
 #if (AMREX_USE_GPIBM || CNS_USE_EB)
@@ -164,8 +163,13 @@ void CNS::compute_rhs(MultiFab& statemf, Real dt, FluxReg* fr_as_crse, FluxReg* 
 #else
     prob_rhs.eflux(geom, mfi, prims, {AMREX_D_DECL(&fluxt[0], &fluxt[1], &fluxt[2])}, state, cls_d);
 #endif
-    BL_PROFILE_VAR_STOP(prof_eflux);
     }
+
+    // replace physical-boundary inviscid fluxes if NSBC are used 
+    if (use_nscbc){
+        overwrite_nscbc_inviscid_flux( mfi, prims, {AMREX_D_DECL(&fluxt[0], &fluxt[1], &fluxt[2])});
+    }
+
     {
     BL_PROFILE_VAR("CNS::compute_rhs::dflux", prof_dflux);
 #if (AMREX_USE_GPIBM || CNS_USE_EB)
@@ -173,7 +177,6 @@ void CNS::compute_rhs(MultiFab& statemf, Real dt, FluxReg* fr_as_crse, FluxReg* 
 #else
     prob_rhs.dflux(geom, mfi, prims, {AMREX_D_DECL(&fluxt[0], &fluxt[1], &fluxt[2])}, state, cls_d);
 #endif
-    BL_PROFILE_VAR_STOP(prof_dflux);
     }
 
     // compute rhs as finite-volume flux divergence, i.e.

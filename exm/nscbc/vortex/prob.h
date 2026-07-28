@@ -32,6 +32,8 @@ struct ProbParm {
   Real beta = 0.04;        // vortex strength
   Real Y0[NUM_SPECIES] = {0.0};
   Real Q =  rho0*u0;      // incoming flow rate (per area)
+  Real Cv = 0.005;
+
 };
 
 
@@ -41,7 +43,7 @@ struct methodparm_t {
   public:
 
   static constexpr bool dissipation = true;         // no dissipation
-  static constexpr int  order = 6;                  // order numerical scheme   
+  static constexpr int  order = 4;                  // order numerical scheme   
   static constexpr Real C2skew=0.1,C4skew=0.016;   // Skew symmetric default
 
 };
@@ -67,7 +69,14 @@ void inline inputs() {
   amrex::Print() << " Two-dimensional vortex convection " << std::endl;
   amrex::Print() << "**************                          ************ " << std::endl;
   Real Ma = data.u0 / data.c0;
+  // vortex info
+  Real Rv = 0.1 * data.Lx; Real Cv = data.Cv; 
+  Real P1 = data.p0 * exp( -0.5*data.gamma* (Cv/(data.c0*Rv))*(Cv/(data.c0*Rv)) );
+
   amrex::Print() << " Mach   =  " << Ma << std::endl;
+  amrex::Print() << " Uo     = "  << data.u0 << std::endl;
+  amrex::Print() << " P1     = "  << P1 << std::endl;
+  
   amrex::Print() << "**************                          ************ " << std::endl;
 }
 
@@ -92,7 +101,7 @@ prob_initdata(int i, int j, int k, Array4<Real> const &state,
   //-- Lodato test case --------------------------------------
 
   const Real Rv = 0.1 * prob_parm.Lx;
-  const Real Cv = 0.005; // dimensional Lodato value if L=0.013 m
+  const Real Cv = prob_parm.Cv; // dimensional Lodato value if L=0.013 m
 
   const Real r2 = (x-xc)*(x-xc) + (y-yc)*(y-yc);
   const Real e1 = exp(-r2/(2.0*Rv*Rv));
@@ -139,7 +148,7 @@ bcnormal(const Real x[AMREX_SPACEDIM], Real dratio, const Real s_int[ProbClosure
       
       break;
     case -1:  // EAST x= Lx
-      //GlobalBC::bc_fixP(-1.0,0.0,0.0,&closures,prob_parm.p0, s_int, s_ext);
+      GlobalBC::bc_fixP(-1.0,0.0,0.0,&closures,prob_parm.p0, s_int, s_ext);
      //GlobalBC::bc_subsonic_outflow_fixP(-1.0,0.0,0.0,&closures,prob_parm.p0, s_int, s_ext);
    
       break;

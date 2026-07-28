@@ -366,6 +366,77 @@ class reconshllc_t {
       flx(iv, cls.UFS + n) = flxrY[n];
     }
   }
+
+  // self-consistent HLLC piecewise
+  AMREX_GPU_DEVICE AMREX_FORCE_INLINE void cns_riemann_first_order(
+    amrex::IntVect const& iv_face, int dir,
+    amrex::Array4<amrex::Real> const& flx, amrex::Real const* ql, amrex::Real const* qr,
+    cls_t const& cls) const noexcept
+    {
+      const int QU1 = cls.QU  + dir;
+      const int UM1 = cls.UMX + dir;
+
+      const int QU2 = (dir == 0) ? cls.QV : cls.QU;
+      const int UM2 = (dir == 0) ? cls.UMY : cls.UMX;
+
+      const int QU3 = (dir == 2) ? cls.QV : cls.QW;
+      const int UM3 = (dir == 2) ? cls.UMY : cls.UMZ;
+
+      const Real rl = ql[cls.QRHO]; const Real ul = ql[QU1]; const Real pl = ql[cls.QPRES]; const Real cl = ql[cls.QC];
+
+      const Real rr = qr[cls.QRHO]; const Real ur = qr[QU1]; const Real pr = qr[cls.QPRES]; const Real cr = qr[cls.QC];
+
+      Real ut1l = 0.0_rt; Real ut1r = 0.0_rt; Real ut2l = 0.0_rt;Real ut2r = 0.0_rt;
+
+#if AMREX_SPACEDIM >= 2
+      ut1l = ql[QU2];
+      ut1r = qr[QU2];
+#endif
+#if AMREX_SPACEDIM == 3
+      ut2l = ql[QU3];
+      ut2r = qr[QU3];
+#endif
+
+      Real Yl[NUM_SPECIES];
+      Real Yr[NUM_SPECIES];
+
+      for (int ns = 0; ns < NUM_SPECIES; ++ns) {
+        Yl[ns] = ql[cls.QFS + ns];
+        Yr[ns] = qr[cls.QFS + ns];
+      }
+
+#if NUM_SPECIES > 1
+      normalize_Y(Yl);
+      normalize_Y(Yr);
+#endif
+
+      Real el, er;
+      cls.RYP2E(rl, Yl, pl, el);
+      cls.RYP2E(rr, Yr, pr, er);
+
+      el += Real(0.5) *
+          (AMREX_D_TERM(ul*ul, +ut1l*ut1l, +ut2l*ut2l));
+
+      er += Real(0.5) *
+          (AMREX_D_TERM(ur*ur, +ut1r*ut1r, +ut2r*ut2r));
+
+      Real fluxY[NUM_SPECIES] = {Real(0.0)};
+
+      hllc(
+        rl, ul, pl, ut1l, ut2l, el, Yl, cl,
+        rr, ur, pr, ut1r, ut2r, er, Yr, cr,
+        flx(iv_face, cls.URHO),
+        flx(iv_face, UM1),
+        flx(iv_face, UM2),
+        flx(iv_face, UM3),
+        flx(iv_face, cls.UET),
+        fluxY);
+
+      for (int ns = 0; ns < NUM_SPECIES; ++ns) {
+        flx(iv_face, cls.UFS + ns) = fluxY[ns];
+      }
+    }
+  //
 };
 
 // Optional alias with the spelling used in the question.
