@@ -22,13 +22,19 @@ geometry.prob_hi     = 0.013   0.013
 # 2 = Outflow            5 = NoSlipWall
 # 6 = user defined
 cns.lo_bc = 2 -1
-cns.hi_bc = 6 -1
+cns.hi_bc = 2 -1
 # NSCBC
-cns.nscbc_lo   = 0 0
-cns.nscbc_hi   = 3 0
+cns.nscbc_lo   = 1 0
+cns.nscbc_hi   = 2 0
 cns.nscbc_order = 1
 cns.nscbc_Lchar = 0.013
 cns.nscbc_sigma = 0.28
+# inflow
+cns.nscbc_utarget = 199.6335
+cns.nscbc_vtarget = 0.0
+cns.nscbc_Ttarget = 300.0
+cns.nscbc_eta = 1.0
+
 #
 cns.nstep_screen_output = 100 # frequency of plotting information to screen
 cns.verbose = 1       # 0=quiet, 1=verbose
@@ -53,5 +59,117 @@ amr.check_file              = chk    # root name of checkpoint file
 amr.check_int               = 10000    # number of timesteps between checkpoints
 amr.plot_files_output = 1
 amr.plot_file         = ./plot/plt # root name of plotfile
-amr.plot_int          = 20         # number of timesteps between plotfiles
+amr.plot_int          = 100         # number of timesteps between plotfiles
 amr.derive_plot_vars  = pressure velocity temperature
+
+# =====================================================================
+# DIAGNOSTICS: 2-D CONVECTING VORTEX
+# =====================================================================
+
+amr.data_log = probe_vortex.csv
+
+cns.record_probe   = 1
+cns.time_probe_lev = 0
+cns.time_probe_int = 1
+
+# Important:
+# Keep this order unchanged 
+#cns.time_probes = PGlobalMAX PGlobalMIN POutletMAX POutletMIN PCentre PUpper PLower
+cns.time_probes = PGlobalMAX PGlobalMIN POutletMAX POutletMIN PCentre UCentre VCentre PUpper UUpper VUpper PLower ULower VLower
+
+# ---------------------------------------------------------------------
+# Global interior pressure extrema
+#
+# Exclude approximately 10% of the domain near the x boundaries.
+# Used to measure pressure disturbances remaining after vortex exit.
+# ---------------------------------------------------------------------
+
+PGlobalMAX.field_name = pressure
+PGlobalMAX.reduction  = max
+PGlobalMAX.box_lo     = 0.0013 0.0
+PGlobalMAX.box_hi     = 0.0117 0.013
+
+PGlobalMIN.field_name = pressure
+PGlobalMIN.reduction  = min
+PGlobalMIN.box_lo     = 0.0013 0.0
+PGlobalMIN.box_hi     = 0.0117 0.013
+
+# ---------------------------------------------------------------------
+# Near-outlet vertical strip
+#
+# xp = 0.8 Lx = 0.0104 m.
+# The strip covers the full periodic y direction.
+# ---------------------------------------------------------------------
+
+POutletMAX.field_name = pressure
+POutletMAX.reduction  = max
+POutletMAX.box_lo     = 0.0102578125 0.0
+POutletMAX.box_hi     = 0.0104609375 0.013
+
+POutletMIN.field_name = pressure
+POutletMIN.reduction  = min
+POutletMIN.box_lo     = 0.0102578125 0.0
+POutletMIN.box_hi     = 0.0104609375 0.013
+
+# ---------------------------------------------------------------------
+# Small centreline probe
+# ---------------------------------------------------------------------
+
+PCentre.field_name = pressure
+PCentre.reduction  = average
+PCentre.box_lo     = 0.0102578125 0.0063984375
+PCentre.box_hi     = 0.0104609375 0.0066015625
+
+UCentre.field_name = velocity
+UCentre.component  = 0
+UCentre.reduction  = average
+UCentre.box_lo     = 0.0102578125 0.0063984375
+UCentre.box_hi     = 0.0104609375 0.0066015625
+
+VCentre.field_name = velocity
+VCentre.component  = 1
+VCentre.reduction  = average
+VCentre.box_lo     = 0.0102578125 0.0063984375
+VCentre.box_hi     = 0.0104609375 0.0066015625
+
+# ---------------------------------------------------------------------
+# Upper vortex probe
+# ---------------------------------------------------------------------
+
+PUpper.field_name = pressure
+PUpper.reduction  = average
+PUpper.box_lo     = 0.0102578125 0.0077187500
+PUpper.box_hi     = 0.0104609375 0.0079218750
+
+UUpper.field_name = velocity
+UUpper.component  = 0
+UUpper.reduction  = average
+UUpper.box_lo     = 0.0102578125 0.0077187500
+UUpper.box_hi     = 0.0104609375 0.0079218750
+
+VUpper.field_name = velocity
+VUpper.component  = 1
+VUpper.reduction  = average
+VUpper.box_lo     = 0.0102578125 0.0077187500
+VUpper.box_hi     = 0.0104609375 0.0079218750
+
+# ---------------------------------------------------------------------
+# Lower vortex probe
+# ---------------------------------------------------------------------
+
+PLower.field_name = pressure
+PLower.reduction  = average
+PLower.box_lo     = 0.0102578125 0.0050781250
+PLower.box_hi     = 0.0104609375 0.0052812500
+
+ULower.field_name = velocity
+ULower.component  = 0
+ULower.reduction  = average
+ULower.box_lo     = 0.0102578125 0.0050781250
+ULower.box_hi     = 0.0104609375 0.0052812500
+
+VLower.field_name = velocity
+VLower.component  = 1
+VLower.reduction  = average
+VLower.box_lo     = 0.0102578125 0.0050781250
+VLower.box_hi     = 0.0104609375 0.0052812500

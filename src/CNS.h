@@ -168,6 +168,7 @@ class CNS : public amrex::AmrLevel {
   static amrex::Vector<std::string> time_probe_names;
   static amrex::Vector<std::string> time_probe_reductions;
   static amrex::Vector<amrex::Box> time_probe_boxes;
+  static amrex::Vector<int> time_probe_components;
 
   // Parameters
   static int num_state_data_types;
@@ -228,6 +229,24 @@ class CNS : public amrex::AmrLevel {
   static bool eb_redistribution;
   static std::string eb_redistribution_type;
 
+
+  // Ghost-shell structure for complex BC
+  struct GhostShell
+  {
+    std::unique_ptr<amrex::MultiFab> state;
+    std::unique_ptr<amrex::MultiFab> rhs;
+
+    // Optional but useful later:
+    // 0 = not part of a physical shell
+    // 1 = x-low, 2 = x-high, 3 = y-low, ...
+    std::unique_ptr<amrex::iMultiFab> owner;
+
+    bool defined() const noexcept
+    {
+        return state != nullptr && rhs != nullptr;
+    }
+  };
+
   // NSCBC-specific keywords  --------------------------------------------------
   static bool use_nscbc;
   static int nscbc_order;
@@ -250,36 +269,29 @@ class CNS : public amrex::AmrLevel {
   static NSCBCParm* d_nscbc_parm;
 
   // -------------------------------------------------------------------------
-  // NSCBC face-centred data.
-  //
-  // nscbc_ubc:
-  //   Persistent conservative boundary state U_BC. This is advanced in time.
-  //
-  // nscbc_qbc:
-  //   Primitive representation Q_BC of nscbc_ubc. Recomputed before evaluating
-  //   the characteristic boundary equations.
-  //
-  // nscbc_rhs_bc:
-  //   Conservative RHS dU_BC/dt produced by the NSCBC equations.
+  // NSCBC ghost cell data.
   // -------------------------------------------------------------------------
-  NSCBCFaceData nscbc_ubc;
-  NSCBCFaceData nscbc_qbc;
-  NSCBCFaceData nscbc_rhs_bc;
+  GhostShell nscbc_shell;
   
   // NSCBC face-state storage and setup
-  void define_nscbc_face_data();
+  void define_nscbc_ghost_shell();
 
-  void initialise_nscbc_face_state( amrex::MultiFab const& cell_state);
+  void initialise_nscbc_ghost_shell(amrex::MultiFab const& cell_state);
 
-  void update_nscbc_face_primitives();
+  void fill_nscbc_ghost_cells( amrex::MultiFab& state) const;
+  
+  void fill_nscbc_ghost_cells2( amrex::MultiFab& state) const;//
 
-  void clear_nscbc_face_rhs();
+  void clear_nscbc_ghost_rhs();
 
-  void compute_nscbc_face_rhs( amrex::MultiFab& cell_state, bool second_order = true);
+  void compute_nscbc_ghostcell_rhs(amrex::MultiFab& stage_state);
 
-  void overwrite_nscbc_inviscid_flux( amrex::MFIter const& mfi, amrex::Array4<const amrex::Real> const& cell_prims,
-                                      std::array<amrex::FArrayBox*, AMREX_SPACEDIM> const& fluxes);
+  void build_nscbc_shell_owner();
 
+  
+  void copy_nscbc_shell(amrex::MultiFab& dst, amrex::MultiFab const& src);
+  void saxpy_nscbc_shell(amrex::MultiFab& dst,amrex::Real a,amrex::MultiFab const& rhs);
+  void lincomb_nscbc_shell(amrex::MultiFab& dst,amrex::Real a,amrex::MultiFab const& A,amrex::Real b, amrex::MultiFab const& B);
   //-------------------------------------------------------------------------------
 
   // LES-variables

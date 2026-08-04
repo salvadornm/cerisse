@@ -113,10 +113,6 @@ CNS::CNS(Amr &papa, int lev, const Geometry &level_geom, const BoxArray &bl,
     const int ncons  = PROB::ProbClosures::NCONS;
     const int nghost = PROB::ProbClosures::NGHOST;    
 
-    //nscbc_ghost_state = std::make_unique<MultiFab>( grids, dmap, ncons, nghost, MFInfo(), Factory());
-    //nscbc_ghost_state->setVal(Real(0.0));
-
-    define_nscbc_face_data();  
     
   }
 
@@ -330,8 +326,8 @@ void CNS::init(AmrLevel &old) {
   FillPatch(old, S_new, 0, cur_time, State_Type, 0,PROB::ProbClosures::NCONS);
 
   if (use_nscbc) {
-    initialise_nscbc_face_state(S_new);
-    update_nscbc_face_primitives();
+    define_nscbc_ghost_shell();
+    initialise_nscbc_ghost_shell(S_new);
   }
 
   if (compute_stats){
@@ -389,9 +385,10 @@ void CNS::initData() {
   // Initialise coefficients   
    prob_rhs.init_coeffs();
 
-  // Initailise NSBC face values 
+  // Initialise NSBC face values 
   if (use_nscbc) {
-    initialise_nscbc_face_state(S_new);
+    define_nscbc_ghost_shell();
+    initialise_nscbc_ghost_shell(S_new);
   }
 
 
@@ -1078,8 +1075,8 @@ amrex::Print() << " recreate markers " << std::endl;
   // WARNING !! UBC not read from restart, it will be rebuild    
   if (use_nscbc) {
     MultiFab& S_new = get_new_data(State_Type);
-    initialise_nscbc_face_state(S_new);
-    update_nscbc_face_primitives();
+    define_nscbc_ghost_shell();
+    initialise_nscbc_ghost_shell(S_new);
   }
 
   // Initialise stats arrays to zero when restarting from a checkpoint
@@ -1583,165 +1580,137 @@ void CNS::writeSurfFile() {
 //
 //
 //------------------------------------------------------------------------------
-void CNS::define_nscbc_face_data()
+void CNS::define_nscbc_ghost_shell()
 {
-    const int ncons = PROB::ProbClosures::NCONS;
-    const int nprim = PROB::ProbClosures::NPRIM;
-    /*
-     * qbc needs one tangential ghost face if transverse derivatives are used:
-     *
-     *     qbc(iv_face + e_t, n)
-     *     qbc(iv_face - e_t, n)
-     *
-     * Initially, you can still allocate one ghost layer even when the
-     * transverse correction is disabled.
-     */
-    constexpr int ng_qbc = 1;
+    const int ncons  = PROB::ProbClosures::NCONS;
+    const int nghost = PROB::ProbClosures::NGHOST;
 
-    for (int dir = 0; dir < AMREX_SPACEDIM; ++dir) {
+    nscbc_shell.state = std::make_unique<MultiFab>(grids, dmap, ncons, nghost, MFInfo(), Factory());
 
-        const IntVect face_type =
-            IntVect::TheDimensionVector(dir);
+    nscbc_shell.rhs = std::make_unique<MultiFab>(grids, dmap, ncons, nghost, MFInfo(), Factory());
 
-        BoxArray face_ba =
-            amrex::convert(grids, face_type);
+    nscbc_shell.owner = std::make_unique<iMultiFab>(grids, dmap, 1, nghost);
 
-        // Persistent conservative face state
-        nscbc_ubc[dir] = std::make_unique<MultiFab>(face_ba, dmap,ncons,0);
+    nscbc_shell.state->setVal(Real(0.0));
+    nscbc_shell.rhs->setVal(Real(0.0));
+    nscbc_shell.owner->setVal(0);
 
-        // Primitive face state. One ghost layer is useful for transverse terms.
-        nscbc_qbc[dir] = std::make_unique<MultiFab>(face_ba,dmap,nprim, ng_qbc);
-
-        // Conservative face RHS
-        nscbc_rhs_bc[dir] = std::make_unique<MultiFab>( face_ba, dmap, ncons, 0);
-
-        nscbc_ubc[dir]->setVal(Real(0.0));
-        nscbc_qbc[dir]->setVal(Real(0.0));
-        nscbc_rhs_bc[dir]->setVal(Real(0.0));
-    }
+    build_nscbc_shell_owner();
 }
 //------------------------------------------------------------------------------
 // 
 //
 //------------------------------------------------------------------------------
-void CNS::initialise_nscbc_face_state(
+void CNS::initialise_nscbc_ghost_shell(
     MultiFab const& cell_state)
 {
-  const Box domain = geom.Domain();
-  const int ncons = PROB::ProbClosures::NCONS;
+    MultiFab& shell = *nscbc_shell.state;
 
-  for (int dir = 0; dir < AMREX_SPACEDIM; ++dir) {
+    const Box domain = Geom().Domain();
+    const int ng     = shell.nGrow();
+    const int ncons  = PROB::ProbClosures::NCONS;
 
-    if (!nscbc_ubc[dir]) {continue;}
+    shell.setVal(Real(0.0));
 
-    MultiFab& ubc_mf = *nscbc_ubc[dir];
+    for (MFIter mfi(shell, false); mfi.isValid(); ++mfi) {
 
-    const int lo_face = domain.smallEnd(dir);
-    const int hi_face = domain.bigEnd(dir) + 1;
+        auto const& U  = cell_state.const_array(mfi);
+        auto const& G  = shell.array(mfi);
+        auto const& own = nscbc_shell.owner->const_array(mfi);
 
-    const IntVect edir = IntVect::TheDimensionVector(dir);
+        Box gbx = mfi.fabbox();
 
-    for (MFIter mfi(ubc_mf, false); mfi.isValid(); ++mfi) {
-      const Box& valid_face_box = mfi.validbox();
+        ParallelFor(
+            gbx, ncons,
+            [=] AMREX_GPU_DEVICE(
+                int i, int j, int k, int n) noexcept
+            {
+                IntVect iv(AMREX_D_DECL(i,j,k));
 
-      auto const& ubc = ubc_mf.array(mfi);
+                const int face = own(iv,0);
+                if (face == 0) {
+                    return;
+                }
 
-      auto const& state = cell_state.const_array(mfi);
+                IntVect src = iv;
 
-      // --------------------------------------------------------------
-      // Low boundary
-      //
-      // Face index and first interior cell index are equal:
-      //
-      //     iv_inner = iv_face
-      // --------------------------------------------------------------
-      if (nscbc_lo[dir] > 0 && valid_face_box.smallEnd(dir) <= lo_face && valid_face_box.bigEnd(dir)   >= lo_face) {
-        Box boundary_box = valid_face_box;
-        boundary_box.setSmall(dir, lo_face);
-        boundary_box.setBig(dir, lo_face);
+                for (int dir = 0; dir < AMREX_SPACEDIM; ++dir) {
+                    src[dir] =
+                        amrex::max(domain.smallEnd(dir),
+                        amrex::min(domain.bigEnd(dir), src[dir]));
+                }
 
-        ParallelFor(boundary_box, ncons, [=] AMREX_GPU_DEVICE( int i, int j, int k, int n) noexcept
-          {
-            IntVect iv_face(AMREX_D_DECL(i,j,k));
-            IntVect iv_inner = iv_face;
-            ubc(iv_face,n) =  state(iv_inner,n);
-           });
-      }
-      // --------------------------------------------------------------
-      // High boundary
-      //
-      // The adjacent interior cell is one index below the face:
-      //
-      //     iv_inner = iv_face - e_dir
-      // --------------------------------------------------------------
-      if (nscbc_hi[dir] > 0 && valid_face_box.smallEnd(dir) <= hi_face && valid_face_box.bigEnd(dir)   >= hi_face) {
-        Box boundary_box = valid_face_box;
-        boundary_box.setSmall(dir, hi_face);
-        boundary_box.setBig(dir, hi_face);
-
-        ParallelFor(boundary_box,ncons, [=] AMREX_GPU_DEVICE( int i, int j, int k, int n) noexcept
-          {
-            IntVect iv_face(AMREX_D_DECL(i,j,k));
-            const IntVect iv_inner = iv_face - edir;
-            ubc(iv_face,n) = state(iv_inner,n);
-          });
-      }
+                G(iv,n) = U(src,n);  // FO extrapolation
+            });
     }
-  }
+
+    shell.FillBoundary(Geom().periodicity());
 }
 //------------------------------------------------------------------------------
 // 
 //
 //------------------------------------------------------------------------------
-void CNS::update_nscbc_face_primitives()
+void CNS::saxpy_nscbc_shell(
+    MultiFab& dst,
+    Real a,
+    MultiFab const& src)
 {
-  const int ncons = PROB::ProbClosures::NCONS;
-  const int nprim = PROB::ProbClosures::NPRIM;
+    const int ncons = PROB::ProbClosures::NCONS;
 
-  PROB::ProbClosures const* cls_d = d_prob_closures;
+    for (MFIter mfi(dst, false); mfi.isValid(); ++mfi) {
 
-  for (int dir = 0; dir < AMREX_SPACEDIM; ++dir) {
+        auto const& d   = dst.array(mfi);
+        auto const& s   = src.const_array(mfi);
+        auto const& own =
+            nscbc_shell.owner->const_array(mfi);
 
-    if (!nscbc_ubc[dir] || !nscbc_qbc[dir]) {continue;}
+        const Box bx = mfi.fabbox();
 
-    MultiFab const& ubc_mf =  *nscbc_ubc[dir];
-
-    MultiFab& qbc_mf = *nscbc_qbc[dir];
-
-    for (MFIter mfi(ubc_mf, false); mfi.isValid(); ++mfi) {
-
-      const Box& fbx = mfi.validbox();
-
-      auto const& ubc = ubc_mf.const_array(mfi);
-
-      auto const& qbc = qbc_mf.array(mfi);
-
-      ParallelFor( fbx, [=] AMREX_GPU_DEVICE( int i, int j, int k) noexcept
-        {
-          const IntVect iv(AMREX_D_DECL(i,j,k));
-
-          Real cons[PROB::ProbClosures::NCONS];
-          Real prim[PROB::ProbClosures::NPRIM];
-
-          for (int n = 0; n < ncons; ++n) { cons[n] = ubc(iv,n); }                    
-            cls_d->cons2prims_point(cons, prim);
-
-          for (int n = 0; n < nprim; ++n) { qbc(iv,n) = prim[n];}
-        });
-    }
-
-    // Needed for transverse differences qbc(iv +/- e_t,n).
-    qbc_mf.FillBoundary(geom.periodicity());
+        ParallelFor(
+            bx, ncons,
+            [=] AMREX_GPU_DEVICE(
+                int i, int j, int k, int n) noexcept
+            {
+                if (own(i,j,k,0) != 0) {
+                    d(i,j,k,n) += a*s(i,j,k,n);
+                }
+            });
     }
 }
 //------------------------------------------------------------------------------
 // 
 //
 //------------------------------------------------------------------------------
-void CNS::clear_nscbc_face_rhs()
+void CNS::lincomb_nscbc_shell(
+    MultiFab& dst,
+    Real a,
+    MultiFab const& A,
+    Real b,
+    MultiFab const& B)
 {
-    for (int dir = 0; dir < AMREX_SPACEDIM; ++dir)
-        if (nscbc_rhs_bc[dir])
-            nscbc_rhs_bc[dir]->setVal(0.0);
+    const int ncons = PROB::ProbClosures::NCONS;
+
+    for (MFIter mfi(dst, false); mfi.isValid(); ++mfi) {
+
+        auto const& d   = dst.array(mfi);
+        auto const& x   = A.const_array(mfi);
+        auto const& y   = B.const_array(mfi);
+        auto const& own =
+            nscbc_shell.owner->const_array(mfi);
+
+        const Box bx = mfi.fabbox();
+
+        ParallelFor(
+            bx, ncons,
+            [=] AMREX_GPU_DEVICE(
+                int i, int j, int k, int n) noexcept
+            {
+                if (own(i,j,k,0) != 0) {
+                    d(i,j,k,n) =
+                        a*x(i,j,k,n)
+                      + b*y(i,j,k,n);
+                }
+            });
+    }
 }
 

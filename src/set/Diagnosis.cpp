@@ -12,9 +12,11 @@ using namespace amrex;
 // ======================== Time probe functionallity ========================
 int CNS::time_probe_lev = 0;
 int CNS::time_probe_int = 1;
+
 Vector<std::string> CNS::time_probe_names;
 Vector<std::string> CNS::time_probe_reductions;
 Vector<Box> CNS::time_probe_boxes;
+Vector<int> CNS::time_probe_components;
 
 // Convert RealBox to Box. If RealBox does not align with grid, return a smaller
 // box such that Box always > RealBox
@@ -24,10 +26,16 @@ Box realbox_to_box(std::vector<Real> const &rbox_lo,
   const Real *prob_lo = geom.ProbLo();
 
   Box bx;
+  
   for (int dir = 0; dir < amrex::SpaceDim; ++dir) {
-    bx.setSmall(dir, ceil((rbox_lo[dir] - prob_lo[dir]) / dx[dir]));
-    bx.setBig(dir, round((rbox_hi[dir] - prob_lo[dir]) / dx[dir]) - 1);
+    //  bx.setSmall(dir, ceil((rbox_lo[dir] - prob_lo[dir]) / dx[dir]));
+    //  bx.setBig(dir, round((rbox_hi[dir] - prob_lo[dir]) / dx[dir]) - 1);
+    const Real ilo = (rbox_lo[dir] - prob_lo[dir]) / dx[dir] - Real(0.5);
+    const Real ihi = (rbox_hi[dir] - prob_lo[dir]) / dx[dir] - Real(0.5);
+    bx.setSmall(dir, static_cast<int>(std::ceil(ilo)));
+    bx.setBig  (dir, static_cast<int>(std::floor(ihi)));
   }
+
   return bx;
 }
 
@@ -56,6 +64,8 @@ void CNS::setupTimeProbe() {
   time_probe_names.clear();
   time_probe_reductions.clear();
   time_probe_boxes.clear();
+  time_probe_components.clear();
+
 
   for (int cnt = 0; cnt < num_probes; ++cnt) {
     ParmParse ppr(time_probes[cnt]);
@@ -63,6 +73,10 @@ void CNS::setupTimeProbe() {
     std::string field_name;
     ppr.get("field_name", field_name);
     time_probe_names.push_back(field_name);
+
+    int component = 0;
+    ppr.query("component", component);
+    time_probe_components.push_back(component);
 
     // Optional: average/mean/avg (default), max/maximum, min/minimum
     std::string reduction = "average";
@@ -85,8 +99,11 @@ void CNS::setupTimeProbe() {
     time_probe_boxes.push_back(realbox_to_box(box_lo, box_hi, probe_geom));
 
     if (!time_probe_boxes[cnt].ok()) {
-      amrex::Abort("Invalid time probe box for " + field_name);
-    }
+    amrex::Abort(
+        "Invalid time probe box for probe '" + time_probes[cnt] +
+        "', field '" + field_name + "'");
+    }   
+
   }
 
   // write header to file
@@ -183,18 +200,45 @@ void CNS::recordTimeProbe() {
           accumulate_probe(cnt, bx, S[mfi].const_array(), scomp);
         }
       }
-    } else if (const DeriveRec *rec = derive_lst.get(name)) {
+    } 
+    // old
+    // else if (const DeriveRec *rec = derive_lst.get(name)) {
+    //   for (MFIter mfi(S, TilingIfNotGPU()); mfi.isValid(); ++mfi) {
+    //     const Box bx = mfi.tilebox() & in_box;
+    //     if (bx.ok()) {
+    //       FArrayBox dfab(bx, 1);
+    //       FArrayBox const &sfab = S[mfi];
+    //       rec->derFuncFab()(bx, dfab, 0, 1, sfab, geom, curtime, rec->getBC(),
+    //                         level);
+    //       accumulate_probe(cnt, bx, dfab.const_array(), 0);
+    //     }
+    //   }
+    // } 
+    // new
+    else if (const DeriveRec *rec = derive_lst.get(name)) {
+      const int nderive = rec->numDerive();
+      const int selected_comp = time_probe_components[cnt];
+      if (selected_comp < 0 || selected_comp >= nderive) {
+      amrex::Abort(
+          "Invalid component " + std::to_string(selected_comp) +
+        " for derived variable " + name +
+        ", which has " + std::to_string(nderive) + " components");
+      }
+
       for (MFIter mfi(S, TilingIfNotGPU()); mfi.isValid(); ++mfi) {
         const Box bx = mfi.tilebox() & in_box;
+
         if (bx.ok()) {
-          FArrayBox dfab(bx, 1);
-          FArrayBox const &sfab = S[mfi];
-          rec->derFuncFab()(bx, dfab, 0, 1, sfab, geom, curtime, rec->getBC(),
-                            level);
-          accumulate_probe(cnt, bx, dfab.const_array(), 0);
+          /* The derive routine may write all components, so allocate all of them.*/
+          FArrayBox dfab(bx, nderive);
+          FArrayBox const& sfab = S[mfi];
+          rec->derFuncFab()(bx, dfab, 0, nderive, sfab, geom, curtime, rec->getBC(), level);
+          accumulate_probe(cnt,bx, dfab.const_array(), selected_comp);
         }
       }
-    } else {
+    }  
+    //
+    else {
       amrex::Abort("Unknown variable name in time_probe: " + name);
     }
   }

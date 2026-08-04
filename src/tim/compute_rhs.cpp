@@ -166,9 +166,10 @@ void CNS::compute_rhs(MultiFab& statemf, Real dt, FluxReg* fr_as_crse, FluxReg* 
     }
 
     // replace physical-boundary inviscid fluxes if NSBC are used 
-    if (use_nscbc){
-        overwrite_nscbc_inviscid_flux( mfi, prims, {AMREX_D_DECL(&fluxt[0], &fluxt[1], &fluxt[2])});
-    }
+    // if (use_nscbc && nscbc_boundary_flux_order > 0) {
+    //     apply_nscbc_boundary_flux_closure(mfi,prims,{AMREX_D_DECL(&fluxt[0], &fluxt[1], &fluxt[2])});
+    // }
+    //
 
     {
     BL_PROFILE_VAR("CNS::compute_rhs::dflux", prof_dflux);
@@ -369,145 +370,6 @@ void CNS::compute_rhs(MultiFab& statemf, Real dt, FluxReg* fr_as_crse, FluxReg* 
 #endif
 
     // TODO: IBM::set_solid_state(mfi,state,cls_d)
-
-
-// ========================================================
-// NSCBC correction (LODI version)
-// state currently contains dU/dt from flux divergence
-// This will overwrite RHS in the first/last interior point were NSBC will be applied
-// ========================================================
-// if (use_nscbc)
-// {
-//     // amrex::Print() << "Entering NSCBC \n"; 
-
-//     const CNS::NSCBCParm* nscbc_parm = CNS::d_nscbc_parm;
-//     const bool nscbc_second_order = (CNS::nscbc_order == 2);
-
-//     const auto dom   = geom.Domain();
-//     const auto dxinv = geom.InvCellSizeArray();
-
-//     // X-low
-//     if (nscbc_lo[0] > 0) {
-
-//         const int nscbc_type = nscbc_lo[0];
-
-//         Box blo = bx & dom;
-
-//         if (blo.ok() && blo.smallEnd(0) == dom.smallEnd(0)) {
-//             blo.setSmall(0, dom.smallEnd(0));
-//             blo.setBig  (0, dom.smallEnd(0));
-
-//             ParallelFor(blo, [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept {
-//                 nscbc::add_lodi_rhs_to_cons<PROB::ProbClosures>(IntVect(AMREX_D_DECL(i,j,k)),
-//                     0, +1, dxinv, cls_d, prims, state,nscbc_second_order, nscbc_type, *nscbc_parm);
-//             });
-//         }
-//     }
-
-//     // X-high
-//     if (nscbc_hi[0] > 0) {
-
-//         const int nscbc_type = nscbc_hi[0];
-
-//         Box bhi = bx & dom;
-
-//         if (bhi.ok() && bhi.bigEnd(0) == dom.bigEnd(0)) {
-//             bhi.setSmall(0, dom.bigEnd(0));
-//             bhi.setBig  (0, dom.bigEnd(0));
-
-//             ParallelFor(bhi, [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept {
-//                 nscbc::add_lodi_rhs_to_cons<PROB::ProbClosures>(IntVect(AMREX_D_DECL(i,j,k)),
-//                     0, -1, dxinv, cls_d, prims, state, nscbc_second_order, nscbc_type, *nscbc_parm);
-//             });
-//         }
-//     }
-
-// #if (AMREX_SPACEDIM >= 2)
-
-//     // Y-low
-//     if (nscbc_lo[1] > 0) {
-
-//         const int nscbc_type = nscbc_lo[1];
-
-//         Box blo = bx & dom;
-
-//         if (blo.ok() && blo.smallEnd(1) == dom.smallEnd(1)) {
-//             blo.setSmall(1, dom.smallEnd(1));
-//             blo.setBig  (1, dom.smallEnd(1));
-
-//             ParallelFor(blo, [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept {
-//             nscbc::add_lodi_rhs_to_cons<PROB::ProbClosures>(IntVect(AMREX_D_DECL(i,j,k)),
-//                 1, +1, dxinv, cls_d, prims, state,nscbc_second_order, nscbc_type, *nscbc_parm);
-//             });
-//         }
-//     }
-
-//     // Y-high
-//     if (nscbc_hi[1] > 0) {
-
-//         const int nscbc_type = nscbc_hi[1];
-
-//         Box bhi = bx & dom;
-
-//         if (bhi.ok() && bhi.bigEnd(1) == dom.bigEnd(1)) {
-//             bhi.setSmall(1, dom.bigEnd(1));
-//             bhi.setBig  (1, dom.bigEnd(1));
-
-//             ParallelFor(bhi, [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept {
-//                 nscbc::add_lodi_rhs_to_cons<PROB::ProbClosures>(IntVect(AMREX_D_DECL(i,j,k)),
-//                     1, -1, dxinv, cls_d, prims, state,nscbc_second_order, nscbc_type, *nscbc_parm);
-//             });
-//         }
-//     }
-
-// #endif
-
-// #if (AMREX_SPACEDIM == 3)
-
-// // Z-low
-// if (nscbc_lo[2] > 0) {
-
-//     const int nscbc_type = nscbc_lo[2];
-
-//     Box blo = bx & dom;
-
-//     if (blo.ok() && blo.smallEnd(2) == dom.smallEnd(2)) {
-//         blo.setSmall(2, dom.smallEnd(2));
-//         blo.setBig  (2, dom.smallEnd(2));
-
-//         ParallelFor(blo, [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept {
-//             nscbc::add_lodi_rhs_to_cons<PROB::ProbClosures>(
-//                 IntVect(i,j,k),
-//                 2, +1, dxinv, cls_d, prims, state,
-//                 nscbc_second_order, nscbc_type, *nscbc_parm);
-//         });
-//     }
-// }
-
-// // Z-high
-// if (nscbc_hi[2] > 0) {
-
-//     const int nscbc_type = nscbc_hi[2];
-
-//     Box bhi = bx & dom;
-
-//     if (bhi.ok() && bhi.bigEnd(2) == dom.bigEnd(2)) {
-//         bhi.setSmall(2, dom.bigEnd(2));
-//         bhi.setBig  (2, dom.bigEnd(2));
-
-//         ParallelFor(bhi, [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept {
-//             nscbc::add_lodi_rhs_to_cons<PROB::ProbClosures>(
-//                 IntVect(i,j,k),
-//                 2, -1, dxinv, cls_d, prims, state,
-//                 nscbc_second_order, nscbc_type, *nscbc_parm);
-//         });
-//     }
-// }
-
-// #endif
-// }       
-//=================
-
     
     // Flux register accumulation (conservation across AMR levels)
     if (do_reflux && (fr_as_crse || fr_as_fine)) {

@@ -4,193 +4,392 @@
 
 using namespace amrex;
 
+
 //------------------------------------------------------------------------------
 // 
 //
 //------------------------------------------------------------------------------
-void CNS::compute_nscbc_face_rhs( MultiFab& cell_state, bool second_order)
-  {
-    const PROB::ProbClosures* cls_d = CNS::d_prob_closures;
-    const PROB::ProbClosures& cls_h = *CNS::h_prob_closures;
-    const CNS::NSCBCParm* nscbc_parm = CNS::d_nscbc_parm;
+namespace {
+
+AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
+void decode_nscbc_owner(
+    int owner,
+    int& dir,
+    int& side_sign) noexcept
+{
+    // owner:
+    // 1,3,5 -> low side
+    // 2,4,6 -> high side
+
+    dir = (owner - 1) / 2;
+
+    side_sign =
+        (owner % 2 == 1)
+        ? +1
+        : -1;
+}
+
+AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
+int number_of_external_directions(
+    amrex::IntVect const& iv,
+    amrex::IntVect const& dom_lo,
+    amrex::IntVect const& dom_hi) noexcept
+{
+    int count = 0;
+
+    for (int dir = 0; dir < AMREX_SPACEDIM; ++dir) {
+        if (iv[dir] < dom_lo[dir] || iv[dir] > dom_hi[dir]) {
+            ++count;
+        }
+    }
+
+    return count;
+}
+
+} // namespace
+
+//------------------------------------------------------------------------------
+// 
+//
+//------------------------------------------------------------------------------
+void CNS::compute_nscbc_ghostcell_rhs( amrex::MultiFab& stage_state)
+{
+    const auto* cls_d = d_prob_closures;
+    const auto& cls_h = *h_prob_closures;
+    const auto* parm  = d_nscbc_parm;
 
     const int nprim  = cls_h.NPRIM;
-    const int nghost = cls_h.NGHOST;
+    const int ng     = cls_h.NGHOST;
 
-    const Box domain = Geom().Domain();
+    MultiFab q( stage_state.boxArray(), stage_state.DistributionMap(), nprim, ng, MFInfo().SetArena(The_Async_Arena()), Factory());
+
+    for (MFIter mfi(stage_state, false); mfi.isValid(); ++mfi) {
+        cls_h.cons2prims(mfi,stage_state.array(mfi),q.array(mfi));
+    }
+
+    q.FillBoundary(Geom().periodicity());
+    clear_nscbc_ghost_rhs();
+
     const auto dxinv = Geom().InvCellSizeArray();
 
-    /*
-     * Build cell-centred primitive variables from the RK-stage conservative
-     * solution. These are used for q0 and q1 in the one-sided normal
-     * derivative.
-     */
-    MultiFab cell_prims(
-        cell_state.boxArray(),
-        cell_state.DistributionMap(),
-        nprim,
-        nghost,
-        MFInfo().SetArena(The_Async_Arena()));
+    const Box domain = Geom().Domain();
+    const auto dom_lo = domain.smallEnd();
+    const auto dom_hi = domain.bigEnd();
 
-    for (MFIter mfi(cell_state, false); mfi.isValid(); ++mfi) {
-        cls_h.cons2prims( mfi, cell_state.array(mfi), cell_prims.array(mfi));
-    }
+    const auto nslo = CNS::nscbc_lo;
+    const auto nshi = CNS::nscbc_hi;
 
-    /*
-     * Convert the current RK-stage face state UBC to QBC.
-     */
-    update_nscbc_face_primitives();
+    for (MFIter mfi(q, false); mfi.isValid(); ++mfi) {
 
-    /*
-     * Clear all face RHS arrays before writing boundary planes.
-     */
-    clear_nscbc_face_rhs();
+        auto const& qp   = q.const_array(mfi);
+        auto const& rhs  = nscbc_shell.rhs->array(mfi);
+        auto const& own  = nscbc_shell.owner->const_array(mfi);
 
-    for (int dir = 0; dir < AMREX_SPACEDIM; ++dir) {
+        const Box bx = mfi.fabbox();
 
-        if (!nscbc_qbc[dir] || !nscbc_rhs_bc[dir]) {
-            continue;
-        }
+        ParallelFor(
+            bx,
+            [=] AMREX_GPU_DEVICE(
+                int i, int j, int k) noexcept
+            {
+                const IntVect iv(AMREX_D_DECL(i,j,k));
+                const int face = own(iv,0);
 
-        MultiFab const& qbc_mf = *nscbc_qbc[dir];
-        MultiFab& rhs_mf       = *nscbc_rhs_bc[dir];
+                if (face == 0) {
+                    return;
+                }
 
-        const int lo_face = domain.smallEnd(dir);
-        const int hi_face = domain.bigEnd(dir) + 1;
+                int dir;
+                int side_sign;
 
-        const IntVect edir = IntVect::TheDimensionVector(dir);
+                decode_nscbc_owner(face, dir, side_sign);
 
-        /*
-         * nscbc_qbc[dir], nscbc_rhs_bc[dir], and cell_prims have the same
-         * number of boxes and DistributionMapping. The first two are
-         * face-centred, while cell_prims is cell-centred.
-         */
-        for (MFIter mfi(qbc_mf, false); mfi.isValid(); ++mfi) {
+                const int nscbc_type = (side_sign > 0) ? nslo[dir] : nshi[dir];
 
-          const Box& face_valid_box = mfi.validbox();
-
-          auto const& qbc = qbc_mf.const_array(mfi);
-          auto const& q = cell_prims.const_array(mfi);
-          auto const& rhs_bc = rhs_mf.array(mfi);
-          // ==============================================================
-          // Low physical boundary
-          // ==============================================================
-          if (nscbc_lo[dir] > 0 && face_valid_box.smallEnd(dir) <= lo_face && face_valid_box.bigEnd(dir)   >= lo_face) {
-
-            Box boundary_box = face_valid_box;
-
-            boundary_box.setSmall(dir, lo_face);
-            boundary_box.setBig(dir, lo_face);                
-
-            if (boundary_box.ok()) {
-
-              const int nscbc_type = nscbc_lo[dir];
-
-              ParallelFor( boundary_box, [=] AMREX_GPU_DEVICE( int i, int j, int k) noexcept
-                {
-                  const IntVect iv_face( AMREX_D_DECL(i,j,k));
-                  const IntVect iv_inner = iv_face;
-
-                  nscbc::add_lodi_rhs_to_cons< PROB::ProbClosures>(
-                      iv_face,iv_inner, dir, +1,dxinv,cls_d, qbc,q,
-                          rhs_bc, second_order, nscbc_type, *nscbc_parm);
-                });
-            }
-          }
-
-          // ==============================================================
-          // High physical boundary
-          // ==============================================================
-          if (nscbc_hi[dir] > 0 && face_valid_box.smallEnd(dir) <= hi_face && face_valid_box.bigEnd(dir)   >= hi_face) {
-
-            Box boundary_box = face_valid_box;
-            boundary_box.setSmall(dir, hi_face);
-            boundary_box.setBig(dir, hi_face);
+                const int external_dirs = number_of_external_directions( iv,dom_lo,dom_hi);
                 
-            if (boundary_box.ok()) {
-              const int nscbc_type = nscbc_hi[dir];
-
-              ParallelFor( boundary_box, [=] AMREX_GPU_DEVICE( int i, int j, int k) noexcept
-                {
-                  const IntVect iv_face(AMREX_D_DECL(i,j,k));
-                  const IntVect iv_inner = iv_face - edir;
-
-                  nscbc::add_lodi_rhs_to_cons< PROB::ProbClosures>(
-                      iv_face,iv_inner, dir, -1,dxinv,cls_d, qbc,q,
-                          rhs_bc, second_order, nscbc_type, *nscbc_parm);
-                });
-            }
-          }
-        }
+                //const bool face_interior = (external_dirs == 1);
+                                
+                nscbc::add_lodi_ghost_rhs_to_cons <PROB::ProbClosures>(
+                        iv,dir,side_sign,dxinv,
+                        cls_d,qp,rhs,nscbc_order,nscbc_type, *parm);
+            });
     }
-  }
+}
 //------------------------------------------------------------------------------
 // 
 //
 //------------------------------------------------------------------------------
-void CNS::overwrite_nscbc_inviscid_flux(MFIter const& mfi, Array4<const Real> const& cell_prims,
-    std::array<FArrayBox*, AMREX_SPACEDIM> const& fluxes)
-  {
-    //if (!use_nscbc) return;
+//------------------------------------------------------------------------------
+// Build the ownership mask for the persistent NSCBC ghost shell.
+//
+// owner = 0 : not an NSCBC physical ghost cell
+// owner = 1 : x-low
+// owner = 2 : x-high
+// owner = 3 : y-low
+// owner = 4 : y-high
+// owner = 5 : z-low
+// owner = 6 : z-high
+//
+// At edges and corners, a cell can lie outside the domain in more than one
+// direction. Until the coupled Lodato edge/corner treatment is implemented,
+// ownership is assigned using the deterministic priority
+//
+//     x > y > z.
+//
+// Thus, the first active external direction owns the cell.
+//------------------------------------------------------------------------------
+void CNS::build_nscbc_shell_owner()
+{
+    using namespace amrex;
 
-    const PROB::ProbClosures* cls_d = CNS::d_prob_closures;
+    AMREX_ALWAYS_ASSERT_WITH_MESSAGE( nscbc_shell.owner != nullptr, "CNS::build_nscbc_shell_owner(): owner iMultiFab is not defined");
+
+    iMultiFab& owner_mf = *nscbc_shell.owner;
+
+    owner_mf.setVal(0);
 
     const Box domain = Geom().Domain();
 
-    const Box cell_box = mfi.tilebox();
+    const auto dom_lo = domain.smallEnd();
+    const auto dom_hi = domain.bigEnd();
+
+    const auto nslo = CNS::nscbc_lo;
+    const auto nshi = CNS::nscbc_hi;
+
+    for (MFIter mfi(owner_mf, false); mfi.isValid(); ++mfi) {
+
+        auto const& owner = owner_mf.array(mfi);
+
+        // Includes the valid region and all allocated ghost cells.
+        const Box bx = mfi.fabbox();
+
+        ParallelFor(
+            bx,
+            [=] AMREX_GPU_DEVICE(int i, int j, int k) noexcept
+            {
+                const IntVect iv(AMREX_D_DECL(i, j, k));
+
+                int shell_owner = 0;
+
+                // Deterministic priority:
+                // x-low, x-high, y-low, y-high, z-low, z-high.
+                for (int dir = 0; dir < AMREX_SPACEDIM; ++dir) {
+
+                    if (iv[dir] < dom_lo[dir] && nslo[dir] > 0) {
+                        shell_owner = 2*dir + 1;
+                        break;
+                    }
+
+                    if (iv[dir] > dom_hi[dir] && nshi[dir] > 0) {
+                        shell_owner = 2*dir + 2;
+                        break;
+                    }
+                }
+
+                owner(iv, 0) = shell_owner;
+            });
+    }
+
+    Gpu::streamSynchronize();
+}
+//------------------------------------------------------------------------------
+// 
+//
+//------------------------------------------------------------------------------
+//------------------------------------------------------------------------------
+// 
+//
+//------------------------------------------------------------------------------
+AMREX_GPU_DEVICE AMREX_FORCE_INLINE
+int number_of_external_directions(amrex::IntVect const& iv, amrex::IntVect const& dom_lo, amrex::IntVect const& dom_hi)
+{
+    int count = 0;
 
     for (int dir = 0; dir < AMREX_SPACEDIM; ++dir) {
-
-        if (!nscbc_qbc[dir]) continue;
-
-        auto const& qbc = nscbc_qbc[dir]->const_array(mfi);
-
-        auto const& flux = fluxes[dir]->array();
-
-        const Box face_box = amrex::surroundingNodes(cell_box, dir);
-
-        const int lo_face = domain.smallEnd(dir);
-
-        const int hi_face = domain.bigEnd(dir) + 1;
-
-        const IntVect edir = IntVect::TheDimensionVector(dir);
-
-        // --------------------------------------------------------------
-        // Low NSCBC face
-        // --------------------------------------------------------------
-        if (nscbc_lo[dir] > 0 && face_box.smallEnd(dir) <= lo_face && face_box.bigEnd(dir)   >= lo_face) {
-
-          Box boundary_box = face_box;
-
-          boundary_box.setSmall(dir, lo_face);
-          boundary_box.setBig(dir, lo_face);
-
-          ParallelFor( boundary_box, [=] AMREX_GPU_DEVICE( int i, int j, int k) noexcept
-            {
-              const IntVect iv_face( AMREX_D_DECL(i,j,k));
-              const IntVect iv_inner = iv_face;
-
-              nscbc::hllc_primitive_flux< PROB::ProbClosures>( iv_face, iv_inner, dir, +1, qbc,cell_prims, flux,*cls_d);
-            });
-        }
-        // --------------------------------------------------------------
-        // High NSCBC face
-        // --------------------------------------------------------------
-        if (nscbc_hi[dir] > 0 && face_box.smallEnd(dir) <= hi_face && face_box.bigEnd(dir)   >= hi_face) {
-
-          Box boundary_box =face_box;
-
-          boundary_box.setSmall(dir, hi_face);
-          boundary_box.setBig(dir, hi_face);
-
-          ParallelFor( boundary_box,[=] AMREX_GPU_DEVICE(int i, int j, int k) noexcept
-            {
-              const IntVect iv_face(AMREX_D_DECL(i,j,k));
-              const IntVect iv_inner = iv_face - edir;
-
-              nscbc::hllc_primitive_flux< PROB::ProbClosures>( iv_face, iv_inner, dir, -1, qbc, cell_prims, flux, *cls_d);
-            });
+        if (iv[dir] < dom_lo[dir] || iv[dir] > dom_hi[dir]) {
+            ++count;
         }
     }
-  }
+
+    return count;
+}
+//------------------------------------------------------------------------------
+// 
+//
+//------------------------------------------------------------------------------
+void CNS::fill_nscbc_ghost_cells2(MultiFab& state) const //old version
+{
+    AMREX_ALWAYS_ASSERT(nscbc_shell.defined());
+
+    state.FillBoundary(Geom().periodicity());
+
+    MultiFab const& shell = *nscbc_shell.state;
+    iMultiFab const& owner = *nscbc_shell.owner;
+
+    const int ncons = PROB::ProbClosures::NCONS;
+
+    for (MFIter mfi(state, false); mfi.isValid(); ++mfi) {
+
+        auto const& S   = state.array(mfi);
+        auto const& G   = shell.const_array(mfi);
+        auto const& own = owner.const_array(mfi);
+
+        const Box bx = mfi.fabbox();
+
+        ParallelFor(bx, ncons, [=] AMREX_GPU_DEVICE( int i, int j, int k, int n) noexcept
+            {
+                if (own(i,j,k,0) != 0) { S(i,j,k,n) = G(i,j,k,n);}
+            });
+    }
+}
+//------------------------------------------------------------------------------
+// 
+//
+//------------------------------------------------------------------------------
+//------------------------------------------------------------------------------
+// Overwrite NSCBC physical ghost cells with the persistent ghost-shell state.
+//
+// Ordinary inter-box and periodic ghost cells are synchronized first.
+// Only slabs outside active NSCBC physical boundaries are then copied.
+//
+// Edge and corner cells may belong to more than one slab, but every copy reads
+// the same cell-centred value from nscbc_shell.state, so repeated writes are
+// harmless.
+//------------------------------------------------------------------------------
+void CNS::fill_nscbc_ghost_cells(amrex::MultiFab& state) const
+{
+    using namespace amrex;
+
+    AMREX_ALWAYS_ASSERT_WITH_MESSAGE(nscbc_shell.state != nullptr, "CNS::fill_nscbc_ghost_cells(): shell state is not defined");
+
+    MultiFab const& shell = *nscbc_shell.state;
+
+    AMREX_ALWAYS_ASSERT_WITH_MESSAGE(state.boxArray() == shell.boxArray(),"CNS::fill_nscbc_ghost_cells(): incompatible BoxArray");
+
+    AMREX_ALWAYS_ASSERT_WITH_MESSAGE(state.DistributionMap() == shell.DistributionMap(),"CNS::fill_nscbc_ghost_cells(): incompatible DistributionMap");
+
+    AMREX_ALWAYS_ASSERT_WITH_MESSAGE(state.nComp() == shell.nComp(),"CNS::fill_nscbc_ghost_cells(): incompatible component count");
+
+    const int ng = amrex::min(state.nGrow(), shell.nGrow());
+
+    const int ncomp = state.nComp();
+
+    const Box domain = Geom().Domain();
+    const auto dom_lo = domain.smallEnd();
+    const auto dom_hi = domain.bigEnd();
+
+    /*
+     * Synchronize internal box boundaries and periodic boundaries.
+     * NSCBC physical ghosts are overwritten below.
+     */
+    state.FillBoundary(Geom().periodicity());
+
+    for (MFIter mfi(state, false); mfi.isValid(); ++mfi) {
+
+        auto const& dst = state.array(mfi);
+        auto const& src = shell.const_array(mfi);
+
+        const Box valid = mfi.validbox();
+
+        /*
+         * Restrict work to ghost cells allocated by this FAB.
+         * The intersection is useful when a factory supplies a FAB box
+         * different from grow(valid,ng).
+         */
+        const Box available = (amrex::grow(valid, ng) & mfi.fabbox());
+
+        for (int dir = 0; dir < AMREX_SPACEDIM; ++dir) {
+
+            // ==============================================================
+            // Low physical boundary
+            // ==============================================================
+            if (nscbc_lo[dir] > 0 && valid.smallEnd(dir) == dom_lo[dir])
+            {
+                Box ghost_box = available;
+
+                ghost_box.setSmall(dir, dom_lo[dir] - ng);
+                ghost_box.setBig  (dir, dom_lo[dir] - 1);
+
+                if (ghost_box.ok()) {
+                    ParallelFor(ghost_box, ncomp, [=] AMREX_GPU_DEVICE( int i, int j, int k, int n) noexcept
+                        {
+                            dst(i,j,k,n) = src(i,j,k,n);
+                        });
+                }
+            }
+            // ==============================================================
+            // High physical boundary
+            // ==============================================================
+            if (nscbc_hi[dir] > 0 && valid.bigEnd(dir) == dom_hi[dir])
+            {
+                Box ghost_box = available;
+
+                ghost_box.setSmall(dir, dom_hi[dir] + 1);
+                ghost_box.setBig  (dir, dom_hi[dir] + ng);
+
+                if (ghost_box.ok()) {
+                    ParallelFor(ghost_box,ncomp,[=] AMREX_GPU_DEVICE(int i,int j,int k,int n) noexcept
+                        {
+                            dst(i,j,k,n) = src(i,j,k,n);
+                        });
+                }
+            }
+        }
+    }
+}
+//------------------------------------------------------------------------------
+// Set the NSCBC ghost-shell RHS to zero.
+// Only the shell cells are later overwritten by compute_nscbc_ghostcell_rhs().  and
+// Clearing the complete MultiFab is cheap and prevents stale RHS values
+//------------------------------------------------------------------------------
+void CNS::clear_nscbc_ghost_rhs()
+{
+    AMREX_ALWAYS_ASSERT_WITH_MESSAGE( nscbc_shell.rhs != nullptr,
+        "CNS::clear_nscbc_ghost_rhs(): ghost-shell RHS is not defined");
+
+    nscbc_shell.rhs->setVal(amrex::Real(0.0));
+}
+//------------------------------------------------------------------------------
+// 
+//
+//------------------------------------------------------------------------------
+//------------------------------------------------------------------------------
+// Copy one NSCBC ghost-shell MultiFab into another.
+//
+// The source and destination must have identical layouts.
+//------------------------------------------------------------------------------
+void CNS::copy_nscbc_shell(
+    amrex::MultiFab& dst,
+    amrex::MultiFab const& src)
+{
+    AMREX_ALWAYS_ASSERT_WITH_MESSAGE(
+        dst.boxArray() == src.boxArray(),
+        "copy_nscbc_shell: incompatible BoxArray");
+
+    AMREX_ALWAYS_ASSERT_WITH_MESSAGE(
+        dst.DistributionMap() == src.DistributionMap(),
+        "copy_nscbc_shell: incompatible DistributionMap");
+
+    AMREX_ALWAYS_ASSERT_WITH_MESSAGE(
+        dst.nComp() == src.nComp(),
+        "copy_nscbc_shell: incompatible number of components");
+
+    AMREX_ALWAYS_ASSERT_WITH_MESSAGE(
+        dst.nGrow() == src.nGrow(),
+        "copy_nscbc_shell: incompatible number of ghost cells");
+
+    amrex::MultiFab::Copy(
+        dst,
+        src,
+        0,              // src component
+        0,              // dst component
+        src.nComp(),    // number of components
+        src.nGrow());   // copy ghost cells too
+}
+//------------------------------------------------------------------------------
+// 
+//
+//------------------------------------------------------------------------------
+
 

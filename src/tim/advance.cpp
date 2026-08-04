@@ -11,107 +11,6 @@
 #endif
 using namespace amrex;
 
-namespace {
-
-using FaceData = CNS::NSCBCFaceData;
-
-void define_face_data_like( FaceData& destination, FaceData const& source, int ncomp, int ngrow = 0)
-{
-    for (int dir = 0; dir < AMREX_SPACEDIM; ++dir) {
-
-        if (!source[dir]) {
-            destination[dir].reset();
-            continue;
-        }
-
-        destination[dir] =
-            std::make_unique<amrex::MultiFab>(
-                source[dir]->boxArray(),
-                source[dir]->DistributionMap(),
-                ncomp,
-                ngrow);
-
-        destination[dir]->setVal(amrex::Real(0.0));
-    }
-}
-
-void copy_face_data(
-    FaceData& destination,
-    FaceData const& source,
-    int ncomp)
-{
-    for (int dir = 0; dir < AMREX_SPACEDIM; ++dir) {
-
-        if (!destination[dir] || !source[dir]) {
-            continue;
-        }
-
-        amrex::MultiFab::Copy(
-            *destination[dir],
-            *source[dir],
-            0,
-            0,
-            ncomp,
-            0);
-    }
-}
-
-void saxpy_face_data(
-    FaceData& destination,
-    amrex::Real factor,
-    FaceData const& source,
-    int ncomp)
-{
-    for (int dir = 0; dir < AMREX_SPACEDIM; ++dir) {
-
-        if (!destination[dir] || !source[dir]) {
-            continue;
-        }
-
-        amrex::MultiFab::Saxpy(
-            *destination[dir],
-            factor,
-            *source[dir],
-            0,
-            0,
-            ncomp,
-            0);
-    }
-}
-
-void lincomb_face_data(
-    FaceData& destination,
-    amrex::Real factor_a,
-    FaceData const& source_a,
-    amrex::Real factor_b,
-    FaceData const& source_b,
-    int ncomp)
-{
-    for (int dir = 0; dir < AMREX_SPACEDIM; ++dir) {
-
-        if (!destination[dir] ||
-            !source_a[dir] ||
-            !source_b[dir]) {
-            continue;
-        }
-
-        amrex::MultiFab::LinComb(
-            *destination[dir],
-            factor_a,
-            *source_a[dir],
-            0,
-            factor_b,
-            *source_b[dir],
-            0,
-            0,
-            ncomp,
-            0);
-    }
-}
-
-} // namespace
-
-
 Real CNS::advance(Real time, Real dt, int /*iteration*/, int /*ncycle*/) {
   BL_PROFILE("CNS::advance()");
 
@@ -123,10 +22,6 @@ Real CNS::advance(Real time, Real dt, int /*iteration*/, int /*ncycle*/) {
 
   int ncons = d_prob_closures->NCONS;
   int nghost= d_prob_closures->NGHOST;
-
-  // temp
-  // int nglin = 0; int ngfill = nghost;
-  // if (CNS::use_nscbc) { nglin = nghost; ngfill = 0;}
 
 
   MultiFab Stemp(grids,dmap,ncons,nghost,MFInfo(),Factory());
@@ -198,30 +93,33 @@ Real CNS::advance(Real time, Real dt, int /*iteration*/, int /*ncycle*/) {
 
   ////////////////////////////////////////////////////////////////////////////
   if (order_rk == -2) {
+
+    // temporary arrays for boundaries
     
-    // Temporary arrays
-    NSCBCFaceData UBC_old; NSCBCFaceData UBC_rhs1; NSCBCFaceData UBC_rhs2;
+    MultiFab G1(grids, dmap, ncons, nghost, MFInfo(), Factory());
+    MultiFab G2(grids, dmap, ncons, nghost, MFInfo(), Factory());          
 
     if (use_nscbc) {
-      define_face_data_like( UBC_old, nscbc_ubc, ncons);
-      define_face_data_like( UBC_rhs1,nscbc_ubc, ncons);
-      define_face_data_like( UBC_rhs2,nscbc_ubc, ncons);
-      copy_face_data(UBC_old,nscbc_ubc,ncons);
+    copy_nscbc_shell( G1, *nscbc_shell.state);
     }
+
     //... Stage 1 ..........................................................
     FillPatch(*this, Stemp, nghost, time, State_Type, 0, ncons);
 
+    // Compute RHS of Boundary
     if (use_nscbc) {
-      compute_nscbc_face_rhs(Stemp, nscbc_order == 2);
-      copy_face_data( UBC_rhs1, nscbc_rhs_bc, ncons);
+      fill_nscbc_ghost_cells(Stemp);
+      compute_nscbc_ghostcell_rhs(Stemp);
     }
     compute_rhs(Stemp, Real(0.5) * dt, fr_as_crse, fr_as_fine);        // Stemp = RHS(t_n,y_n) 
-
     MultiFab::LinComb(S2, Real(1.0), S1, 0,dt, Stemp, 0, 0, ncons, 0); // U* = U_n + dt *RHS(t_n,y_n)
 
+
+    // Compute G* = G^n + dt R_G(U^n,G^n) (persistent state)
     if (use_nscbc) {
-      // UBC* = UBC^n + dt RHS_BC^n
-      saxpy_face_data(nscbc_ubc,dt,UBC_rhs1,ncons);
+      copy_nscbc_shell(G2,G1);
+      saxpy_nscbc_shell(G2,dt,*nscbc_shell.rhs);
+      copy_nscbc_shell( *nscbc_shell.state, G2);
     }
 
     //... Stage 2 ..........................................................
@@ -230,27 +128,22 @@ Real CNS::advance(Real time, Real dt, int /*iteration*/, int /*ncycle*/) {
     state[0].setNewTimeLevel(time + dt);
     FillPatch(*this, Stemp, nghost, time + dt, State_Type, 0, ncons);
 
+    // Compute RHS of Boundary
     if (use_nscbc) {
-      /*  nscbc_ubc now contains UBC*, so this evaluates RHS_BC(UBC*, U*).*/
-      compute_nscbc_face_rhs(Stemp,nscbc_order == 2);
-      copy_face_data(UBC_rhs2, nscbc_rhs_bc, ncons);
+      fill_nscbc_ghost_cells(Stemp);
+      compute_nscbc_ghostcell_rhs(Stemp);
     }
 
     compute_rhs(Stemp, Real(0.5) * dt, fr_as_crse, fr_as_fine); // Stemp = RHS(t_n+1/2,y_*) 
 
-    // U^(n+1/2) = 0.5*(U_n+ U*)  intermediate state
-    MultiFab::LinComb(S2, Real(0.5), S1, 0,Real(0.5), S2, 0,0, ncons, 0);  
+  
+    MultiFab::LinComb(S2, Real(0.5), S1, 0,Real(0.5), S2, 0,0, ncons, 0);   // U^(n+1/2) = 0.5*(U1+ U2)
+    MultiFab::Saxpy(S2, Real(0.5) * dt, Stemp, 0, 0, ncons, 0);             // U^(n+1)   = U^(n+1/2) + 0.5*RHS(U*)
 
-    // U^(n+1) = U^(n+1/2)  + 0.5 dt *RHS(t_n+1/2,y_*) 
-    MultiFab::Saxpy(S2, Real(0.5) * dt, Stemp, 0, 0, ncons, 0);
-
-    // NSBC BC
     if (use_nscbc) {
-      /* UBC^(n+1/2) = 0.5 UBC^n + 0.5 UBC*/
-      lincomb_face_data( nscbc_ubc, Real(0.5), UBC_old, Real(0.5), nscbc_ubc, ncons);
-      /* UBC^(n+1)   = 0.5 UBC^n + 0.5 UBC + 0.5 dt RHS_BC(UBC*,U*) */
-      saxpy_face_data( nscbc_ubc, Real(0.5)*dt, UBC_rhs2, ncons);
-      update_nscbc_face_primitives();
+        // G^{n+1} = 0.5 G^n + 0.5 [G* + dt R_G(U*,G*)]
+        lincomb_nscbc_shell( *nscbc_shell.state, Real(0.5), G1, Real(0.5), G2);   // G* = 0.5*(G1+ G2) 
+        saxpy_nscbc_shell( *nscbc_shell.state, Real(0.5)*dt, *nscbc_shell.rhs); // G^(n+1) = G* + 0.5*dt*RHS(G*)
     }
   ////////////////////////////////////////////////////////////////////////////
   } else if (order_rk == 0) {  
@@ -265,16 +158,18 @@ Real CNS::advance(Real time, Real dt, int /*iteration*/, int /*ncycle*/) {
 
     FillPatch(*this, Stemp, nghost, time, State_Type, 0,  ncons);  // filled at t_n to evalulate F(t_n,y_n).
 
+    // Compute RHS of Boundary 
     if (use_nscbc) {
-      compute_nscbc_face_rhs(Stemp,nscbc_order == 2);
+      fill_nscbc_ghost_cells(Stemp);
+      compute_nscbc_ghostcell_rhs(Stemp);
     }
 
     compute_rhs(Stemp, dt, fr_as_crse, fr_as_fine);                      // Stemp = RHS(t_n,y_n)    
     MultiFab::LinComb(S2, Real(1.0), S1, 0, dt, Stemp, 0, 0, ncons, 0);  // U_n+1 = U_n + dt *RHS(t_n,y_n) 
 
+    // Boundary update.
     if (use_nscbc) {
-      saxpy_face_data(nscbc_ubc,dt,nscbc_rhs_bc,ncons);
-      update_nscbc_face_primitives();
+        saxpy_nscbc_shell(*nscbc_shell.state, dt,*nscbc_shell.rhs);   
     }
 
   ////////////////////////////////////////////////////////////////////////////    

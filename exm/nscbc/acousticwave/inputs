@@ -3,14 +3,14 @@
 max_step  = 10000
 stop_time = 0.008 # 0.001  equal to tr =0.34  0.003 (tr ~ 1)
 cfl = 0.3
-cns.order_rk  = 3
-cns.stages_rk = 3
+cns.order_rk  = -2
+cns.stages_rk = 2
 
 # Geometry 
 geometry.is_periodic = 0 
 geometry.coord_sys   = 0  # 0 => cart, 1 => RZ  2=>spherical
 geometry.prob_lo     = 0.0    
-geometry.prob_hi     = 2.0   
+geometry.prob_hi     = 1.0   
 
 # -1 = N/A (Incase of periodic)
 # 0 = Interior           3 = Symmetry
@@ -22,14 +22,14 @@ cns.hi_bc = 2
 # NSCBC
 cns.nscbc_lo   = 0 
 cns.nscbc_hi   = 2 
-cns.nscbc_order = 1
+cns.nscbc_order = 2
 
 cns.screen_output   = 0 # 0=quiet, 1=verbose
 cns.verbose         = 0 # 0=quiet, 1=verbose
 amr.v               = 0
 
 # Refinement and regridding 
-amr.n_cell          = 128
+amr.n_cell          = 256
 amr.max_level       = 0     # maximum level number allowed
 amr.ref_ratio       = 2  # refinement ratio per level
 amr.regrid_int      = 2  # how often to regrid per level
@@ -57,10 +57,30 @@ amr.data_log = probe.csv
 cns.record_probe = 1
 cns.time_probe_lev = 0
 cns.time_probe_int = 1
-cns.time_probes = Pressure
-Pressure.field_name = pressure
-Pressure.box_lo = 0.0
-Pressure.box_hi = 2.0
+
+cns.time_probes = PressureMAX PressureMIN Pprobe Uprobe
+#
+PressureMAX.field_name = pressure
+PressureMAX.reduction  = max
+PressureMAX.box_lo = 0.05
+PressureMAX.box_hi = 0.95
+#
+PressureMIN.field_name = pressure
+PressureMIN.reduction  = min
+PressureMIN.box_lo = 0.05
+PressureMIN.box_hi = 0.95
+#
+Pprobe.field_name = pressure
+Pprobe.reduction  = average
+Pprobe.box_lo = 0.795
+Pprobe.box_hi = 0.805
+#
+Uprobe.field_name = velocity
+Uprobe.reduction  = average
+Uprobe.box_lo = 0.795
+Uprobe.box_hi = 0.805
+
+
 
 
 
