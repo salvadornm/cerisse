@@ -65,7 +65,7 @@ class manual_bc_t
   // \param  P0      : fix pressure [Pa]
 
   static AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE void bc_fixP(
-    const Real nx, const Real ny, Real nz, const cls_t* cls,
+    const Real /*nx*/, const Real /*ny*/, Real /*nz*/, const cls_t* cls,
     const Real P0,
     const Real Uinner[cls_t::NCONS], Real* Ughost )
     {

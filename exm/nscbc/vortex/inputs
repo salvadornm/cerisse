@@ -25,10 +25,15 @@ cns.lo_bc = 2 -1
 cns.hi_bc = 2 -1
 # NSCBC
 cns.nscbc_lo   = 1 0
-cns.nscbc_hi   = 2 0
-cns.nscbc_order = 1
+cns.nscbc_hi   = 3 0
+cns.nscbc_order = 2
 cns.nscbc_Lchar = 0.013
 cns.nscbc_sigma = 0.28
+cns.nscbc_use_transverse = 1
+cns.nscbc_beta_transverse = 0.575
+cns.nscbc_Mmax = 0.575
+
+
 # inflow
 cns.nscbc_utarget = 199.6335
 cns.nscbc_vtarget = 0.0

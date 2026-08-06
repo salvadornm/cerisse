@@ -61,7 +61,14 @@ void CNS::compute_nscbc_ghostcell_rhs( amrex::MultiFab& stage_state)
     const int nprim  = cls_h.NPRIM;
     const int ng     = cls_h.NGHOST;
 
+    /*
+     * Fill ordinary inter-FAB ghosts and then install the current persistent
+     * NSCBC state in every local physical-boundary slab.
+     */
+    fill_nscbc_ghost_cells(stage_state);
+
     MultiFab q( stage_state.boxArray(), stage_state.DistributionMap(), nprim, ng, MFInfo().SetArena(The_Async_Arena()), Factory());
+    q.setVal(Real(0.0)); // set to 0
 
     for (MFIter mfi(stage_state, false); mfi.isValid(); ++mfi) {
         cls_h.cons2prims(mfi,stage_state.array(mfi),q.array(mfi));
@@ -87,17 +94,15 @@ void CNS::compute_nscbc_ghostcell_rhs( amrex::MultiFab& stage_state)
 
         const Box bx = mfi.fabbox();
 
-        ParallelFor(
-            bx,
-            [=] AMREX_GPU_DEVICE(
-                int i, int j, int k) noexcept
+        const IntVect fab_lo = bx.smallEnd();
+        const IntVect fab_hi = bx.bigEnd();
+
+        ParallelFor( bx, [=] AMREX_GPU_DEVICE( int i, int j, int k) noexcept
             {
                 const IntVect iv(AMREX_D_DECL(i,j,k));
                 const int face = own(iv,0);
 
-                if (face == 0) {
-                    return;
-                }
+                if (face == 0) {return;}
 
                 int dir;
                 int side_sign;
@@ -109,10 +114,25 @@ void CNS::compute_nscbc_ghostcell_rhs( amrex::MultiFab& stage_state)
                 const int external_dirs = number_of_external_directions( iv,dom_lo,dom_hi);
                 
                 //const bool face_interior = (external_dirs == 1);
-                                
+
+                bool transverse_stencil_available = (external_dirs == 1);
+
+                // check if transverse terms possible
+                for (int tdir = 0; tdir < AMREX_SPACEDIM; ++tdir) {
+                    if (tdir == dir) {continue;}
+
+                    if (iv[tdir] <= fab_lo[tdir] || iv[tdir] >= fab_hi[tdir]) {
+                    transverse_stencil_available = false;
+                    }
+                }
+
+               // transverse_stencil_available = false; //temp
+                
+                // temp: only activates transverse terms in interior points
+
                 nscbc::add_lodi_ghost_rhs_to_cons <PROB::ProbClosures>(
                         iv,dir,side_sign,dxinv,
-                        cls_d,qp,rhs,nscbc_order,nscbc_type, *parm);
+                        cls_d,qp,rhs,nscbc_order,nscbc_type, *parm, transverse_stencil_available);
             });
     }
 }

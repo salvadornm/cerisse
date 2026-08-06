@@ -105,16 +105,13 @@ CNS::CNS(Amr &papa, int lev, const Geometry &level_geom, const BoxArray &bl,
 
 
   // build NSCBC ghost state if needed
-  if (use_nscbc)
-  {
+  // if (use_nscbc)
+  // {
 
-    amrex::Print() << "CNS::CNS() building NSCBC ghost state MultiFab " << std::endl;
-
-    const int ncons  = PROB::ProbClosures::NCONS;
-    const int nghost = PROB::ProbClosures::NGHOST;    
+  //   amrex::Print() << "CNS::CNS() building NSCBC ghost state MultiFab " << std::endl;
 
     
-  }
+  // }
 
 
   rz_sanity_check(Geom());
@@ -179,8 +176,10 @@ void CNS::read_params() {
     pp.query("nscbc_wtarget", h_nscbc_parm.wtarget);
     pp.query("nscbc_Ttarget", h_nscbc_parm.Ttarget);
     pp.query("nscbc_eta",     h_nscbc_parm.eta);
+    pp.query("nscbc_use_transverse", h_nscbc_parm.use_transverse);
+    pp.query("nscbc_beta_transverse",h_nscbc_parm.beta_transverse);
     pp.query("nscbc_order", nscbc_order);
-
+    
 
 #ifdef AMREX_USE_GPU
   amrex::Gpu::htod_memcpy(d_nscbc_parm, &h_nscbc_parm, sizeof(NSCBCParm));
@@ -1610,41 +1609,48 @@ void CNS::initialise_nscbc_ghost_shell(
     const int ng     = shell.nGrow();
     const int ncons  = PROB::ProbClosures::NCONS;
 
+    /*
+     * Construct a synchronized source with enough ghost cells.
+     * This is essential at tangential FAB interfaces on a physical boundary.
+     */
+    MultiFab source(cell_state.boxArray(),cell_state.DistributionMap(),ncons,ng,MFInfo(),Factory());
+
+    source.setVal(Real(0.0));
+
+    MultiFab::Copy(source,cell_state,0, 0,ncons,0);             // copy valid cells
+
+    source.FillBoundary(Geom().periodicity());
+
     shell.setVal(Real(0.0));
 
     for (MFIter mfi(shell, false); mfi.isValid(); ++mfi) {
 
-        auto const& U  = cell_state.const_array(mfi);
-        auto const& G  = shell.array(mfi);
+        auto const& U   = source.const_array(mfi);
+        auto const& G   = shell.array(mfi);
         auto const& own = nscbc_shell.owner->const_array(mfi);
 
-        Box gbx = mfi.fabbox();
+        const Box bx = mfi.fabbox();
 
-        ParallelFor(
-            gbx, ncons,
-            [=] AMREX_GPU_DEVICE(
-                int i, int j, int k, int n) noexcept
+        ParallelFor( bx, ncons, [=] AMREX_GPU_DEVICE( int i, int j, int k, int n) noexcept
             {
-                IntVect iv(AMREX_D_DECL(i,j,k));
-
-                const int face = own(iv,0);
-                if (face == 0) {
-                    return;
-                }
+                const IntVect iv(AMREX_D_DECL(i,j,k));
+                if (own(iv,0) == 0) {return;}
 
                 IntVect src = iv;
 
+                /*
+                 * Extrapolate only in physical-boundary directions.
+                 * Tangential inter-FAB coordinates remain unchanged and
+                 * are supplied by source.FillBoundary().
+                 */
                 for (int dir = 0; dir < AMREX_SPACEDIM; ++dir) {
-                    src[dir] =
-                        amrex::max(domain.smallEnd(dir),
-                        amrex::min(domain.bigEnd(dir), src[dir]));
+                    src[dir] = amrex::max( domain.smallEnd(dir), amrex::min(domain.bigEnd(dir), src[dir]));
                 }
 
-                G(iv,n) = U(src,n);  // FO extrapolation
+                G(iv,n) = U(src,n);
             });
     }
-
-    shell.FillBoundary(Geom().periodicity());
+    Gpu::streamSynchronize();
 }
 //------------------------------------------------------------------------------
 // 

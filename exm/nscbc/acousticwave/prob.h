@@ -47,9 +47,9 @@ typedef closures_dt<indicies_t, visc_suth_t, cond_suth_t,
 // skew-symmetric
 //typedef rhs_dt<skew_t<methodparm_t, ProbClosures>, no_diffusive_t, no_source_t > ProbRHS;
 // KEEP 2/4/6
-typedef rhs_dt<keep_euler_t<false,false,4, ProbClosures>, no_diffusive_t,  no_source_t> ProbRHS;
+//typedef rhs_dt<keep_euler_t<false,false,4, ProbClosures>, no_diffusive_t,  no_source_t> ProbRHS;
 // WENO & TENO   WenoZ5/Teno5/Teno6
-//typedef rhs_dt<weno_t<ReconScheme::Teno5, ProbClosures>, no_diffusive_t,  no_source_t>  ProbRHS;
+typedef rhs_dt<weno_t<ReconScheme::Teno5, ProbClosures>, no_diffusive_t,  no_source_t>  ProbRHS;
     
 //
 void inline inputs() {

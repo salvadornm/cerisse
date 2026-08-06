@@ -22,8 +22,7 @@ static constexpr amrex::Real r1_2 =  amrex::Real(1.0) / amrex::Real(2.0);
 static constexpr amrex::Real r1_3 =  amrex::Real(1.0) / amrex::Real(3.0); 
 
 
-static constexpr bool use_transverse_terms = false;    //later can be passed as a parameter
-static constexpr amrex::Real transverse_scale = 1.0;  // use it as parameter
+static constexpr bool use_transverse_terms = false;   
 
 
 // Default parameter object for LODI-only NSCBCs.
@@ -38,7 +37,10 @@ struct NSCBCParm {
     amrex::Real vtarget = 0.0;
     amrex::Real wtarget = 0.0;
     amrex::Real Ttarget = 300.0;
-    amrex::Real eta     = 1.0;        
+    amrex::Real eta     = 1.0;   
+    bool use_transverse = false;
+    amrex::Real beta_transverse = 0.0; 
+    amrex::Real relax  = sigma*(1.0- Mmax*Mmax)/(2.0*Lchar); 
 };
 
 
@@ -282,6 +284,7 @@ void compute_L_lodi (
 #else
     amrex::ignore_unused(dY);
 #endif
+
 }
 
 //-----------------------------------------------------------------
@@ -320,11 +323,11 @@ void apply_lodi_outflow_transverse(
 
     // Low boundary: L+ + T+ is incoming.
     if (side_sign > 0) {
-        L[LPLUS]  = -transverse_scale*Tchar[LPLUS];
+        L[LPLUS]  = -Tchar[LPLUS];
     }
     // High boundary: L- + T- is incoming.
     else {
-        L[LMINUS] = -transverse_scale*Tchar[LMINUS];
+        L[LMINUS] = -Tchar[LMINUS];
     }
 }
 //-----------------------------------------------------------------
@@ -338,21 +341,18 @@ void apply_lodi_outflow_pressure_relaxation (
     int side_sign,
     amrex::Array4<const amrex::Real> const& qbc,
     amrex::Real* L,
-    nscbc_parm_t const& nscbc_parm)
+    nscbc_parm_t const& parm)
 {
     using amrex::Real;
 
     const Real p = qbc(iv_face, cls_t::QPRES);
     const Real c = qbc(iv_face, cls_t::QC);
-    const Real dp = p - nscbc_parm.Ptarget;
+    const Real dp = p - parm.Ptarget;
 
-    const Real relax = nscbc_parm.sigma
-        * (Real(1.0) - nscbc_parm.Mmax*nscbc_parm.Mmax)
-        / (Real(2.0) * c * nscbc_parm.Lchar)
-        * dp;
+    const Real relax = parm.sigma * r1_2*(Real(1.0) - parm.Mmax*parm.Mmax) / (c*parm.Lchar) * dp; // could be cleaned and pre-comp
 
     if (side_sign > 0) {
-        L[LPLUS] = relax;
+        L[LPLUS]  = relax;
     } else {
         L[LMINUS] = relax;
     }
@@ -364,26 +364,27 @@ void apply_lodi_outflow_pressure_relaxation (
 template <typename cls_t, typename nscbc_parm_t>
 AMREX_GPU_DEVICE AMREX_FORCE_INLINE
 void apply_lodi_outflow_pressure_relaxation_transverse(
-    amrex::IntVect const& iv_face,
+    amrex::IntVect const& iv,
     int side_sign,
-    amrex::Array4<const amrex::Real> const& qbc,
+    amrex::Array4<const amrex::Real> const& q,
     amrex::Real const* Tchar,
     amrex::Real* L,
-    nscbc_parm_t const& nscbc_parm)
+    nscbc_parm_t const& parm)
 {
     using amrex::Real;
 
-    const Real p  = qbc(iv_face, cls_t::QPRES);
-    const Real c  = qbc(iv_face, cls_t::QC);
-    const Real dp = p - nscbc_parm.Ptarget;
+    const Real p  = q(iv, cls_t::QPRES);
+    const Real c  = q(iv, cls_t::QC);
+    const Real dp = p - parm.Ptarget;
 
-    const Real relax = nscbc_parm.sigma * ( Real(1.0) - nscbc_parm.Mmax*nscbc_parm.Mmax)
-        / ( Real(2.0) * c * nscbc_parm.Lchar )* dp;
+    const Real relax = parm.sigma * r1_2*(Real(1.0) - parm.Mmax*parm.Mmax) / (c*parm.Lchar) * dp; // could be cleaned and pre-comp
+
+    const Real beta  = parm.beta_transverse; // must be  0 <= beta <=1
 
     if (side_sign > 0) {
-        L[LPLUS]  = relax - transverse_scale*Tchar[LPLUS];
+        L[LPLUS]  = relax - (Real(1.0) - beta)*Tchar[LPLUS];
     } else {
-        L[LMINUS] = relax - transverse_scale*Tchar[LMINUS];
+        L[LMINUS] = relax - (Real(1.0) - beta)*Tchar[LMINUS];
     }
 }
 //-----------------------------------------------------------------
@@ -551,58 +552,43 @@ void primitive_rhs_from_L (
 template <typename cls_t>
 AMREX_GPU_DEVICE AMREX_FORCE_INLINE
 void compute_transverse_characteristics(
-    amrex::IntVect const& iv_face,
-    amrex::IntVect const& iv_inner,
+    amrex::IntVect const& iv,
     int dir,
     amrex::GpuArray<amrex::Real, AMREX_SPACEDIM> const& dxinv,
-    amrex::Array4<const amrex::Real> const& qbc,
     amrex::Array4<const amrex::Real> const& q,
     amrex::Real* Tchar)
 {
     using amrex::Real;
 
-    // Characteristic basis evaluated from the evolved boundary state.
-    const Real rho   = qbc(iv_face, cls_t::QRHO);
-    const Real T     = qbc(iv_face, cls_t::QT);
-    const Real c     = qbc(iv_face, cls_t::QC);
-    const Real gamma = qbc(iv_face, cls_t::QG);
+    const Real rho   = q(iv, cls_t::QRHO);
+    const Real T     = q(iv, cls_t::QT);
+    const Real c     = q(iv, cls_t::QC);
+    const Real gamma = q(iv, cls_t::QG);
 
-    // Transverse convection evaluated from the first interior plane.
     Real vel[3] = {
-        q(iv_inner, cls_t::QU),
+        q(iv, cls_t::QU),
 #if AMREX_SPACEDIM >= 2
-        q(iv_inner, cls_t::QV),
+        q(iv, cls_t::QV),
 #else
         Real(0.0),
 #endif
 #if AMREX_SPACEDIM == 3
-        q(iv_inner, cls_t::QW)
+        q(iv, cls_t::QW)
 #else
         Real(0.0)
 #endif
     };
 
     auto Dc =
-        [&] AMREX_GPU_DEVICE(int tdir, int n) noexcept -> Real
+        [=] AMREX_GPU_DEVICE(int tdir, int n) noexcept -> Real
     {
-        const auto e =
-            amrex::IntVect::TheDimensionVector(tdir);
-
-        return Real(0.5)*dxinv[tdir]*
-            (
-                q(iv_inner + e, n)
-              - q(iv_inner - e, n)
-            );
+        const auto e = amrex::IntVect::TheDimensionVector(tdir);
+        return r1_2*dxinv[tdir] *(q(iv + e,n) - q(iv - e,n));
     };
 
     Real Trho = Real(0.0);
     Real TT   = Real(0.0);
-
-    Real Tvel[3] = {
-        Real(0.0),
-        Real(0.0),
-        Real(0.0)
-    };
+    Real Tvel[3] = {Real(0.0),Real(0.0),Real(0.0)};
 
 #if NUM_SPECIES > 1
     Real TY[NUM_SPECIES] = {Real(0.0)};
@@ -610,31 +596,29 @@ void compute_transverse_characteristics(
 
     for (int tdir = 0; tdir < AMREX_SPACEDIM; ++tdir) {
 
-        if (tdir == dir) continue;
+        if (tdir == dir) {
+            continue;
+        }
 
         const Real ut = vel[tdir];
 
-        Trho +=
-              ut*Dc(tdir, cls_t::QRHO)
-            + rho*Dc(tdir, qvel<cls_t>(tdir));
+        // Continuity transverse contribution.
+        Trho += ut*Dc(tdir, cls_t::QRHO) + rho*Dc(tdir, qvel<cls_t>(tdir));
 
-        TT +=
-              ut*Dc(tdir, cls_t::QT)
-            + (gamma - Real(1.0))*T
-              * Dc(tdir, qvel<cls_t>(tdir));
+        // Temperature transverse contribution.
+        TT += ut*Dc(tdir, cls_t::QT) + (gamma - Real(1.0))*T* Dc(tdir, qvel<cls_t>(tdir));
 
+        // Convective contribution to all velocity components.
         for (int m = 0; m < AMREX_SPACEDIM; ++m) {
-            Tvel[m] +=
-                ut*Dc(tdir, qvel<cls_t>(m));
+            Tvel[m] += ut*Dc(tdir, qvel<cls_t>(m));
         }
 
-        Tvel[tdir] +=
-            Dc(tdir, cls_t::QPRES)/rho;
+        // Pressure gradient in the tdir momentum equation.
+        Tvel[tdir] += Dc(tdir, cls_t::QPRES)/rho;
 
 #if NUM_SPECIES > 1
         for (int ns = 0; ns < NUM_SPECIES; ++ns) {
-            TY[ns] +=
-                ut*Dc(tdir, cls_t::QFS + ns);
+            TY[ns] += ut*Dc(tdir, cls_t::QFS + ns);
         }
 #endif
     }
@@ -642,42 +626,25 @@ void compute_transverse_characteristics(
     const Real Tun = Tvel[dir];
     const Real inv_2gamma = Real(0.5)/gamma;
 
-    Tchar[LMINUS] =
-        inv_2gamma*
-        (
-            Trho
-          - gamma*rho*Tun/c
-          + rho*TT/T
-        );
+    Tchar[LMINUS] = inv_2gamma *(Trho - gamma*rho*Tun/c + rho*TT/T );
 
-    Tchar[LENT] =
-        (
-            TT
-          - (gamma - Real(1.0))*T*Trho/rho
-        )/gamma;
+    Tchar[LENT]   = ( TT - (gamma - Real(1.0))*T*Trho/rho)/gamma;
 
     int t1, t2;
     tangent_dirs<cls_t>(dir, t1, t2);
 
-    Tchar[LTAN1] =
-        (t1 >= 0) ? Tvel[t1] : Real(0.0);
+    Tchar[LTAN1] = (t1 >= 0) ? Tvel[t1] : Real(0.0);
 
-    Tchar[LTAN2] =
-        (t2 >= 0) ? Tvel[t2] : Real(0.0);
+    Tchar[LTAN2] = (t2 >= 0) ? Tvel[t2] : Real(0.0);
 
-    Tchar[LPLUS] =
-        inv_2gamma*
-        (
-            Trho
-          + gamma*rho*Tun/c
-          + rho*TT/T
-        );
+    Tchar[LPLUS] = inv_2gamma * (Trho + gamma*rho*Tun/c + rho*TT/T);
 
 #if NUM_SPECIES > 1
     for (int ns = 0; ns < NUM_SPECIES; ++ns) {
         Tchar[LSP + ns] = TY[ns];
     }
 #endif
+
 }
 //-----------------------------------------------------------------
 // Compute the conservative RHS of the face-centred U_BC state.
@@ -742,7 +709,8 @@ void add_lodi_ghost_rhs_to_cons(
     amrex::Array4<amrex::Real> const& rhs_ghost,
     int derivative_order,
     int nscbc_type,
-    nscbc_parm_t const& nscbc_parm)    
+    nscbc_parm_t const& nscbc_parm,
+    bool use_transverse_here)    
 {
     using amrex::Real;
 
@@ -770,6 +738,32 @@ void add_lodi_ghost_rhs_to_cons(
     // directly in place of the previous face-centred qbc.
     // ==============================================================
 
+//...
+//     const Real rho_dbg = q(iv, cls_t::QRHO);
+// const Real T_dbg   = q(iv, cls_t::QT);
+// const Real c_dbg   = q(iv, cls_t::QC);
+// const Real g_dbg   = q(iv, cls_t::QG);
+// const Real p_dbg   = q(iv, cls_t::QPRES);
+
+// if (!amrex::Math::isfinite(rho_dbg) ||
+//     !amrex::Math::isfinite(T_dbg)   ||
+//     !amrex::Math::isfinite(c_dbg)   ||
+//     !amrex::Math::isfinite(g_dbg)   ||
+//     !amrex::Math::isfinite(p_dbg)   ||
+//     rho_dbg <= Real(0.0) ||
+//     T_dbg   <= Real(0.0) ||
+//     c_dbg   <= Real(0.0)) {
+
+//     std::cout << " iv=" << iv << "\n";    
+
+//     printf("BAD NSCBC q:  dir=%d side=%d "
+//            "rho=%e p=%e T=%e c=%e gamma=%e\n",
+//            dir, side_sign,
+//            rho_dbg, p_dbg, T_dbg, c_dbg, g_dbg);
+//     amrex::Abort("Invalid primitive state in NSCBC ghost shell");               
+// }
+//...
+
     Real L[NLWAVES] = {Real(0.0)};
 
     compute_L_lodi<cls_t>(iv,dir,q,drho,dun,dut1,dut2,dT,dY,L);
@@ -786,23 +780,16 @@ void add_lodi_ghost_rhs_to_cons(
     // characteristic treatment is implemented.
     // ==============================================================
 
-    // const bool use_transverse_here = use_transverse_terms && face_interior;
-    const bool use_transverse_here = false; // temp
 
-    const bool include_transverse = use_transverse_here && use_transverse_terms && (nscbc_type == 2 || nscbc_type == 3);
+    //const bool include_transverse = use_transverse_here && use_transverse_terms && (nscbc_type == 2 || nscbc_type == 3);
+
+    const bool include_transverse = use_transverse_here && nscbc_parm.use_transverse && (nscbc_type == 2 || nscbc_type == 3);
+
     Real Tchar[NLWAVES] = {Real(0.0)};
 
     if (include_transverse) {
-        compute_transverse_characteristics<cls_t>(
-            iv,       // local characteristic state
-            iv,       // centre for tangential derivatives
-            dir,
-            dxinv,
-            q,        // local primitive state
-            q,        // neighbouring primitive states
-            Tchar);
+        compute_transverse_characteristics<cls_t>( iv, dir, dxinv, q,Tchar);
     }
-
     // ==============================================================
     // 4. Prescribe the incoming characteristic waves
     // ==============================================================
@@ -849,9 +836,15 @@ void add_lodi_ghost_rhs_to_cons(
     for (int n = 0; n < NLWAVES; ++n) {
         A[n] = L[n];
         if (include_transverse) {
-            A[n] += transverse_scale*Tchar[n];
+            A[n] += Tchar[n];
         }
     }
+
+// #if debug
+//     for (int n = 0; n < NLWAVES; ++n) {
+//       printf(" n=%d A[n]=%f L[n] = %f Tchar[n]=%f \n ",n,A[n],L[n],Tchar[n]);
+//     }
+// #endif
 
     // ==============================================================
     // 6. Reconstruct primitive-variable time derivatives
@@ -1007,8 +1000,7 @@ void physical_flux_from_qbc(
 
     flux(iv_face, cls_t::UMX + dir) += p;
 
-    flux(iv_face, cls_t::UET) =
-        un*(rho*etot + p);
+    flux(iv_face, cls_t::UET) = un*(rho*etot + p);
 
 #if NUM_SPECIES > 1
     for (int ns = 0; ns < NUM_SPECIES; ++ns) {
