@@ -77,6 +77,8 @@ amrex::GpuArray<int, AMREX_SPACEDIM> CNS::nscbc_hi = {AMREX_D_DECL(0,0,0)};
 CNS::NSCBCParm CNS::h_nscbc_parm{};
 CNS::NSCBCParm* CNS::d_nscbc_parm = nullptr;
 
+int CNS::second_order_flux_method = CNS::NONE;
+
 // needed for CNSBld - derived from LevelBld (abstract class, pure virtual
 // functions must be implemented)
 
@@ -189,6 +191,13 @@ void CNS::read_params() {
     const NSCBCParm* nscbc_parm =d_nscbc_parm;
     nscbc::check_nscbc<PROB::ProbClosures>(nslo,nshi,*nscbc_parm);
   } 
+  
+  // second order flux close to BC 
+  pp.query("second_order_flux_method", second_order_flux_method);
+
+  if (second_order_flux_method != KEEP && second_order_flux_method != SKEW && second_order_flux_method != NONE) {
+    amrex::Abort( "cns.second_order_flux_method must be 0 (NONE), 1 (KEEP) or 2 (SKEW)");
+  }
   //
 
 

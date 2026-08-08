@@ -64,6 +64,21 @@ class CNS : public amrex::AmrLevel {
   void compute_rhs(amrex::MultiFab& S, amrex::Real dt,
                    FluxReg* fr_as_crse, FluxReg* fr_as_fine);
 
+  // Order reduction close to BC
+  // Order reduction at physical boundaries
+  enum SecondOrderFluxMethod {
+    NONE = 0,
+    KEEP = 1,
+    SKEW = 2
+  };
+
+  static int second_order_flux_method;
+
+  void apply_second_order_boundary_flux( const amrex::MFIter& mfi, const amrex::Array4<amrex::Real>& cons, 
+    const amrex::Array4<amrex::Real>& prims, std::array<amrex::FArrayBox*, AMREX_SPACEDIM> const& flxt);  
+  //    
+
+
 #if NUM_SPECIES > 1                   
   void clip_species_state(amrex::MultiFab& S);                   
 #endif  

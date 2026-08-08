@@ -14,8 +14,6 @@
 #endif
 
 
-
-
 using namespace amrex;
 
 // Since we do not want to use expensive cudaMemCopy, we are storing all our
@@ -165,11 +163,10 @@ void CNS::compute_rhs(MultiFab& statemf, Real dt, FluxReg* fr_as_crse, FluxReg* 
 #endif
     }
 
-    // replace physical-boundary inviscid fluxes if NSBC are used 
-    // if (use_nscbc && nscbc_boundary_flux_order > 0) {
-    //     apply_nscbc_boundary_flux_closure(mfi,prims,{AMREX_D_DECL(&fluxt[0], &fluxt[1], &fluxt[2])});
-    // }
-    //
+    // Reduce inviscid flux to second order at non-periodic boundaries
+    if (second_order_flux_method != NONE) {
+        apply_second_order_boundary_flux( mfi, state, prims,{AMREX_D_DECL(&fluxt[0],&fluxt[1],&fluxt[2])});
+    }
 
     {
     BL_PROFILE_VAR("CNS::compute_rhs::dflux", prof_dflux);
@@ -457,3 +454,106 @@ void CNS::clip_species_state(MultiFab& statemf) {
 
 }
 #endif
+
+//--------------------------------------------------------------------------------------
+namespace {
+
+struct SecondOrderSkewParm
+{
+    static constexpr int  order       = 2;
+    static constexpr bool dissipation = false;
+
+    static constexpr amrex::Real C2skew = 0.0_rt;
+    static constexpr amrex::Real C4skew = 0.0_rt;
+};
+
+}
+//--------------------------------------------------------------------------------------
+void CNS::apply_second_order_boundary_flux(const amrex::MFIter& mfi, const amrex::Array4<amrex::Real>& cons,
+    const amrex::Array4<amrex::Real>& prims, std::array<amrex::FArrayBox*, AMREX_SPACEDIM> const& flxt)
+{
+    using cls_t = PROB::ProbClosures;
+
+    if (second_order_flux_method == NONE) {return;}
+
+    const Box& domain = geom.Domain();
+    const Box& valid  = mfi.validbox();
+
+    const cls_t* cls = CNS::d_prob_closures;
+
+    // Second-order KEEP operator
+    keep_euler_t<false, false, 2, cls_t> keep2;
+
+    const Array1D<Real, 0, 2> keep2_coeffs{ Real(1.0), Real(0.0), Real(0.0)};
+
+    // Second-order Ducros/skew-symmetric operator
+    skew_t<SecondOrderSkewParm, cls_t> skew2;
+
+    // flux_dir() does not actually use lambda_max
+    const Array4<Real> dummy_lambda;
+
+    const int method = second_order_flux_method;
+
+    for (int dir = 0; dir < AMREX_SPACEDIM; ++dir) {
+
+        // Do not modify periodic boundaries
+        if (geom.isPeriodic(dir)) {continue;}
+
+        const auto flx = flxt[dir]->array();
+
+        const GpuArray<int, 3> vdir{int(dir == 0), int(dir == 1),int(dir == 2)
+        };
+
+        const int Qdir = cls_t::QRHO + dir + 1;
+
+        // =============================================================
+        // LOW physical boundary
+        // =============================================================
+
+        if (valid.smallEnd(dir) == domain.smallEnd(dir)) {
+
+            const int iface = domain.smallEnd(dir);
+
+            // LOW
+            const int iface0 = domain.smallEnd(dir);
+            Box face = amrex::surroundingNodes(valid, dir);
+            face.setSmall(dir, iface0);
+            face.setBig  (dir, iface0 + 1);
+
+            // this could be improved by putting if outsude
+            ParallelFor( face, [=] AMREX_GPU_DEVICE( int i, int j, int k) noexcept
+                {
+                    if (method == KEEP) {
+                        keep2.flux_dir(i, j, k, dir,keep2_coeffs,prims,flx,cls);
+                    } else if (method == SKEW) {
+                        skew2.flux_dir(i, j, k, Qdir,vdir,cons,prims,dummy_lambda,flx,cls);
+                    }
+                });
+        }
+
+        // =============================================================
+        // HIGH physical boundary
+        // =============================================================
+
+        if (valid.bigEnd(dir) == domain.bigEnd(dir)) {
+
+            const int iface = domain.bigEnd(dir) + 1;
+
+            // HIGH
+            const int iface1 = domain.bigEnd(dir) + 1;
+            Box face = amrex::surroundingNodes(valid, dir);
+            face.setSmall(dir, iface1 - 1);
+            face.setBig  (dir, iface1);
+
+            // this could be improved by putting if outsude
+            ParallelFor(face,[=] AMREX_GPU_DEVICE( int i, int j, int k) noexcept
+                {
+                    if (method == KEEP) {
+                        keep2.flux_dir(i, j, k,dir,keep2_coeffs,prims,flx,cls);
+                    } else if (method == SKEW) {
+                        skew2.flux_dir(i, j, k,Qdir,vdir,cons,prims,dummy_lambda,flx,cls);
+                    }
+                });
+        }
+    }
+}

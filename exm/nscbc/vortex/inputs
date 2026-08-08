@@ -32,6 +32,7 @@ cns.nscbc_sigma = 0.28
 cns.nscbc_use_transverse = 1
 cns.nscbc_beta_transverse = 0.575
 cns.nscbc_Mmax = 0.575
+cns.second_order_flux_method = 2
 
 
 # inflow
