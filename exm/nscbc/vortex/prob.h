@@ -44,7 +44,7 @@ struct methodparm_t {
 
   static constexpr bool dissipation = true;         // no dissipation
   static constexpr int  order = 4;                  // order numerical scheme   
-  static constexpr Real C2skew=0.1,C4skew=0.016;   // Skew symmetric default
+  static constexpr Real C2skew=0.01,C4skew=0.016;   // Skew symmetric default
 
 };
 

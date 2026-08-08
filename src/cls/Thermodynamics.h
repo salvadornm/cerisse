@@ -75,10 +75,25 @@ class calorifically_perfect_gas_t {
     R = P/(T *Rspec);    
   }    
   
-  // \brief calculate the specific internal energy
+  // \brief calculate the specific internal energy e=e(P,Y,T)
   AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE void PYT2E(
     const Real /*P*/, const Real* /*Y*/, const Real T, Real& E) const {      
     E = cv*T;
+  }
+
+  // \brief calculate the specific internal energy e=e(T,Y,rho)
+  AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE void TYR2E(
+    const Real T, const Real* /*Y*/, const Real rho, Real& E) const {      
+    E = cv*T;
+  }
+
+  // \brief calculate derivative specific energy  de=F(T,Y,dT,dY,rho,drho)
+  AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE Real dE(
+    const Real /*T*/, const Real* /*Y*/,
+    const Real dT, const Real* /*dY*/,
+    const Real /*rho*/, const Real /*drho*/) const
+  {  
+    return cv*dT;
   }
   
   // \brief this function ensures P and T  do not violate bounds
@@ -311,8 +326,7 @@ class calorifically_perfect_gas_t {
     for (int n = 0; n < idx_t::NCONS; ++n) f[n] = tmp[n];
   }
 
-  AMREX_GPU_DEVICE AMREX_FORCE_INLINE void char2cons(
-      RoeAvgState r, Real f[idx_t::NCONS]) const {
+  AMREX_GPU_DEVICE AMREX_FORCE_INLINE void char2cons( RoeAvgState r, Real f[idx_t::NCONS]) const {
     amrex::Real tmp[idx_t::NCONS];
 
     const int UN = idx_t::UMX + r.CN;
@@ -365,25 +379,6 @@ class calorifically_perfect_gas_t {
   
 
 ////////////////////////////////////////////////////////////////////////////////////////
-// TODO 
-class calorifically_perfect_gas_nasg_liquid_t {
- private:
-  /* data */
-  // gamma_a =;
-  // gamma_l =;
-
- public:
-  // state
-
-  Real inline energy(Real p, Real rho) {
-    Real eint = 0;
-    eint = p/rho; // temp just to avoid warnings
-    return eint;
-  }
-
-  // pressure (eint,rho)
-};
-
 #ifdef USE_PELEPHYSICS
 #include <PelePhysics.H>
 
@@ -395,6 +390,13 @@ class multispecies_pele_gas_t {
   idx_t idx;
 
  public:
+
+    // This is a place holder for KEEP or other mechanism that need Cv, Cp or Gamma
+    // it uses dry air at standard temperature (all SI units)
+    Real cv = Real(718.0);  // Cv = Rg/(gamma-1)
+    Real cp = Real(1005.0);
+    Real gamma = Real(1.4);
+    Real Rspec = 287;
 
   /**
   *  @brief compute internal energy from density, pressure and mass fraction
@@ -538,13 +540,47 @@ class multispecies_pele_gas_t {
   /**
   *  @brief compute pressure from density, temperature and mass fractions
   */
-  AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE void RTY2P(
-      const Real R, const Real T, const Real Y[NUM_SPECIES],  Real& P) const {
+  AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE void RTY2P(const Real R, const Real T, const Real Y[NUM_SPECIES],  Real& P) const {
  
       auto eos = pele::physics::PhysicsType::eos();                   
       eos.RTY2P(R*rho_si2cgs, T, Y, P);P *= pres_cgs2si;
   }            
 
+  // \brief calculate the specific internal energy e=e(T,Y,rho)
+  AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE void TYR2E(
+    const Real T, const Real* Y, const Real rho, Real& E) const
+    {   
+    auto eos = pele::physics::PhysicsType::eos();
+
+    Real e_cgs;
+    eos.RTY2E(rho * rho_si2cgs, T, Y, e_cgs);
+
+    E = e_cgs * specenergy_cgs2si;
+    }
+
+  // \brief calculate derivative specific energy  de=F(T,Y,dT,dY,rho,drho)
+  AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE Real dE(const Real T, const Real* Y, const Real dT, const Real* dY,
+    const Real rho, const Real /*drho*/) const
+    {
+    auto eos = pele::physics::PhysicsType::eos();
+
+    Real cv_cgs;
+    Real ei_cgs[NUM_SPECIES];
+
+    Real rho_cgs = rho*rho_si2cgs;
+    eos.RTY2Cv(rho_cgs, T, Y, cv_cgs);
+    eos.RTY2Ei(rho_cgs, T, Y, ei_cgs);
+
+    Real de_cgs = cv_cgs * dT;
+
+    // non-ideal gas contribution (need to add a wrapper fro SRK)
+    // drho_cgs = drho*rho_si2cgs;
+    // eos.RTY2dEdr(rho_cgs, T, Y, dedrho_cgs);
+    // de_cgs += dedrho_cgs*drho_cgs;
+
+    for (int k = 0; k < NUM_SPECIES; ++k) { de_cgs += ei_cgs[k] * dY[k];}
+    return de_cgs * specenergy_cgs2si;
+    }
 
   //-------------------------------------------------------------------------------------
   // @brief Compute mole fraction array from mass fraction species array

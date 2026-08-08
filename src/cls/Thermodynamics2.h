@@ -10,7 +10,7 @@ using namespace amrex;
 using namespace universal_constants;
 using namespace CNSConstants;
 
-// Generic Perfect gas (needs gamma and moecular weight as input)
+// Generic Perfect gas (needs gamma and molecular weight as input)
 ////////////////////////////////////////////////////////////////////////////////////////
 template <typename param, typename idx_t>
 class perfect_gas_t {
@@ -72,12 +72,27 @@ AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE Real get_ei_min() const {
     R = P/(T *Rspec);    
   }    
   
-  // \brief calculate the specific internal energy
+  // \brief calculate the specific internal energy e=e(P,Y,T)
   AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE void PYT2E(
     const Real /*P*/, const Real* /*Y*/, const Real T, Real& E) const {      
     E = cv*T;
   }
+
+  // \brief calculate the specific internal energy e=e(T,Y,rho)
+  AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE void TYR2E(
+    const Real T, const Real* /*Y*/, const Real rho, Real& E) const {      
+    E = cv*T;
+  }
   
+  // \brief calculate derivative specific energy  de=F(T,Y,dT,dY,rho,drho)
+  AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE Real dE(
+    const Real /*T*/, const Real* /*Y*/,
+    const Real dT, const Real* /*dY*/,
+    const Real /*rho*/, const Real /*drho*/) const
+  {  
+    return cv*dT;
+  }
+
   // \brief this function ensures P and T  do not violate bounds
   // and then fills the q-array  to ensure consistency.
   // Used in IBM to calculate auxiliar primitives corerctly

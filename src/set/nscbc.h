@@ -714,8 +714,6 @@ void add_lodi_ghost_rhs_to_cons(
 {
     using amrex::Real;
 
-    amrex::ignore_unused(cls);
-
     // ==============================================================
     // 1. Normal primitive-variable derivatives
     // ==============================================================
@@ -737,32 +735,6 @@ void add_lodi_ghost_rhs_to_cons(
     // Array4, so the cell-centred primitive field can be passed
     // directly in place of the previous face-centred qbc.
     // ==============================================================
-
-//...
-//     const Real rho_dbg = q(iv, cls_t::QRHO);
-// const Real T_dbg   = q(iv, cls_t::QT);
-// const Real c_dbg   = q(iv, cls_t::QC);
-// const Real g_dbg   = q(iv, cls_t::QG);
-// const Real p_dbg   = q(iv, cls_t::QPRES);
-
-// if (!amrex::Math::isfinite(rho_dbg) ||
-//     !amrex::Math::isfinite(T_dbg)   ||
-//     !amrex::Math::isfinite(c_dbg)   ||
-//     !amrex::Math::isfinite(g_dbg)   ||
-//     !amrex::Math::isfinite(p_dbg)   ||
-//     rho_dbg <= Real(0.0) ||
-//     T_dbg   <= Real(0.0) ||
-//     c_dbg   <= Real(0.0)) {
-
-//     std::cout << " iv=" << iv << "\n";    
-
-//     printf("BAD NSCBC q:  dir=%d side=%d "
-//            "rho=%e p=%e T=%e c=%e gamma=%e\n",
-//            dir, side_sign,
-//            rho_dbg, p_dbg, T_dbg, c_dbg, g_dbg);
-//     amrex::Abort("Invalid primitive state in NSCBC ghost shell");               
-// }
-//...
 
     Real L[NLWAVES] = {Real(0.0)};
 
@@ -913,22 +885,31 @@ void add_lodi_ghost_rhs_to_cons(
     //       = (e + ke) drho/dt
     //       + rho [cv dT/dt + d(ke)/dt].
     //
-    // This should eventually be replaced by an EOS-specific helper
-    // for variable-cp or reacting mixtures.
+    // Thermodynamic dependence is handled entirely by the EOS
+    // through TYR2E() and dE().
     // ==============================================================
 
-    const Real p = q(iv, cls_t::QPRES);
     const Real T = q(iv, cls_t::QT);
+    
+    Real Y[NUM_SPECIES] = {Real(0.0)};
 
-    const Real gamma =q(iv, cls_t::QG);
-    const Real e = p / (rho*(gamma - Real(1.0)));
-    const Real cv = e/T;
+#if NUM_SPECIES > 1
+    for (int ns = 0; ns < NUM_SPECIES; ++ns) {
+        Y[ns] = q(iv, cls_t::QFS + ns);
+    }
+#else
+    Y[0] = Real(1.0);
+#endif
 
+    // Specific internal energy e(T,Y,rho)
+    Real e; cls->TYR2E(T, Y, rho, e);
+
+    // Specific internal-energy time derivative
+    const Real dedt = cls->dE(T, Y, dTdt, dYdt, rho, drhodt);
     const Real ke = Real(0.5)*(u*u + v*v + w*w);
-
     const Real dkedt = u*dudt + v*dvdt + w*dwdt;
-
-    rhs_ghost(iv, cls_t::UET) = (e + ke)*drhodt + rho*(cv*dTdt + dkedt);
+    //    
+    rhs_ghost(iv, cls_t::UET) = (e + ke)*drhodt + rho*(dedt + dkedt);
 }
 //------------------------------------------------------------------------------
 // 
