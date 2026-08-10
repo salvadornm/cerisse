@@ -4,7 +4,6 @@
 
 using namespace amrex;
 
-
 //------------------------------------------------------------------------------
 // 
 //
@@ -12,28 +11,15 @@ using namespace amrex;
 namespace {
 
 AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
-void decode_nscbc_owner(
-    int owner,
-    int& dir,
-    int& side_sign) noexcept
+void decode_nscbc_owner(int owner,int& dir, int& side_sign) noexcept
 {
-    // owner:
-    // 1,3,5 -> low side
-    // 2,4,6 -> high side
-
+    // owner: // 1,3,5 -> low side. // 2,4,6 -> high side
     dir = (owner - 1) / 2;
-
-    side_sign =
-        (owner % 2 == 1)
-        ? +1
-        : -1;
+    side_sign = (owner % 2 == 1) ? +1 : -1;
 }
 
 AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
-int number_of_external_directions(
-    amrex::IntVect const& iv,
-    amrex::IntVect const& dom_lo,
-    amrex::IntVect const& dom_hi) noexcept
+int number_of_external_directions(amrex::IntVect const& iv, amrex::IntVect const& dom_lo, amrex::IntVect const& dom_hi) noexcept
 {
     int count = 0;
 
@@ -56,7 +42,12 @@ void CNS::compute_nscbc_ghostcell_rhs( amrex::MultiFab& stage_state)
 {
     const auto* cls_d = d_prob_closures;
     const auto& cls_h = *h_prob_closures;
-    const auto* parm  = d_nscbc_parm;
+    
+    // NEW
+    const auto nslo = CNS::nscbc_lo;
+    const auto nshi = CNS::nscbc_hi;
+    const auto parm_lo = CNS::nscbc_parm_lo;
+    const auto parm_hi = CNS::nscbc_parm_hi;
 
     const int nprim  = cls_h.NPRIM;
     const int ng     = cls_h.NGHOST;
@@ -83,9 +74,6 @@ void CNS::compute_nscbc_ghostcell_rhs( amrex::MultiFab& stage_state)
     const auto dom_lo = domain.smallEnd();
     const auto dom_hi = domain.bigEnd();
 
-    const auto nslo = CNS::nscbc_lo;
-    const auto nshi = CNS::nscbc_hi;
-
     for (MFIter mfi(q, false); mfi.isValid(); ++mfi) {
 
         auto const& qp   = q.const_array(mfi);
@@ -111,6 +99,8 @@ void CNS::compute_nscbc_ghostcell_rhs( amrex::MultiFab& stage_state)
 
                 const int nscbc_type = (side_sign > 0) ? nslo[dir] : nshi[dir];
 
+                const auto& parm = (side_sign > 0) ? parm_lo[dir] : parm_hi[dir];
+
                 const int external_dirs = number_of_external_directions( iv,dom_lo,dom_hi);
                 
                 //const bool face_interior = (external_dirs == 1);
@@ -126,13 +116,13 @@ void CNS::compute_nscbc_ghostcell_rhs( amrex::MultiFab& stage_state)
                     }
                 }
 
-               // transverse_stencil_available = false; //temp
-                
+                // transverse_stencil_available = false; //temp                
                 // temp: only activates transverse terms in interior points
+                // palce holder for corners and edges
 
                 nscbc::add_lodi_ghost_rhs_to_cons <PROB::ProbClosures>(
                         iv,dir,side_sign,dxinv,
-                        cls_d,qp,rhs,nscbc_order,nscbc_type, *parm, transverse_stencil_available);
+                        cls_d,qp,rhs,nscbc_order,nscbc_type, parm, transverse_stencil_available); //NEW
             });
     }
 }
@@ -217,10 +207,6 @@ void CNS::build_nscbc_shell_owner()
 // 
 //
 //------------------------------------------------------------------------------
-//------------------------------------------------------------------------------
-// 
-//
-//------------------------------------------------------------------------------
 AMREX_GPU_DEVICE AMREX_FORCE_INLINE
 int number_of_external_directions(amrex::IntVect const& iv, amrex::IntVect const& dom_lo, amrex::IntVect const& dom_hi)
 {
@@ -263,10 +249,6 @@ void CNS::fill_nscbc_ghost_cells2(MultiFab& state) const //old version
             });
     }
 }
-//------------------------------------------------------------------------------
-// 
-//
-//------------------------------------------------------------------------------
 //------------------------------------------------------------------------------
 // Overwrite NSCBC physical ghost cells with the persistent ghost-shell state.
 //
@@ -371,17 +353,11 @@ void CNS::clear_nscbc_ghost_rhs()
     nscbc_shell.rhs->setVal(amrex::Real(0.0));
 }
 //------------------------------------------------------------------------------
-// 
-//
-//------------------------------------------------------------------------------
-//------------------------------------------------------------------------------
 // Copy one NSCBC ghost-shell MultiFab into another.
 //
 // The source and destination must have identical layouts.
 //------------------------------------------------------------------------------
-void CNS::copy_nscbc_shell(
-    amrex::MultiFab& dst,
-    amrex::MultiFab const& src)
+void CNS::copy_nscbc_shell(amrex::MultiFab& dst, amrex::MultiFab const& src)
 {
     AMREX_ALWAYS_ASSERT_WITH_MESSAGE(
         dst.boxArray() == src.boxArray(),
@@ -399,17 +375,7 @@ void CNS::copy_nscbc_shell(
         dst.nGrow() == src.nGrow(),
         "copy_nscbc_shell: incompatible number of ghost cells");
 
-    amrex::MultiFab::Copy(
-        dst,
-        src,
-        0,              // src component
-        0,              // dst component
-        src.nComp(),    // number of components
-        src.nGrow());   // copy ghost cells too
+    amrex::MultiFab::Copy( dst, src, 0, 0,src.nComp(),src.nGrow());   
 }
-//------------------------------------------------------------------------------
-// 
-//
-//------------------------------------------------------------------------------
 
 

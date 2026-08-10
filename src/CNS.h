@@ -17,6 +17,7 @@ using FluxReg = amrex::YAFluxRegister;
 #include <CNSconstants.h>
 
 #include <Utilities.h>
+#include <nscbc_parm.h>
 
 
 // using namespace amrex;
@@ -268,23 +269,8 @@ class CNS : public amrex::AmrLevel {
   static amrex::GpuArray<int, AMREX_SPACEDIM> nscbc_lo;
   static amrex::GpuArray<int, AMREX_SPACEDIM> nscbc_hi;
 
-  struct NSCBCParm {
-    amrex::Real Lchar   = 1.0;
-    amrex::Real Mmax    = 0.1;
-    amrex::Real Ptarget = 101325.0;
-    amrex::Real sigma   = 0.28;
-    amrex::Real utarget = 0.0;
-    amrex::Real vtarget = 0.0;
-    amrex::Real wtarget = 0.0;
-    amrex::Real Ttarget = 300.0;
-    amrex::Real eta     = 1.0;   
-    bool use_transverse = false;
-    amrex::Real beta_transverse = 0.0; 
-    amrex::Real relax  = sigma*(1.0- Mmax*Mmax)/(2.0*Lchar); 
-  };
-
-  static NSCBCParm h_nscbc_parm;
-  static NSCBCParm* d_nscbc_parm;
+  static amrex::GpuArray<nscbc::NSCBCParm, AMREX_SPACEDIM> nscbc_parm_lo;
+  static amrex::GpuArray<nscbc::NSCBCParm, AMREX_SPACEDIM> nscbc_parm_hi;
 
   // -------------------------------------------------------------------------
   // NSCBC ghost cell data.

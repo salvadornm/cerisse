@@ -102,23 +102,13 @@ void CNS::variableSetUp() {
   CNS::h_prob_parm = new PROB::ProbParm{};
   CNS::h_phys_bc = new BCRec{};
 #ifdef AMREX_USE_GPU
-  CNS::d_prob_closures =
-      (PROB::ProbClosures*)The_Arena()->alloc(sizeof(PROB::ProbClosures));
-  CNS::d_prob_parm =
-      (PROB::ProbParm*)The_Arena()->alloc(sizeof(PROB::ProbParm));
-  CNS::d_phys_bc = (BCRec*)The_Arena()->alloc(sizeof(BCRec));
+  CNS::d_prob_closures = (PROB::ProbClosures*)The_Arena()->alloc(sizeof(PROB::ProbClosures));
+  CNS::d_prob_parm     = (PROB::ProbParm*)The_Arena()->alloc(sizeof(PROB::ProbParm));
+  CNS::d_phys_bc       = (BCRec*)The_Arena()->alloc(sizeof(BCRec));
 #else
   CNS::d_prob_closures = h_prob_closures;
-  CNS::d_prob_parm = h_prob_parm;
-  CNS::d_phys_bc = h_phys_bc;
-#endif
-
-  // 
-#ifdef AMREX_USE_GPU
-  CNS::d_nscbc_parm =
-    (NSCBCParm*)The_Arena()->alloc(sizeof(NSCBCParm));
-#else
-  CNS::d_nscbc_parm = &CNS::h_nscbc_parm;
+  CNS::d_prob_parm     = h_prob_parm;
+  CNS::d_phys_bc       = h_phys_bc;
 #endif
 
   // Read input parameters

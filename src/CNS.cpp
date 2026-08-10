@@ -74,14 +74,37 @@ int CNS::nscbc_order = 2;
 amrex::GpuArray<int, AMREX_SPACEDIM> CNS::nscbc_lo = {AMREX_D_DECL(0,0,0)};
 amrex::GpuArray<int, AMREX_SPACEDIM> CNS::nscbc_hi = {AMREX_D_DECL(0,0,0)};
 
-CNS::NSCBCParm CNS::h_nscbc_parm{};
-CNS::NSCBCParm* CNS::d_nscbc_parm = nullptr;
+
+amrex::GpuArray<nscbc::NSCBCParm, AMREX_SPACEDIM>CNS::nscbc_parm_lo{};
+amrex::GpuArray<nscbc::NSCBCParm, AMREX_SPACEDIM>CNS::nscbc_parm_hi{};
+
 
 int CNS::second_order_flux_method = CNS::NONE;
 
-// needed for CNSBld - derived from LevelBld (abstract class, pure virtual
-// functions must be implemented)
 
+// helper function to avoid repeated pp.query() to read nscbc parameters
+namespace {
+
+void read_nscbc_parm(amrex::ParmParse& pp,std::string const& face, nscbc::NSCBCParm& p)
+{
+    pp.query(("nscbc_" + face + "_Lchar").c_str(), p.Lchar);
+    pp.query(("nscbc_" + face + "_Mmax").c_str(), p.Mmax);
+    pp.query(("nscbc_" + face + "_Ptarget").c_str(), p.Ptarget);
+    pp.query(("nscbc_" + face + "_sigma").c_str(), p.sigma);
+
+    pp.query(("nscbc_" + face + "_utarget").c_str(), p.utarget);
+    pp.query(("nscbc_" + face + "_vtarget").c_str(), p.vtarget);
+    pp.query(("nscbc_" + face + "_wtarget").c_str(), p.wtarget);
+    pp.query(("nscbc_" + face + "_Ttarget").c_str(), p.Ttarget);
+    pp.query(("nscbc_" + face + "_eta").c_str(), p.eta);
+    pp.query(("nscbc_" + face + "_inflow_target").c_str(), p.inflow_target);
+    pp.query(("nscbc_" + face + "_mass_flux_target").c_str(),p.mass_flux_target);
+    pp.query(("nscbc_" + face + "_use_transverse").c_str(),p.use_transverse);
+    pp.query(("nscbc_" + face + "_beta_transverse").c_str(),p.beta_transverse);
+}
+
+}
+//------------------------------------------------------------------------------
 CNS::CNS() {}
 
 CNS::CNS(Amr &papa, int lev, const Geometry &level_geom, const BoxArray &bl,
@@ -169,27 +192,41 @@ void CNS::read_params() {
                  << "\n";
    
     // read NSBC parameters and store in host_nsbc_parm
-    pp.query("nscbc_Lchar",   h_nscbc_parm.Lchar);
-    pp.query("nscbc_Mmax",    h_nscbc_parm.Mmax);
-    pp.query("nscbc_Ptarget", h_nscbc_parm.Ptarget);
-    pp.query("nscbc_sigma",   h_nscbc_parm.sigma);
-    pp.query("nscbc_utarget", h_nscbc_parm.utarget);
-    pp.query("nscbc_vtarget", h_nscbc_parm.vtarget);
-    pp.query("nscbc_wtarget", h_nscbc_parm.wtarget);
-    pp.query("nscbc_Ttarget", h_nscbc_parm.Ttarget);
-    pp.query("nscbc_eta",     h_nscbc_parm.eta);
-    pp.query("nscbc_use_transverse", h_nscbc_parm.use_transverse);
-    pp.query("nscbc_beta_transverse",h_nscbc_parm.beta_transverse);
-    pp.query("nscbc_order", nscbc_order);
-    
+    // pp.query("nscbc_Lchar",   h_nscbc_parm.Lchar);
+    // pp.query("nscbc_Mmax",    h_nscbc_parm.Mmax);
+    // pp.query("nscbc_Ptarget", h_nscbc_parm.Ptarget);
+    // pp.query("nscbc_sigma",   h_nscbc_parm.sigma);
+    // pp.query("nscbc_utarget", h_nscbc_parm.utarget);
+    // pp.query("nscbc_vtarget", h_nscbc_parm.vtarget);
+    // pp.query("nscbc_wtarget", h_nscbc_parm.wtarget);
+    // pp.query("nscbc_Ttarget", h_nscbc_parm.Ttarget);
+    // pp.query("nscbc_eta",     h_nscbc_parm.eta);
+    // pp.query("nscbc_use_transverse", h_nscbc_parm.use_transverse);
+    // pp.query("nscbc_beta_transverse",h_nscbc_parm.beta_transverse);
+    // pp.query("nscbc_order", nscbc_order);
 
-#ifdef AMREX_USE_GPU
-  amrex::Gpu::htod_memcpy(d_nscbc_parm, &h_nscbc_parm, sizeof(NSCBCParm));
+    // read NSBC parameters for each face
+    read_nscbc_parm(pp, "xlo", nscbc_parm_lo[0]);
+    read_nscbc_parm(pp, "xhi", nscbc_parm_hi[0]);
+
+#if AMREX_SPACEDIM >= 2
+    read_nscbc_parm(pp, "ylo", nscbc_parm_lo[1]);
+    read_nscbc_parm(pp, "yhi", nscbc_parm_hi[1]);
 #endif
 
-    // check parameters validity
-    const NSCBCParm* nscbc_parm =d_nscbc_parm;
-    nscbc::check_nscbc<PROB::ProbClosures>(nslo,nshi,*nscbc_parm);
+#if AMREX_SPACEDIM == 3
+    read_nscbc_parm(pp, "zlo", nscbc_parm_lo[2]);
+    read_nscbc_parm(pp, "zhi", nscbc_parm_hi[2]);
+#endif
+
+    pp.query("nscbc_order", nscbc_order);
+
+    for (int d = 0; d < AMREX_SPACEDIM; ++d) {
+
+      nscbc::check_nscbc_boundary( d, true, nscbc_lo[d], nscbc_parm_lo[d]);
+      nscbc::check_nscbc_boundary(d, false, nscbc_hi[d], nscbc_parm_hi[d]);
+    }
+
   } 
   
   // second order flux close to BC 

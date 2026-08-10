@@ -26,20 +26,25 @@ cns.hi_bc = 2 -1
 # NSCBC
 cns.nscbc_lo   = 1 0
 cns.nscbc_hi   = 3 0
+
+# parameters
 cns.nscbc_order = 2
-cns.nscbc_Lchar = 0.013
-cns.nscbc_sigma = 0.28
-cns.nscbc_use_transverse = 1
-cns.nscbc_beta_transverse = 0.575
-cns.nscbc_Mmax = 0.575
+
+# inflow xlo
+cns.nscbc_xlo_utarget = 199.6335
+cns.nscbc_xlo_vtarget = 0.0
+cns.nscbc_xlo_Ttarget = 300.0
+cns.nscbc_xlo_eta = 1.0
+
+# pressure-relaxation xhi
+cns.nscbc_xhi_Lchar = 0.013 
+cns.nscbc_xhi_sigma = 0.28
+cns.nscbc_xhi_use_transverse = 1
+cns.nscbc_xhi_beta_transverse = 0.575
+cns.nscbc_xhi_Mmax = 0.575
+
+# reduce order close to BC
 cns.second_order_flux_method = 2
-
-
-# inflow
-cns.nscbc_utarget = 199.6335
-cns.nscbc_vtarget = 0.0
-cns.nscbc_Ttarget = 300.0
-cns.nscbc_eta = 1.0
 
 #
 cns.nstep_screen_output = 100 # frequency of plotting information to screen

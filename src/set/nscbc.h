@@ -6,6 +6,7 @@
 #include <AMReX_IntVect.H>
 #include <AMReX_Gpu.H>
 #include <AMReX_Math.H>
+#include <nscbc_parm.h>
 
 namespace nscbc {
 
@@ -21,76 +22,44 @@ static constexpr int NLWAVES = NUM_SPECIES + 5;
 static constexpr amrex::Real r1_2 =  amrex::Real(1.0) / amrex::Real(2.0); 
 static constexpr amrex::Real r1_3 =  amrex::Real(1.0) / amrex::Real(3.0); 
 
+// TO DELETE
+//static constexpr bool use_transverse_terms = false;   
 
-static constexpr bool use_transverse_terms = false;   
-
-
-// Default parameter object for LODI-only NSCBCs.
-// The solver may also pass any user-defined nscbc_parm_t with the same fields.
-// (defiend as well in CNS.h coudl be cleaned!!)
-struct NSCBCParm {
-    amrex::Real Lchar   = 1.0;
-    amrex::Real Mmax    = 0.1;
-    amrex::Real Ptarget = 101325.0;
-    amrex::Real sigma   = 0.28;
-    amrex::Real utarget = 0.0;
-    amrex::Real vtarget = 0.0;
-    amrex::Real wtarget = 0.0;
-    amrex::Real Ttarget = 300.0;
-    amrex::Real eta     = 1.0;   
-    bool use_transverse = false;
-    amrex::Real beta_transverse = 0.0; 
-    amrex::Real relax  = sigma*(1.0- Mmax*Mmax)/(2.0*Lchar); 
-};
-
-
-template <typename cls_t, typename nscbc_parm_t>
-AMREX_GPU_DEVICE AMREX_FORCE_INLINE
-void check_nscbc (Vector<int> &nslo, Vector<int> &nshi, nscbc_parm_t const& nscbc_parm)
+//-----------------------------------------------------------------
+//
+//
+//-----------------------------------------------------------------
+template <typename nscbc_parm_t>
+void check_nscbc_boundary( int dir,bool is_lo,int type, nscbc_parm_t const& parm)
 {
-    amrex::Print() << " Using NSBC:  \n";
-    
-    // check if NSBC boundaries are well posed
-    int type = 0;
-    for (int n=0;n< AMREX_SPACEDIM;n++){
-        for (int bcside=0; bcside< 2; bcside++) {
-            if (bcside==0) {
-                //type = cls_t::nscbc_type_lo[n]; 
-                type = nslo[n];   
-                amrex::Print() << " dim = " << n <<  "  nscbc_type_lo " <<  type << "\n";
-            }
-            else {
-                //type = cls_t::nscbc_type_hi[n];  
-                type = nshi[n]; 
-                amrex::Print() << " dim = " << n <<  "  nscbc_type_hi " <<  type << "\n";  
-            }
-            // classify BC
-            if (type ==1 ){
-                amrex::Print() << " non-reflecting inflow with target relaxation  \n";
-                amrex::Print() << "      utarget "   <<  nscbc_parm.utarget << "\n";
-                amrex::Print() << "      vtarget "   <<  nscbc_parm.vtarget << "\n";
-                amrex::Print() << "      wtarget "   <<  nscbc_parm.wtarget << "\n";
-                amrex::Print() << "      Ttarget "   <<  nscbc_parm.Ttarget << "\n";
-                amrex::Print() << "      eta     "   <<  nscbc_parm.eta     << "\n";
-            }
-            else if (type == 2) {
-                amrex::Print() << " purely non-reflecting outflow \n";
-            }
-            else if (type == 3) {
-                amrex::Print() << " non-reflecting outflow  targeting pressure  \n";        
-                amrex::Print() << "      p_target "   <<  nscbc_parm.Ptarget << "\n";  
-                amrex::Print() << "      sigma "      <<  nscbc_parm.sigma << "\n";
-                amrex::Print() << "      Lchar "      <<  nscbc_parm.Lchar  << "\n";                         
-                amrex::Print() << "      Mmax  "      <<  nscbc_parm.Mmax  << "\n";                                                       
-            }
-            else if (type == 0) {                          
-                amrex::Print() << " no NSBC  \n";        
-            }
-        }    
-    }
-    //
+    amrex::Print() << "NSCBC: dir=" << dir << (is_lo ? " lo" : " hi") << " type=" << type << "\n";
 
+    if (type == 1) {
+        amrex::Print()
+            << " -inflow: "
+            << " u=" << parm.utarget
+            << " v=" << parm.vtarget
+            << " w=" << parm.wtarget
+            << " T=" << parm.Ttarget
+            << " eta=" << parm.eta << "\n";
+    }
+    else if (type == 2) {
+        amrex::Print()
+            << "  -purely non-reflecting outflow\n";
+    }
+    else if (type == 3) {
+        amrex::Print()
+            << " -pressure-relaxed outflow: "
+            << " Ptarget=" << parm.Ptarget
+            << " sigma=" << parm.sigma
+            << " Lchar=" << parm.Lchar
+            << " Mmax=" << parm.Mmax << "\n";
+    }
 }
+//-----------------------------------------------------------------
+//
+//
+//-----------------------------------------------------------------
 template <typename cls_t>
 AMREX_GPU_DEVICE AMREX_FORCE_INLINE
 int qvel (int dir)
@@ -394,10 +363,7 @@ void apply_lodi_outflow_pressure_relaxation_transverse(
 template <typename cls_t>
 AMREX_GPU_DEVICE AMREX_FORCE_INLINE
 amrex::Real target_velocity_component (
-    int dir,
-    amrex::Real utarget,
-    amrex::Real vtarget,
-    amrex::Real wtarget)
+    int dir, amrex::Real utarget, amrex::Real vtarget, amrex::Real wtarget)
 {
     if (dir == 0) return utarget;
 #if AMREX_SPACEDIM >= 2
@@ -417,13 +383,8 @@ amrex::Real target_velocity_component (
 //-----------------------------------------------------------------
 template <typename cls_t, typename nscbc_parm_t>
 AMREX_GPU_DEVICE AMREX_FORCE_INLINE
-void apply_lodi_inflow_relaxation (
-    amrex::IntVect const& iv_face,
-    int dir,
-    int side_sign,
-    amrex::Array4<const amrex::Real> const& qbc,
-    amrex::Real* L,
-    nscbc_parm_t const& nscbc_parm)
+void apply_lodi_inflow_relaxation ( amrex::IntVect const& iv_face, int dir, int side_sign,
+    amrex::Array4<const amrex::Real> const& qbc, amrex::Real* L, nscbc_parm_t const& nscbc_parm)
 {
     using amrex::Real;
 
@@ -450,6 +411,8 @@ void apply_lodi_inflow_relaxation (
 #endif
     };
 
+    
+
     L[LENT] = eta * (qbc(iv_face, cls_t::QT) - nscbc_parm.Ttarget);
 
 #if AMREX_SPACEDIM >= 2
@@ -463,8 +426,12 @@ void apply_lodi_inflow_relaxation (
     }
 #endif
 
+    Real un_targ = u_target[dir];      
+    // re-define target velocity in case of mass-flux 
+    if (nscbc_parm.inflow_target == TARGET_MASS_FLUX) {
+        un_targ = Real(side_sign) * nscbc_parm.mass_flux_target / rho;
+    }
     const Real un      = qbc(iv_face, qvel<cls_t>(dir));
-    const Real un_targ = u_target[dir];
     const Real acoustic_delta = rho/c * eta * (un - un_targ);
 
     if (side_sign > 0) {
@@ -646,17 +613,6 @@ void compute_transverse_characteristics(
 #endif
 
 }
-//-----------------------------------------------------------------
-// Compute the conservative RHS of the face-centred U_BC state.
-// qbc and rhs_bc are face-centred; q is the cell-centred interior primitive
-// field. All local boundary quantities vary independently with iv_face.
-//
-//-----------------------------------------------------------------
-//
-//
-//-----------------------------------------------------------------
-
-
 //------------------------------------------------------------------------------
 // 
 //
