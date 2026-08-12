@@ -6,8 +6,8 @@ stop_time = 0.00013
 
 time_step = 5e-8
 #cfl = 0.3
-cns.order_rk  = -2
-cns.stages_rk = 2
+cns.order_rk  = 3 #-2
+cns.stages_rk = 3 # 2
 
 # Geometry 
 geometry.is_periodic = 0 1

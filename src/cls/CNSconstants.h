@@ -31,6 +31,17 @@ namespace CNSConstants {
     constexpr Real one_half  = 1.0/2.0;   // 1/2
     constexpr Real one_third = 1.0/3.0;   // 1/3
     constexpr Real two_third = 2.0/3.0;   // 2/3
+
+    // common fractions and numbers
+    constexpr Real r1   = 1.0;
+    constexpr Real r1_2 = 1.0/2.0;
+    constexpr Real r1_3 = 1.0/3.0;
+    constexpr Real r1_4 = 1.0/4.0;
+    constexpr Real r1_6 = 1.0/6.0;
+
+    constexpr Real r2_3 = 2.0/3.0;
+    constexpr Real r3_4 = 3.0/4.0;
+    
  
 }; // namespace CNSConstants
 

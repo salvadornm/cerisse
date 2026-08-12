@@ -149,6 +149,10 @@ Real CNS::advance(Real time, Real dt, int /*iteration*/, int /*ncycle*/) {
   } else if (order_rk == 0) {  
     // returns rhs  (debugging only)
     FillPatch(*this, Stemp, nghost, time, State_Type, 0, ncons);
+    if (use_nscbc) {
+      fill_nscbc_ghost_cells(Stemp);
+      compute_nscbc_ghostcell_rhs(Stemp);
+    }
     compute_rhs(Stemp, dt, fr_as_crse, fr_as_fine);
     MultiFab::Copy(S2, Stemp, 0, 0, ncons, 0);
   ////////////////////////////////////////////////////////////////////////////  
@@ -178,57 +182,121 @@ Real CNS::advance(Real time, Real dt, int /*iteration*/, int /*ncycle*/) {
     // Ref: Gottlieb et al., "Strong Stability Preserving Runge-Kutta and
     // Multistep Time Discretizations", §4.2.
     int m = stages_rk;
+
+    // G1 stores G^n and G2 follows the same SSP-RK stages as S2.
+    MultiFab G1(grids, dmap, ncons, nghost, MFInfo(), Factory());
+    MultiFab G2(grids, dmap, ncons, nghost, MFInfo(), Factory());
+    if (use_nscbc) {
+      copy_nscbc_shell(G1, *nscbc_shell.state);
+      copy_nscbc_shell(G2, G1);
+    }
+
     MultiFab::Copy(S2, S1, 0, 0, ncons, 0);
     state[0].setOldTimeLevel(time);
     state[0].setNewTimeLevel(time);
     // First m-1 forward-Euler increments
     for (int i = 1; i <= m - 1; i++) {
-      FillPatch(*this, Stemp, nghost, time + dt * Real(i - 1) / (m - 1),
-                State_Type, 0, ncons);
+      // Real dti = dt/Real(m-1);
+      FillPatch(*this, Stemp, nghost, time + dt * Real(i - 1) / (m - 1),State_Type, 0, ncons);
+
+       if (use_nscbc) {
+        fill_nscbc_ghost_cells(Stemp);
+        compute_nscbc_ghostcell_rhs(Stemp);
+      }          
       compute_rhs(Stemp, dt / Real(m - 1), fr_as_crse, fr_as_fine);
       MultiFab::Saxpy(S2, dt / Real(m - 1), Stemp, 0, 0, ncons, 0);
+      if (use_nscbc) {
+        saxpy_nscbc_shell(G2, dt / Real(m - 1), *nscbc_shell.rhs);
+        copy_nscbc_shell(*nscbc_shell.state, G2);
+      }
       state[State_Type].setNewTimeLevel(
-          time + dt * Real(i) /
-                     (m - 1));  // important to do this for correct fillpatch
+          time + dt * Real(i) /(m - 1));  // important to do this for correct fillpatch
                                 // interpolations for the proceeding stages
     }
     // final stage
     FillPatch(*this, Stemp, nghost, time + dt, State_Type, 0, ncons);
+    if (use_nscbc) {
+      fill_nscbc_ghost_cells(Stemp);
+      compute_nscbc_ghostcell_rhs(Stemp);
+    }
     compute_rhs(Stemp, dt / Real(m - 1), fr_as_crse, fr_as_fine);
     MultiFab::LinComb(S2, Real(m - 1), S2, 0, dt, Stemp, 0, 0, ncons, 0);
-    MultiFab::LinComb(S2, Real(1.0) / m, S1, 0, Real(1.0) / m, S2, 0, 0, ncons,
-                      0);
-
+    MultiFab::LinComb(S2, Real(1.0) / m, S1, 0, Real(1.0) / m, S2, 0, 0, ncons,0);
+    if (use_nscbc) {
+      // G^{n+1} = (1/m)G^n + ((m-1)/m)G^{m-1} //           + (dt/m) R_G(G^{m-1}).
+      lincomb_nscbc_shell(*nscbc_shell.state, Real(1.0) / m, G1,Real(m - 1) / m, G2);
+      saxpy_nscbc_shell(*nscbc_shell.state,dt / Real(m), *nscbc_shell.rhs);
+    }
     state[State_Type].setNewTimeLevel(time + dt);
   }
-
+  ////////////////////////////////////////////////////////////////////////////
   // default
   else if (order_rk == 3) {
+
+    MultiFab G1(grids, dmap, ncons, nghost, MFInfo(), Factory());
+    MultiFab G2(grids, dmap, ncons, nghost, MFInfo(), Factory());
+    if (use_nscbc) {
+      copy_nscbc_shell(G1, *nscbc_shell.state);
+      copy_nscbc_shell(G2, G1);
+    } 
+
+
+
     if (stages_rk == 3) {
       // SSP-RK(3,3): http://ketch.github.io/numipedia/methods/SSPRK33.html
       state[0].setOldTimeLevel(time);
-      FillPatch(*this, Stemp, nghost, time, State_Type, 0,
-                ncons);  // filled at t_n to evalulate f(t_n,y_n).
+      FillPatch(*this, Stemp, nghost, time, State_Type, 0, ncons);  // filled at t_n to evalulate f(t_n,y_n).
+      if (use_nscbc) {
+        fill_nscbc_ghost_cells(Stemp);
+        compute_nscbc_ghostcell_rhs(Stemp);
+      }
+
       compute_rhs(Stemp, dt, fr_as_crse, fr_as_fine);
       MultiFab::LinComb(S2, Real(1.0), S1, 0, dt, Stemp, 0, 0, ncons, 0);
+      if (use_nscbc) {
+        copy_nscbc_shell(G2, G1);
+        saxpy_nscbc_shell(G2, dt, *nscbc_shell.rhs);
+        copy_nscbc_shell(*nscbc_shell.state, G2);
+      }
 
       state[0].setNewTimeLevel(
           time + dt);  // same time as upcoming FillPatch ensures we copy S2 to
                        // Sborder, without time interpolation
       FillPatch(*this, Stemp, nghost, time + dt, State_Type, 0, ncons);
+      if (use_nscbc) {
+        fill_nscbc_ghost_cells(Stemp);
+        compute_nscbc_ghostcell_rhs(Stemp);
+      }
       compute_rhs(Stemp, dt / 4, fr_as_crse, fr_as_fine);
       MultiFab::Xpay(Stemp, dt, S2, 0, 0, ncons, 0);
-      MultiFab::LinComb(S2, Real(3.0) / 4, S1, 0, Real(1.0) / 4, Stemp, 0, 0,
-                        ncons, 0);
+      MultiFab::LinComb(S2, Real(3.0) / 4, S1, 0, Real(1.0) / 4, Stemp, 0, 0,ncons, 0);
+
+      if (use_nscbc) {
+        // G = 3/4 G^n + 1/4 (G2 + dt R_G(G2)).
+        saxpy_nscbc_shell(G2, dt, *nscbc_shell.rhs);
+        lincomb_nscbc_shell(*nscbc_shell.state,Real(3.0) / 4, G1,Real(1.0) / 4, G2);
+        copy_nscbc_shell(G2, *nscbc_shell.state);
+      }
 
       state[0].setNewTimeLevel(
           time + dt / 2);  // same time as upcoming FillPatch ensures we copy S2
                            // to Sborder, without time interpolation
       FillPatch(*this, Stemp, nghost, time + dt / 2, State_Type, 0, ncons);
+
+      if (use_nscbc) {
+        fill_nscbc_ghost_cells(Stemp);
+        compute_nscbc_ghostcell_rhs(Stemp);
+      }
+
       compute_rhs(Stemp, dt * Real(2.0) / 3, fr_as_crse, fr_as_fine);
       MultiFab::Xpay(Stemp, dt, S2, 0, 0, ncons, 0);
-      MultiFab::LinComb(S2, Real(1.0) / 3, S1, 0, Real(2.0) / 3, Stemp, 0, 0,
-                        ncons, 0);
+      MultiFab::LinComb(S2, Real(1.0) / 3, S1, 0, Real(2.0) / 3, Stemp, 0, 0, ncons, 0);
+
+      if (use_nscbc) {
+        // G^{n+1} = 1/3 G^n + 2/3 (G2 + dt R_G(G2)).
+        saxpy_nscbc_shell(G2, dt, *nscbc_shell.rhs);
+        lincomb_nscbc_shell(*nscbc_shell.state,Real(1.0) / 3, G1,Real(2.0) / 3, G2);
+      }
 
       state[State_Type].setNewTimeLevel(
           time + dt);  // important to do this for correct fillpatch
@@ -241,31 +309,70 @@ Real CNS::advance(Real time, Real dt, int /*iteration*/, int /*ncycle*/) {
 
       state[0].setOldTimeLevel(time);
       FillPatch(*this, Stemp, nghost, time, State_Type, 0, ncons);
+      if (use_nscbc) {
+        fill_nscbc_ghost_cells(Stemp);
+        compute_nscbc_ghostcell_rhs(Stemp);
+      }
       compute_rhs(Stemp, dt / 2, fr_as_crse, fr_as_fine);
       MultiFab::LinComb(S2, Real(1.0), S1, 0, dt / 2, Stemp, 0, 0, ncons, 0);
+      if (use_nscbc) {
+        copy_nscbc_shell(G2, G1);
+        saxpy_nscbc_shell(G2, dt / 2, *nscbc_shell.rhs);
+        copy_nscbc_shell(*nscbc_shell.state, G2);
+      }
 
       state[0].setNewTimeLevel(
           time + dt / 2);  // same time as upcoming FillPatch ensures we copy S2
                            // to Sborder, without time interpolation
       FillPatch(*this, Stemp, nghost, time + dt / 2, State_Type, 0, ncons);
+      if (use_nscbc) {
+        fill_nscbc_ghost_cells(Stemp);
+        compute_nscbc_ghostcell_rhs(Stemp);
+      }
       compute_rhs(Stemp, dt / 2, fr_as_crse, fr_as_fine);
       MultiFab::Saxpy(S2, dt / 2, Stemp, 0, 0, ncons, 0);
+      if (use_nscbc) {
+        saxpy_nscbc_shell(G2, dt / 2, *nscbc_shell.rhs);
+        copy_nscbc_shell(*nscbc_shell.state, G2);
+      }
 
       state[0].setNewTimeLevel(
           time + dt);  // same time as upcoming FillPatch ensures we copy S2 to
                        // Sborder, without time interpolation
       FillPatch(*this, Stemp, nghost, time + dt, State_Type, 0, ncons);
+      if (use_nscbc) {
+        fill_nscbc_ghost_cells(Stemp);
+        compute_nscbc_ghostcell_rhs(Stemp);
+      }
       compute_rhs(Stemp, dt / 6, fr_as_crse, fr_as_fine);
       MultiFab::LinComb(S2, Real(2.0) / 3, S1, 0, Real(1.0) / 3, S2, 0, 0,
                         ncons, 0);
       MultiFab::Saxpy(S2, dt / 6, Stemp, 0, 0, ncons, 0);
+      if (use_nscbc) {
+        // G = 2/3 G^n + 1/3 G2 + dt/6 R_G(G2).
+        lincomb_nscbc_shell(*nscbc_shell.state,
+                            Real(2.0) / 3, G1,
+                            Real(1.0) / 3, G2);
+        saxpy_nscbc_shell(*nscbc_shell.state,
+                          dt / 6, *nscbc_shell.rhs);
+        copy_nscbc_shell(G2, *nscbc_shell.state);
+      }
 
       state[0].setNewTimeLevel(
           time + dt / 2);  // same time as upcoming FillPatch ensures we copy S2
                            // to Sborder, without time interpolation
       FillPatch(*this, Stemp, nghost, time + dt / 2, State_Type, 0, ncons);
+      if (use_nscbc) {
+        fill_nscbc_ghost_cells(Stemp);
+        compute_nscbc_ghostcell_rhs(Stemp);
+      }
+
       compute_rhs(Stemp, dt / 2, fr_as_crse, fr_as_fine);
       MultiFab::Saxpy(S2, dt / 2, Stemp, 0, 0, ncons, 0);
+      if (use_nscbc) {
+        saxpy_nscbc_shell(G2, dt / 2, *nscbc_shell.rhs);
+        copy_nscbc_shell(*nscbc_shell.state, G2);
+      }
 
       state[State_Type].setNewTimeLevel(
           time + dt);  // important to do this for correct fillpatch
