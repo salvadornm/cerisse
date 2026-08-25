@@ -66,59 +66,116 @@ If option "0" is selected, the corresponding `geometry.is_periodic` must also be
 
 If option "1" is selected, the `bcnormal` function in `prob.H` will be activated (see boundary conditions).
 
-### NCBC Boundary conditions (optional)
+### NSCBC boundary conditions (optional)
 
-Cerisse supports **Navier–Stokes Characteristic Boundary Conditions (NSCBC)** based on the **LODI (Local One-Dimensional Inviscid)** formulation. Instead of directly imposing the conservative variables at the boundary, the incoming characteristic waves are modified while the outgoing waves are allowed to leave the computational domain with minimal reflection. This significantly reduces artificial reflections in compressible simulations involving acoustics, vortices and shock waves.
+Cerisse supports **Navier-Stokes Characteristic Boundary Conditions (NSCBC)** based on the **LODI (Local One-Dimensional Inviscid)** formulation. NSCBC prescribes only incoming characteristic information and lets outgoing waves leave the domain, reducing artificial reflections from subsonic open boundaries.
 
-NSCBC is enabled independently for each boundary by selecting an NSCBC type. Conventional boundary conditions (`cns.lo_bc` and `cns.hi_bc`) are still used to identify inflow/outflow boundaries, while the NSCBC type determines how the characteristic waves are treated.
-
-```ini
-# NSCBC types
-# 0 = Disabled (standard boundary condition)
-# 1 = Non-reflecting inflow with target relaxation
-# 2 = Pure non-reflecting outflow
-# 3 = Non-reflecting outflow with pressure relaxation
-
-cns.nscbc_lo = 1 0 0
-cns.nscbc_hi = 3 0 0
-
-# Parameters
-cns.nscbc_utarget = 20.0
-cns.nscbc_vtarget = 0.0
-cns.nscbc_wtarget = 0.0
-cns.nscbc_Ttarget = 300.0
-cns.nscbc_eta     = 1.0
-
-cns.nscbc_Ptarget = 101325.0
-cns.nscbc_sigma   = 0.28
-cns.nscbc_Lchar   = 1.0
-cns.nscbc_Mmax    = 0.1
-```
-
-In the example above, the lower **x** boundary uses a **non-reflecting inflow**, where the velocity and temperature are smoothly relaxed towards the prescribed target values. The upper **x** boundary uses a **non-reflecting pressure outlet**, allowing disturbances to leave the domain while slowly relaxing the mean pressure towards the specified target pressure.
+NSCBC is selected independently on every low and high domain face. `cns.nscbc_lo` and `cns.nscbc_hi` contain one type per coordinate direction. The face must be non-periodic. The ordinary `cns.lo_bc` and `cns.hi_bc` settings are still required to fill the remaining physical ghost cells; use an open-boundary value such as `2` on an NSCBC inlet or outlet.
 
 #### Available NSCBC types
 
-<table><thead><tr><th width="139">Type</th><th>Description</th></tr></thead><tbody><tr><td><strong>0</strong></td><td>NSCBC disabled. The standard boundary condition is used.</td></tr><tr><td><strong>1</strong></td><td>Non-reflecting inflow. Incoming characteristic waves are adjusted so that velocity and temperature relax towards prescribed target values (<code>utarget</code>, <code>vtarget</code>, <code>wtarget</code>, <code>Ttarget</code>). The relaxation strength is controlled by <code>eta</code>.</td></tr><tr><td><strong>2</strong></td><td>Pure non-reflecting outflow. Outgoing characteristic waves exit freely with essentially no additional constraints. Suitable when the outlet pressure is determined naturally by the solution.</td></tr><tr><td><strong>3</strong></td><td>Non-reflecting outflow with pressure relaxation. Similar to Type 2, but the mean outlet pressure is gradually relaxed towards <code>Ptarget</code>. The relaxation depends on <code>sigma</code>, the characteristic domain length <code>Lchar</code>, and the reference Mach number <code>Mmax</code>.</td></tr></tbody></table>
+| Type | Description |
+| ---- | ----------- |
+| **0** | Disabled; use the ordinary boundary condition. |
+| **1** | Subsonic non-reflecting inflow with relaxation toward velocity and temperature targets. |
+| **2** | Pure non-reflecting subsonic outflow. The incoming acoustic amplitude is set to zero, so the mean pressure is free to evolve. |
+| **3** | Subsonic non-reflecting outflow with controlled relaxation toward `Ptarget`. |
 
-| Option             | Type       | Default | Description                              |
-| ------------------ | ---------- | ------- | ---------------------------------------- |
-| **`cns.nscbc_lo`** | DIM \* Int | 0 0 0   | NSCBC flags at lower boundaries in x,y,z |
-| **`cns.nscbc_hi`** | DIM \* Int | 0 0 0   | NSCBC flags at upper boundaries in x,y,z |
+The following two-dimensional example applies a target-relaxed inlet at `xlo`, a pressure-relaxed outlet at `xhi`, and no NSCBC treatment in the y direction:
 
-#### NSCBC parameters
+```ini
+cns.lo_bc = 2 5
+cns.hi_bc = 2 5
 
-| Option                  | Default   | Description                                                       |
-| ----------------------- | --------- | ----------------------------------------------------------------- |
-| **`cns.nscbc_utarget`** | 0         | Target x-velocity for inflow relaxation                           |
-| **`cns.nscbc_vtarget`** | 0         | Target y-velocity for inflow relaxation                           |
-| **`cns.nscbc_wtarget`** | 0         | Target z-velocity for inflow relaxation                           |
-| **`cns.nscbc_Ttarget`** | 300 K     | Target inflow temperature                                         |
-| **`cns.nscbc_eta`**     | 1.0       | Relaxation coefficient for inflow boundary                        |
-| **`cns.nscbc_Ptarget`** | 101325 Pa | Target pressure for pressure outlet                               |
-| **`cns.nscbc_sigma`**   | 0.28      | Pressure relaxation coefficient                                   |
-| **`cns.nscbc_Lchar`**   | 1.0       | Characteristic domain length used in the relaxation model         |
-| **`cns.nscbc_Mmax`**    | 0.1       | Reference maximum Mach number used to scale the outlet relaxation |
+cns.nscbc_lo = 1 0
+cns.nscbc_hi = 3 0
+cns.nscbc_order = 2
+
+# x-low inflow targets
+cns.nscbc_xlo_utarget = 20.0
+cns.nscbc_xlo_vtarget = 0.0
+cns.nscbc_xlo_Ttarget = 300.0
+cns.nscbc_xlo_eta = 1.0
+
+# x-high pressure-relaxed outflow
+cns.nscbc_xhi_Ptarget = 101325.0
+cns.nscbc_xhi_sigma = 0.28
+cns.nscbc_xhi_Lchar = 1.0
+cns.nscbc_xhi_Mmax = 0.1
+cns.nscbc_xhi_use_transverse = 1
+cns.nscbc_xhi_beta_transverse = 0.1
+```
+
+{% hint style="warning" %}
+NSCBC parameters are **face-specific**. Use one of `xlo`, `xhi`, `ylo`, `yhi`, `zlo`, or `zhi` between `nscbc_` and the parameter name. For example, use `cns.nscbc_xlo_utarget`, not `cns.nscbc_utarget`.
+{% endhint %}
+
+| Option | Type | Default | Description |
+| ------ | ---- | ------- | ----------- |
+| **`cns.nscbc_lo`** | DIM \* Int | 0 0 0 | NSCBC type on each low face. |
+| **`cns.nscbc_hi`** | DIM \* Int | 0 0 0 | NSCBC type on each high face. |
+| **`cns.nscbc_order`** | Int | 2 | Order of the inward one-sided normal derivative; supported values are `1` and `2`. |
+
+#### Face-specific parameters
+
+In the table below, `<face>` is `xlo`, `xhi`, `ylo`, `yhi`, `zlo`, or `zhi` as applicable to the build dimension.
+
+| Option | Type | Default | Used by | Description |
+| ------ | ---- | ------- | ------- | ----------- |
+| **`cns.nscbc_<face>_utarget`** | Real | 0 | Type 1 | Target x velocity. |
+| **`cns.nscbc_<face>_vtarget`** | Real | 0 | Type 1 | Target y velocity. |
+| **`cns.nscbc_<face>_wtarget`** | Real | 0 | Type 1 | Target z velocity. |
+| **`cns.nscbc_<face>_Ttarget`** | Real | 300 K | Type 1 | Target temperature. |
+| **`cns.nscbc_<face>_eta`** | Real | 1.0 | Type 1 | Velocity and temperature relaxation coefficient. |
+| **`cns.nscbc_<face>_inflow_target`** | Int | 0 | Type 1 | Normal inflow target: `0` for velocity or `1` for mass flux. |
+| **`cns.nscbc_<face>_mass_flux_target`** | Real | 0 | Type 1 | Positive mass flux into the domain in kg/(m2 s); used when `inflow_target = 1`. |
+| **`cns.nscbc_<face>_Ptarget`** | Real | 101325 Pa | Type 3 | Target outlet pressure. |
+| **`cns.nscbc_<face>_sigma`** | Real | 0.28 | Type 3 | Pressure relaxation coefficient. Set to zero for a perfectly non-reflecting pressure wave. |
+| **`cns.nscbc_<face>_Lchar`** | Real | 1.0 | Type 3 | Characteristic length used by pressure relaxation. |
+| **`cns.nscbc_<face>_Mmax`** | Real | 0.1 | Type 3 | Maximum/reference Mach number used to scale pressure relaxation. |
+| **`cns.nscbc_<face>_use_transverse`** | Bool | 0 | Types 2, 3 | Include transverse characteristic terms where the stencil is available. |
+| **`cns.nscbc_<face>_beta_transverse`** | Real | 1.0 | Type 3 | Transverse relaxation coefficient, normally between 0 and 1. |
+
+#### Spatially varying inflow targets
+
+A problem can replace the constant type-1 velocity and temperature targets with an arbitrary profile over the boundary face. Enable the compile-time flag in the problem `GNUmakefile`:
+
+```makefile
+USE_MANUAL_NSBC_TARGET = TRUE
+
+ifeq ($(USE_MANUAL_NSBC_TARGET),TRUE)
+  DEFINES += -DUSE_MANUAL_NSBC_TARGET
+endif
+```
+
+Then define the following GPU-callable function inside namespace `PROB` in `prob.h`:
+
+```cpp
+#ifdef USE_MANUAL_NSBC_TARGET
+AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
+void nscbc_target(amrex::Real x, amrex::Real y, amrex::Real z,
+                  int dir, int side_sign,
+                  amrex::Real& u, amrex::Real& v,
+                  amrex::Real& w, amrex::Real& T)
+{
+    // Example: parabolic profile at the x-low inflow.
+    if (dir == 0 && side_sign > 0) {
+        constexpr amrex::Real half_height = 1.0e-3;
+        constexpr amrex::Real umax = 20.0;
+        const amrex::Real yn = y / half_height;
+        u = umax * amrex::max(amrex::Real(0.0),
+                              amrex::Real(1.0) - yn*yn);
+        v = 0.0;
+        w = 0.0;
+        T = 300.0;
+    }
+}
+#endif
+```
+
+`dir` is `0`, `1`, or `2` for x, y, or z. `side_sign` is `+1` on a low face and `-1` on a high face. The normal coordinate is exactly on the physical domain face; tangential coordinates are at the ghost-cell centre. The four target references are initialized from the corresponding face-specific input values, so the function may modify only the required fields or faces.
+
+The callback is evaluated only for type-1 NSCBC boundaries and must use GPU-compatible code. It changes velocity and temperature targets only. When `inflow_target = 1`, `mass_flux_target` overrides the callback's normal target velocity; tangential velocity and temperature targets still come from the callback.
 
 ### Time Marching
 
