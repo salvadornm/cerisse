@@ -69,6 +69,9 @@ void CNS::compute_nscbc_ghostcell_rhs( amrex::MultiFab& stage_state)
     clear_nscbc_ghost_rhs();
 
     const auto dxinv = Geom().InvCellSizeArray();
+    const auto dx = Geom().CellSizeArray();
+    const auto prob_lo = Geom().ProbLoArray();
+    const auto prob_hi = Geom().ProbHiArray();
 
     const Box domain = Geom().Domain();
     const auto dom_lo = domain.smallEnd();
@@ -99,7 +102,24 @@ void CNS::compute_nscbc_ghostcell_rhs( amrex::MultiFab& stage_state)
 
                 const int nscbc_type = (side_sign > 0) ? nslo[dir] : nshi[dir];
 
-                const auto& parm = (side_sign > 0) ? parm_lo[dir] : parm_hi[dir];
+                auto parm = (side_sign > 0) ? parm_lo[dir] : parm_hi[dir];
+
+#ifdef USE_MANUAL_NSBC_TARGET
+                // The input-file values remain the defaults.  A problem may
+                // replace them pointwise on an NSCBC inflow by defining the
+                // GPU-callable PROB::nscbc_target hook in prob.h.
+                if (nscbc_type == 1) {
+                    Real xyz[3] = {Real(0.0), Real(0.0), Real(0.0)};
+                    for (int d = 0; d < AMREX_SPACEDIM; ++d) {
+                        xyz[d] = prob_lo[d] + (Real(iv[d]) + Real(0.5))*dx[d];
+                    }
+                    xyz[dir] = (side_sign > 0) ? prob_lo[dir] : prob_hi[dir];
+
+                    PROB::nscbc_target(xyz[0], xyz[1], xyz[2], dir, side_sign,
+                                       parm.utarget, parm.vtarget,
+                                       parm.wtarget, parm.Ttarget);
+                }
+#endif
 
                 const int external_dirs = number_of_external_directions( iv,dom_lo,dom_hi);
                 
@@ -377,5 +397,4 @@ void CNS::copy_nscbc_shell(amrex::MultiFab& dst, amrex::MultiFab const& src)
 
     amrex::MultiFab::Copy( dst, src, 0, 0,src.nComp(),src.nGrow());   
 }
-
 

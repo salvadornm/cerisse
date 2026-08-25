@@ -1,0 +1,53 @@
+max_step = 2000
+stop_time = 2.0e-4
+cfl = 0.3
+cns.order_rk = 3
+cns.stages_rk = 3
+
+# 5 mm long by 2 mm high, centred about y=0.
+geometry.is_periodic = 0 0
+geometry.coord_sys = 0
+geometry.prob_lo = 0.0 -0.001
+geometry.prob_hi = 0.005 0.001
+
+# x faces are ordinary outflow ghost fills because NSCBC owns their shell.
+# y faces are no-slip walls supplied by bcnormal().
+cns.lo_bc = 2 5
+cns.hi_bc = 2 5
+
+# 1 = target-relaxed inflow; 3 = pressure-relaxed non-reflecting outflow.
+cns.nscbc_lo = 1 0
+cns.nscbc_hi = 3 0
+cns.nscbc_order = 2
+
+# These are defaults before prob.h::nscbc_target overwrites the x-low values.
+cns.nscbc_xlo_utarget = 0.0
+cns.nscbc_xlo_vtarget = 0.0
+cns.nscbc_xlo_Ttarget = 300.0
+cns.nscbc_xlo_eta = 3.0
+
+# Li et al. use sigma=0.3 for a pressure-relaxed non-reflecting outlet.
+cns.nscbc_xhi_Ptarget = 101325.0
+cns.nscbc_xhi_Lchar = 0.005
+cns.nscbc_xhi_sigma = 0.3
+cns.nscbc_xhi_Mmax = 0.1
+cns.nscbc_xhi_use_transverse = 0
+cns.nscbc_xhi_beta_transverse = 0.1
+
+cns.second_order_flux_method = 2
+cns.nstep_screen_output = 100
+cns.verbose = 1
+
+amr.n_cell = 100 40
+amr.max_level = 0
+amr.blocking_factor_x = 4
+amr.blocking_factor_y = 4
+amr.max_grid_size_x = 100
+amr.max_grid_size_y = 40
+amr.checkpoint_files_output = 0
+amr.plot_files_output = 1
+amr.plot_file = ./plot/plt
+amr.plot_int = 200
+amr.derive_plot_vars = pressure velocity temperature
+
+amr.v               = 0
