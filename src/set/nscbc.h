@@ -442,7 +442,8 @@ void apply_lodi_inflow_relaxation ( amrex::IntVect const& iv_face, int dir, int 
 
 #if NUM_SPECIES > 1
     for (int ns = 0; ns < NUM_SPECIES; ++ns) {
-        L[LSP + ns] = Real(0.0);
+        L[LSP + ns] = eta *
+            (qbc(iv_face, cls_t::QFS + ns) - nscbc_parm.Ytarget[ns]);
     }
 #endif
 }

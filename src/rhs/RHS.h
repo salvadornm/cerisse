@@ -8,6 +8,7 @@
 #include <Weno.h>
 #include <WenoEB.h>
 #include <CentralKEEP.h>
+#include <CentralKEEP_SPEC.h>
 #include <CentralDif.h>
 #include <Riemann.h>
 #include <Rusanov.h>

@@ -2,6 +2,7 @@
 #define NSCBC_PARM_H_
 
 #include <AMReX_REAL.H>
+#include <AMReX_GpuContainers.H>
 
 namespace nscbc {
 
@@ -23,6 +24,9 @@ struct NSCBCParm
     amrex::Real wtarget = 0.0;
     amrex::Real Ttarget = 300.0;
     amrex::Real eta     = 1.0;
+
+    // Inflow mass-fraction targets. The default is the first species only.
+    amrex::GpuArray<amrex::Real, NUM_SPECIES> Ytarget = {amrex::Real(1.0)};
 
     bool use_transverse = false;	
 

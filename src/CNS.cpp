@@ -97,6 +97,24 @@ void read_nscbc_parm(amrex::ParmParse& pp,std::string const& face, nscbc::NSCBCP
     pp.query(("nscbc_" + face + "_wtarget").c_str(), p.wtarget);
     pp.query(("nscbc_" + face + "_Ttarget").c_str(), p.Ttarget);
     pp.query(("nscbc_" + face + "_eta").c_str(), p.eta);
+
+    amrex::Vector<amrex::Real> Ytarget(p.Ytarget.begin(), p.Ytarget.end());
+    if (pp.queryarr(("nscbc_" + face + "_Ytarget").c_str(), Ytarget)) {
+        AMREX_ALWAYS_ASSERT_WITH_MESSAGE(
+            Ytarget.size() == NUM_SPECIES,
+            "NSCBC Ytarget must contain exactly NUM_SPECIES mass fractions");
+        amrex::Real sumY = amrex::Real(0.0);
+        for (int ns = 0; ns < NUM_SPECIES; ++ns) {
+            AMREX_ALWAYS_ASSERT_WITH_MESSAGE(
+                Ytarget[ns] >= amrex::Real(0.0),
+                "NSCBC Ytarget mass fractions must be non-negative");
+            p.Ytarget[ns] = Ytarget[ns];
+            sumY += Ytarget[ns];
+        }
+        AMREX_ALWAYS_ASSERT_WITH_MESSAGE(
+            amrex::Math::abs(sumY - amrex::Real(1.0)) < amrex::Real(1.0e-10),
+            "NSCBC Ytarget mass fractions must sum to one");
+    }
     pp.query(("nscbc_" + face + "_inflow_target").c_str(), p.inflow_target);
     pp.query(("nscbc_" + face + "_mass_flux_target").c_str(),p.mass_flux_target);
     pp.query(("nscbc_" + face + "_use_transverse").c_str(),p.use_transverse);
@@ -1765,4 +1783,3 @@ void CNS::lincomb_nscbc_shell(
             });
     }
 }
-
