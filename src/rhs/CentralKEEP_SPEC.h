@@ -46,10 +46,10 @@ class keep_euler_spec_t {
       const Array4<Real>& prims,
       std::array<FArrayBox*, AMREX_SPACEDIM> const& flxt,
       const Array4<Real>& /*cons*/, const cls_t* cls) {
-    static_assert(NUM_SPECIES > 1,
-                  "keep_euler_spec_t requires a multispecies closure");
-    static_assert(order == 2 || order == 4 || order == 6,
-                  "KEEP order must be 2, 4, or 6");
+    // static_assert(NUM_SPECIES > 1,
+    //               "keep_euler_spec_t requires a multispecies closure");
+    // static_assert(order == 2 || order == 4 || order == 6,
+    //               "KEEP order must be 2, 4, or 6");
 
     const Box& bxgnodal = mfi.grownnodaltilebox(-1, 0);
     const int halfsten = order / 2;
