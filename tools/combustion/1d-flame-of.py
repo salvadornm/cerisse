@@ -20,7 +20,7 @@ specformat = 'mass'   # mole or mass
 units      = 'MKS'    #MKS or CGS
 
 # 1. Define gas mixture and mechanism
-gas = ct.Solution("Li.yaml")  # Use a mechanism that includes H2/Air combustion
+gas = ct.Solution("boivin.yaml")  # Use a mechanism that includes H2/Air combustion
 
 # Define fuel and oxidizer mole fractions for a stoichiometric mixture
 fuel = "H2"
@@ -60,7 +60,7 @@ in2   = gas.species_index('N2')
 gas.set_equivalence_ratio(phi, fuel, oxidizer)
 
 ## 1d simulation or thermodynamic equilibrium only?
-solve_1d = False
+solve_1d = True
 
 if not solve_1d: 
     # ==========================================
@@ -68,14 +68,18 @@ if not solve_1d:
     # ==========================================
     gas.equilibrate('HP')
     T_adiabatic = gas.T
-    nu = gas.viscosity / gas.density
-    alpha = gas.thermal_conductivity / (gas.density * gas.cp_mass)
-    Pr = nu / alpha
-
+    D_im = gas.mix_diff_coeffs      # The 1D array (Mixture-averaged Fickian)
+    D_ij = gas.binary_diff_coeffs   # The 2D matrix (Exact Binary)
+    #nu = gas.viscosity / gas.density
+    #alpha = gas.thermal_conductivity / (gas.density * gas.cp_mass)
+    #Pr = nu / alpha
+    
     print(f"The equilibrium adiabatic flame temperature is: {T_adiabatic:.2f} K")
     print(gas.report())
-    print(f"Prandtl Number (Pr):         {Pr:.4f}")
-    print(f"Prandtl Number inverse (Pr^-1):         {1/Pr:.4f}")
+    #print(f"Prandtl Number (Pr):         {Pr:.4f}")
+    #print(f"Prandtl Number inverse (Pr^-1):         {1/Pr:.4f}")
+    print(f"diffusion matrix {D_ij}")
+    print(f"mixture averaged diffusion coefs {D_im}")
 
 else:
     # ==========================================
@@ -159,6 +163,28 @@ else:
     max_gradient = np.max(np.abs(dTdx))
     diffusive_thickness = (T_b - T_u) / max_gradient
     print(f"Diffusive Thickness: {diffusive_thickness * 1e3:.4f} mm")
+
+    ##find center of flame
+    hrr = f.heat_release_rate
+    center_idx_hrr = np.argmax(hrr)
+    center_x_hrr = f.grid[center_idx_hrr]
+    print(center_x_hrr)
+
+    for kk in range(len(f.grid)):  
+        if kk == center_idx_hrr:
+            f.set_gas_state(kk)
+            # You can extract BOTH at any grid point
+            D_im = gas.mix_diff_coeffs      # The 1D array (Mixture-averaged Fickian)
+            alpha = gas.thermal_conductivity / (gas.density * gas.cp_mass)
+            nu = gas.viscosity / gas.density
+            Sc = nu / D_im
+            Le = alpha / D_im
+            D_ij = gas.binary_diff_coeffs   # The 2D matrix (Exact Binary)
+            print(f"diffusion matrix {D_ij}")
+            print(f"mixture averaged diffusion Le {Le}")
+            print(f"mixture averaged diffusion Schmidt {Sc}")
+
+    
 
     #Write the velocity, temperature, density, and mole fractions to a CSV file
     # 6. Export results to CSV file
