@@ -215,55 +215,35 @@ user_tagging(int i, int j, int k, int nt_level, auto &tagfab,
   Real r = sqrt(x*x + y*y);
 
   bool refine = false;
-  
-  // // refine exit of injector
-  // refine= (z > 0.035) && (z < 0.07);
-  // // refine close to exit  (avoid corner problem)
-  // refine= (z > 0.13) || refine;
+        
+  switch (level)
+
+    {
+      case 0:
+        refine = (x < 1.4e-3) && (y < 1.1e-3);
+        //refine = true;
+        break;
+      case 1:
+        refine = (x > 0) && (y < 1.038e-3) && (x < 0.0012972);
+
+        break;
+      case 2:
+        refine= (x > 4.350e-4) && (x < 6.690e-4) && (y < 0);
 
 
-  //const int URHO= ProbClosures::URHO;
-
-  // // compoute | d rho | normalised with rho
-  // Real o_over_rhot = Real(1.0)/sdatafab(i,j,k,URHO);
-
-  // Real drhox = Math::abs(sdatafab(i+1,j,k,URHO) - sdatafab(i-1,j,k,URHO));
-  // Real drhoy = Math::abs(sdatafab(i,j+1,k,URHO) - sdatafab(i,j-1,k,URHO));
-  // Real drhoz = Math::abs(sdatafab(i,j,k+1,URHO) - sdatafab(i,j,k-1,URHO));
-
-  // Real gradrho= Real(0.5)*sqrt(drhox*drhox+drhoy*drhoy)*o_over_rhot;        
-
-
- switch (level)
-
-  {
-    case 0:
-      refine = (x < 1.4e-3) && (y < 1.1e-3);
-      //refine = true;
-      break;
-    case 1:
-      refine = (x > 0) && (y < 1.038e-3) && (x < 0.0012972);
+        break;
+      case 3:
+        // refine= (z > 0.035) && (z < 0.07);    
+        break;  
+        
+      default:
 
       break;
-    case 2:
-      refine= (x > 4.350e-4) && (x < 6.690e-4) && (y < 0);
+    }
 
-
-      break;
-    case 3:
-      // refine= (z > 0.035) && (z < 0.07);    
-      break;  
-      
-    default:
-
-    break;
-  }
-
- // refine = true; // temp
+  // refine = true; // temp
 
   tagfab(i,j,k) = refine;
-
-
 }
 ///////////////////////////////SOURCE TERM /////////////////////////////////////
 template <typename cls_t>
@@ -333,38 +313,16 @@ class user_source_t {
       bool buffer = (x <= x0_lo) || (x >= x0_hi) || (y >= y0_hi);
 
       if (buffer) {
-        Real a = 0.0;
-        Real m_max = 1.0;
+        // 1. Calculate normalized penetration depth (0 to 1) for each boundary
+        // Note: Assumes xw_hi > x0_hi and yw_hi > y0_hi
+        Real d_xlo = (x <= x0_lo) ? (x0_lo - x) / (x0_lo - xw_lo) : 0.0;
+        Real d_xhi = (x >= x0_hi) ? (x - x0_hi) / (xw_hi - x0_hi) : 0.0;
+        Real d_yhi = (y >= y0_hi) ? (y - y0_hi) / (yw_hi - y0_hi) : 0.0;
 
-        if ((x <= x0_lo) && (y >= y0_hi)) {
-          Real r = sqrt((x0_lo - x)*(x0_lo - x) + (y0_hi - y)*(y0_hi - y));
-          Real r0 = sqrt((x0_lo - xw_lo)*(x0_lo - xw_lo));
-          Real m = m_max/r0;
-          a = m * r;
-        }
-
-        else if ((x >= x0_hi) && (y >= y0_hi)) {
-          Real r = sqrt((x0_hi - x)*(x0_hi - x) + (y0_hi - y)*(y0_hi - y));
-          Real r0 = sqrt((x0_hi - xw_hi)*(x0_hi - xw_hi));
-          Real m = m_max/r0;
-          a = m * r;
-        }
-
-        else //((x <= x0_lo) && (y < y0_hi) || (x >= x0_hi) && (y < y0_hi) || (x > x0_lo) && (x < x0_hi) && (y >= y0_hi))
-            {
-           Real mask_xlo = (x <= x0_lo);
-           Real mask_xhi = (x >= x0_hi);
-           Real mask_yhi = (y >= y0_hi);
-
-           Real m_xlo = m_max/(x0_lo - xw_lo);
-           Real m_xhi = m_max/(x0_hi - xw_hi);
-           Real m_yhi = m_max/(y0_hi - yw_hi);
-
-           a = m_xlo * (x0_lo - x) * mask_xlo + m_xhi * (x0_hi - x) * mask_xhi + m_yhi * (y0_hi - y) * mask_yhi;
-        } 
-
-        a = std::min(m_max,a);
-        Real tau_relax = a * 200000; //corresponds to tau relax = 5.0e-5 and coef = dt/taurelax
+        // 2. Combine using max to naturally handle corners
+        Real a_linear = amrex::max(d_xlo, amrex::max(d_xhi, d_yhi));
+        a_linear = amrex::min(1.0, a_linear);
+        Real tau_relax = a_linear * 200000; //corresponds to tau relax = 5.0e-5 and coef = dt/taurelax
         Real coef = dt * tau_relax;
 
         // pressure relax  if P > P0  P drops and to keep T constant rho drops
