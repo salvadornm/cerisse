@@ -1674,16 +1674,24 @@ void CNS::initialise_nscbc_ghost_shell(
     const int ncons  = PROB::ProbClosures::NCONS;
 
     /*
-     * Construct a synchronized source with enough ghost cells.
-     * This is essential at tangential FAB interfaces on a physical boundary.
+     * Construct a level-aware source with enough ghost cells.  A plain
+     * MultiFab::FillBoundary only exchanges data between grids on this level;
+     * it leaves coarse-fine ghost cells untouched.  That is not sufficient
+     * when an NSCBC face terminates at a coarse-fine interface: extrapolating
+     * the physical-boundary shell then reads an uninitialised tangential
+     * ghost cell at the end of the fine patch.
+     *
+     * FillPatch performs both same-level exchange and coarse-to-fine
+     * interpolation (and applies the ordinary physical BCs).  The NSCBC shell
+     * below still extrapolates from the nearest in-domain cell; FillPatch is
+     * needed to make that cell valid when it lies outside the fine valid box
+     * in a tangential direction.
      */
     MultiFab source(cell_state.boxArray(),cell_state.DistributionMap(),ncons,ng,MFInfo(),Factory());
 
     source.setVal(Real(0.0));
-
-    MultiFab::Copy(source,cell_state,0, 0,ncons,0);             // copy valid cells
-
-    source.FillBoundary(Geom().periodicity());
+    const Real time = state[State_Type].curTime();
+    FillPatch(*this, source, ng, time, State_Type, 0, ncons);
 
     shell.setVal(Real(0.0));
 
@@ -1704,8 +1712,8 @@ void CNS::initialise_nscbc_ghost_shell(
 
                 /*
                  * Extrapolate only in physical-boundary directions.
-                 * Tangential inter-FAB coordinates remain unchanged and
-                 * are supplied by source.FillBoundary().
+                 * Tangential same-level and coarse-fine coordinates remain
+                 * unchanged and are supplied by FillPatch above.
                  */
                 for (int dir = 0; dir < AMREX_SPACEDIM; ++dir) {
                     src[dir] = amrex::max( domain.smallEnd(dir), amrex::min(domain.bigEnd(dir), src[dir]));

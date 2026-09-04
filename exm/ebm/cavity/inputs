@@ -1,11 +1,14 @@
 # Simulation time
-max_step  =  500000
+max_step  =  5000
 stop_time =  0.5
 cfl = 0.3
 #time_step = 5.0e-7
 
-cns.order_rk  = -2 
-cns.stages_rk = 2
+cns.order_rk  = 3 
+cns.stages_rk = 3
+
+# Refluxing (important AMR)
+cns.do_reflux = 1
 
 # Geometry 
 geometry.is_periodic = 0 0 0
@@ -16,12 +19,12 @@ geometry.prob_hi = 0.0012972 0.0012616
 #geometry.prob_hi     = 0.0012972  0.0010716 
 
 # BC
-cns.lo_bc = 1 1 
-cns.hi_bc = 1 1  
+cns.lo_bc = 2 2 
+cns.hi_bc = 2 2  
 
 cns.nscbc_lo   = 1 0 
 cns.nscbc_hi   = 3 3
-cns.nscbc_order = 1
+cns.nscbc_order = 2
 
 # non reflecting inflow
 cns.nscbc_xlo_utarget = 208.3500981
@@ -32,14 +35,14 @@ cns.nscbc_xlo_eta = 1.0
 # non reflecting outlow with target pressure
 #cns.nscbc_xhi_Lchar   = 0.0014872
 cns.nscbc_xhi_Lchar   = 0.00141
-cns.nscbc_xhi_Mmax    = 0.7
+cns.nscbc_xhi_Mmax    = 0.6
 cns.nscbc_xhi_Ptarget = 101325.0
-cns.nscbc_xhi_sigma   = 0.2
+cns.nscbc_xhi_sigma   = 0.28
 
-cns.nscbc_yhi_Lchar   = 0.00141
-cns.nscbc_yhi_Mmax    = 0.7
-cns.nscbc_yhi_Ptarget = 101325.0
-cns.nscbc_yhi_sigma   = 0.2
+#cns.nscbc_yhi_Lchar   = 0.00141
+#cns.nscbc_yhi_Mmax    = 0.6
+#cns.nscbc_yhi_Ptarget = 101325.0
+#cns.nscbc_yhi_sigma   = 0.28
 
 # output screen
 cns.screen_output = 0 # 0=quiet, 1=verbose
@@ -47,9 +50,9 @@ cns.verbose       = 1 # 0=quiet, 1=verbose
 amr.v             = 1 # 0=quiet,1= verbose
 
 # Refinement and regridding
-amr.n_cell            = 544 544 
-#amr.n_cell            = 272 272 
-amr.max_level         = 3     # maximum level number allowed
+#amr.n_cell            = 544 544 
+amr.n_cell            = 272 272 
+amr.max_level         = 1     # maximum level number allowed
 amr.ref_ratio         = 2      # refinement ratio per level
 amr.regrid_int        = 10    # how often to regrid per level
 amr.blocking_factor_x = 8      # blocking factor in x per level
@@ -62,13 +65,13 @@ amr.n_error_buf       = 2      # number of buffer cells in error est
 amr.grid_eff          = 0.7    # what constitutes an efficient grid
 
 #Plot and checkpoint
-amr.checkpoint_files_output = 1
+amr.checkpoint_files_output = 0
 amr.check_file              = ./checkpoint/chk     # root name of checkpoint file
 amr.check_int               = 10000   # number of timesteps betw.  checkpoints
 amr.plot_files_output = 1000
 #amr.restart = chk110000
 amr.plot_file         = ./plot/plt    # root name of plotfile
-amr.plot_int          = 10000       # number of timesteps between plotfiles
+amr.plot_int          = 1       # number of timesteps between plotfiles
 amr.derive_plot_vars  = pressure velocity temperature
 
 eb2.geom_type = "custom"
