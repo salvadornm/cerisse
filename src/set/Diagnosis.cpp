@@ -12,6 +12,7 @@ using namespace amrex;
 // ======================== Time probe functionallity ========================
 int CNS::time_probe_lev = 0;
 int CNS::time_probe_int = 1;
+int CNS::time_probe_precision = 6;
 
 Vector<std::string> CNS::time_probe_names;
 Vector<std::string> CNS::time_probe_reductions;
@@ -51,6 +52,11 @@ void CNS::setupTimeProbe() {
 
   pp.query("time_probe_lev", time_probe_lev);  // default 0
   pp.query("time_probe_int", time_probe_int);  // default 1
+  pp.query("time_probe_precision", time_probe_precision);
+  if (time_probe_precision < 1 ||
+      time_probe_precision > std::numeric_limits<Real>::max_digits10) {
+    amrex::Abort("time_probe_precision must be between 1 and Real::max_digits10");
+  }
 
   if (time_probe_lev < 0 || time_probe_lev > parent->maxLevel()) {
     amrex::Abort("time_probe_lev must be between 0 and amr.max_level");
@@ -275,7 +281,7 @@ void CNS::recordTimeProbe() {
   if (ParallelDescriptor::IOProcessor()) {
     const int log_index = 0;
     std::ostream &data_log = parent->DataLog(log_index);
-    const int datprecision = 6;
+    const int datprecision = time_probe_precision;
     data_log << std::setprecision(datprecision) << curtime;
     for (int cnt = 0; cnt < num_probes; ++cnt) {
       Real value = probe[cnt];

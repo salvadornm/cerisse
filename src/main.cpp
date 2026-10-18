@@ -111,6 +111,11 @@ int main(int argc, char* argv[])
   IBM::ib.cleanup();  // release arena memory before Finalize destroys arenas
 #endif
 
+#if CNS_USE_EB
+  // The global EB object outlives AMReX's memory arenas.
+  EBM::eb.level_mask_a.clear();
+#endif
+
   amrex::Finalize();
 
   return 0;

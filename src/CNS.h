@@ -181,6 +181,7 @@ class CNS : public amrex::AmrLevel {
   void recordTimeProbe();
   static int time_probe_lev;
   static int time_probe_int;
+  static int time_probe_precision;
   static amrex::Vector<std::string> time_probe_names;
   static amrex::Vector<std::string> time_probe_reductions;
   static amrex::Vector<amrex::Box> time_probe_boxes;

@@ -1,0 +1,104 @@
+# Lodato section 4.4: T1 standard NSCBC (LODI) baseline.
+# Fixed dt synchronizes probes and plotfiles between the two domains.
+max_step = 840
+stop_time = 8.4e-5
+time_step = 1.0e-7
+cns.order_rk = 3
+cns.stages_rk = 3
+geometry.coord_sys = 0
+geometry.is_periodic = 0 0 0
+geometry.prob_lo = -0.0065 -0.0065 -0.0065
+geometry.prob_hi = 0.0065 0.0065 0.0065
+amr.n_cell = 64 64 64
+amr.max_level = 0
+amr.blocking_factor = 8
+amr.max_grid_size = 32
+cns.lo_bc = 2 2 2
+cns.hi_bc = 2 2 2
+cns.nscbc_lo = 3 3 3
+cns.nscbc_hi = 3 3 3
+cns.nscbc_order = 2
+# No extra boundary flux replacement: retain the fourth-order skew scheme.
+cns.second_order_flux_method = 0
+
+cns.nscbc_xlo_Ptarget = 101325.0
+cns.nscbc_xlo_Lchar = 0.013
+cns.nscbc_xlo_Mmax = 0.0
+cns.nscbc_xlo_sigma = 0.28
+cns.nscbc_xlo_use_transverse = 0
+# Fixed acoustic-Mach proxy; used only if transverse terms are enabled.
+cns.nscbc_xlo_beta_transverse = 5.0e-5
+
+cns.nscbc_xhi_Ptarget = 101325.0
+cns.nscbc_xhi_Lchar = 0.013
+cns.nscbc_xhi_Mmax = 0.0
+cns.nscbc_xhi_sigma = 0.28
+cns.nscbc_xhi_use_transverse = 0
+# Fixed acoustic-Mach proxy; used only if transverse terms are enabled.
+cns.nscbc_xhi_beta_transverse = 5.0e-5
+
+cns.nscbc_ylo_Ptarget = 101325.0
+cns.nscbc_ylo_Lchar = 0.013
+cns.nscbc_ylo_Mmax = 0.0
+cns.nscbc_ylo_sigma = 0.28
+cns.nscbc_ylo_use_transverse = 0
+# Fixed acoustic-Mach proxy; used only if transverse terms are enabled.
+cns.nscbc_ylo_beta_transverse = 5.0e-5
+
+cns.nscbc_yhi_Ptarget = 101325.0
+cns.nscbc_yhi_Lchar = 0.013
+cns.nscbc_yhi_Mmax = 0.0
+cns.nscbc_yhi_sigma = 0.28
+cns.nscbc_yhi_use_transverse = 0
+# Fixed acoustic-Mach proxy; used only if transverse terms are enabled.
+cns.nscbc_yhi_beta_transverse = 5.0e-5
+
+cns.nscbc_zlo_Ptarget = 101325.0
+cns.nscbc_zlo_Lchar = 0.013
+cns.nscbc_zlo_Mmax = 0.0
+cns.nscbc_zlo_sigma = 0.28
+cns.nscbc_zlo_use_transverse = 0
+# Fixed acoustic-Mach proxy; used only if transverse terms are enabled.
+cns.nscbc_zlo_beta_transverse = 5.0e-5
+
+cns.nscbc_zhi_Ptarget = 101325.0
+cns.nscbc_zhi_Lchar = 0.013
+cns.nscbc_zhi_Mmax = 0.0
+cns.nscbc_zhi_sigma = 0.28
+cns.nscbc_zhi_use_transverse = 0
+# Fixed acoustic-Mach proxy; used only if transverse terms are enabled.
+cns.nscbc_zhi_beta_transverse = 5.0e-5
+
+cns.verbose = 1
+cns.nstep_screen_output = 20
+amr.v = 0
+amr.checkpoint_files_output = 0
+amr.plot_files_output = 1
+amr.plot_file = plot_small/plt
+amr.plot_int = 20
+amr.derive_plot_vars = pressure velocity temperature
+amr.data_log = probes_small.csv
+cns.record_probe = 1
+cns.time_probe_lev = 0
+cns.time_probe_int = 1
+cns.time_probe_precision = 17
+cns.time_probes = L1 L2 L3
+# Same physical sample volumes on both meshes (dx = 0.013/64).
+# Face: 1x2x2 cells; edge: 1x1x2 cells; corner: one cell.
+# Small-domain indices: L1=(63,31:32,31:32), L2=(63,63,31:32), L3=(63,63,63).
+# Wider-domain indices are shifted by 32 in all three directions.
+
+L1.field_name = pressure
+L1.reduction = average
+L1.box_lo = 0.006296875 -0.000203125 -0.000203125
+L1.box_hi = 0.0065 0.000203125 0.000203125
+
+L2.field_name = pressure
+L2.reduction = average
+L2.box_lo = 0.006296875 0.006296875 -0.000203125
+L2.box_hi = 0.0065 0.0065 0.000203125
+
+L3.field_name = pressure
+L3.reduction = average
+L3.box_lo = 0.006296875 0.006296875 0.006296875
+L3.box_hi = 0.0065 0.0065 0.0065

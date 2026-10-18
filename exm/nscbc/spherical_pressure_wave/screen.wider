@@ -1,0 +1,1082 @@
+Lodato spherical pressure pulse: L=0.013 m, Rp=0.00065 m, delta=0.001
+Fourth-order skew-symmetric convection and centered diffusion
+Initializing AMReX (v2.0.0-beta-34-g3bf7f1274f0f-dirty)...
+MPI initialized with 4 MPI processes
+MPI initialized with thread support level 0
+AMReX (v2.0.0-beta-34-g3bf7f1274f0f-dirty) initialized
+Using NSCBC/LODI flags: lo=3 3 3 hi=3 3 3
+NSCBC: dir=0 lo type=3
+ -pressure-relaxed outflow:  Ptarget=101325 sigma=0.28 Lchar=0.026 Mmax=0
+NSCBC: dir=0 hi type=3
+ -pressure-relaxed outflow:  Ptarget=101325 sigma=0.28 Lchar=0.026 Mmax=0
+NSCBC: dir=1 lo type=3
+ -pressure-relaxed outflow:  Ptarget=101325 sigma=0.28 Lchar=0.026 Mmax=0
+NSCBC: dir=1 hi type=3
+ -pressure-relaxed outflow:  Ptarget=101325 sigma=0.28 Lchar=0.026 Mmax=0
+NSCBC: dir=2 lo type=3
+ -pressure-relaxed outflow:  Ptarget=101325 sigma=0.28 Lchar=0.026 Mmax=0
+NSCBC: dir=2 hi type=3
+ -pressure-relaxed outflow:  Ptarget=101325 sigma=0.28 Lchar=0.026 Mmax=0
+Mesh size (dx,dy,dz) = 0.000203125  0.000203125  0.000203125  
+[computeInitialDt] Level 0, Max CFL= 0.171131   Max eigenvalues =(  347.610444  347.610444  347.610444  ) 
+   Total Xmom = 0
+   Total Ymom = 0
+   Total Zmom = 0
+   Total Energy = 4.4522215956204976
+   Total Density = 2.063379760054549e-05
+ --------------------- Time advance ---------------- 
+[computeInitialDt] Level 0, Max CFL= 0.171131   Max eigenvalues =(  347.610444  347.610444  347.610444  ) 
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+   Total Xmom = 2.5605656134186755e-24
+   Total Ymom = 7.4963243012618133e-25
+   Total Zmom = 1.0339757656912846e-24
+   Total Energy = 4.4522215956206432
+   Total Density = 2.0633797600543955e-05
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+   Total Xmom = -6.0994586368312057e-24
+   Total Ymom = -7.8582158192537629e-24
+   Total Zmom = -1.1839022517165209e-23
+   Total Energy = 4.452221595620812
+   Total Density = 2.0633797600540895e-05
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+   Total Xmom = 2.447453059562499e-24
+   Total Ymom = -1.7060600133906196e-23
+   Total Zmom = -2.2592370480354568e-23
+   Total Energy = 4.4522215956211211
+   Total Density = 2.0633797600537355e-05
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+   Total Xmom = -2.8400881392152175e-24
+   Total Ymom = -4.5288138537278265e-23
+   Total Zmom = -4.4667753077863494e-23
+   Total Energy = 4.4522215956214417
+   Total Density = 2.0633797600532889e-05
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+   Total Xmom = 3.6068570936619107e-24
+   Total Ymom = -5.5162607099630033e-23
+   Total Zmom = -5.366334223937767e-23
+   Total Energy = 4.4522215956218201
+   Total Density = 2.0633797600527217e-05
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+   Total Xmom = -4.738509876531999e-25
+   Total Ymom = -5.9918895621809942e-23
+   Total Zmom = -6.2969124130599232e-23
+   Total Energy = 4.4522215956223494
+   Total Density = 2.0633797600520306e-05
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+   Total Xmom = 3.0186847894753476e-24
+   Total Ymom = -6.9689966607592582e-23
+   Total Zmom = -7.015525570215366e-23
+   Total Energy = 4.4522215956228983
+   Total Density = 2.0633797600512191e-05
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+   Total Xmom = 2.7657163552399305e-24
+   Total Ymom = -5.1647089496279665e-23
+   Total Zmom = -5.2112378590840744e-23
+   Total Energy = 4.4522215956235787
+   Total Density = 2.0633797600503009e-05
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+   Total Xmom = -1.0221983962029041e-22
+   Total Ymom = -1.4460151083192615e-22
+   Total Zmom = -1.3581271682355023e-22
+   Total Energy = 4.4522215956244429
+   Total Density = 2.0633797600491588e-05
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+   Total Xmom = 2.5085239607076087e-22
+   Total Ymom = 2.3259284849225447e-22
+   Total Zmom = 1.6688368858257333e-22
+   Total Energy = 4.4522215956253053
+   Total Density = 2.0633797600479956e-05
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+   Total Xmom = 1.3445542222125113e-20
+   Total Ymom = 1.3453317181350727e-20
+   Total Zmom = 1.3411234367687091e-20
+   Total Energy = 4.4522215956263267
+   Total Density = 2.0633797600465851e-05
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+   Total Xmom = 2.8327113282168547e-20
+   Total Ymom = 2.8364385095961311e-20
+   Total Zmom = 2.8221851536660767e-20
+   Total Energy = 4.4522215956273481
+   Total Density = 2.0633797600449368e-05
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+   Total Xmom = 3.3199342031543521e-20
+   Total Ymom = 3.3223812700768926e-20
+   Total Zmom = 3.3035422316259974e-20
+   Total Energy = 4.4522215956279698
+   Total Density = 2.0633797600430324e-05
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+   Total Xmom = 2.6170168744045e-20
+   Total Ymom = 2.6206219179022177e-20
+   Total Zmom = 2.6022481685458836e-20
+   Total Energy = 4.4522215956345406
+   Total Density = 2.0633797600433034e-05
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+   Total Xmom = 6.3025745864877042e-21
+   Total Ymom = 6.2964988227536467e-21
+   Total Zmom = 5.58486500201662e-21
+   Total Energy = 4.4522215960490978
+   Total Density = 2.0633797601784289e-05
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+   Total Xmom = -2.0191388184518394e-20
+   Total Ymom = -2.0181242392339062e-20
+   Total Zmom = -2.1666962170060869e-20
+   Total Energy = 4.4522215914656957
+   Total Density = 2.0633797586596104e-05
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+   Total Xmom = -4.9191244500056582e-20
+   Total Ymom = -4.9121810483731841e-20
+   Total Zmom = -5.058772962554066e-20
+   Total Energy = 4.4522214758495906
+   Total Density = 2.0633797203882112e-05
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+   Total Xmom = -7.6390080693873359e-20
+   Total Ymom = -7.6397264002055376e-20
+   Total Zmom = -7.7630228403853948e-20
+   Total Energy = 4.4522208467722297
+   Total Density = 2.0633795121492845e-05
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+   Total Xmom = -1.0479624534564181e-19
+   Total Ymom = -1.0494532196809467e-19
+   Total Zmom = -1.0801146077897854e-19
+   Total Energy = 4.4522195521497334
+   Total Density = 2.0633790835875458e-05
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+   Total Xmom = -1.3846089464801148e-19
+   Total Ymom = -1.3874137563168837e-19
+   Total Zmom = -1.4082624559153706e-19
+   Total Energy = 4.4522185450987486
+   Total Density = 2.0633787502092803e-05
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+   Total Xmom = -1.737117414239383e-19
+   Total Ymom = -1.7469731419693166e-19
+   Total Zmom = -1.763232410884812e-19
+   Total Energy = 4.4522183070449426
+   Total Density = 2.0633786714007609e-05
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+   Total Xmom = -2.0918425255044304e-19
+   Total Ymom = -2.1064056070965109e-19
+   Total Zmom = -2.1366439698702111e-19
+   Total Energy = 4.4522182724670287
+   Total Density = 2.0633786599555809e-05
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+   Total Xmom = -2.4142078232280137e-19
+   Total Ymom = -2.440720991417474e-19
+   Total Zmom = -2.4801904313333245e-19
+   Total Energy = 4.4522182592361714
+   Total Density = 2.0633786555775783e-05
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+   Total Xmom = -2.7195802777088671e-19
+   Total Ymom = -2.7562376623424038e-19
+   Total Zmom = -2.8060959737640375e-19
+   Total Energy = 4.4522182487719544
+   Total Density = 2.0633786521151468e-05
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+   Total Xmom = -3.024206471687285e-19
+   Total Ymom = -3.0710781131165715e-19
+   Total Zmom = -3.1399238385114771e-19
+   Total Energy = 4.4522182834066486
+   Total Density = 2.0633786635807556e-05
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+   Total Xmom = -3.3155007978327187e-19
+   Total Ymom = -3.372528577725037e-19
+   Total Zmom = -3.4518520965415753e-19
+   Total Energy = 4.452218538394149
+   Total Density = 2.0633787479872445e-05
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+   Total Xmom = -3.6071242066311861e-19
+   Total Ymom = -3.6836513686336617e-19
+   Total Zmom = -3.7759231074700105e-19
+   Total Energy = 4.4522191575986003
+   Total Density = 2.0633789529628996e-05
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+   Total Xmom = -3.8795691376744467e-19
+   Total Ymom = -3.9649338774383774e-19
+   Total Zmom = -4.0693196763455653e-19
+   Total Energy = 4.4522198385274994
+   Total Density = 2.0633791783769562e-05
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+   Total Xmom = -4.149084416948118e-19
+   Total Ymom = -4.2566237400656879e-19
+   Total Zmom = -4.3563134795390474e-19
+   Total Energy = 4.4522202972190588
+   Total Density = 2.0633793302236114e-05
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+   Total Xmom = -4.4069250213434878e-19
+   Total Ymom = -4.5362420648755234e-19
+   Total Zmom = -4.6428254500257174e-19
+   Total Energy = 4.452220592274899
+   Total Density = 2.0633794278994407e-05
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+   Total Xmom = -4.6449814099393574e-19
+   Total Ymom = -4.7947507727647483e-19
+   Total Zmom = -4.9045770613453197e-19
+   Total Energy = 4.4522207990123608
+   Total Density = 2.0633794963380447e-05
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+   Total Xmom = -4.8739308166184067e-19
+   Total Ymom = -5.0445211333538532e-19
+   Total Zmom = -5.1728520984720893e-19
+   Total Energy = 4.4522209282959135
+   Total Density = 2.0633795391367482e-05
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+   Total Xmom = -5.0943277872325482e-19
+   Total Ymom = -5.2982004398300248e-19
+   Total Zmom = -5.4438247667595149e-19
+   Total Energy = 4.4522209589105799
+   Total Density = 2.0633795492728974e-05
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+   Total Xmom = -5.326018090618897e-19
+   Total Ymom = -5.5527821355290581e-19
+   Total Zmom = -5.7207562565697166e-19
+   Total Energy = 4.4522209142703852
+   Total Density = 2.0633795344961071e-05
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+   Total Xmom = -5.5696480150495275e-19
+   Total Ymom = -5.8153538229167921e-19
+   Total Zmom = -5.9906046211099241e-19
+   Total Energy = 4.4522208529211156
+   Total Density = 2.0633795141872871e-05
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+   Total Xmom = -5.8127841367332473e-19
+   Total Ymom = -6.0697242205184224e-19
+   Total Zmom = -6.2795214415130073e-19
+   Total Energy = 4.4522207994654677
+   Total Density = 2.063379496491691e-05
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+   Total Xmom = -6.0715860144480106e-19
+   Total Ymom = -6.3507546815743795e-19
+   Total Zmom = -6.5636231660222369e-19
+   Total Energy = 4.4522207552787325
+   Total Density = 2.0633794818640487e-05
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+   Total Xmom = -6.3416417137194421e-19
+   Total Ymom = -6.6261599913475491e-19
+   Total Zmom = -6.8516291022433601e-19
+   Total Energy = 4.4522207184703788
+   Total Density = 2.063379469679044e-05
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+   Total Xmom = -6.588920074445047e-19
+   Total Ymom = -6.882537804430655e-19
+   Total Zmom = -7.1339222577355536e-19
+   Total Energy = 4.4522206874690777
+   Total Density = 2.063379459416402e-05
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+   Total Xmom = -6.8533537000289434e-19
+   Total Ymom = -7.1550303560042584e-19
+   Total Zmom = -7.3999125234596366e-19
+   Total Energy = 4.4522206616208679
+   Total Density = 2.0633794508597524e-05
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+   Total Xmom = -7.0962547917373346e-19
+   Total Ymom = -7.4206357242495627e-19
+   Total Zmom = -7.6993679964516862e-19
+   Total Energy = 4.4522206409989771
+   Total Density = 2.0633794440332425e-05
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+... Processing time statistics
+   Total Xmom = -7.3564240515320977e-19
+   Total Ymom = -7.6841302955926937e-19
+   Total Zmom = -7.9673717037972542e-19
+   Total Energy = 4.452220623519441
+   Total Density = 2.0633794382469178e-05
+Run Time total        = 4613.590324
+Run Time init         = 0.986913366
+Run Time advance      = 4612.569187
+AMReX (v2.0.0-beta-34-g3bf7f1274f0f-dirty) finalized

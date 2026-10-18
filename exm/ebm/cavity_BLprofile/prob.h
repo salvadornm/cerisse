@@ -81,6 +81,32 @@ struct ProbParm {
   }
 };
 
+// Constant-density developing Pohlhausen layer above the wall y = 0.
+// Requires x + x_virtual > 0 and positive free-stream velocity.
+AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
+void pohlhausen_velocity(Real x, Real y, Real u_inf,
+                         Real& u, Real& v, Real& w)
+{
+  u = v = w = Real(0.0);
+  if (y <= Real(0.0)) { return; }
+
+  const Real distance = x + CavityParm::x_virtual;
+  AMREX_ASSERT(distance > Real(0.0) && u_inf > Real(0.0));
+  const Real delta = Real(5.29) * std::sqrt(
+      CavityParm::viscosity * distance / (CavityParm::rho_inf * u_inf));
+  const Real xi = amrex::min(y / delta, Real(1.0));
+  const Real xi2 = xi * xi;
+  const Real xi3 = xi2 * xi;
+  const Real xi4 = xi2 * xi2;
+  const Real xi5 = xi4 * xi;
+
+  u = u_inf * (Real(2.0)*xi - Real(2.0)*xi3 + xi4);
+  // Integrate du/dx + dv/dy = 0 with v(x,0) = 0.
+  // Clamping xi retains the edge value v = 0.3 U_inf delta' above the layer.
+  v = u_inf * delta / (Real(2.0)*distance) *
+      (xi2 - Real(1.5)*xi4 + Real(0.8)*xi5);
+}
+
 // numerical method parameters 
 struct skewparm_t {
 
@@ -117,7 +143,7 @@ template <typename cls_t > class user_source_t;
 //typedef rhs_dt<skew_t<skewparm_t, ProbClosures>, viscousLES_t<user_source_t<ProbClosures>, ProbClosures>, reactor_sourceLES_t<user_source_t<ProbClosures>,ProbClosures >> ProbRHS;
 
 // Skew Symmetric. No LES
-typedef rhs_dt<skew_t<skewparm_t, ProbClosures>, viscousLES_t<user_source_t<ProbClosures>, ProbClosures>, user_source_t<ProbClosures>> ProbRHS;
+typedef rhs_dt<skew_t<skewparm_t, ProbClosures>, viscous_t< viscous_param_t , ProbClosures>, user_source_t<ProbClosures>> ProbRHS;
 
 
 // define type of wall and EBM class
@@ -140,28 +166,14 @@ prob_initdata(int i, int j, int k, Array4<Real> const &state,
               GeometryData const &geomdata, ProbClosures const &cls,
               ProbParm const &prob_parm) {
   const Real *prob_lo = geomdata.ProbLo();
-  const Real *prob_hi = geomdata.ProbHi();
   const Real *dx = geomdata.CellSize();
-  CavityParm cavity;
+  const Real x = prob_lo[0] + (i + Real(0.5)) * dx[0];
+  const Real y = prob_lo[1] + (j + Real(0.5)) * dx[1];
 
-  Real x = prob_lo[0] + (i + Real(0.5)) * dx[0];
-  Real y = prob_lo[1] + (j + Real(0.5)) * dx[1];
-  Real z = prob_lo[2] + (k + Real(0.5)) * dx[2];
-
-  // local vars
-  Real rhot,eint,u[3];
-
-  rhot =  prob_parm.rho_0;
-
-  //free stream velocities    
-  for(int idim=0;idim < AMREX_SPACEDIM;idim++) {u[idim]=prob_parm.vel_inlet[idim];}
-  //Paulhausen profile
-  Real x_0 = cavity.x_virtual;
-  Real delta = 5.29 * sqrt((cavity.viscosity * (x + x_0)) / (cavity.rho_inf * prob_parm.vel_inlet[0]));
-  if (y < delta) {u[0] = (2 * (y/delta) - 2 * (y/delta)*(y/delta)*(y/delta) + (y/delta)*(y/delta)*(y/delta)*(y/delta)) * prob_parm.vel_inlet[0];}
-  if (y <= 0) {u[0] = 0;}
-
-
+  Real rhot,eint;
+  Real u[3];
+  pohlhausen_velocity(x, y, prob_parm.vel_inlet[0], u[0], u[1], u[2]);
+  rhot = prob_parm.rho_0;
 
   eint =  prob_parm.eint_0;
 
@@ -209,25 +221,12 @@ bcnormal(const Real x[AMREX_SPACEDIM], Real dratio, const Real s_int[ProbClosure
 AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
 void nscbc_target(amrex::Real x, amrex::Real y, amrex::Real /*z*/,
                   int dir, int side_sign, amrex::Real& u,
-                  amrex::Real& v, amrex::Real& /*w*/, amrex::Real& T)
+                  amrex::Real& v, amrex::Real& w, amrex::Real& T)
 {
   if (dir == 0 && side_sign > 0){
-    CavityParm cavity;
     ProbParm const prob_parm;
-    Real x_0 = cavity.x_virtual;
-    Real u_inlet = prob_parm.vel_inlet[0];
-    Real delta = 5.29 * sqrt((cavity.viscosity * (x + x_0)) / (cavity.rho_inf * u_inlet));
-
-    //std::cout << "DELTA" << delta << std::endl;
-    //Real deex = 1.366911765e-06;
-    //std::cout << "number of cells in bl @ domain inlet" << delta / deex << std::endl;
-
-    if (y < delta) 
-    {u = (2 * (y/delta) - 2 * (y/delta)*(y/delta)*(y/delta) + (y/delta)*(y/delta)*(y/delta)*(y/delta)) * u_inlet;} 
-    else {u = u_inlet;}
-    
-    v = 0;
-    T = 300;
+    pohlhausen_velocity(x, y, prob_parm.vel_inlet[0], u, v, w);
+    T = CavityParm::T_inf;
   }
 }
 #endif
@@ -289,7 +288,8 @@ class user_source_t {
 
   // viscous options
   static constexpr int order = 2;                  // order numerical scheme   
-  static constexpr bool use_LES= true;
+  //static constexpr bool use_LES= true;
+  static constexpr bool use_LES = false;
   bool static constexpr mask_cells_boundary = true; // avoid compute reactions in cells partially covered
 
   inline static int src_dt = 0;

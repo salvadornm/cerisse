@@ -25,7 +25,7 @@ cns.nscbc_order = 1
 cns.nscbc_xlo_utarget = 208.3500981
 cns.nscbc_xlo_vtarget = 0.0
 cns.nscbc_xlo_Ttarget = 300.0
-cns.nscbc_xlo_eta = 1.0
+cns.nscbc_xlo_eta = 100.0
 
 # non reflecting outlow with target pressure
 cns.nscbc_xhi_Lchar   = 0.00141
@@ -40,13 +40,12 @@ cns.nscbc_yhi_sigma   = 0.05
 
 
 # output screen
-cns.screen_output = 0 # 0=quiet, 1=verbose
+cns.screen_output = 1 # 0=quiet, 1=verbose
 cns.verbose       = 1 # 0=quiet, 1=verbose
 amr.v             = 1 # 0=quiet,1= verbose
 
 # Refinement and regridding
 amr.n_cell            = 464 464 
-#amr.n_cell            = 272 272 
 amr.max_level         = 0     # maximum level number allowed
 amr.ref_ratio         = 2      # refinement ratio per level
 amr.regrid_int        = 10    # how often to regrid per level
@@ -60,17 +59,16 @@ amr.n_error_buf       = 2      # number of buffer cells in error est
 amr.grid_eff          = 0.7    # what constitutes an efficient grid
 
 #Plot and checkpoint
-amr.checkpoint_files_output = 10000
-amr.check_file              = ./checkpoint/chk     # root name of checkpoint file
-amr.check_int               = 1000   # number of timesteps betw.  checkpoints
-amr.plot_files_output = 1000
-amr.restart = chk152000
+#amr.checkpoint_files_output = 10000
+#amr.check_file              = ./checkpoint/chk     # root name of checkpoint file
+#amr.check_int               = 10000   # number of timesteps betw.  checkpoints
+#amr.restart = chk150000
 amr.plot_file         = ./plot/plt    # root name of plotfile
-amr.plot_int          = 50      # number of timesteps between plotfiles
+amr.plot_int          = 5000      # number of timesteps between plotfiles
 amr.derive_plot_vars  = pressure velocity temperature
 
+#EB
 eb2.geom_type = "custom"
-
 eb2.eb_weight  = 1.0
 eb2.redistribution_type = "FluxRedist"
 
@@ -98,3 +96,4 @@ ode.clean_init_massfrac = 1
 
 # STATS
 cns.record_stats = 1
+ 
