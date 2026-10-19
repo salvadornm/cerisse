@@ -13,6 +13,7 @@
 #include <Riemann.h>
 #include <Rusanov.h>
 #include <Skew.h>
+#include <Keep.h>
 #include <ReconsHLLC.h>
 
 // viscous templates
