@@ -62,6 +62,10 @@ class reconshllc_t {
 #endif
   {
     const Box& bx = mfi.tilebox();
+
+
+    // uses NGHOST without checking it against the reconstruction stencil. 
+    // Some schemes may require more ghost cells than others.
     const int ngh = cls_t::NGHOST;
 
     for (int dir = 0; dir < AMREX_SPACEDIM; ++dir) {
@@ -79,8 +83,9 @@ class reconshllc_t {
       auto const& wr = wrf.array();
       auto const& flx = flxt[dir]->array();
 
-      // Build either characteristic variables or primitive variables in w.
-      amrex::ParallelFor(char_bx, [=, *this] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {
+      // Build either characteristic variables or primitive variables in w (line change for CUDA)
+      //amrex::ParallelFor(char_bx, [=, *this] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {
+      amrex::ParallelFor(char_bx,[dir, prims, w, cls, *this] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {
         if constexpr (recon_char_var) {
           this->cns_ctochar(i, j, k, dir, prims, w, *cls);
         } else {
