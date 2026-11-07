@@ -477,12 +477,18 @@ void read_geom()
     if (files_a.empty()) {
         amrex::Warning("ib.filename is empty: no geometry files provided");
     }
+    if (!interior_is_solid && skip_validation) {
+        amrex::Abort("IBM interior-is-fluid mode requires a validated watertight geometry; do not set ib.skip_validation=1.");
+    }
 
     // Release inside/outside testers
     inout_fa.clear();
 
     // Resize all containers to match new geometry count
     this->ngeom = static_cast<int>(files_a.size());
+    if (!interior_is_solid && ngeom != 1) {
+        amrex::Abort("IBM interior-is-fluid mode currently requires exactly one closed STL geometry.");
+    }
     this->geom_a.resize(this->ngeom);
 #ifdef AMREX_USE_CGAL
     this->tree_a.resize(this->ngeom);

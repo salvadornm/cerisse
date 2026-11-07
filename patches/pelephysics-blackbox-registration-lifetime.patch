@@ -1,0 +1,27 @@
+--- a/Source/Utility/BlackBoxFunction/BlackBoxFunction.cpp
++++ b/Source/Utility/BlackBoxFunction/BlackBoxFunction.cpp
+@@ -4,11 +4,19 @@
+ #include <AMReX_Utility.H>
+ #include <AMReX_Arena.H>
+ #include <AMReX_ParmParse.H>
+-#include "NeuralNetHomerolled.H"
+-#include "Table.H"
++#include <NeuralNetHomerolled.H>
++#include <Table.H>
+ 
++// Register these models during startup, but destroy the temporary parameter
++// objects before AMReX finalizes its factory registry and memory arenas.
+ namespace pele::physics {
+-// Need to instantiate these so Factory picks them up
+-NeuralNetFunctionParams dummy_1;
+-TabulatedFunctionParams dummy_2;
++namespace {
++struct RegisterBlackBoxFunctions {
++    RegisterBlackBoxFunctions() {
++        NeuralNetFunctionParams neural_net;
++        TabulatedFunctionParams table;
++    }
++};
++RegisterBlackBoxFunctions register_black_box_functions;
++} // namespace
+ } // namespace pele::physics

@@ -604,8 +604,9 @@ Real CNS::advance(Real time, Real dt, int /*iteration*/, int /*ncycle*/) {
       const Real rho_floor = smallr_local * Real(1.0e6);
       const Real ei_floor  = cls_h.get_ei_min() * Real(1.0e6);
 
-      ReduceOps<ReduceOpSum, ReduceOpSum, ReduceOpMin, ReduceOpMin> rop;
-      ReduceData<int, int, Real, Real> rdata(rop);
+      ReduceOps<ReduceOpSum, ReduceOpSum, ReduceOpSum, ReduceOpSum,
+                ReduceOpMin, ReduceOpMin> rop;
+      ReduceData<int, int, int, int, Real, Real> rdata(rop);
       using RT = typename decltype(rdata)::Type;
 
       for (MFIter mfi(S2, false); mfi.isValid(); ++mfi) {
@@ -615,11 +616,16 @@ Real CNS::advance(Real time, Real dt, int /*iteration*/, int /*ncycle*/) {
 
         rop.eval(bx, rdata, [=] AMREX_GPU_DEVICE(int i, int j, int k) -> RT {
           using PC = PROB::ProbClosures;
-          if (ibMarkers(i,j,k,0) != 0) return {0, 0, Real(1e300), Real(1e300)};
-          const Real rho = state(i,j,k, PC::URHO);
+          if (ibMarkers(i,j,k,0) != 0)
+            return {0, 0, 0, 0, Real(1e300), Real(1e300)};
+          Real rho = Real(0.0);
+          for (int n = 0; n < NUM_SPECIES; ++n)
+            rho += state(i,j,k, PC::UFS + n);
           const Real E   = state(i,j,k, PC::UET);
           const int nonfinite = (!std::isfinite(rho) || !std::isfinite(E)) ? 1 : 0;
-          int nonpos = (rho <= Real(0.0) || E <= Real(0.0)) ? 1 : 0;
+          int rho_nonpos = (rho <= Real(0.0)) ? 1 : 0;
+          int E_nonpos = (E <= Real(0.0)) ? 1 : 0; // diagnostic only: total energy may use a negative reference
+          int nonpos = rho_nonpos;
           if (strict && !nonfinite && !nonpos) {
             // Approaching-clipping check (uses conservative E, not eint).
             // eint ≈ E/rho - 0.5*|u|² ; comparing E/rho against ei_floor
@@ -628,27 +634,33 @@ Real CNS::advance(Real time, Real dt, int /*iteration*/, int /*ncycle*/) {
             const Real eint_approx = E / amrex::max(rho, smallr_local);
             if (rho < rho_floor || eint_approx < ei_floor) nonpos = 1;
           }
-          return {nonfinite, nonpos, rho, E};
+          return {nonfinite, nonpos, rho_nonpos, E_nonpos, rho, E};
         });
       }
       auto hv = rdata.value(rop);
       int  n_nonfinite = amrex::get<0>(hv);
       int  n_nonpos    = amrex::get<1>(hv);
-      Real rho_min     = amrex::get<2>(hv);
-      Real E_min       = amrex::get<3>(hv);
+      int  n_rho_nonpos = amrex::get<2>(hv);
+      int  n_E_nonpos   = amrex::get<3>(hv);
+      Real rho_min     = amrex::get<4>(hv);
+      Real E_min       = amrex::get<5>(hv);
       ParallelDescriptor::ReduceIntSum(n_nonfinite);
       ParallelDescriptor::ReduceIntSum(n_nonpos);
+      ParallelDescriptor::ReduceIntSum(n_rho_nonpos);
+      ParallelDescriptor::ReduceIntSum(n_E_nonpos);
       ParallelDescriptor::ReduceRealMin(rho_min);
       ParallelDescriptor::ReduceRealMin(E_min);
 
       if (n_nonfinite > 0 || n_nonpos > 0) {
         const char* badlabel = strict
-          ? "rho<=0, E<=0, rho<rho_floor, or eint<ei_floor (strict_positivity=1)"
-          : "rho<=0 or E<=0";
+          ? "rho<=0, rho<rho_floor, or eint<ei_floor (strict_positivity=1)"
+          : "rho<=0";
         amrex::Print() << "\n========================================================\n"
                        << "NUMERICAL FAILURE at level " << level
                        << ", t = " << time + dt << ", dt = " << dt << "\n"
                        << "  fluid cells with NaN/Inf : " << n_nonfinite << "\n"
+                       << "  fluid cells with rho<=0 : " << n_rho_nonpos << "\n"
+                       << "  fluid cells with UET<=0 : " << n_E_nonpos << "\n"
                        << "  fluid cells with " << badlabel << " : " << n_nonpos << "\n"
                        << "  min(rho) = " << rho_min
                        << "   (rho_floor = " << rho_floor << ")\n"
@@ -677,10 +689,12 @@ Real CNS::advance(Real time, Real dt, int /*iteration*/, int /*ncycle*/) {
           for (int i = lo0; i <= hi0 && printed < MAX_PRINT; ++i) {
             using PC = PROB::ProbClosures;
             if (ibMarkers(i,j,k,0) != 0) continue;
-            const Real rho = state(i,j,k, PC::URHO);
+            Real rho = Real(0.0);
+            for (int n = 0; n < NUM_SPECIES; ++n)
+              rho += state(i,j,k, PC::UFS + n);
             const Real E   = state(i,j,k, PC::UET);
             const bool bad = !std::isfinite(rho) || !std::isfinite(E)
-                           || rho <= Real(0.0)   || E   <= Real(0.0);
+                           || rho <= Real(0.0);
             if (!bad) continue;
             const Real x = plo[0] + (i + Real(0.5)) * dx[0];
             const Real y = plo[1] + (j + Real(0.5)) * dx[1];
@@ -699,7 +713,10 @@ Real CNS::advance(Real time, Real dt, int /*iteration*/, int /*ncycle*/) {
               amrex::AllPrint() << "    ";
               for (int di = -1; di <= 1; ++di) {
                 const int ii = i+di, jj = j+dj;
-                amrex::AllPrint() << std::setw(13) << std::setprecision(4) << state(ii,jj,k,PC::URHO)
+                Real rho_neigh = Real(0.0);
+                for (int n = 0; n < NUM_SPECIES; ++n)
+                  rho_neigh += state(ii,jj,k,PC::UFS+n);
+                amrex::AllPrint() << std::setw(13) << std::setprecision(4) << rho_neigh
                                   << "[" << int(ibMarkers(ii,jj,k,0)) << "] ";
               }
               amrex::AllPrint() << "\n";

@@ -317,10 +317,11 @@ public:
   /**
    * \brief Computes the solid/fluid markers and identifies ghost points for the Immersed Boundary Method.
    *
-   * This function iterates over the grid points per level to determine if they are inside (solid) or outside (fluid)
-   * the immersed boundary geometry using BVH-accelerated inside/outside tests. It populates the ibMarkers where:
+   * This function iterates over grid points per level and uses BVH-accelerated
+   * inside/outside tests to classify solid and fluid cells.  The selected solid
+   * side depends on interior_is_solid.  It populates ibMarkers where:
    * - Component 0 indicates if a point is solid (true) or fluid (false).
-   * - Component 1 indicates if a solid point is a ghost point (neighbor to a fluid point).
+   * - Component 1 indicates if a solid point is a ghost point next to fluid.
    *
    * \param lev The current AMR level.
    */
@@ -384,11 +385,16 @@ public:
           if (intersects) { any_touches = true; break; }
         }
         if (!any_touches) {
-          // Entire FAB is in pure freestream — mark every cell as fluid,
-          // no ghost points. setVal(0) covers both components (solid flag
-          // and ghost-point flag) across the FAB's full allocated region,
-          // matching the default state expected downstream.
-          mfab.get(mfi).template setVal<amrex::RunOn::Device>(typename std::remove_reference_t<decltype(mfab.get(mfi))>::value_type(0));
+          // This FAB does not touch any geometry.  For the usual external-
+          // flow mode it is all fluid; for interior-is-fluid mode it is all
+          // solid because the fluid is the bounded interior of the mesh.
+          auto& marker_fab = mfab.get(mfi);
+          if (interior_is_solid) {
+            marker_fab.template setVal<amrex::RunOn::Device>(uint8_t(0));
+          } else {
+            marker_fab.template setVal<amrex::RunOn::Device>(uint8_t(1), 0);
+            marker_fab.template setVal<amrex::RunOn::Device>(uint8_t(0), 1);
+          }
           ibFab.gpData.ngps = 0;
           gp_counts[ifab_local] = 0;
           continue;
@@ -430,6 +436,10 @@ public:
         for (int ii = 0; ii < ngeom_local; ii++) {
           // Fast rejection with world-frame bounding box
           if (!bbox_contains(bboxes[ii], gridpoint)) {
+              if (!interior_is_solid) {
+                ibMarkers(i, j, k, 0) = static_cast<uint8_t>(ii + 1);
+                break;
+              }
               continue;
           }
 
@@ -437,7 +447,11 @@ public:
           Point gp_body = transforms[ii].to_body(gridpoint);
           BoundedSide result = inout_views[ii](gp_body);
 
-          if (result == BoundedSide::Inside || result == BoundedSide::OnBoundary) {
+          const bool bounded = result == BoundedSide::Inside ||
+                               result == BoundedSide::OnBoundary;
+          const bool solid = interior_is_solid ? bounded :
+              (result == BoundedSide::Outside || result == BoundedSide::OnBoundary);
+          if (solid) {
             ibMarkers(i, j, k, 0) = static_cast<uint8_t>(ii + 1);
             break;
           }
@@ -495,6 +509,10 @@ public:
 
         for (int ii = 0; ii < ngeom; ii++) {
           if (!bbox_contains(bbox_a[ii], gridpoint)) {
+              if (!interior_is_solid) {
+                  ibMarkers(i, j, k, 0) = static_cast<uint8_t>(ii + 1);
+                  break;
+              }
               continue;
           }
 
@@ -504,7 +522,11 @@ public:
           BoundedSide result = inside(gp_body);
           IB_WarnOnBoundary(ii, lev, i, j, k, result, gridpoint);
 
-          if (result == BoundedSide::Inside || result == BoundedSide::OnBoundary) {
+          const bool bounded = result == BoundedSide::Inside ||
+                               result == BoundedSide::OnBoundary;
+          const bool solid = interior_is_solid ? bounded :
+              (result == BoundedSide::Outside || result == BoundedSide::OnBoundary);
+          if (solid) {
             ibMarkers(i, j, k, 0) = static_cast<uint8_t>(ii + 1);
             break;
           }

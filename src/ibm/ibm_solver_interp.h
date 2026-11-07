@@ -53,6 +53,53 @@ int valid_mirror(
     return fluid_count;
 #endif
 }
+
+// Search the 3x3x3 cell neighborhood around the nominal base and select
+// the 2x2x2 block containing the most fluid cells.  The original block is
+// tested first, so ties preserve the original stencil choice.
+static AMREX_FORCE_INLINE AMREX_GPU_HOST_DEVICE
+int best_mirror_stencil(
+    int i, int j, int k,
+    const Box& bx,
+    const Array4<const uint8_t>& ibMarkers,
+    int& best_i, int& best_j, int& best_k)
+{
+    int best_fluid = -1;
+    const int offsets[] = {0, -1};
+#if (AMREX_SPACEDIM == 2)
+    for (int oi = 0; oi < 2; ++oi) {
+      for (int oj = 0; oj < 2; ++oj) {
+        const int ci = i + offsets[oi];
+        const int cj = j + offsets[oj];
+        if (!bx.contains(IntVect(ci, cj)) ||
+            !bx.contains(IntVect(ci + 1, cj + 1))) continue;
+        const int nfluid = valid_mirror(ci, cj, 0, ibMarkers);
+        if (nfluid > best_fluid) {
+          best_fluid = nfluid;
+          best_i = ci; best_j = cj; best_k = 0;
+        }
+      }
+    }
+#else
+    for (int oi = 0; oi < 2; ++oi) {
+      for (int oj = 0; oj < 2; ++oj) {
+        for (int ok = 0; ok < 2; ++ok) {
+          const int ci = i + offsets[oi];
+          const int cj = j + offsets[oj];
+          const int ck = k + offsets[ok];
+          if (!bx.contains(IntVect(ci, cj, ck)) ||
+              !bx.contains(IntVect(ci + 1, cj + 1, ck + 1))) continue;
+          const int nfluid = valid_mirror(ci, cj, ck, ibMarkers);
+          if (nfluid > best_fluid) {
+            best_fluid = nfluid;
+            best_i = ci; best_j = cj; best_k = ck;
+          }
+        }
+      }
+    }
+#endif
+    return best_fluid;
+}
 // ============================================================================
 // 2. search_optimal_image_point
 // ============================================================================
@@ -95,25 +142,33 @@ void search_optimal_image_point(
           ));
       }
     
-#if (AMREX_SPACEDIM == 2)
-      bool in_box = check_interpolation_stencil<IPDATA>(candi_ijk(0), candi_ijk(1), 0, 
-                                                bxg, lev,
-                                                ipData, f_idx,
-                                                (attempt == 0) ? CheckMode::Abort : CheckMode::Silent);
-      int n_fluid = (in_box) ? valid_mirror(candi_ijk(0), candi_ijk(1), 0, ibMarkers) : -1;
+      int stencil_i = candi_ijk(0), stencil_j = candi_ijk(1);
+#if (AMREX_SPACEDIM == 3)
+      int stencil_k = candi_ijk(2);
 #else
-      bool in_box = check_interpolation_stencil<IPDATA>(candi_ijk(0), candi_ijk(1), candi_ijk(2),
-                                                bxg, lev,
-                                                ipData, f_idx,
-                                                (attempt == 0) ? CheckMode::Abort : CheckMode::Silent);
-      int n_fluid = (in_box) ? valid_mirror(candi_ijk(0), candi_ijk(1), candi_ijk(2), ibMarkers) : -1;
+      int stencil_k = 0;
 #endif
+      int candidate_k = 0;
+#if (AMREX_SPACEDIM == 3)
+      candidate_k = candi_ijk(2);
+#endif
+      int n_fluid = best_mirror_stencil(candi_ijk(0), candi_ijk(1), candidate_k,
+                                        bxg, ibMarkers,
+                                        stencil_i, stencil_j, stencil_k);
+      if (n_fluid < 0 && attempt == 0) {
+        check_interpolation_stencil<IPDATA>(candi_ijk(0), candi_ijk(1), candidate_k,
+                                            bxg, lev, ipData, f_idx, CheckMode::Abort);
+      }
       if (n_fluid > best_fluid) {
         best_fluid = n_fluid;
         for (int d = 0; d < AMREX_SPACEDIM; ++d) {
             imp_xyz(0, d) = candi_xyz(d);
-            imp_ijk(0, d) = candi_ijk(d);
         }
+        imp_ijk(0, 0) = stencil_i;
+        imp_ijk(0, 1) = stencil_j;
+#if (AMREX_SPACEDIM == 3)
+        imp_ijk(0, 2) = stencil_k;
+#endif
         imp_ninterp(0) = n_fluid; 
         disIM(0) = IMP_FACTOR[attempt] * di;
       }
@@ -209,19 +264,26 @@ void search_image_point(
             (imp_xyz(jj, d) - prob_lo[d]) / dx_lev[d] - 0.5
         ));
     }
-#if (AMREX_SPACEDIM == 2)
-    bool in_box = check_interpolation_stencil<IPDATA>(imp_ijk(jj, 0), imp_ijk(jj, 1), 0, 
-                                              bxg, lev,
-                                              ipData, f_idx, 
-                                              CheckMode::Silent);
-    int fluid = (in_box) ? valid_mirror(imp_ijk(jj, 0), imp_ijk(jj, 1), 0, ibMarkers) : -1;
+    int stencil_i = imp_ijk(jj, 0), stencil_j = imp_ijk(jj, 1);
+#if (AMREX_SPACEDIM == 3)
+    int stencil_k = imp_ijk(jj, 2);
 #else
-    bool in_box = check_interpolation_stencil<IPDATA>(imp_ijk(jj, 0), imp_ijk(jj, 1), imp_ijk(jj, 2),
-                                              bxg, lev,
-                                              ipData, f_idx,
-                                              CheckMode::Silent);   
-    int fluid = (in_box) ? valid_mirror(imp_ijk(jj, 0), imp_ijk(jj, 1), imp_ijk(jj, 2), ibMarkers) : -1;
+    int stencil_k = 0;
 #endif
+    int candidate_k = 0;
+#if (AMREX_SPACEDIM == 3)
+    candidate_k = imp_ijk(jj, 2);
+#endif
+    int fluid = best_mirror_stencil(imp_ijk(jj, 0), imp_ijk(jj, 1), candidate_k,
+                                    bxg, ibMarkers,
+                                    stencil_i, stencil_j, stencil_k);
+    if (fluid >= 0) {
+      imp_ijk(jj, 0) = stencil_i;
+      imp_ijk(jj, 1) = stencil_j;
+#if (AMREX_SPACEDIM == 3)
+      imp_ijk(jj, 2) = stencil_k;
+#endif
+    }
     disIM(jj) = (jj > 0) ? disIM(jj - 1) + di : di;
     imp_ninterp(jj) = fluid;
 }
@@ -257,6 +319,10 @@ void computeIPweights(
       for (int d = 0; d < AMREX_SPACEDIM; ++d) {
         Real lo = prob_lo[d] + Real(base_ijk[d] + 0.5_rt) * dxyz[d];
         frac[d] = (imp_xyz(iim, d) - lo) / dxyz[d];
+        // A shifted stencil can place the image point outside its cell-center
+        // bounds. Clamp to the nearest edge so trilinear weights stay nonnegative.
+        frac[d] = (frac[d] < Real(0.0)) ? Real(0.0) :
+                  ((frac[d] > Real(1.0)) ? Real(1.0) : frac[d]);
       }
       int  sumfluid   = 0;
       Real sumweights = Real(0.0);
