@@ -1,0 +1,46 @@
+# Pipe-internal-flow IBM practice case. Coordinates and STL are in metres.
+max_step = 2
+stop_time = 0.05
+cfl = 0.1
+
+cns.order_rk = -2
+cns.stages_rk = 2
+# The larger box boundaries lie outside the fluid volume enclosed by the STL.
+cns.lo_bc = 2 2 2
+cns.hi_bc = 2 2 2
+cns.nstep_screen_output = 1
+cns.verbose = 1
+cns.reactor_type = "ReactorNull"
+cns.record_stats = 0
+
+geometry.is_periodic = 0 0 0
+geometry.coord_sys = 0
+geometry.prob_lo = -0.075 -0.075 -0.10
+geometry.prob_hi =  0.075  0.075  2.60
+
+ib.filename = pipe_reverse.stl
+ib.move = 0
+ib.plot_surf = 1
+ib.surf_file = ./plot/ib_surface
+ib.surf_int = 1
+
+# Base spacing is 3.125 mm in x/y and 6.25 mm in z. Refine pipe interior once.
+amr.n_cell = 48 48 432
+amr.max_level = 1
+amr.ref_ratio = 2
+amr.regrid_int = 100
+amr.blocking_factor_x = 8
+amr.blocking_factor_y = 8
+amr.blocking_factor_z = 8
+amr.max_grid_size_x = 64
+amr.max_grid_size_y = 64
+amr.max_grid_size_z = 64
+amr.n_error_buf = 4
+amr.grid_eff = 0.7
+
+amr.checkpoint_files_output = 0
+amr.plot_files_output = 1
+amr.plot_file = ./plot/pipe_plt
+amr.plot_int = 1
+amr.derive_plot_vars = pressure velocity temperature
+amr.the_arena_is_managed = 1
