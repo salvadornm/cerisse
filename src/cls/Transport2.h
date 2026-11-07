@@ -11,13 +11,13 @@ class transport_const_t {
 
   public:
 
-  AMREX_GPU_DEVICE AMREX_FORCE_INLINE Real visc(const Real& /*T*/) const {
+  AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE Real visc(const Real& /*T*/) const {
     return visc_ref;
   } 
-  AMREX_GPU_DEVICE AMREX_FORCE_INLINE Real cond(const Real& /*T*/) const {
+  AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE Real cond(const Real& /*T*/) const {
     return cond_ref;
   } 
-  AMREX_GPU_DEVICE AMREX_FORCE_INLINE Real xi(const Real& /*T*/) const {
+  AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE Real xi(const Real& /*T*/) const {
     return xi_ref;
   } 
 };
@@ -33,15 +33,15 @@ class transport_suth_t {
   Real xi_ref     = 0.0; // bulk
 
   public:
-  AMREX_GPU_DEVICE AMREX_FORCE_INLINE Real visc(const Real& T) const {
+  AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE Real visc(const Real& T) const {
     return visc_ref * T * sqrt(T) / (Tvisc_ref + T);
   }
 
-  AMREX_GPU_DEVICE AMREX_FORCE_INLINE Real cond(Real& T) const {
+  AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE Real cond(Real& T) const {
     return cond_ref * T * sqrt(T) / (Tcond_ref + T);
   }
 
-  AMREX_GPU_DEVICE AMREX_FORCE_INLINE Real xi(Real& /*T*/) const {
+  AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE Real xi(Real& /*T*/) const {
     return xi_ref;
   }
 

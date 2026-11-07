@@ -2,14 +2,25 @@
 #define CNS_H_
 
 #include <AMReX_AmrLevel.H>
-#include <AMReX_FluxRegister.H>
+#if CNS_USE_EB
+#include <AMReX_EBFluxRegister.H>
+using FluxReg = amrex::EBFluxRegister;
+#else
+#include <AMReX_YAFluxRegister.H>
+#include <AMReX_Math.H>
+using FluxReg = amrex::YAFluxRegister;
+#endif
+
+#include <AMReX_MultiFab.H>
+
 #include <prob.h>
 #include <CNSconstants.h>
 
 #include <Utilities.h>
+#include <nscbc_parm.h>
 
 
-using namespace amrex;
+// using namespace amrex;
 
 class CNS : public amrex::AmrLevel {
  public:
@@ -22,6 +33,10 @@ class CNS : public amrex::AmrLevel {
 
   CNS(const CNS& rhs) = delete;
   CNS& operator=(const CNS& rhs) = delete;
+
+
+  using NSCBCFaceData = std::array<std::unique_ptr<amrex::MultiFab>, AMREX_SPACEDIM>;  
+
 
   // Read parameters
   static void read_params();
@@ -48,8 +63,26 @@ class CNS : public amrex::AmrLevel {
 
   // Time-stepping -----------------------------------------------------------
   void compute_rhs(amrex::MultiFab& S, amrex::Real dt,
-                   amrex::FluxRegister* fr_as_crse,
-                   amrex::FluxRegister* fr_as_fine);
+                   FluxReg* fr_as_crse, FluxReg* fr_as_fine);
+
+  // Order reduction close to BC
+  // Order reduction at physical boundaries
+  enum SecondOrderFluxMethod {
+    NONE = 0,
+    KEEP = 1,
+    SKEW = 2
+  };
+
+  static int second_order_flux_method;
+
+  void apply_second_order_boundary_flux( const amrex::MFIter& mfi, const amrex::Array4<amrex::Real>& cons, 
+    const amrex::Array4<amrex::Real>& prims, std::array<amrex::FArrayBox*, AMREX_SPACEDIM> const& flxt);  
+  //    
+
+
+#if NUM_SPECIES > 1                   
+  void clip_species_state(amrex::MultiFab& S);                   
+#endif  
 
   // void computeTemp(amrex::MultiFab& State, int ng);
 
@@ -82,6 +115,8 @@ class CNS : public amrex::AmrLevel {
 
   virtual void post_restart() override;
 
+  void set_state_in_checkpoint(amrex::Vector<int>& state_in_checkpoint) override;
+
   // -------------------------------------------------------------------------
 
   // Gridding ----------------------------------------------------------------
@@ -100,14 +135,31 @@ class CNS : public amrex::AmrLevel {
   // init
   CNS& getLevel(int lev) { return dynamic_cast<CNS&>(parent->getLevel(lev)); }
 
-  // enum StateVariable {
-  //     Density = 0, Xmom, Ymom, Zmom, Etot
-  // };
-
-
   enum StateDataType { State_Type = 0, Stats_Type, Cost_Type };
 
   void buildMetrics();
+
+  static AMREX_FORCE_INLINE void rz_sanity_check(amrex::Geometry const& geom)
+  {
+    // RZ axis sanity check: for RZ the axis must be at r=0 and r-direction
+    // cannot be periodic.
+    if (geom.IsRZ()) {
+#if (AMREX_SPACEDIM != 2)
+      amrex::Abort("RZ requires AMREX_SPACEDIM=2 (axisymmetric r-z)");
+#endif
+      if (geom.isPeriodic(0)) {
+        amrex::Abort(
+            "RZ requires geometry.is_periodic[0]=0 (non-periodic r-direction)");
+      }
+
+      const amrex::Real rlo = geom.ProbLo(0);
+      if (amrex::Math::abs(rlo) > amrex::Real(1.e-14)) {
+        amrex::Abort("RZ requires geometry.prob_lo[0]=0 (axis at r=0)");
+      }
+    }
+  }
+
+  int okToContinue() override;
 
   void avgDown();
 
@@ -130,12 +182,13 @@ class CNS : public amrex::AmrLevel {
   static int time_probe_lev;
   static int time_probe_int;
   static amrex::Vector<std::string> time_probe_names;
+  static amrex::Vector<std::string> time_probe_reductions;
   static amrex::Vector<amrex::Box> time_probe_boxes;
-
+  static amrex::Vector<int> time_probe_components;
 
   // Parameters
   static int num_state_data_types;
-  std::unique_ptr<amrex::FluxRegister> flux_reg;
+  FluxReg flux_reg;
   static int do_reflux;
 
   static bool verbose;
@@ -163,6 +216,20 @@ class CNS : public amrex::AmrLevel {
   static int order_rk;
   static int stages_rk;
 
+  // When true, the end-of-step IBM abort check uses "approaching the
+  // smallr / ei_min clipping floors" as the failure criterion instead of
+  // "already non-positive". Catches silent clipping in cons2prims that
+  // would otherwise mask a numerical breakdown.
+  static bool strict_positivity;
+
+  // Pass 2 (flood-fill interior solid + zero momentum) always runs for FSI.
+  // For static geometry, it is opt-in: some complex-geometry / multi-body
+  // cases are actually *destabilised* by the flood-fill because the averaged
+  // neighbour values spread post-shock states into the body, which the next
+  // step's WENO stencil then reads back and oscillates on. Enable via
+  // cns.pass2_static = 1 only when you explicitly want that behaviour.
+  static bool pass2_static;
+
   // Utility-variables
   static bool use_utility;
   static Utility utilidades;
@@ -178,15 +245,68 @@ class CNS : public amrex::AmrLevel {
   static bool eb_redistribution;
   static std::string eb_redistribution_type;
 
-  // LES -variables
+
+  // Ghost-shell structure for complex BC
+  struct GhostShell
+  {
+    std::unique_ptr<amrex::MultiFab> state;
+    std::unique_ptr<amrex::MultiFab> rhs;
+
+    // Optional but useful later:
+    // 0 = not part of a physical shell
+    // 1 = x-low, 2 = x-high, 3 = y-low, ...
+    std::unique_ptr<amrex::iMultiFab> owner;
+
+    bool defined() const noexcept
+    {
+        return state != nullptr && rhs != nullptr;
+    }
+  };
+
+  // NSCBC-specific keywords  --------------------------------------------------
+  static bool use_nscbc;
+  static int nscbc_order;
+  static amrex::GpuArray<int, AMREX_SPACEDIM> nscbc_lo;
+  static amrex::GpuArray<int, AMREX_SPACEDIM> nscbc_hi;
+
+  static amrex::GpuArray<nscbc::NSCBCParm, AMREX_SPACEDIM> nscbc_parm_lo;
+  static amrex::GpuArray<nscbc::NSCBCParm, AMREX_SPACEDIM> nscbc_parm_hi;
+
+  // -------------------------------------------------------------------------
+  // NSCBC ghost cell data.
+  // -------------------------------------------------------------------------
+  GhostShell nscbc_shell;
+  
+  // NSCBC face-state storage and setup
+  void define_nscbc_ghost_shell();
+
+  void initialise_nscbc_ghost_shell(amrex::MultiFab const& cell_state);
+
+  void fill_nscbc_ghost_cells( amrex::MultiFab& state) const;
+  
+  void fill_nscbc_ghost_cells2( amrex::MultiFab& state) const;//
+
+  void clear_nscbc_ghost_rhs();
+
+  void compute_nscbc_ghostcell_rhs(amrex::MultiFab& stage_state);
+
+  void build_nscbc_shell_owner();
+
+  
+  void copy_nscbc_shell(amrex::MultiFab& dst, amrex::MultiFab const& src);
+  void saxpy_nscbc_shell(amrex::MultiFab& dst,amrex::Real a,amrex::MultiFab const& rhs);
+  void lincomb_nscbc_shell(amrex::MultiFab& dst,amrex::Real a,amrex::MultiFab const& A,amrex::Real b, amrex::MultiFab const& B);
+  //-------------------------------------------------------------------------------
+
+  // LES-variables
   static bool use_LES;
 
  public:
-  // /*static inline*/ PROB::ProbRHS prob_rhs;   // removed (we now use a local object in compute_rhs)
+  PROB::ProbRHS prob_rhs{};   // per-level RHS object (Euler + diffusive + source functors)
   static PROB::ProbClosures* h_prob_closures;
   static PROB::ProbClosures* d_prob_closures;
-  static PROB::ProbParm* h_prob_parm;
-  static PROB::ProbParm* d_prob_parm;
+  static PROB::ProbParm* h_prob_parm;       // host-resident objects used on CPU and as sources for copies
+  static PROB::ProbParm* d_prob_parm;       // device-resident objects used on GPU (copied from host at initialization)
   static BCRec* h_phys_bc;
   static BCRec* d_phys_bc;
 };

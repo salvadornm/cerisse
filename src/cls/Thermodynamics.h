@@ -18,19 +18,24 @@ template <typename idx_t>
 class calorifically_perfect_gas_t {
  protected:
  public:
-  Real gamma   = 1.40;   // ratio of specific heats
-  Real mw = 28.96e-3;  // mean molecular weight air kg/mol
+  static constexpr Real gamma   = 1.40;   // ratio of specific heats
+  static constexpr Real mw = 28.96e-3;  // mean molecular weight air kg/mol
 
   Real gamma_m1 = gamma - Real(1.0);
+  Real o_gamma_m1 = Real(1.0)/gamma_m1;
   Real Ru = gas_constant;
   Real cv = Ru / (mw * gamma_m1);
   Real cp = gamma * cv;
   Real Rspec = Ru / mw;
-#if CLIP_TEMPERATURE_MIN  
-  Real ei_min = Rspec*min_euler_temp/gamma_m1;    // if physical T used
-#else  
-  Real ei_min = 1.0*min_euler_press/gamma_m1;     // if no physical T used
-#endif  
+
+
+  AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE Real get_ei_min() const {
+#if CLIP_TEMPERATURE_MIN
+    return Rspec * min_temp() * o_gamma_m1;
+#else
+    return min_press() * o_gamma_m1;
+#endif
+  }
 
   AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE void RYP2E(const Real R,
                                                       const Real* /*Y*/,
@@ -70,24 +75,39 @@ class calorifically_perfect_gas_t {
     R = P/(T *Rspec);    
   }    
   
-  // \brief calculate the specific internal energy
+  // \brief calculate the specific internal energy e=e(P,Y,T)
   AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE void PYT2E(
     const Real /*P*/, const Real* /*Y*/, const Real T, Real& E) const {      
     E = cv*T;
   }
+
+  // \brief calculate the specific internal energy e=e(T,Y,rho)
+  AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE void TYR2E(
+    const Real T, const Real* /*Y*/, const Real rho, Real& E) const {      
+    E = cv*T;
+  }
+
+  // \brief calculate derivative specific energy  de=F(T,Y,dT,dY,rho,drho)
+  AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE Real dE(
+    const Real /*T*/, const Real* /*Y*/,
+    const Real dT, const Real* /*dY*/,
+    const Real /*rho*/, const Real /*drho*/) const
+  {  
+    return cv*dT;
+  }
   
   // \brief this function ensures P and T  do not violate bounds
-  // and then fills the q-array  to ensure consistency
-  // used in IBM to claculate aux primitives corerctly
+  // and then fills the q-array  to ensure consistency.
+  // Used in IBM to calculate auxiliar primitives corerctly
 
   AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE void ensurePTYfillq(
     Real& P, Real& T, Real* /*Y*/, 
     const Real ux, const Real uy, const Real uz,
     Real* Q ) const {
 
-    P = std::max(min_euler_press,P);  
+    P = amrex::max(min_press(),P);  
 #if CLIP_TEMPERATURE_MIN        
-    T = std::max(min_euler_temp,T);
+    T = amrex::max(min_temp(),T);
 #endif    
     Q[idx_t::QRHO] = P/(T*Rspec);
     Q[idx_t::QT] = T;
@@ -118,7 +138,7 @@ class calorifically_perfect_gas_t {
                            vel[0] * vel[0] + vel[1] * vel[1] + vel[2] * vel[2]);
     ke = Real(0.5) * rho * ke;
     Real eint = (cons(i, j, k, idx_t::UET) - ke) / rho;
-    eint = max(eint,ei_min); //clip energy
+    eint = max(eint, get_ei_min() ); //clip energy
     Real T = eint / cv;
 
     Real cs = std::sqrt(gamma * Rspec * T);
@@ -164,7 +184,7 @@ class calorifically_perfect_gas_t {
       Real uz = cons(i, j, k, idx_t::UMZ) * rhoinv;
       Real rhoke = Real(0.5) * rho * (ux * ux + uy * uy + uz * uz);
       Real rhoei = cons(i, j, k, idx_t::UET) - rhoke ;
-      rhoei = max(rhoei,rho*(this->ei_min)); //clip energy
+      rhoei = max(rhoei,rho*(this->get_ei_min() )); //clip energy
       Real p = (this->gamma_m1) * rhoei;
 
       prims(i, j, k, idx_t::QRHO) = rho;
@@ -189,7 +209,7 @@ class calorifically_perfect_gas_t {
     cons[idx_t::UMX] = prims(iv, idx_t::QRHO) * prims(iv, idx_t::QU);
     cons[idx_t::UMY] = prims(iv, idx_t::QRHO) * prims(iv, idx_t::QV);
     cons[idx_t::UMZ] = prims(iv, idx_t::QRHO) * prims(iv, idx_t::QW);
-    const Real E = max(prims(iv, idx_t::QEINT),ei_min) +
+    const Real E = max(prims(iv, idx_t::QEINT),get_ei_min()) +
                    Real(0.5) * (prims(iv, idx_t::QU) * prims(iv, idx_t::QU) +
                                 prims(iv, idx_t::QV) * prims(iv, idx_t::QV) +
                                 prims(iv, idx_t::QW) * prims(iv, idx_t::QW));
@@ -306,8 +326,7 @@ class calorifically_perfect_gas_t {
     for (int n = 0; n < idx_t::NCONS; ++n) f[n] = tmp[n];
   }
 
-  AMREX_GPU_DEVICE AMREX_FORCE_INLINE void char2cons(
-      RoeAvgState r, Real f[idx_t::NCONS]) const {
+  AMREX_GPU_DEVICE AMREX_FORCE_INLINE void char2cons( RoeAvgState r, Real f[idx_t::NCONS]) const {
     amrex::Real tmp[idx_t::NCONS];
 
     const int UN = idx_t::UMX + r.CN;
@@ -340,7 +359,7 @@ class calorifically_perfect_gas_t {
     // T and P
     Real rhoke = Real(0.5) * rho * (ux * ux+ uy* uy + uz * uz);
     Real rhoei = U[idx_t::UET] - rhoke;
-    rhoei = max(rhoei,rho*(this->ei_min)); //clip energy
+    rhoei = max(rhoei,rho*(this->get_ei_min() )); //clip energy
     Real p = (this->gamma_m1) * rhoei;
     Real T = p / (rho * this->Rspec);
     Q[idx_t::QT] = T;
@@ -360,25 +379,6 @@ class calorifically_perfect_gas_t {
   
 
 ////////////////////////////////////////////////////////////////////////////////////////
-// TODO 
-class calorifically_perfect_gas_nasg_liquid_t {
- private:
-  /* data */
-  // gamma_a =;
-  // gamma_l =;
-
- public:
-  // state
-
-  Real inline energy(Real p, Real rho) {
-    Real eint = 0;
-    eint = p/rho; // temp just to avoid warnings
-    return eint;
-  }
-
-  // pressure (eint,rho)
-};
-
 #ifdef USE_PELEPHYSICS
 #include <PelePhysics.H>
 
@@ -390,7 +390,14 @@ class multispecies_pele_gas_t {
   idx_t idx;
 
  public:
-  
+
+    // This is a place holder for KEEP or other mechanism that need Cv, Cp or Gamma
+    // it uses dry air at standard temperature (all SI units)
+    Real cv = Real(718.0);  // Cv = Rg/(gamma-1)
+    Real cp = Real(1005.0);
+    Real gamma = Real(1.4);
+    Real Rspec = 287;
+
   /**
   *  @brief compute internal energy from density, pressure and mass fraction
   *  @param R density  (kg/m3)
@@ -430,6 +437,9 @@ class multispecies_pele_gas_t {
     Real p_cgs;
     T = 0.0;
     eos.REY2T(rho_cgs, e_cgs, Y, T);
+#if CLIP_TEMPERATURE_MIN
+    T = std::max(T, min_euler_temp);
+#endif
     eos.RTY2P(rho_cgs, T, Y, p_cgs);
 
     // CGS -> SI
@@ -456,6 +466,9 @@ class multispecies_pele_gas_t {
     auto eos = pele::physics::PhysicsType::eos();
     Real T = 0.0, p_cgs, G, cs_cgs;
     eos.REY2T(rho_cgs, e_cgs, Y, T);
+#if CLIP_TEMPERATURE_MIN
+    T = std::max(T, min_euler_temp);
+#endif
     eos.RTY2P(rho_cgs, T, Y, p_cgs);
     eos.RTY2G(rho_cgs, T, Y, G);
     cs_cgs = std::sqrt(G * p_cgs / rho_cgs);
@@ -481,6 +494,9 @@ class multispecies_pele_gas_t {
     Real p_cgs, cs_cgs;
     T = 0.0;
     eos.REY2T(rho_cgs, e_cgs, Y, T);
+// #if CLIP_TEMPERATURE_MIN
+//     T = std::max(T, min_euler_temp);
+// #endif
     eos.RTY2P(rho_cgs, T, Y, p_cgs);
     eos.RTY2G(rho_cgs, T, Y, G);
     cs_cgs = std::sqrt(G * p_cgs / rho_cgs);
@@ -501,32 +517,70 @@ class multispecies_pele_gas_t {
   *  @param Y array of mass fractions of chemical species
   */
   AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE void PYT2R(
-      const Real P, const Real Y[NUM_SPECIES], const Real T, Real& R) const {
- 
-      auto eos = pele::physics::PhysicsType::eos();                   
-      eos.PYT2R(P*pres_si2cgs, Y, T, R); R *= rho_cgs2si;
+    const Real P, const Real Y[NUM_SPECIES], const Real T, Real& R) const {
+
+    auto eos = pele::physics::PhysicsType::eos();                   
+    eos.PYT2R(P*pres_si2cgs, Y, T, R);
+    R *= rho_cgs2si;
   }            
 
   /**
   *  @brief compute temperature from density and enthalpy and mass fractions
   */
  AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE void RHY2T(
-      const Real R, const Real H, const Real Y[NUM_SPECIES], Real& T) const {
- 
-      auto eos = pele::physics::PhysicsType::eos();                   
-      eos.RHY2T(R*rho_si2cgs,H*specenergy_si2cgs, Y, T);
+    const Real R, const Real H, const Real Y[NUM_SPECIES], Real& T) const {
+
+    auto eos = pele::physics::PhysicsType::eos();                   
+    eos.RHY2T(R*rho_si2cgs,H*specenergy_si2cgs, Y, T);
+// #if CLIP_TEMPERATURE_MIN
+//     T = std::max(T, min_euler_temp);
+// #endif
   }     
 
   /**
   *  @brief compute pressure from density, temperature and mass fractions
   */
-  AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE void RTY2P(
-      const Real R, const Real T, const Real Y[NUM_SPECIES],  Real& P) const {
+  AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE void RTY2P(const Real R, const Real T, const Real Y[NUM_SPECIES],  Real& P) const {
  
       auto eos = pele::physics::PhysicsType::eos();                   
       eos.RTY2P(R*rho_si2cgs, T, Y, P);P *= pres_cgs2si;
   }            
 
+  // \brief calculate the specific internal energy e=e(T,Y,rho)
+  AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE void TYR2E(
+    const Real T, const Real* Y, const Real rho, Real& E) const
+    {   
+    auto eos = pele::physics::PhysicsType::eos();
+
+    Real e_cgs;
+    eos.RTY2E(rho * rho_si2cgs, T, Y, e_cgs);
+
+    E = e_cgs * specenergy_cgs2si;
+    }
+
+  // \brief calculate derivative specific energy  de=F(T,Y,dT,dY,rho,drho)
+  AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE Real dE(const Real T, const Real* Y, const Real dT, const Real* dY,
+    const Real rho, const Real /*drho*/) const
+    {
+    auto eos = pele::physics::PhysicsType::eos();
+
+    Real cv_cgs;
+    Real ei_cgs[NUM_SPECIES];
+
+    Real rho_cgs = rho*rho_si2cgs;
+    eos.RTY2Cv(rho_cgs, T, Y, cv_cgs);
+    eos.RTY2Ei(rho_cgs, T, Y, ei_cgs);
+
+    Real de_cgs = cv_cgs * dT;
+
+    // non-ideal gas contribution (need to add a wrapper fro SRK)
+    // drho_cgs = drho*rho_si2cgs;
+    // eos.RTY2dEdr(rho_cgs, T, Y, dedrho_cgs);
+    // de_cgs += dedrho_cgs*drho_cgs;
+
+    for (int k = 0; k < NUM_SPECIES; ++k) { de_cgs += ei_cgs[k] * dY[k];}
+    return de_cgs * specenergy_cgs2si;
+    }
 
   //-------------------------------------------------------------------------------------
   // @brief Compute mole fraction array from mass fraction species array
@@ -541,17 +595,16 @@ class multispecies_pele_gas_t {
     eos.RTY2Hi(rho*rho_si2cgs, T, Y, hk); //eos.T2Hi(T, hk);
     for (int n = 0; n < NUM_SPECIES; n++) { hk[n] *= specenergy_cgs2si;}
   }
-  //------------------------------------------------------------------------------------- 
+  //-------------------------------------------------------------------------------------
   AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE void ensurePTYfillq(
     Real& P, Real& T, Real* Y, 
     const Real ux, const Real uy, const Real uz,
     Real* Q ) const {
 
-    //local vars  
-    
-    P = std::max(min_euler_press,P);  
+    //local vars      
+    P = amrex::max(min_press(),P);  
 #if CLIP_TEMPERATURE_MIN        
-    T = std::max(min_euler_temp,T);
+    T = amrex::max(min_temp(),T);
 #endif    
           
     // compute rho,ei,gamma,cs from eos   SI->cgs
@@ -577,8 +630,8 @@ class multispecies_pele_gas_t {
     // aux primitives    
     Q[idx_t::QC] =  cs_cgs*speed_cgs2si;
     Q[idx_t::QG] = G; 
-    Q[idx_t::QEINT] = e_cgs*specenergy_cgs2si;    
-  }   
+    Q[idx_t::QEINT] = e_cgs*specenergy_cgs2si;
+  }
   //-------------------------------------------------------------------------------------
   AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE GpuArray<Real, idx_t::NWAVES>
   cons2eigenvals(const int i, const int j, const int k,

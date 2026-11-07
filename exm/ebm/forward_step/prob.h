@@ -51,6 +51,21 @@ struct methodparm_t {
   static constexpr Real C2skew=1.5,C4skew=0.0016;   // Skew symmetric default
 
 };
+
+struct reconsparm_t {
+
+  public:
+
+  // 1 Godunov, 2 PLM, 3 WENO-Z3, 4 WENO-JS5, 5 WENO-Z5, 6 TENO5
+  static constexpr int  recon_scheme = 5;     
+  static constexpr int  recon_sys = 1;    // 0 sound-speed char system, 1 gamma char system
+  static constexpr bool recon_char_var = true;
+  static constexpr Real plm_theta = 1.5_rt;
+  static constexpr Real teno_cutoff = 0.0_rt;
+
+};
+
+
 struct wall_param {
 
   public:
@@ -69,7 +84,11 @@ typedef closures_dt<indicies_t, visc_suth_t, cond_suth_t,
 //typedef rhs_dt<rusanov_t<ProbClosures>, no_diffusive_t, no_source_t > ProbRHS;
 //typedef rhs_dt<riemann_t<false, ProbClosures>, no_diffusive_t, no_source_t > ProbRHS;
 //typedef rhs_dt<skew_t<methodparm_t, ProbClosures>, no_diffusive_t, no_source_t > ProbRHS;
-typedef rhs_dt<weno_t<ReconScheme::Teno5, ProbClosures>, no_diffusive_t, no_source_t > ProbRHS;
+//typedef rhs_dt<wenoEB_t<ReconSchemeEB::WenoZ5 , ProbClosures>, no_diffusive_t, no_source_t > ProbRHS;
+//typedef rhs_dt<wenoEB_t<ReconSchemeEB::Teno5 , ProbClosures>, no_diffusive_t, no_source_t > ProbRHS;
+typedef rhs_dt< reconshllc_t<reconsparm_t, ProbClosures>, no_diffusive_t, no_source_t > ProbRHS;
+
+
 
 
 // define type of wall and EBM class
@@ -79,10 +98,9 @@ typedef ebm_t<TypeWall,wall_param,ProbClosures> ProbEB;
 
 
 void inline inputs() {
-  // ParmParse pp;
 
-  // pp.add("cns.order_rk", -2);   // -2, 1, 2 or 3"  (was 3)
-  // pp.add("cns.stages_rk", 3);  // 1, 2 or 3
+///
+
 }
 
 // initial condition
@@ -161,7 +179,7 @@ bcnormal(const Real x[AMREX_SPACEDIM], Real dratio, const Real s_int[ProbClosure
 ///////////////////////////////AMR//////////////////////////////////////////////
 AMREX_GPU_DEVICE AMREX_FORCE_INLINE void
 user_tagging(int i, int j, int k, int nt_level, auto &tagfab,
-             const auto &sdatafab, const auto &geomdata,
+             const auto &sdatafab, const auto& ebflag, const auto &geomdata,
              const ProbParm &prob_parm, int level) {
 
   const Real *prob_lo = geomdata.ProbLo();

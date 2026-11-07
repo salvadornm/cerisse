@@ -10,7 +10,7 @@ using namespace amrex;
 using namespace universal_constants;
 using namespace CNSConstants;
 
-// Generic Perfect gas (needs gamma and moecular weight as input)
+// Generic Perfect gas (needs gamma and molecular weight as input)
 ////////////////////////////////////////////////////////////////////////////////////////
 template <typename param, typename idx_t>
 class perfect_gas_t {
@@ -20,15 +20,19 @@ class perfect_gas_t {
   Real mw = param::molecular_weight;  // mean molecular weight air kg/mol
 
   Real gamma_m1 = gamma - Real(1.0);
+  Real o_gamma_m1 = Real(1.0)/gamma_m1;
   Real Ru = gas_constant;
   Real cv = Ru / (mw * gamma_m1);
   Real cp = gamma * cv;
   Real Rspec = Ru / mw;
-#if CLIP_TEMPERATURE_MIN  
-  Real ei_min = Rspec*min_euler_temp/gamma_m1;    // if physical T used
-#else  
-  Real ei_min = 1.0*min_euler_press/gamma_m1;     // if no physical T used
-#endif  
+
+AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE Real get_ei_min() const {
+#if CLIP_TEMPERATURE_MIN
+    return Rspec * min_temp() * o_gamma_m1;
+#else
+    return min_press() * o_gamma_m1;
+#endif
+  }
 
   AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE void RYP2E(const Real R,
                                                       const Real* /*Y*/,
@@ -68,24 +72,39 @@ class perfect_gas_t {
     R = P/(T *Rspec);    
   }    
   
-  // \brief calculate the specific internal energy
+  // \brief calculate the specific internal energy e=e(P,Y,T)
   AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE void PYT2E(
     const Real /*P*/, const Real* /*Y*/, const Real T, Real& E) const {      
     E = cv*T;
   }
+
+  // \brief calculate the specific internal energy e=e(T,Y,rho)
+  AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE void TYR2E(
+    const Real T, const Real* /*Y*/, const Real rho, Real& E) const {      
+    E = cv*T;
+  }
   
+  // \brief calculate derivative specific energy  de=F(T,Y,dT,dY,rho,drho)
+  AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE Real dE(
+    const Real /*T*/, const Real* /*Y*/,
+    const Real dT, const Real* /*dY*/,
+    const Real /*rho*/, const Real /*drho*/) const
+  {  
+    return cv*dT;
+  }
+
   // \brief this function ensures P and T  do not violate bounds
-  // and then fills the q-array  to ensure consistency
-  // used in IBM to claculate aux primitives corerctly
+  // and then fills the q-array  to ensure consistency.
+  // Used in IBM to calculate auxiliar primitives corerctly
 
   AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE void ensurePTYfillq(
     Real& P, Real& T, Real* /*Y*/, 
     const Real ux, const Real uy, const Real uz,
     Real* Q ) const {
 
-    P = std::max(min_euler_press,P);  
+    P = amrex::max(min_press(),P);  
 #if CLIP_TEMPERATURE_MIN        
-    T = std::max(min_euler_temp,T);
+    T = amrex::max(min_temp(),T);
 #endif    
     Q[idx_t::QRHO] = P/(T*Rspec);
     Q[idx_t::QT] = T;
@@ -116,7 +135,7 @@ class perfect_gas_t {
                            vel[0] * vel[0] + vel[1] * vel[1] + vel[2] * vel[2]);
     ke = Real(0.5) * rho * ke;
     Real eint = (cons(i, j, k, idx_t::UET) - ke) / rho;
-    eint = max(eint,ei_min); //clip energy
+    eint = max(eint,get_ei_min() ); //clip energy
     Real T = eint / cv;
 
     Real cs = std::sqrt(gamma * Rspec * T);
@@ -162,7 +181,7 @@ class perfect_gas_t {
       Real uz = cons(i, j, k, idx_t::UMZ) * rhoinv;
       Real rhoke = Real(0.5) * rho * (ux * ux + uy * uy + uz * uz);
       Real rhoei = cons(i, j, k, idx_t::UET) - rhoke ;
-      rhoei = max(rhoei,rho*(this->ei_min)); //clip energy
+      rhoei = max(rhoei,rho*(this->get_ei_min() )); //clip energy
       Real p = (this->gamma_m1) * rhoei;
 
       prims(i, j, k, idx_t::QRHO) = rho;
@@ -187,7 +206,7 @@ class perfect_gas_t {
     cons[idx_t::UMX] = prims(iv, idx_t::QRHO) * prims(iv, idx_t::QU);
     cons[idx_t::UMY] = prims(iv, idx_t::QRHO) * prims(iv, idx_t::QV);
     cons[idx_t::UMZ] = prims(iv, idx_t::QRHO) * prims(iv, idx_t::QW);
-    const Real E = max(prims(iv, idx_t::QEINT),ei_min) +
+    const Real E = max(prims(iv, idx_t::QEINT),get_ei_min() ) +
                    Real(0.5) * (prims(iv, idx_t::QU) * prims(iv, idx_t::QU) +
                                 prims(iv, idx_t::QV) * prims(iv, idx_t::QV) +
                                 prims(iv, idx_t::QW) * prims(iv, idx_t::QW));
@@ -338,7 +357,7 @@ class perfect_gas_t {
     // T and P
     Real rhoke = Real(0.5) * rho * (ux * ux+ uy* uy + uz * uz);
     Real rhoei = U[idx_t::UET] - rhoke;
-    rhoei = max(rhoei,rho*(this->ei_min)); //clip energy
+    rhoei = max(rhoei,rho*(this->get_ei_min())); //clip energy
     Real p = (this->gamma_m1) * rhoei;
     Real T = p / (rho * this->Rspec);
     Q[idx_t::QT] = T;

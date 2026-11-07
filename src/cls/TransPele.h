@@ -4,15 +4,39 @@
 #ifdef USE_PELEPHYSICS
 #include <PelePhysics.H>
 
+#include <Constants.h>
+#include <CNSconstants.h>
+
+
+#if (PELEPVERSION==23)
 // v23
-static pele::physics::transport::TransportParams<
-       pele::physics::PhysicsType::transport_type> trans_parms;
+static  pele::physics::transport::TransportParams<
+        pele::physics::PhysicsType::transport_type> trans_parms;
 
+// check (not validated v23)
+using trans_parm_t =
+ 	pele::physics::transport::TransParm<
+	pele::physics::PhysicsType::eos_type,
+	pele::physics::PhysicsType::transport_type>;	
+
+#else
 // v25       
-// static pele::physics::transport::TransParm<
-// pele::physics::PhysicsType::eos_type,
-// pele::physics::PhysicsType::transport_type> trans_parms;
+extern  pele::physics::PeleParams<
+        pele::physics::transport::TransParm<
+        pele::physics::PhysicsType::eos_type,
+        pele::physics::PhysicsType::transport_type > > trans_parms;
 
+using trans_parm_t =
+	typename pele::physics::transport::TransParm<
+	pele::physics::PhysicsType::eos_type,
+	pele::physics::PhysicsType::transport_type>;
+
+#endif
+
+
+#else
+
+  struct trans_parm_t {}; //dummy type definition for compiling
 
 #endif
 ////////////////////////////////TRANSPORT/////////////////////////////////
@@ -25,6 +49,9 @@ class transport_Pele_t {
   Real visc_ref = 1.458e-6;
   Real cond_ref = 2.495e-3;
   Real xi_ref = 0.0;
+
+
+  
   
   public:
 
@@ -50,6 +77,23 @@ class transport_Pele_t {
   AMREX_GPU_DEVICE AMREX_FORCE_INLINE Real xi(const Real& T) const {
     return (xi_ref);
   }
+
+  // for consistency
+  AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE Real get_ei_min() const {
+
+    const Real gamma   = 1.40;   // ratio of specific heats
+    const Real mw = 28.96e-3;  // mean molecular weight air kg/mol
+    const Real gamma_m1 = gamma - Real(1.0);
+    const Real o_gamma_m1 = Real(1.0)/gamma_m1;
+    
+#if CLIP_TEMPERATURE_MIN
+    return gas_constant/mw * min_temp() * o_gamma_m1; // based on molecular weight air and gamma =1.4
+#else
+    return min_press() * o_gamma_m1;
+#endif
+  }
+
+
 
 #ifdef USE_PELEPHYSICS
 

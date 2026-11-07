@@ -42,12 +42,18 @@ class Utility{
 // PMF: Premixed Flame Initilialization
 #ifdef USE_PELEPHYSICS
 
-  pele::physics::PMF::PmfData pmfData;
 
+#if (PELEPVERSION==23)
+  pele::physics::PMF::PmfData pmfData;
+#else
+  pele::physics::PeleParams<pele::physics::PMF::PmfData::DataContainer> pmfData; 
+  // to use:  auto const* pmf_dev = pmfData.device_parm();
+#endif
   // initialize PMF data
   void initPMF() {
     pmfData.initialize();
   }
+
 #endif
   VelocityField turbData;
 

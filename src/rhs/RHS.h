@@ -6,11 +6,14 @@
 
 // Euler numerical methods
 #include <Weno.h>
+#include <WenoEB.h>
 #include <CentralKEEP.h>
+#include <CentralKEEP_SPEC.h>
 #include <CentralDif.h>
 #include <Riemann.h>
 #include <Rusanov.h>
 #include <Skew.h>
+#include <ReconsHLLC.h>
 
 // viscous templates
 #include <DiffusionCD.h>
@@ -50,6 +53,7 @@ public:
 #endif  
 };
 
+
 // no diffusive flux
 class no_diffusive_t
 {
@@ -73,6 +77,11 @@ public:
             const Array4<Real>& rhs, Args&&... args) { }
 
 #endif  
+
+  // no-op RZ geometric viscous source (no diffusion => no hoop stress)
+  void inline rz_geometric_source(const Geometry& /*geom*/, const MFIter& /*mfi*/,
+            const Array4<Real>& /*prims*/, const Array4<Real>& /*state*/,
+            const auto* /*cls*/) { }
 };
 
 // no source

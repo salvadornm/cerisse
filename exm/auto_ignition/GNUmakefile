@@ -25,10 +25,14 @@ USE_GPIBM = FALSE
 USE_EB = FALSE
 USE_PELEPHYSICS = TRUE
 
-# GNU Make
+# Paths
 AMR_SOLVER = $(abspath ../../)
 AMREX_HOME = $(abspath ../../lib/amrex)
 PELE_PHYSICS_HOME = $(abspath ../../lib/PelePhysics)
+SUNDIALS_HOME = $(abspath ../../lib/sundials/)
+# Versions
+PELEPVERSION = 25
+AMREXVERSION = 25
 
 CEXE_headers += prob.h
 include $(AMR_SOLVER)/src/Make.CNS

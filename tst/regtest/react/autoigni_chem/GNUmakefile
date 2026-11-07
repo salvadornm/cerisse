@@ -1,0 +1,39 @@
+# AMReX
+DIM = 1
+COMP = gcc
+CXXSTD    = c++20
+PRECISION = DOUBLE
+
+# Profiling
+TINY_PROFILE = FALSE
+
+# Performance
+USE_MPI = FALSE
+USE_OMP = FALSE
+
+# Debugging
+DEBUG = FALSE
+
+# PelePhysics
+EOS_MODEL := FUEGO
+TRANSPORT_MODEL := SIMPLE
+CHEMISTRY_MODEL := LiDryer
+
+# CNS
+AMREX_NO_PROBINIT = TRUE
+USE_GPIBM = FALSE
+USE_EB = FALSE
+USE_PELEPHYSICS = TRUE
+
+# Paths
+AMR_SOLVER = $(abspath ../../../../)
+AMREX_HOME = $(AMR_SOLVER)/lib/amrex
+PELE_PHYSICS_HOME = $(AMR_SOLVER)/lib/PelePhysics
+SUNDIALS_HOME = $(AMR_SOLVER)/lib/sundials
+
+# Versions
+PELEPVERSION = 25
+AMREXVERSION = 25
+
+CEXE_headers += prob.h
+include $(AMR_SOLVER)/src/Make.CNS

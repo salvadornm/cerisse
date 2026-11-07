@@ -70,12 +70,13 @@ static constexpr int QLASTVAR = QEINT;
 static constexpr int CMU=0;   // dynamic viscosity
 static constexpr int CXI=1;   // bulk viscosity
 static constexpr int CLAM=2;  // heat conductivity 
-static constexpr int CRHOD=3; // species diffusivity (rho*D)
+static constexpr int CRHOD=3; // species diffusivity (rho*D) first species
+static constexpr int CSORET= CRHOD + NUM_SPECIES;  // Soret coefficent after diffusivities
 
 static constexpr int NCONS = UFS + NUM_SPECIES;
 static constexpr int NPRIM = QLASTVAR + 1;
 static constexpr int NWAVES=2 + NUM_SPECIES;
-static constexpr int NCOEF= 3 + NUM_SPECIES;
+static constexpr int NCOEF= 3 + NUM_SPECIES + 1;  // number of transport properties to store  
 static constexpr int NGHOST=3; // TODO: make it an automatic parameter
 static constexpr int NSLOPE= NCONS+1; // for reconstruction (+1 due to density)
 

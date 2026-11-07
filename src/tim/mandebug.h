@@ -1,15 +1,23 @@
 #ifndef mandebug_H_
 #define mandebug_H_
 
+#include <cmath>
+
 #include <AMReX_FluxRegister.H>
 #include <AMReX_FArrayBox.H>
+#include <AMReX_Print.H>
+#include <AMReX_ParallelDescriptor.H>
+
 #include <CNS.h>
 
-#include <cmath>
 
 using namespace amrex;
 
-// set of auxiliary arrays for manual debugging
+//-----------------------------------------------------------------------------------------
+// set of helper functions for manual debugging, do not use for production
+
+//-----------------------------------------------------------------------------------------
+
 //------------------------------------------------------------------//
 // check array for NaNs (NVAR is size array)
 // e.g : checkNaN_prims(" check flux array",mfi,cls_h.NCONS,flx_x);    
@@ -130,6 +138,41 @@ void inline print_flx_point(const std::string& errorMessage,const MFIter& mfi,
       }
   });  
 }  
+
+
+//------------------------------------------------------------------//
+// print info at  a point at a given state, to be called in advance.cpp
+// usage :
+// printinfo_point_atState(Stemp, 125, 63, 0, "Message");
+AMREX_FORCE_INLINE
+void printinfo_point_atState(const amrex::MultiFab& mf,
+                             int i, int j, int k,
+                             const std::string& msg = "State point")
+{
+  using namespace amrex;
+
+  const IntVect iv(AMREX_D_DECL(i,j,k));
+  const int ncomp = mf.nComp();
+
+  for (MFIter mfi(mf, false); mfi.isValid(); ++mfi) {
+      const Box& bx = mfi.fabbox();  // includes ghosts
+      if (!bx.contains(iv)) continue;
+      
+      auto const& a = mf.const_array(mfi);
+
+      amrex::Print() << "\n=== " << msg << " ===\n";
+      amrex::Print() << "Point: " << iv << "\n";
+
+      for (int n = 0; n < ncomp; ++n) {
+        amrex::Print() << "  comp[" << n << "] = "  << a(i,j,k,n) << "\n";
+      }
+
+      amrex::Print() << "========================\n";
+      break;
+    }
+}
+
+
 
 #endif
 

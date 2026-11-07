@@ -6,17 +6,16 @@ time_step = 0.001 # at base level, higher level time step is computed based on t
 # or
 #cfl = 1.0
 
+cns.order_rk  = 3 # original
+cns.stages_rk = 3
+
 # Geometry 
 geometry.is_periodic = 0 
 geometry.coord_sys   = 0  # 0 => cart, 1 => RZ  2=>spherical
 geometry.prob_lo     = 0.0    
 geometry.prob_hi     = 1.0   
 
-# -1 = N/A (Incase of periodic)
-# 0 = Interior           3 = Symmetry
-# 1 = Inflow             4 = SlipWall
-# 2 = Outflow            5 = NoSlipWall
-# 6 = user defined
+# BC
 cns.lo_bc = 2 
 cns.hi_bc = 2 
 cns.screen_output = 0 # 0=quiet, 1=verbose

@@ -226,7 +226,7 @@ class user_source_t {
   void inline src(const Geometry& /*geomdata*/, const amrex::MFIter &mfi,
                   const amrex::Array4<const amrex::Real> &prims,
                   const amrex::Array4<amrex::Real> &rhs, const cls_t *cls_d,
-                  amrex::Real dt){
+                  amrex::Real dt, amrex::Real /*time*/) {
 
     const Box bx = mfi.tilebox();
 

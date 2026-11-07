@@ -102,15 +102,13 @@ void CNS::variableSetUp() {
   CNS::h_prob_parm = new PROB::ProbParm{};
   CNS::h_phys_bc = new BCRec{};
 #ifdef AMREX_USE_GPU
-  CNS::d_prob_closures =
-      (PROB::ProbClosures*)The_Arena()->alloc(sizeof(PROB::ProbClosures));
-  CNS::d_prob_parm =
-      (PROB::ProbParm*)The_Arena()->alloc(sizeof(PROB::ProbParm));
-  CNS::d_phys_bc = (BCRec*)The_Arena()->alloc(sizeof(BCRec));
+  CNS::d_prob_closures = (PROB::ProbClosures*)The_Arena()->alloc(sizeof(PROB::ProbClosures));
+  CNS::d_prob_parm     = (PROB::ProbParm*)The_Arena()->alloc(sizeof(PROB::ProbParm));
+  CNS::d_phys_bc       = (BCRec*)The_Arena()->alloc(sizeof(BCRec));
 #else
   CNS::d_prob_closures = h_prob_closures;
-  CNS::d_prob_parm = h_prob_parm;
-  CNS::d_phys_bc = h_phys_bc;
+  CNS::d_prob_parm     = h_prob_parm;
+  CNS::d_phys_bc       = h_phys_bc;
 #endif
 
   // Read input parameters
@@ -168,18 +166,17 @@ void CNS::variableSetUp() {
 
   num_state_data_types = desc_lst.size();
 
-  //printf("num_state_data_types (1) %d \n",num_state_data_types);
-  // exit(0);
-
   // SET-UP Stats Type 
   ////////////////////////////////////////////////////////////////////////////
   if (h_prob_closures->NSTAT > 0) { 
 
-    printf(" NSTAT=%d record_stats=%d \n",h_prob_closures->NSTAT,record_stats);
 
-    int NSTAT        = h_prob_closures->NSTAT;     
+    int NSTAT        = h_prob_closures->NSTAT;         
     Vector<BCRec> stats_bcs(NSTAT);
     Vector<std::string>  stats_name(NSTAT);
+
+    amrex::Print() << " Storing  Flow Statistics " << "\n";
+    amrex::Print() << " NSTAT=" << NSTAT  << " record_stats=" << record_stats << "\n";
 
     int statv = -1;
     // names velocity

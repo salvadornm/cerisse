@@ -2,7 +2,6 @@
 #define Riemann_H_
 
 #include <AMReX_FArrayBox.H>
-#include <CNS.h>
 
 ///
 /// \brief Template class for Riemann solvers
